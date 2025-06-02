@@ -43,37 +43,40 @@ function ProductInventory() {
 
 
   return (
-     <div className="overflow-x-auto p-4">
-      <table className="min-w-400 divide-y divide-gray-200 shadow rounded-lg">
-        <thead className="bg-gray-100">
-          <tr>
-            {productColumns.map((col, idx) => (
-              <th
-                key={idx}
-                className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-gray-600"
-              >
-                {col}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-100">
-          {data.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              <td className="px-4 py-2">{row.id}</td>
-              <td className="px-4 py-2">{row.name}</td>
-              <td className="px-4 py-2">{row.email}</td>
-              <td className="px-4 py-2">{row.phone}</td>
-              <td className="px-4 py-2">{row.address}</td>
-              <td className="px-4 py-2">{row.city}</td>
-              <td className="px-4 py-2">{row.state}</td>
-              <td className="px-4 py-2">{row.zip}</td>
-              <td className="px-4 py-2">{row.country}</td>
-              <td className="px-4 py-2">{row.status}</td>
+
+     <div className="bg-black ml-[225px]">
+      <div className="overflow-x-auto p-6 bg-red">
+        <table className="w-full divide-y divide-gray-200 shadow rounded-lg">
+          <thead className="bg-gray-100">
+            <tr>
+              {productColumns.map((col, idx) => (
+                <th
+                  key={idx}
+                  className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-gray-600"
+                >
+                  {col}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-100">
+            {data.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                <td className="px-4 py-2">{row.id}</td>
+                <td className="px-4 py-2">{row.name}</td>
+                <td className="px-4 py-2">{row.email}</td>
+                <td className="px-4 py-2">{row.phone}</td>
+                <td className="px-4 py-2">{row.address}</td>
+                <td className="px-4 py-2">{row.city}</td>
+                <td className="px-4 py-2">{row.state}</td>
+                <td className="px-4 py-2">{row.zip}</td>
+                <td className="px-4 py-2">{row.country}</td>
+                <td className="px-4 py-2">{row.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
