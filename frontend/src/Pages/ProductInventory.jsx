@@ -63,126 +63,6 @@ function ProductInventory() {
       zip: "77001",
       country: "USA",
       status: "Inactive",
-    },
-    {
-      id: 5,
-      name: "Carol Brown",
-      email: "carol@example.com",
-      phone: "555-222-3333",
-      address: "654 Cedar Ave",
-      city: "Phoenix",
-      state: "AZ",
-      zip: "85001",
-      country: "USA",
-      status: "Active",
-    },
-    {
-      id: 6,
-      name: "David Lee",
-      email: "david@example.com",
-      phone: "555-444-5555",
-      address: "987 Spruce Dr",
-      city: "Philadelphia",
-      state: "PA",
-      zip: "19101",
-      country: "USA",
-      status: "Inactive",
-    },
-    {
-      id: 7,
-      name: "Eva Green",
-      email: "eva@example.com",
-      phone: "555-666-7777",
-      address: "246 Birch Ln",
-      city: "San Antonio",
-      state: "TX",
-      zip: "78201",
-      country: "USA",
-      status: "Active",
-    },
-    {
-      id: 8,
-      name: "Frank Harris",
-      email: "frank@example.com",
-      phone: "555-888-9999",
-      address: "135 Willow Way",
-      city: "San Diego",
-      state: "CA",
-      zip: "92101",
-      country: "USA",
-      status: "Inactive",
-    },
-    {
-      id: 9,
-      name: "Grace Kim",
-      email: "grace@example.com",
-      phone: "555-000-1111",
-      address: "753 Aspen Ct",
-      city: "Dallas",
-      state: "TX",
-      zip: "75201",
-      country: "USA",
-      status: "Active",
-    },
-    {
-      id: 10,
-      name: "Henry Clark",
-      email: "henry@example.com",
-      phone: "555-222-4444",
-      address: "159 Elm St",
-      city: "San Jose",
-      state: "CA",
-      zip: "95101",
-      country: "USA",
-      status: "Inactive",
-    },
-    {
-      id: 11,
-      name: "Ivy Martinez",
-      email: "ivy@example.com",
-      phone: "555-333-5555",
-      address: "852 Oak Cir",
-      city: "Austin",
-      state: "TX",
-      zip: "73301",
-      country: "USA",
-      status: "Active",
-    },
-    {
-      id: 12,
-      name: "Jack Turner",
-      email: "jack@example.com",
-      phone: "555-444-6666",
-      address: "951 Pine Pl",
-      city: "Jacksonville",
-      state: "FL",
-      zip: "32099",
-      country: "USA",
-      status: "Inactive",
-    },
-    {
-      id: 13,
-      name: "Karen Scott",
-      email: "karen@example.com",
-      phone: "555-555-7777",
-      address: "357 Redwood Blvd",
-      city: "Fort Worth",
-      state: "TX",
-      zip: "76101",
-      country: "USA",
-      status: "Active",
-    },
-    {
-      id: 14,
-      name: "Leo Adams",
-      email: "leo@example.com",
-      phone: "555-666-8888",
-      address: "468 Cypress St",
-      city: "Columbus",
-      state: "OH",
-      zip: "43085",
-      country: "USA",
-      status: "Inactive",
     }
   ];
 
@@ -196,7 +76,7 @@ function ProductInventory() {
           INVENTORY
         </h1>
 
-        <hr className="mt-3 mb-10 border-t-4 border-green-800"/>
+        <hr className="mt-3 mb-6 border-t-4 border-green-800"/>
 
 
         {/*SEARCH AND ADD*/}
@@ -226,11 +106,11 @@ function ProductInventory() {
 
         </div>
 
-        <hr className="border-t-2 my-6 w-full border-gray-500"/>
+        <hr className="border-t-2 my-4 w-full border-gray-500"/>
 
         {/*TABLE */}
-        <div className="overflow-x-auto  overflow-y-auto h-120 bg-red rounded-sm">
-          <table className="w-full divide-y divide-gray-200 shadow  text-sm">
+        <div className="overflow-x-auto  overflow-y-auto max-h-[570px] bg-red rounded-sm">
+          <table className="w-full divide-y divide-gray-200  shadow  text-sm">
             <thead className="sticky top-0 bg-gray-100">
               <tr>
                 {productColumns.map((col, idx) => (
@@ -248,20 +128,24 @@ function ProductInventory() {
                 
                
                 <tr key={rowIndex} className={(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}>
-                  <td className="px-4 py-2">{row.id}</td>
-                  <td className="px-4 py-2">{row.name}</td>
-                  <td className="px-4 py-2">{row.email}</td>
-                  <td className="px-4 py-2">{row.phone}</td>
-                  <td className="px-4 py-2">{row.address}</td>
-                  <td className="px-4 py-2">{row.city}</td>
-                  <td className="px-4 py-2">{row.state}</td>
-                  <td className="px-4 py-2">{row.zip}</td>
-                  <td className="px-4 py-2">
-                    <div className='border rounded-full px-5 bg-[#61E85C] text-green-900' >
+                  <td className="px-4 py-2"  >{row.id}</td>
+                  <td className="px-4 py-2"  >{row.name}</td>
+                  <td className="px-4 py-2"  >{row.email}</td>
+                  <td className="px-4 py-2"  >{row.phone}</td>
+                  <td className="px-4 py-2"  >{row.address}</td>
+                  <td className="px-4 py-2"  >{row.city}</td>
+                  <td className="px-4 py-2"  >{row.state}</td>
+                  <td className="px-4 py-2"  >{row.zip}</td>
+                  <td className="px-4 py-2 text-center"  >
+                    <div className='border rounded-full px-5 py-1 bg-[#61E85C] text-green-700 font-medium'>
                       {row.country }
                     </div>
                   </td>
-                  <td className="px-4 py-2">{row.status}</td>
+                  <td className="px-4 py-2 text-center">
+                    <button className="bg-blue-600 px-5 py-1 rounded-md text-white">
+                        Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
