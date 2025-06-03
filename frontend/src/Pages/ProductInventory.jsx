@@ -1,6 +1,6 @@
 import React, {useState }from 'react'
 
-function ProductInventory() {
+function ProductInventory({handleOpen}) {
 
   const productColumns = [
     "ITEM_ID",
@@ -99,7 +99,7 @@ function ProductInventory() {
 
 
             {/*ADD ITEM BTN*/}
-            <button className='border border-[#63FF4F] text-[#63FF4F] font-medium hover:bg-[#63FF4F] hover:text-white px-5 rounded-md transition-all'>ADD ITEMS</button>
+            <button className='border border-[#63FF4F] text-[#63FF4F] font-medium hover:bg-[#63FF4F] hover:text-white px-5 rounded-md transition-all' onClick={() => handleOpen('add')}>ADD ITEMS</button>
 
           </div>
           
@@ -142,7 +142,7 @@ function ProductInventory() {
                     </div>
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <button className="bg-blue-600 px-5 py-1 rounded-md text-white">
+                    <button className="bg-blue-600 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit')}>
                         Edit
                     </button>
                   </td>

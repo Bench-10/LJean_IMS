@@ -3,7 +3,6 @@ import { useState } from "react";
 import ModalForm from "./components/ModalForm";
 import NavBar from "./components/navBar";
 import ProductInventory from "./Pages/productInventory";
-import { console } from "inspector";
 
 
 function App() {
@@ -13,6 +12,7 @@ function App() {
 
   const handleOpen = (mode) =>{
     setIsOpen(true);
+    setModalMode(mode);
   };
 
   const handleSubmit = () =>{
@@ -30,9 +30,9 @@ function App() {
 
       <NavBar />
 
-      <ProductInventory onOpen={() => handleOpen('add')}/>
+      <ProductInventory handleOpen={handleOpen}/>
 
-      <ModalForm/>
+      <ModalForm isOpen={isOpen} onSubmit={handleSubmit} mode={modalMode} onClose={() => setIsOpen(false)}/>
 
 
     </div>
