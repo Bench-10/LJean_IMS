@@ -10,6 +10,17 @@ export default {
         background: '#E6ECE6',
         navBackground: '#0A2C0A',
       },
+      keyframes: {
+        popup: {
+          '0%': { transform: 'scale(0.7)', opacity: '0' },
+          '40%': { transform: 'scale(1.1)', opacity: '1' },
+          '70%': { transform: 'scale(0.95)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+      },
+      animation: {
+        popup: 'popup 0.45s ease-out',
+      },
     },
   },
   plugins: [],

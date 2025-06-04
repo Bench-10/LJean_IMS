@@ -32,7 +32,8 @@ function App() {
 
       <ProductInventory handleOpen={handleOpen}/>
 
-      <ModalForm isOpen={isOpen} onSubmit={handleSubmit} mode={modalMode} onClose={() => setIsOpen(false)}/>
+      <ModalForm isOpen={isOpen} onSubmit={handleSubmit} mode={modalMode} onClose={() =>
+        setIsOpen(false)}/>
 
 
     </div>
