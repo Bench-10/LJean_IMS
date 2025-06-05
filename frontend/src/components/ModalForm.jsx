@@ -38,7 +38,7 @@ function ModalForm({isOpen, onSubmit, mode, onClose}) {
                 {/*FORMS */}
                 <form method="dialog">
                 
-                <button className="btn-sm btn-circle btn-ghost absolute right-2 top-2 animate-fadeOut" onClick={onClose}>✕</button>
+                <button className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " onClick={onClose}>✕</button>
 
                 <input type="text" placeholder='Item Name' className="bg-gray-100 py-2 px-3 w-full rounded-md border border-t-2 border-gray-300"  value={itemName}  onChange={(e) => setItemName(e.target.value)} />
 
