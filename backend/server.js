@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import itemRoutes from './Routes/itemRoutes.js';
 
-const  app  = express();
+const app  = express();
 
 
 dotenv.config();
@@ -17,7 +17,7 @@ const PORT = process.env.PORT;
 app.use('/api', itemRoutes);
 
 app.listen(PORT, ()=>{
-    console.log('hello from port '+ PORT )
+    console.log('Port '+ PORT + ' is currently running....' )
 });
 
 

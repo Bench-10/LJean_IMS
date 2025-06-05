@@ -5,6 +5,8 @@ import * as itemControllers from '../Controllers/itemControllers.js';
 const router = express.Router();
 
 router.get("/items", itemControllers.getAllItems);
+router.post("/items", itemControllers.addItem);
+
 
 export default router;
 
