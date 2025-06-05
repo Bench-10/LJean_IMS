@@ -25,3 +25,27 @@ export const addItem = async (req, res) =>{
         
     }
 };
+
+
+
+export const updateItem = async (req, res) =>{
+    try {
+
+        const itemId = req.params.id;
+        const updatedItemData = req.body;
+        const updatedItem = await itemServices.updateProductItem(updatedItemData, itemId);
+
+        if (!updatedItem){
+            send.res.status(404).json({message: 'Item no found'})
+        }
+
+        res.status(200).json(updatedItem);
+    } catch (error) {
+        await SQLquery('ROLLBACK');
+        console.error('Error fetching items: ', error);
+        res.status(500).jason({message: 'Internal Server Error'});
+        
+    }
+};
+
+

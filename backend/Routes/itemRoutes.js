@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.get("/items", itemControllers.getAllItems);
 router.post("/items", itemControllers.addItem);
+router.put("/items/:id", itemControllers.updateItem);
 
 
 export default router;
