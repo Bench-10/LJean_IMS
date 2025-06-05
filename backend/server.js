@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import itemRoutes from './Routes/itemRoutes.js';
 
 const  app  = express();
 
@@ -13,9 +14,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT;
 
-
-
-
+app.use('/api', itemRoutes);
 
 app.listen(PORT, ()=>{
     console.log('hello from port '+ PORT )
