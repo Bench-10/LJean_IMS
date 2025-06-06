@@ -1,6 +1,8 @@
 import { SQLquery } from '../db.js';
 import * as itemServices from '../Services/itemServices.js';
 
+
+
 export const getAllItems = async (req, res) =>{
     try {
         const items = await itemServices.getProductItems();
@@ -47,5 +49,19 @@ export const updateItem = async (req, res) =>{
         
     }
 };
+
+
+
+export const searchItem = async (req, res) =>{
+    try {
+        const searchItem = req.query.q;
+        const item = await itemServices.searchProductItem(searchItem);
+        res.status(200).json(item);
+    } catch (error) {
+        console.error('Error fetching items: ', error);
+        res.status(500).json({message: 'Internal Server Error'});
+        
+    }
+}
 
 

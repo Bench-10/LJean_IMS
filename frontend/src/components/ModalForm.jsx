@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 
 
-function ModalForm({isOpen, onSubmit, mode, onClose}) {
+function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
 
   const options =['apple', 'lemon', 'banana'];
 
@@ -17,8 +17,17 @@ function ModalForm({isOpen, onSubmit, mode, onClose}) {
   const [expirationDate, setExpirationDate] = useState('');
 
 
-  const handleSubmit = (e) =>{
+  const handleSubmit = async (e) =>{
     e.preventDefault();
+    try {
+      const itemData = {itemName, category, quantity, purchasedPrice, datePurchased, unit, threshold, price, expirationDate};
+
+      await OnSubmit(itemData); 
+    } catch (error) {
+      console.log("Error adding client", error);
+      
+    }
+    
     onClose();
   }
 

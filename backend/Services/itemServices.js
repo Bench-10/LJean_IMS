@@ -1,7 +1,7 @@
 import { SQLquery } from "../db.js";
 
 export const getProductItems = async() => {
-    const {rows} = await SQLquery('SELECT * FROM inventory_product');
+    const {rows} = await SQLquery('SELECT product_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold FROM inventory_product LEFT JOIN Category USING(category_id)');
     return rows;
 };
 
@@ -70,6 +70,15 @@ export const updateProductItem = async (productData, itemId) => {
 
     await SQLquery('COMMIT');
     return { success: true};
+};
+
+
+export const searchProductItem = async (searchItem) =>{
+
+    const {rows} = await SQLquery('SELECT * FROM Inventory_Product WHERE product_name ILIKE $1', [`%${searchItem}%`]);
+
+    return rows;
+
 };
 
 
