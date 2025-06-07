@@ -91,7 +91,7 @@ function ProductInventory({handleOpen}) {
 
 
         {/*TABLE */}
-        <div className="overflow-x-auto  overflow-y-auto max-h-[570px] bg-red rounded-sm">
+        <div className="overflow-x-auto  overflow-y-auto max-h-[550px] bg-red rounded-sm">
           <table className="w-full divide-y divide-gray-200  shadow  text-sm">
             <thead className="sticky top-0 bg-gray-100">
               <tr>

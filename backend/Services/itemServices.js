@@ -16,7 +16,7 @@ export const addProductItem = async (productData) => {
         (category_id, branch_id, product_name, unit, unit_price, unit_cost, quantity, threshold)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
         [category_id, branch_id, product_name, unit, unit_price, unit_cost, quantity_added, threshold]
-    );
+    );   
 
     const addedProductId = insertToInventoryProducts.rows[0].product_id;
 

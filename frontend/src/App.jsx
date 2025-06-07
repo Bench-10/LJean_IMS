@@ -30,7 +30,7 @@ function App() {
     } else{
       console.log('edit');
     }
-  }
+  };
 
 
   return (
@@ -49,7 +49,7 @@ function App() {
    
 
 
-  )
+  );
 }
 
 export default App;
