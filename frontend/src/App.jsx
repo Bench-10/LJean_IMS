@@ -11,7 +11,8 @@ function App() {
   const [modalMode, setModalMode] = useState('add');
   const [itemData, setItemData] = useState(null);
 
-  const handleOpen = (mode) =>{
+  const handleOpen = (mode, items) =>{
+    setItemData(items);
     setIsOpen(true);
     setModalMode(mode);
   };
@@ -26,9 +27,15 @@ function App() {
          console.error('Error adding Item', error);
       }
 
-      console.log('hello add');
     } else{
-      console.log('edit');
+      try {
+        console.log(itemData)
+        const response = await axios.put(`http://localhost:3000/api/items/${itemData.product_id}`, newItem);
+        console.log('Item Updated', response.data);
+        
+      } catch (error) {
+         console.error('Error adding Item', error);
+      }
     }
   };
 

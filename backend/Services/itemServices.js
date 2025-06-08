@@ -1,7 +1,11 @@
 import { SQLquery } from "../db.js";
 
 export const getProductItems = async() => {
-    const {rows} = await SQLquery('SELECT product_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold FROM inventory_product LEFT JOIN Category USING(category_id)');
+    const {rows} = await SQLquery(`
+        SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold FROM inventory_product
+        LEFT JOIN Category USING(category_id)
+        ORDER BY inventory_product ASC
+    `);
     return rows;
 };
 

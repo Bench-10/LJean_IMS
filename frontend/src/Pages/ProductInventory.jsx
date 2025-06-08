@@ -114,7 +114,7 @@ function ProductInventory({handleOpen}) {
                 <tr key={rowIndex} className={(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}>
                   <td className="px-4 py-2"  >{row.product_id}</td>
                   <td className="px-4 py-2"  >{row.product_name}</td>
-                  <td className="px-4 py-2"  >{row.category_name}</td>
+                  <td className="px-4 py-2"  >{row.category_id}</td>
                   <td className="px-4 py-2"  >{row.unit}</td>
                   <td className="px-4 py-2"  >{row.unit_price}</td>
                   <td className="px-4 py-2"  >{row.unit_cost}</td>
@@ -126,7 +126,7 @@ function ProductInventory({handleOpen}) {
                     </div>
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <button className="bg-blue-600 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit')}>
+                    <button className="bg-blue-600 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
                         Edit
                     </button>
                   </td>
