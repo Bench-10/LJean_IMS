@@ -135,6 +135,8 @@ function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
       setUnit(itemData.unit);
       setThreshold(itemData.threshold);
       setPrice(itemData.unit_price);
+      setDatePurchased('');
+      setExpirationDate('');
     } 
 
   }, [isOpen, mode, itemData]);

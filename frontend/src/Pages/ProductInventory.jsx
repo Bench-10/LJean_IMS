@@ -1,7 +1,8 @@
-import React, {useEffect, useState }from 'react';
+import React, { useState }from 'react';
 import axios from 'axios';
 
-function ProductInventory({handleOpen}) {
+
+function ProductInventory({handleOpen, setProductsData, productsData}) {
 
   const productColumns = [
     "ITEM_ID",
@@ -16,7 +17,7 @@ function ProductInventory({handleOpen}) {
     "ACTION",
   ];
 
-  const [productsData, setProductsData] = useState([]);
+  
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
 
@@ -24,20 +25,6 @@ function ProductInventory({handleOpen}) {
     setSearchItem(event.target.value);
   }
   
-  useEffect(() =>{
-    const fetchProductsData = async () =>{
-      try {
-        const response = await axios.get('http://localhost:3000/api/items/');
-        setProductsData(response.data);
-      } catch (error) {
-        setError(error.message);
-        
-      }
-    };
-
-    fetchProductsData();
-
-  }, []);
 
 
   const filteredData = productsData.filter(product =>
