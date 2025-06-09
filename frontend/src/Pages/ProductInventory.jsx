@@ -1,4 +1,4 @@
-import React, { useState }from 'react';
+import React, { useEffect, useState }from 'react';
 import axios from 'axios';
 
 
@@ -23,15 +23,13 @@ function ProductInventory({handleOpen, setProductsData, productsData}) {
 
   const handleSearch = (event) =>{
     setSearchItem(event.target.value);
+
   }
   
-
 
   const filteredData = productsData.filter(product =>
     product.product_name.toLowerCase().includes(searchItem.toLowerCase())
   );
-
-  
 
 
   return (
@@ -78,7 +76,7 @@ function ProductInventory({handleOpen, setProductsData, productsData}) {
 
 
         {/*TABLE */}
-        <div className="overflow-x-auto  overflow-y-auto max-h-[550px] bg-red rounded-sm">
+        <div className="overflow-x-auto  overflow-y-auto max-h-[550px] bg-red rounded-sm hide-scrollbar">
           <table className="w-full divide-y divide-gray-200  shadow  text-sm">
             <thead className="sticky top-0 bg-gray-100">
               <tr>
@@ -107,8 +105,8 @@ function ProductInventory({handleOpen, setProductsData, productsData}) {
                   <td className="px-4 py-2"  >{row.unit_cost}</td>
                   <td className="px-4 py-2"  >{row.quantity}</td>
                   <td className="px-4 py-2"  >{row.threshold}</td>
-                  <td className="px-4 py-2 text-center"  >
-                    <div className={`border rounded-full px-5 py-1 ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
+                  <td className="px-4 py-2 text-center w-36"  >
+                    <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
                       {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}
                     </div>
                   </td>

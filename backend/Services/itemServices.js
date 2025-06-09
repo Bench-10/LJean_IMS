@@ -1,5 +1,19 @@
 import { SQLquery } from "../db.js";
 
+
+const getUpdatedInventoryList =  async (productId) => {
+   const { rows } = await SQLquery(
+        `SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold 
+         FROM inventory_product
+         LEFT JOIN Category USING(category_id)
+         WHERE product_id = $1`,
+        [productId]
+    );
+
+    return rows[0];
+};
+
+
 export const getProductItems = async() => {
     const {rows} = await SQLquery(`
         SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold FROM inventory_product
@@ -34,16 +48,9 @@ export const addProductItem = async (productData) => {
 
     await SQLquery('COMMIT');
 
-    const { rows } = await SQLquery(
-        `SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold 
-         FROM inventory_product
-         LEFT JOIN Category USING(category_id)
-         WHERE product_id = $1`,
-        [addedProductId]
-    );
+    const newProductRow = await getUpdatedInventoryList(addedProductId);
 
-    return rows[0];
-
+    return newProductRow;
 };
 
 
@@ -84,15 +91,11 @@ export const updateProductItem = async (productData, itemId) => {
 
     await SQLquery('COMMIT');
 
-    const { rows } = await SQLquery(
-        `SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold 
-         FROM inventory_product
-         LEFT JOIN Category USING(category_id)
-         WHERE product_id = $1`,
-        [itemId]
-    );
+    const updatedProductRow = await getUpdatedInventoryList(itemId);
 
-    return rows[0];
+    return  updatedProductRow;
+
+    
 };
 
 
