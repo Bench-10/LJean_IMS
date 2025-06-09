@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 
 
-function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
+function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData}) {
   // CATEGORY OPTIONS (TEMPORARY)
   const options = ['1', '2'];
 
@@ -26,7 +26,7 @@ function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
 
   //CLEARS THE FORM EVERYTIME THE ADD ITEMS BUTTON IS PRESSED
   useEffect(() => {
-    if (isOpen) {
+    if (isModalOpen) {
       setInvalidNumber({});
       setIsExpiredEarly(false);
       setEmptyField({});
@@ -44,7 +44,7 @@ function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
           setExpirationDate('');
         }
     }
-  }, [isOpen]); 
+  }, [isModalOpen]); 
 
 
   
@@ -126,7 +126,7 @@ function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
   };
 
   useEffect(() =>{
-    if (isOpen && mode === 'edit' && itemData){
+    if (isModalOpen && mode === 'edit' && itemData){
       setItemName(itemData.product_name);
       setCategory(itemData.category_id);
       setBranch('1');
@@ -139,7 +139,7 @@ function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
       setExpirationDate('');
     } 
 
-  }, [isOpen, mode, itemData]);
+  }, [isModalOpen, mode, itemData]);
 
 
   const inputClass = (field) =>
@@ -151,7 +151,7 @@ function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
   return (
     <div>
 
-      {isOpen && (
+      {isModalOpen && (
         <div
           className="fixed inset-0 bg-black/35 bg-opacity-50 z-40"
           style={{ pointerEvents: 'auto' }}  onClick={onClose}
@@ -160,7 +160,7 @@ function ModalForm({isOpen, OnSubmit, mode, onClose, itemData}) {
 
 
 
-        <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isOpen}>
+        <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen}>
             <div className="relative flex flex-col border border-gray-600/40 bg-white h-[500px] w-[600px] rounded-md p-7 animate-popup" >
 
 

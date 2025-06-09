@@ -3,11 +3,13 @@ import { useState, useEffect } from "react";
 import ModalForm from "./components/ModalForm";
 import NavBar from "./components/navBar";
 import ProductInventory from "./Pages/ProductInventory";
+import Category from "./components/Category";
 
 
 function App() {
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCategoryOpen, setIsCategory] = useState(false);
   const [modalMode, setModalMode] = useState('add');
   const [itemData, setItemData] = useState(null);
   const [productsData, setProductsData] = useState([]);
@@ -31,7 +33,7 @@ function App() {
 
   const handleOpen = (mode, items) =>{
     setItemData(items);
-    setIsOpen(true);
+    setIsModalOpen(true);
     setModalMode(mode);
   };
 
@@ -66,12 +68,16 @@ function App() {
 
     <div>
 
+      
+
       <NavBar />
 
-      <ProductInventory handleOpen={handleOpen} setProductsData={setProductsData} productsData={productsData}/>
+      <ProductInventory setIsCategory={setIsCategory} handleOpen={handleOpen} setProductsData={setProductsData} productsData={productsData}/>
 
-      <ModalForm isOpen={isOpen} OnSubmit={handleSubmit} mode={modalMode} 
-      onClose={() => setIsOpen(false)} itemData={itemData}/>
+      <Category isCategoryOpen={isCategoryOpen} onClose={() => setIsCategory(false)} />
+
+      <ModalForm isModalOpen={isModalOpen} OnSubmit={handleSubmit} mode={modalMode} 
+      onClose={() => setIsModalOpen(false)} itemData={itemData}/>
 
 
     </div>

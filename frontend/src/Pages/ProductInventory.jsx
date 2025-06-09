@@ -2,7 +2,7 @@ import React, { useEffect, useState }from 'react';
 import axios from 'axios';
 
 
-function ProductInventory({handleOpen, setProductsData, productsData}) {
+function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory}) {
 
   const productColumns = [
     "ITEM_ID",
@@ -61,7 +61,7 @@ function ProductInventory({handleOpen, setProductsData, productsData}) {
           <div  className="ml-auto flex gap-4">
             
             {/*CATEGORIES BTN*/}
-            <button className='border border-[#61CBE0] text-[#61CBE0] font-medium hover:bg-[#61CBE0] hover:text-white px-5 rounded-md transition-all'>CATEGORIES</button>
+            <button className='border border-[#61CBE0] text-[#61CBE0] font-medium hover:bg-[#61CBE0] hover:text-white px-5 rounded-md transition-all' onClick={() => setIsCategory(true)}>CATEGORIES</button>
 
 
             {/*ADD ITEM BTN*/}
