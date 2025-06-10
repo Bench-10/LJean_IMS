@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react'
 
 
-function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData}) {
+function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategories}) {
   // CATEGORY OPTIONS (TEMPORARY)
-  const options = ['1', '2'];
 
   const [product_name, setItemName] = useState('');
   const [category_id, setCategory] = useState('');
@@ -201,8 +200,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData}) {
                         onChange={(e) => setCategory(e.target.value)}
                         >
                           <option value="" >Select Category</option>
-                            {options.map((option) => (
-                              <option key={option} value={option}>{option}</option>
+                            {listCategories.map((option) => (
+                              <option key={option.category_id} value={option.category_id}>{option.category_name}</option>
                             ))}
                           </select>
 

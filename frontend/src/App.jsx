@@ -7,12 +7,12 @@ import Category from "./components/Category";
 
 
 function App() {
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryOpen, setIsCategory] = useState(false);
   const [modalMode, setModalMode] = useState('add');
   const [itemData, setItemData] = useState(null);
   const [productsData, setProductsData] = useState([]);
+  const [listCategories, setListCategories] = useState([]);
 
 
   const fetchProductsData = async () =>{
@@ -74,10 +74,10 @@ function App() {
 
       <ProductInventory setIsCategory={setIsCategory} handleOpen={handleOpen} setProductsData={setProductsData} productsData={productsData}/>
 
-      <Category isCategoryOpen={isCategoryOpen} onClose={() => setIsCategory(false)} />
+      <Category isCategoryOpen={isCategoryOpen} onClose={() => setIsCategory(false)}  listCategories={listCategories} setListCategories={setListCategories}/>
 
       <ModalForm isModalOpen={isModalOpen} OnSubmit={handleSubmit} mode={modalMode} 
-      onClose={() => setIsModalOpen(false)} itemData={itemData}/>
+      onClose={() => setIsModalOpen(false)} itemData={itemData}  listCategories={listCategories}/>
 
 
     </div>

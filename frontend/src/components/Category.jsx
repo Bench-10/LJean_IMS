@@ -1,14 +1,22 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 
-function Category({isCategoryOpen, onClose}) {
+function Category({isCategoryOpen, onClose, setListCategories, listCategories}) {
 
-  const dbCategories = [
-    {category_id: "1", category_name: "Construction Supply"},
-    {category_id: "2", category_name: "Electric Supply"},
+  const generateCategories = () => {
+    const dbCategories = [
+      {category_id: "1", category_name: "Construction Supply"},
+      {category_id: "2", category_name: "Electric Supply"},
+      {category_id: "3", category_name: "Sewege Supply"},
+    ];
+    setListCategories(dbCategories);
 
-  ]
+  };
 
- 
+  useEffect(() =>{
+    generateCategories();
+  }, generateCategories)
+
+  
 
   return (
     <div >
@@ -22,7 +30,7 @@ function Category({isCategoryOpen, onClose}) {
 
         <dialog className='bg-transparent fixed top-0 bottom-0  z-50' open={isCategoryOpen}>  
 
-            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[600px] rounded-md p-7 animate-popup" >
+            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[600px] rounded-md p-7 pb-14 border-gray-300 animate-popup" >
 
             <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 
               onClick={onClose}>✕</button>
@@ -50,7 +58,7 @@ function Category({isCategoryOpen, onClose}) {
               </div>
 
               {/*CATEGORIES TABLE */}
-              <div className='w-full mt-5  overflow-y-auto hide-scrollbar'>
+              <div className='w-full h-full mt-5  overflow-y-auto hide-scrollbar border border-gray-200'>
                 <table className='w-full text-left'>
                   <thead className='sticky top-0 h-9  bg-gray-200 '>
                     <tr>
@@ -63,7 +71,7 @@ function Category({isCategoryOpen, onClose}) {
                   </thead>
 
                   <tbody className='divide-gray-100'>
-                    {dbCategories.map((row, rowIndex) =>(
+                    {listCategories.map((row, rowIndex) =>(
                       <tr  key={rowIndex} className='h-12'>
                         <td className='text-center px-2'>{row.category_id}</td>
                         <td className='text-center px-2'>{row.category_name}</td>
