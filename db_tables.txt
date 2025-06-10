@@ -26,7 +26,7 @@ create table Login_Credentials (
 
 
 create table Category (
-	category_id int primary key,
+	category_id serial primary key,
 	category_name varchar(255) not null
 );
 

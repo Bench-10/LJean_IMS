@@ -1,24 +1,23 @@
 import React, { useEffect } from 'react'
+import axios from 'axios';
 
 function Category({isCategoryOpen, onClose, setListCategories, listCategories}) {
 
-  const [category_name, setCategoryName] = useState('');
 
-  const generateCategories = () => {
-    const dbCategories = [
-      {category_id: "1", category_name: "Construction Supply"},
-      {category_id: "2", category_name: "Electric Supply"},
-      {category_id: "3", category_name: "Sewege Supply"},
-    ];
-    setListCategories(dbCategories);
 
+  const generateCategories =  async() => {
+      try {
+        const response = await axios.get('http://localhost:3000/api/categories/');
+        setListCategories(response.data);
+      } catch (error) {
+        setError(error.message);
+      }
   };
 
   useEffect(() =>{
     generateCategories();
-  }, generateCategories)
+  }, [])
 
-  
 
   return (
     <div >
@@ -32,7 +31,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
 
         <dialog className='bg-transparent fixed top-0 bottom-0  z-50' open={isCategoryOpen}>  
 
-            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[600px] rounded-md p-7 pb-14 border-gray-300 animate-popup" >
+            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[600px] rounded-md p-7 pb-14 border-gray-300 animate-popup">
 
             <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 
               onClick={onClose}>✕</button>
@@ -49,11 +48,11 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
 
               <div className='flex justify-between w-full mt-8 gap-x-5 '>
                 <div className='w-[73%]'>
-                  <input type="text" placeholder='Category Name' className='w-full border rounded-md  bg-gray-100 border-gray-300 h-10 px-4' />
+                  <input type="text" placeholder='Category Name' className='w-full border rounded-md  bg-gray-100 border-gray-300 h-10 px-4'/>
                 </div>
 
                  <div className='flex align-middle'>
-                  <button className='border rounded-md px-3 font-medium bg-[#61CBE0] text-white  hover:bg-[#61CBE0]/90'>Add Category</button>
+                  <button type='submit' className='border rounded-md px-3 font-medium bg-[#61CBE0] text-white  hover:bg-[#61CBE0]/90'>Add Category</button>
                 </div>
                 
 
