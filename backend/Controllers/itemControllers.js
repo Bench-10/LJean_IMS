@@ -2,7 +2,7 @@ import { SQLquery } from '../db.js';
 import * as itemServices from '../Services/itemServices.js';
 
 
-
+//INVENTORY CONTROLLERS
 export const getAllItems = async (req, res) =>{
     try {
         const items = await itemServices.getProductItems();
@@ -65,6 +65,8 @@ export const searchItem = async (req, res) =>{
 }
 
 
+
+//CATEGORY CONTROLLERS
 export const getAllCategories = async (req, res) =>{
      try {
         const categories = await itemServices.getAllCategories();
@@ -72,6 +74,18 @@ export const getAllCategories = async (req, res) =>{
     } catch (error) {
         console.error('Error fetching list of categories: ', error);
         res.status(500).jason({message: 'Internal Server Error'})
+    }
+}
+
+
+export const addCAtegory = async (req, res) => {
+    try {
+        const addCategoryData = req.body;
+        const categories = await itemServices.addListCategory(addCategoryData);
+        res.status(200).json(categories);
+    } catch (error) {
+        console.error('Error fetching items: ', error);
+        res.status(500).jason({message: 'Internal Server Error'});
     }
 }
 

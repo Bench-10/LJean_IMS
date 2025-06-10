@@ -2,6 +2,8 @@ import React, { useEffect } from 'react'
 
 function Category({isCategoryOpen, onClose, setListCategories, listCategories}) {
 
+  const [category_name, setCategoryName] = useState('');
+
   const generateCategories = () => {
     const dbCategories = [
       {category_id: "1", category_name: "Construction Supply"},

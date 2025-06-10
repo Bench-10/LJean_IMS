@@ -1,6 +1,7 @@
 import { SQLquery } from "../db.js";
 
 
+//INVENTORY SERVICES
 const getUpdatedInventoryList =  async (productId) => {
    const { rows } = await SQLquery(
         `SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold 
@@ -14,14 +15,17 @@ const getUpdatedInventoryList =  async (productId) => {
 };
 
 
+
 export const getProductItems = async() => {
     const {rows} = await SQLquery(`
         SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold FROM inventory_product
         LEFT JOIN Category USING(category_id)
         ORDER BY inventory_product ASC
     `);
+
     return rows;
 };
+
 
 
 export const addProductItem = async (productData) => {
@@ -52,6 +56,7 @@ export const addProductItem = async (productData) => {
 
     return newProductRow;
 };
+
 
 
 export const updateProductItem = async (productData, itemId) => {
@@ -94,13 +99,11 @@ export const updateProductItem = async (productData, itemId) => {
     const updatedProductRow = await getUpdatedInventoryList(itemId);
 
     return  updatedProductRow;
-
-    
 };
 
 
-export const searchProductItem = async (searchItem) =>{
 
+export const searchProductItem = async (searchItem) =>{
     const {rows} = await SQLquery('SELECT * FROM Inventory_Product WHERE product_name ILIKE $1', [`%${searchItem}%`]);
 
     return rows;
@@ -108,11 +111,25 @@ export const searchProductItem = async (searchItem) =>{
 
 
 
+
+
+//CATEGORIES SERVICES
 export const getAllCategories = async () => {
     const { rows } = await SQLquery('SELECT * FROM Category ORDER BY category_id');
-
     return rows;
 }
+
+
+
+export const addListCategory = async (categoryData) => {
+   const { category_name } = categoryData;
+
+   const { rows } = await SQLquery('INSERT INTO Category (category_name) VALUES($1) RETURNING *', [category_name]);
+
+   return rows[0];
+}
+
+
 
 
 
