@@ -108,3 +108,11 @@ export const searchProductItem = async (searchItem) =>{
 
 
 
+export const getAllCategories = async () => {
+    const { rows } = await SQLquery('SELECT * FROM Category ORDER BY category_id');
+
+    return rows;
+}
+
+
+
