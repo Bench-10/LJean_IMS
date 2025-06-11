@@ -16,6 +16,7 @@ router.get("/items/search", itemControllers.searchItem);
 //CATEGORY ROUTES
 router.get("/categories", itemControllers.getAllCategories);
 router.post("/categories", itemControllers.addCAtegory);
+router.put("/categories/:id", itemControllers.updateCategory);
 
 
 export default router;

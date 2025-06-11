@@ -90,3 +90,15 @@ export const addCAtegory = async (req, res) => {
 }
 
 
+export const updateCategory = async (req, res) => {
+    try {
+        const categoryId = req.params.id;
+        const updatedCategoryData = req.body;
+        const categories = await itemServices.updateListCategory(updatedCategoryData, categoryId);
+        res.status(200).json(categories);
+    } catch (error) {
+        console.error('Error fetching items: ', error);
+        res.status(500).jason({message: 'Internal Server Error'});
+    }
+}
+

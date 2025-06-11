@@ -130,6 +130,14 @@ export const addListCategory = async (categoryData) => {
 }
 
 
+export const updateListCategory = async (categoryData, categoryId) =>{
+    const { category_name } = categoryData;
+
+    const { rows } = await SQLquery('UPDATE Category SET category_name = $1 WHERE category_id = $2 RETURNING*', [category_name, categoryId])
+
+    return rows[0]
+}
+
 
 
 

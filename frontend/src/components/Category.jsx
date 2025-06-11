@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import axios from 'axios';
 
 function Category({isCategoryOpen, onClose, setListCategories, listCategories}) {
+
+  const [category_name, setCategoryName] = useState('');
 
 
 
@@ -17,6 +19,21 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
   useEffect(() =>{
     generateCategories();
   }, [])
+
+  const submitCategory = async () =>{
+    
+        try {
+            const response = await axios.post('http://localhost:3000/api/categories/', {category_name});
+            setListCategories((prevData) => [...prevData, response.data]);
+            console.log('Category Added', response.data);
+        } catch (error) {
+          
+        }
+    
+
+     
+
+  }
 
 
   return (
@@ -48,11 +65,11 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
 
               <div className='flex justify-between w-full mt-8 gap-x-5 '>
                 <div className='w-[73%]'>
-                  <input type="text" placeholder='Category Name' className='w-full border rounded-md  bg-gray-100 border-gray-300 h-10 px-4'/>
+                  <input type="text" placeholder='Category Name' className='w-full border rounded-md  bg-gray-100 border-gray-300 h-10 px-4' value={category_name} onChange={(e) => setCategoryName(e.target.value)}/>
                 </div>
 
                  <div className='flex align-middle'>
-                  <button type='submit' className='border rounded-md px-3 font-medium bg-[#61CBE0] text-white  hover:bg-[#61CBE0]/90'>Add Category</button>
+                  <button className='border rounded-md px-3 font-medium bg-[#61CBE0] text-white  hover:bg-[#61CBE0]/90' onClick={e => { e.preventDefault(); submitCategory(); }}>Add Category</button>
                 </div>
                 
 
@@ -98,5 +115,6 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
     </div>
   )
 }
+
 
 export default Category
