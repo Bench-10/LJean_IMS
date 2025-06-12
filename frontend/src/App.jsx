@@ -28,7 +28,7 @@ function App() {
 
   useEffect(() =>{
       fetchProductsData();
-  }, []);
+  }, [listCategories]);
 
 
   const handleOpen = (mode, items) =>{
@@ -74,7 +74,7 @@ function App() {
 
       <ProductInventory setIsCategory={setIsCategory} handleOpen={handleOpen} setProductsData={setProductsData} productsData={productsData}/>
 
-      <Category isCategoryOpen={isCategoryOpen} onClose={() => setIsCategory(false)}  listCategories={listCategories} setListCategories={setListCategories}/>
+      <Category isCategoryOpen={isCategoryOpen} onClose={() => setIsCategory(false)}  listCategories={listCategories} setListCategories={setListCategories} fetchProductsData={fetchProductsData}/>
 
       <ModalForm isModalOpen={isModalOpen} OnSubmit={handleSubmit} mode={modalMode} 
       onClose={() => setIsModalOpen(false)} itemData={itemData}  listCategories={listCategories}/>

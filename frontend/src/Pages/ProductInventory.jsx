@@ -25,10 +25,11 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
     setSearchItem(event.target.value);
 
   }
-  
 
-  const filteredData = productsData.filter(product =>
+
+  const filteredData = productsData.filter(product => 
     product.product_name.toLowerCase().includes(searchItem.toLowerCase())
+    
   );
 
 
@@ -99,7 +100,7 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
                 <tr key={rowIndex} className={(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}>
                   <td className="px-4 py-2"  >{row.product_id}</td>
                   <td className="px-4 py-2"  >{row.product_name}</td>
-                  <td className="px-4 py-2"  >{row.category_id}</td>
+                  <td className="px-4 py-2"  >{row.category_name}</td>
                   <td className="px-4 py-2"  >{row.unit}</td>
                   <td className="px-4 py-2"  >{row.unit_price}</td>
                   <td className="px-4 py-2"  >{row.unit_cost}</td>

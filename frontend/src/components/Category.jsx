@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios';
 
-function Category({isCategoryOpen, onClose, setListCategories, listCategories}) {
+function Category({isCategoryOpen, onClose, setListCategories, listCategories, fetchProductsData}) {
 
   const [category_name, setCategoryName] = useState('');
   const [editCategory_name, setEditcategoryName] = useState ('')
@@ -55,6 +55,8 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
         setListCategories((prevData) => 
           prevData.map((cat) => (cat.category_id === selectEditCategory.category_id ? response.data : cat))
         );
+        
+
         console.log('Item Updated', response.data);
         
       } catch (error) {
@@ -67,7 +69,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
     setCategoryName('');
   }
 
-
+  
   return (
     <div >
 

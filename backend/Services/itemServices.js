@@ -4,7 +4,7 @@ import { SQLquery } from "../db.js";
 //INVENTORY SERVICES
 const getUpdatedInventoryList =  async (productId) => {
    const { rows } = await SQLquery(
-        `SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold 
+        `SELECT product_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
          FROM inventory_product
          LEFT JOIN Category USING(category_id)
          WHERE product_id = $1`,
@@ -18,7 +18,7 @@ const getUpdatedInventoryList =  async (productId) => {
 
 export const getProductItems = async() => {
     const {rows} = await SQLquery(`
-        SELECT product_id, Category.category_id, product_name, unit, unit_price, unit_cost, quantity, threshold FROM inventory_product
+        SELECT product_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold FROM inventory_product
         LEFT JOIN Category USING(category_id)
         ORDER BY inventory_product ASC
     `);
