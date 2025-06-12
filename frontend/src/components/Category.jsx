@@ -4,6 +4,15 @@ import axios from 'axios';
 function Category({isCategoryOpen, onClose, setListCategories, listCategories}) {
 
   const [category_name, setCategoryName] = useState('');
+  const [editCategory_name, setEditcategoryName] = useState ('')
+  const [openEdit, setOpenEdit] = useState(false);
+  const [selectEditCategory, setSelectEditCategory] = useState({});
+
+
+  useEffect(()=>{
+    if (openEdit)
+      setEditcategoryName(selectEditCategory.category_name);
+  },[selectEditCategory])
 
 
 
@@ -20,24 +29,49 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
     generateCategories();
   }, [])
 
-  const submitCategory = async () =>{
-    
-        try {
-            const response = await axios.post('http://localhost:3000/api/categories/', {category_name});
-            setListCategories((prevData) => [...prevData, response.data]);
-            console.log('Category Added', response.data);
-        } catch (error) {
-          
-        }
-    
 
-     
+  const submitCategory = async (type) =>{
 
+    if (type === 'add'){
+      if (category_name.length === 0)
+      return;
+
+      try {
+        const response = await axios.post('http://localhost:3000/api/categories/', {category_name});
+        setListCategories((prevData) => [...prevData, response.data]);
+        console.log('Category Added', response.data);
+        
+      } catch (error) {
+        console.error('Error adding Item', error);
+      }
+
+    } else if (type === 'edit') {
+      try {
+        if (editCategory_name.length === 0)
+          return
+
+        const category_name = editCategory_name;
+        const response = await axios.put(`http://localhost:3000/api/categories/${selectEditCategory.category_id}`, { category_name }  );
+        setListCategories((prevData) => 
+          prevData.map((cat) => (cat.category_id === selectEditCategory.category_id ? response.data : cat))
+        );
+        console.log('Item Updated', response.data);
+        
+      } catch (error) {
+        console.error('Error adding Item', error);
+      }
+
+      setOpenEdit(false);
+    }
+    
+    setCategoryName('');
   }
 
 
   return (
     <div >
+
+     
 
         {isCategoryOpen && (
         <div
@@ -51,7 +85,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
             <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[600px] rounded-md p-7 pb-14 border-gray-300 animate-popup">
 
             <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 
-              onClick={onClose}>✕</button>
+              onClick={() => {onClose(); setOpenEdit(false);}}>✕</button>
 
               {/*CATEGORIES TITLE*/}
               <div className='flex text-center mt-4'>
@@ -69,7 +103,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
                 </div>
 
                  <div className='flex align-middle'>
-                  <button className='border rounded-md px-3 font-medium bg-[#61CBE0] text-white  hover:bg-[#61CBE0]/90' onClick={e => { e.preventDefault(); submitCategory(); }}>Add Category</button>
+                  <button className='border rounded-md px-3 font-medium bg-[#61CBE0] text-white  hover:bg-[#53b4c7]' onClick={e => { e.preventDefault(); submitCategory('add'); }}>Add Category</button>
                 </div>
                 
 
@@ -94,7 +128,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
                         <td className='text-center px-2'>{row.category_id}</td>
                         <td className='text-center px-2'>{row.category_name}</td>
                         <td className='text-center px-2'>
-                          <button className='bg-blue-500 px-5 py-1 border rounded-md text-white'>Edit</button>
+                          <button className='bg-blue-500 px-5 py-1 border rounded-md text-white' onClick={() => {setOpenEdit(true); setSelectEditCategory(row)}}>Edit</button>
                         </td>
                       </tr>
 
@@ -106,12 +140,52 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories}) 
                 </table>
 
               </div>
-              
+
+                {/*EDIT CATEGORY POPUP */}
+
+                {openEdit && (
+                  //OVERLAY
+                  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-60"  onClick={() => {
+                    setOpenEdit(false);
+                    setSelectEditCategory({});
+                    setEditcategoryName('');
+                  }}>
+                    
+                    <div className="relative w-[400px] bg-white rounded-md p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                      <button 
+                        type="button" 
+                        className="absolute right-2 top-2 btn-sm btn-circle btn-ghost" 
+                        onClick={() => {
+                          setOpenEdit(false);
+                          setSelectEditCategory({});
+                          setEditcategoryName('');
+                        }}
+                      >
+                        ✕
+                      </button>
+                      <h3 className="text-lg font-bold mb-4">Edit Category</h3>
+                      <div className="flex flex-col gap-4">
+                        <input 
+                          type="text" 
+                          className="border-2 rounded-md px-3 py-2 border-gray-300 w-full" 
+                          value={editCategory_name} 
+                          onChange={(e) => setEditcategoryName(e.target.value)}
+                        />
+                        <button 
+                          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+                          onClick={() => submitCategory('edit')}
+                        >
+                          Update Category
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
             
             </div>
-           
-        </dialog>
 
+        </dialog>
+        
     </div>
   )
 }
