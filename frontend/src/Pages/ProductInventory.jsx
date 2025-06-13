@@ -28,7 +28,8 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
 
 
   const filteredData = productsData.filter(product => 
-    product.product_name.toLowerCase().includes(searchItem.toLowerCase())
+    product.product_name.toLowerCase().includes(searchItem.toLowerCase()) ||
+    product.category_name.toLowerCase().includes(searchItem.toLowerCase())
     
   );
 
@@ -48,11 +49,12 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
         {/*SEARCH AND ADD*/}
         <div className='flex w-full'>
           {/*SEARCH */}
-          <div>
+          <div className='w-[400px]'>
+            
             <input
               type="text"
-              placeholder="Search"
-              className="border border-gray-400 focus:border-blue-500 px-3 py-2 rounded w-full h-9"
+              placeholder="Search Item Name or Category"
+              className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
               onChange={handleSearch}
             />
 
@@ -77,8 +79,8 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
 
 
         {/*TABLE */}
-        <div className="overflow-x-auto  overflow-y-auto max-h-[550px] bg-red rounded-sm hide-scrollbar">
-          <table className="w-full divide-y divide-gray-200  shadow  text-sm">
+        <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
+          <table className="w-full divide-y divide-gray-200  text-sm">
             <thead className="sticky top-0 bg-gray-100">
               <tr>
                 {productColumns.map((col, idx) => (
@@ -93,17 +95,17 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
             </thead>
 
             
-            <tbody className="bg-white divide-y divide-gray-100">
+            <tbody className="bg-white 0">
               {filteredData.map((row, rowIndex) => (
                 
                
-                <tr key={rowIndex} className={(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}>
+                <tr key={rowIndex} className={`border-b-2 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`}>
                   <td className="px-4 py-2"  >{row.product_id}</td>
                   <td className="px-4 py-2"  >{row.product_name}</td>
                   <td className="px-4 py-2"  >{row.category_name}</td>
                   <td className="px-4 py-2"  >{row.unit}</td>
-                  <td className="px-4 py-2"  >{row.unit_price}</td>
-                  <td className="px-4 py-2"  >{row.unit_cost}</td>
+                  <td className="px-4 py-2"  >{`₱ ${row.unit_price}`}</td>
+                  <td className="px-4 py-2"  >{`₱ ${row.unit_cost}`}</td>
                   <td className="px-4 py-2"  >{row.quantity}</td>
                   <td className="px-4 py-2"  >{row.threshold}</td>
                   <td className="px-4 py-2 text-center w-36"  >
@@ -112,7 +114,7 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
                     </div>
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <button className="bg-blue-600 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
+                    <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
                         Edit
                     </button>
                   </td>

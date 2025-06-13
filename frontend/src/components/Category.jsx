@@ -130,7 +130,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
                         <td className='text-center px-2'>{row.category_id}</td>
                         <td className='text-center px-2'>{row.category_name}</td>
                         <td className='text-center px-2'>
-                          <button className='bg-blue-500 px-5 py-1 border rounded-md text-white' onClick={() => {setOpenEdit(true); setSelectEditCategory(row)}}>Edit</button>
+                          <button className='bg-blue-600 hover:bg-blue-700 px-5 py-1 border rounded-md text-white' onClick={() => {setOpenEdit(true); setSelectEditCategory(row)}}>Edit</button>
                         </td>
                       </tr>
 
