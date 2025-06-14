@@ -4,6 +4,8 @@ create table Branch (
 	address varchar(255) not null
 );
 
+insert into Branch (branch_id, branch_name, address) values(1, )
+
 
 create table Users (
 	user_id int primary key,

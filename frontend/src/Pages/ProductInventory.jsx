@@ -2,7 +2,7 @@ import React, { useEffect, useState }from 'react';
 import axios from 'axios';
 
 
-function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory}) {
+function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory, setIsProductTransactOpen}) {
 
   const productColumns = [
     "ITEM_ID",
@@ -124,6 +124,15 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
           </table>
            {error && <div className="flex font-bold justify-center px-4 py-4">{error}</div>} 
         </div>
+
+        <div className='flex justify-end mt-3 px-3 '>
+
+          <button className=' rounded-md border border-black  hover:bg-black hover:text-white transition-all py-2 px-5' onClick={() => setIsProductTransactOpen(true)}>
+            Show Inventory History
+          </button>
+
+        </div>
+
       </div>
   )
 }

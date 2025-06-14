@@ -4,17 +4,21 @@ import ModalForm from "./components/ModalForm";
 import NavBar from "./components/navBar";
 import ProductInventory from "./Pages/ProductInventory";
 import Category from "./components/Category";
+import ProductTransactionHistory from "./components/ProductTransactionHistory";
+
 
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryOpen, setIsCategory] = useState(false);
+  const [isProductTransactOpen, setIsProductTransactOpen] = useState(false);
   const [modalMode, setModalMode] = useState('add');
   const [itemData, setItemData] = useState(null);
   const [productsData, setProductsData] = useState([]);
   const [listCategories, setListCategories] = useState([]);
 
-
+  
+  //DISPLAY THE INVENTORY TABLE
   const fetchProductsData = async () =>{
       try {
         const response = await axios.get('http://localhost:3000/api/items/');
@@ -26,17 +30,21 @@ function App() {
   };
 
 
+  //RENDERS THE TABLE
   useEffect(() =>{
       fetchProductsData();
   }, [listCategories]);
 
 
+  //HANDLES OPENING ADD OR EDIT MODAL
   const handleOpen = (mode, items) =>{
     setItemData(items);
     setIsModalOpen(true);
     setModalMode(mode);
   };
 
+
+  //ADD OR EDIT DATA TO THE DATABASE
   const handleSubmit = async (newItem) =>{
     if (modalMode === 'add'){
       try {
@@ -68,16 +76,45 @@ function App() {
 
     <div>
 
-      
-
       <NavBar />
 
-      <ProductInventory setIsCategory={setIsCategory} handleOpen={handleOpen} setProductsData={setProductsData} productsData={productsData}/>
+      {/*PAGES*/}
+      <ProductInventory 
+         setIsCategory={setIsCategory} 
+         handleOpen={handleOpen} 
+         setProductsData={setProductsData} 
+         productsData={productsData}
+         setIsProductTransactOpen={setIsProductTransactOpen}
 
-      <Category isCategoryOpen={isCategoryOpen} onClose={() => setIsCategory(false)}  listCategories={listCategories} setListCategories={setListCategories} fetchProductsData={fetchProductsData}/>
+      />
 
-      <ModalForm isModalOpen={isModalOpen} OnSubmit={handleSubmit} mode={modalMode} 
-      onClose={() => setIsModalOpen(false)} itemData={itemData}  listCategories={listCategories}/>
+
+      {/*COMPONENTS*/}
+      <Category 
+         isCategoryOpen={isCategoryOpen} 
+         onClose={() => setIsCategory(false)}  
+         listCategories={listCategories} 
+         setListCategories={setListCategories} 
+         fetchProductsData={fetchProductsData}
+         
+      />
+
+
+      <ModalForm 
+         isModalOpen={isModalOpen} 
+         OnSubmit={handleSubmit} 
+         mode={modalMode} 
+         onClose={() => setIsModalOpen(false)} 
+         itemData={itemData}  
+         listCategories={listCategories}
+         
+      />
+
+      <ProductTransactionHistory
+         isProductTransactOpen={isProductTransactOpen}
+         onClose={() => setIsProductTransactOpen(false)}
+      
+      />
 
 
     </div>
