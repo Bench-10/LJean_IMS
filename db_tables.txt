@@ -51,6 +51,8 @@ create table Inventory_Product(
 create table Add_Stocks(
 	add_id serial primary key,
 	product_id int not null,
+	h_unit_price decimal(10,2) not null,
+	h_unit_cost decimal(10,2) not null,
 	quantity_added int not null,
 	date_added date not null,
 	product_validity date not null,

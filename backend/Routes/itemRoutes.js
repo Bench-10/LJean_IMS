@@ -19,6 +19,12 @@ router.post("/categories", itemControllers.addCAtegory);
 router.put("/categories/:id", itemControllers.updateCategory);
 
 
+
+//PRODUCT HISTORY
+router.get("/product_history", itemControllers.getAllProductHistory);
+
+
+
 export default router;
 
 

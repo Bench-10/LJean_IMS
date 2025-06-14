@@ -80,7 +80,12 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
     //CHECK IF NUMBER IS 0 OR LESS
-    if (String(quantity_added).trim() && Number(quantity_added) <= 0) invalidNumberValue.quantity_added = true;
+    if (mode === 'add'){
+      if (String(quantity_added).trim() && Number(quantity_added) <= 0) invalidNumberValue.quantity_added = true;
+
+    } else{
+      if (String(quantity_added).trim() && Number(quantity_added) < 0) invalidNumberValue.quantity_added = true;
+    }
     if (String(unit_cost).trim() && Number(unit_cost) <= 0) invalidNumberValue.unit_cost = true;
     if (String(threshold).trim()  && Number(threshold) <= 0) invalidNumberValue.threshold = true;
     if (String(unit_price).trim() && Number(unit_price) <= 0) invalidNumberValue.unit_price = true;
@@ -129,7 +134,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       setItemName(itemData.product_name);
       setCategory(itemData.category_id);
       setBranch('1');
-      setQuantity(itemData.quantity);
+      setQuantity('');
       setPurchasedPrice(itemData.unit_cost);
       setUnit(itemData.unit);
       setThreshold(itemData.threshold);
@@ -141,7 +146,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   }, [isModalOpen, mode, itemData]);
 
 
-  const inputClass = (field) =>
+  const inputClass = (field) => 
     `bg-gray-100 border-gray-300 py-2 px-3 w-full rounded-md border border-t-2 ${
       emptyField[field] || notANumber[field] || invalidNumber[field] ? 'border-red-500' : ''
   } ${isExpiredEarly && field === 'product_validity' ? 'border-red-500' : ''}`;
@@ -179,6 +184,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
                 <div className='relative'>
+
                   <input type="text" placeholder='Item Name' className={inputClass('product_name')}  value={product_name}  onChange={(e) => setItemName(e.target.value)} />
 
                   {emptyField['product_name'] && (

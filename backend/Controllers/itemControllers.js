@@ -102,3 +102,17 @@ export const updateCategory = async (req, res) => {
     }
 }
 
+
+
+//PRODUCT HISTORY
+export const getAllProductHistory = async (req, res) =>{
+    try {
+        const items = await itemServices.getProductHistory();
+        res.status(200).json(items);
+    } catch (error) {
+        console.error('Error fetching items: ', error);
+        res.status(500).jason({message: 'Internal Server Error'})
+    }
+};
+
+
