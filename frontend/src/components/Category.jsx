@@ -112,13 +112,13 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
               </div>
 
               {/*CATEGORIES TABLE */}
-              <div className='w-full h-full mt-5  overflow-y-auto hide-scrollbar border border-gray-200'>
+              <div className='w-full h-full mt-5 rounded-lg shadow-sm overflow-y-auto hide-scrollbar border border-gray-200'>
                 <table className='w-full text-left'>
-                  <thead className='sticky top-0 h-9  bg-gray-200 '>
-                    <tr>
-                      <th className='text-center px-2 w-[120px]'>Category ID</th>
-                      <th className='text-center px-2'>Category Name</th>
-                      <th className='text-center px-2 w-[120px]'>Action</th>
+                  <thead className='sticky top-0 h-10'>
+                    <tr className='bg-gray-200 '>
+                      <th className='uppercase text-center text-gray-500  text-md font-medium px-2 w-[130px]'>Category ID</th>
+                      <th className='uppercase text-gray-500  text-md font-medium px-7 '>Category Name</th>
+                      <th className='uppercase text-center  text-gray-500  text-md font-medium px-2 w-[130px]'>Action</th>
 
                     </tr> 
                     
@@ -126,10 +126,10 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
 
                   <tbody className='divide-gray-100'>
                     {listCategories.map((row, rowIndex) =>(
-                      <tr  key={rowIndex} className='h-12'>
-                        <td className='text-center px-2'>{row.category_id}</td>
-                        <td className='text-center px-2'>{row.category_name}</td>
-                        <td className='text-center px-2'>
+                      <tr  key={rowIndex} className='h-14 hover:bg-gray-100 transition-colors'>
+                        <td className='text-center text-md px-2'>{row.category_id}</td>
+                        <td className='px-7 whitespace-nowrap text-gray-900 font-medium'>{row.category_name}</td>
+                        <td className='text-center text-sm px-2'>
                           <button className='bg-blue-600 hover:bg-blue-700 px-5 py-1 border rounded-md text-white' onClick={() => {setOpenEdit(true); setSelectEditCategory(row)}}>Edit</button>
                         </td>
                       </tr>

@@ -3,20 +3,6 @@ import axios from 'axios';
 
 
 function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory, setIsProductTransactOpen}) {
-
-  const productColumns = [
-    "ITEM_ID",
-    "ITEM NAME",
-    "CETEGORY",
-    "UNIT",
-    "UNITPRICE",
-    "UNITCOST",
-    "QUANTITY",
-    "THRESHOLD",
-    "STATUS",
-    "ACTION",
-  ];
-
   
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
@@ -83,31 +69,55 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
           <table className="w-full divide-y divide-gray-200  text-sm">
             <thead className="sticky top-0 bg-gray-100">
               <tr>
-                {productColumns.map((col, idx) => (
-                  <th
-                    key={idx}
-                    className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white"
-                  >
-                    {col}
+                
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-24">
+                    ITEM ID
                   </th>
-                ))}
+                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white">
+                    ITEM NAME
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-44">
+                    CATEGORY
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-3">
+                    UNIT
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
+                    UNIT PRICE
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
+                    UNIT COST
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-4">
+                    QUANTITY
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-4">
+                    THRESHOLD
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-38">
+                    STATUS
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-20">
+                    ACTION
+                  </th>
+               
               </tr>
             </thead>
 
             
-            <tbody className="bg-white 0">
+            <tbody className="bg-white">
               {filteredData.map((row, rowIndex) => (
                 
                
-                <tr key={rowIndex} className={`border-b-2 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`}>
-                  <td className="px-4 py-2"  >{row.product_id}</td>
-                  <td className="px-4 py-2"  >{row.product_name}</td>
-                  <td className="px-4 py-2"  >{row.category_name}</td>
+                <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`}>
+                  <td className="px-4 py-2 text-center"  >{row.product_id}</td>
+                  <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
+                  <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
                   <td className="px-4 py-2"  >{row.unit}</td>
-                  <td className="px-4 py-2"  >{`₱ ${row.unit_price}`}</td>
-                  <td className="px-4 py-2"  >{`₱ ${row.unit_cost}`}</td>
-                  <td className="px-4 py-2"  >{row.quantity}</td>
-                  <td className="px-4 py-2"  >{row.threshold}</td>
+                  <td className="px-4 py-2 text-right"  >{`₱ ${row.unit_price}`}</td>
+                  <td className="px-4 py-2 text-right"  >{`₱ ${row.unit_cost}`}</td>
+                  <td className="px-4 py-2 text-right"  >{row.quantity}</td>
+                  <td className="px-4 py-2 text-center"  >{row.threshold}</td>
                   <td className="px-4 py-2 text-center w-36"  >
                     <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
                       {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}
@@ -127,7 +137,7 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
 
         <div className='flex justify-end mt-3 px-3 '>
 
-          <button className=' rounded-md border border-black  hover:bg-black hover:text-white transition-all py-2 px-5' onClick={() => setIsProductTransactOpen(true)}>
+          <button className=' rounded-md border border-gray-800 hover:bg-gray-800/80 hover:text-white transition-all py-2 px-5 text-sm' onClick={() => setIsProductTransactOpen(true)}>
             Show Inventory History
           </button>
 
