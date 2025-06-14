@@ -114,8 +114,8 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
                   <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
                   <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
                   <td className="px-4 py-2"  >{row.unit}</td>
-                  <td className="px-4 py-2 text-right"  >{`₱ ${row.unit_price}`}</td>
-                  <td className="px-4 py-2 text-right"  >{`₱ ${row.unit_cost}`}</td>
+                  <td className="px-4 py-2 text-right"  >₱ {row.unit_price}</td>
+                  <td className="px-4 py-2 text-right"  >₱ {row.unit_cost}</td>
                   <td className="px-4 py-2 text-right"  >{row.quantity}</td>
                   <td className="px-4 py-2 text-center"  >{row.threshold}</td>
                   <td className="px-4 py-2 text-center w-36"  >

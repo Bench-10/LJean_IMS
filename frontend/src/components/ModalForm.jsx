@@ -236,7 +236,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
                      <div className='relative'>
                         <input
-                          placeholder="Purchase Price"
+                          placeholder="Cost"
                           className={inputClass('unit_cost')}
                           value={unit_cost}
                           onChange={(e) => setPurchasedPrice(e.target.value)}

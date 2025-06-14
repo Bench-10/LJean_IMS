@@ -99,7 +99,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose}) {
                       <th className='px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider'>Date</th>
                       <th className='px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider'>Item Name</th>
                       <th className='px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider'>Category</th>
-                      <th className='px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider'>Price</th>
+                      <th className='px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider'>Unit Cost</th>
                       <th className='px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider'>Quantity</th>
                       <th className='px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider'>Value</th>
                     </tr>
@@ -110,9 +110,9 @@ function ProductTransactionHistory({isProductTransactOpen, onClose}) {
                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.date_added}</td>
                         <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>${history.price.toFixed(2)}</td>
+                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {history.price.toFixed(2)}</td>
                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{history.quantity}</td>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>${(history.price * history.quantity).toFixed(2)}</td>
+                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {(history.price * history.quantity).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
