@@ -26,8 +26,9 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
   };
 
   useEffect(() =>{
-    generateCategories();
-  }, [])
+    if (isCategoryOpen)
+      generateCategories();
+  }, [isCategoryOpen])
 
 
   const submitCategory = async (type) =>{
