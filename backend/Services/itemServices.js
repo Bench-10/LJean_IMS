@@ -143,20 +143,64 @@ export const updateListCategory = async (categoryData, categoryId) =>{
 
 
 //PRODUCT HISTORY
-export const getProductHistory = async() => {
-    const {rows} = await SQLquery(`
-        SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
-        FROM Add_Stocks
-        LEFT JOIN Inventory_product USING(product_id)
-        LEFT JOIN Category USING(category_id)
-        ORDER BY date_added DESC
-    `);
+export const getProductHistory = async(dates) => {
+    const { startDate, endDate } = dates;
 
-    return rows;
+
+    if (startDate === '' && endDate === '') {
+        const {rows} = await SQLquery(`
+            SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
+            FROM Add_Stocks
+            LEFT JOIN Inventory_product USING(product_id)
+            LEFT JOIN Category USING(category_id)
+            ORDER BY date_added DESC
+        `);
+        return rows;
+  
+    }
+
+
+    if (startDate !== '' && endDate !== '') {
+        const {rows} = await SQLquery(`
+            SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
+            FROM Add_Stocks
+            LEFT JOIN Inventory_product USING(product_id)
+            LEFT JOIN Category USING(category_id)
+            WHERE date_added BETWEEN $1 AND $2
+            ORDER BY date_added DESC
+        `, [startDate, endDate]);
+
+        return rows;
+        
+    }
+
+
+    if (endDate === ''){
+        const {rows} = await SQLquery(`
+            SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
+            FROM Add_Stocks
+            LEFT JOIN Inventory_product USING(product_id)
+            LEFT JOIN Category USING(category_id)
+            WHERE date_added >= $1
+            ORDER BY date_added DESC
+        `, [startDate]);
+
+        return rows;
+    }
+    
+
+    if (startDate === '') {
+        const {rows} = await SQLquery(`
+            SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
+            FROM Add_Stocks
+            LEFT JOIN Inventory_product USING(product_id)
+            LEFT JOIN Category USING(category_id)
+            WHERE date_added <= $1
+            ORDER BY date_added DESC
+        `, [endDate]);
+
+        return rows;
+    }
+    
 };
-
-
-
-
-
 

@@ -32,7 +32,6 @@ export const addItem = async (req, res) =>{
 
 export const updateItem = async (req, res) =>{
     try {
-
         const itemId = req.params.id;
         const updatedItemData = req.body;
         const updatedItem = await itemServices.updateProductItem(updatedItemData, itemId);
@@ -107,8 +106,9 @@ export const updateCategory = async (req, res) => {
 //PRODUCT HISTORY
 export const getAllProductHistory = async (req, res) =>{
     try {
-        const items = await itemServices.getProductHistory();
-        res.status(200).json(items);
+        const dates = req.body;
+        const itemsHistory = await itemServices.getProductHistory(dates);
+        res.status(200).json(itemsHistory);
     } catch (error) {
         console.error('Error fetching items: ', error);
         res.status(500).jason({message: 'Internal Server Error'})

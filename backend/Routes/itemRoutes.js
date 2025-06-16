@@ -21,7 +21,7 @@ router.put("/categories/:id", itemControllers.updateCategory);
 
 
 //PRODUCT HISTORY
-router.get("/product_history", itemControllers.getAllProductHistory);
+router.post("/product_history", itemControllers.getAllProductHistory);
 
 
 
