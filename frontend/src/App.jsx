@@ -110,7 +110,7 @@ function App() {
 
        {/*EXPERIMENTAL */} {/*PAGES */}
       <Routes>
-
+          
           <Route path="/" exact element={ 
             <ProductInventory 
               setIsCategory={setIsCategory} 
@@ -120,8 +120,9 @@ function App() {
               setIsProductTransactOpen={setIsProductTransactOpen}
 
             />
-          
+        
           }/> 
+         
 
           <Route path="/notification" exact element={
             <Notification />

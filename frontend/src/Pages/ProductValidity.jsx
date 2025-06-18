@@ -2,7 +2,7 @@ import React from 'react'
 
 function ProductValidity() {
   return (
-    <div className='ml-[210px]'>ProductValidity</div>
+    <div className='ml-[220px]'>ProductValidity</div>
   )
 }
 

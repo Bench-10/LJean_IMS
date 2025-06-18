@@ -23,7 +23,7 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
   return (
    
       
-      <div className=" ml-[210px] p-8 max-h-screen" >
+      <div className=" ml-[220px] p-8 max-h-screen" >
         {/*TITLE*/}
         <h1 className=' text-4xl font-bold text-green-900'>
           INVENTORY
