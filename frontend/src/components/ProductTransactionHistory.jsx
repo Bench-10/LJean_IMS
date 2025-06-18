@@ -32,7 +32,6 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
     }
 
     fetchProductHistory();
-    
     setOpenFilter(false); 
       
   };
@@ -75,7 +74,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
                 <div className='relative'>
 
                   {/*FILTER POPUP */}
-                  <dialog className='absolute bg-transparent rounded-md flex-col z-50 bg-white top-[100%] left-[-1200%]' open={openFilter}> 
+                  <dialog className='absolute bg-transparent rounded-md flex-col z-50 bg-white top-[100%] left-[-1200%]' open={openFilter}>
                     <div className=' w-[160px] h-[210px]  border rounded-md px-3 py-4 shadow-md text-xs'>
                      <h1 className='font-bold text-md'>Filter</h1>
 

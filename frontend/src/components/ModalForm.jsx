@@ -185,7 +185,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
                 <div className='relative'>
 
-                  <input type="text" placeholder='Item Name' className={inputClass('product_name')}  value={product_name}  onChange={(e) => setItemName(e.target.value)} />
+                  <input id='item' type="text"  placeholder='Item Name' className={inputClass('product_name')}  value={product_name}  onChange={(e) => setItemName(e.target.value)} />
 
                   {emptyField['product_name'] && (
                     <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please enter a product name!</div>
