@@ -1,10 +1,13 @@
 import axios from "axios";
 import { useState, useEffect } from "react";
 import ModalForm from "./components/ModalForm";
-import NavBar from "./components/navBar";
+import NavBar from "./components/NavBar";
 import ProductInventory from "./Pages/ProductInventory";
+import Notification from "./Pages/Notification";
+import ProductValidity from "./Pages/ProductValidity";
 import Category from "./components/Category";
 import ProductTransactionHistory from "./components/ProductTransactionHistory";
+import { Routes, Route} from "react-router-dom";
 
 
 
@@ -78,16 +81,6 @@ function App() {
 
       <NavBar />
 
-      {/*PAGES*/}
-      <ProductInventory 
-         setIsCategory={setIsCategory} 
-         handleOpen={handleOpen} 
-         setProductsData={setProductsData} 
-         productsData={productsData}
-         setIsProductTransactOpen={setIsProductTransactOpen}
-
-      />
-
 
       {/*COMPONENTS*/}
       <Category 
@@ -111,11 +104,42 @@ function App() {
       />
 
       <ProductTransactionHistory
-         isProductTransactOpen={isProductTransactOpen}
-         onClose={() => setIsProductTransactOpen(false)}
-      
+          isProductTransactOpen={isProductTransactOpen}
+          onClose={() => setIsProductTransactOpen(false)}
       />
 
+       {/*EXPERIMENTAL */} {/*PAGES */}
+      <Routes>
+
+          <Route path="/" exact element={ 
+            <ProductInventory 
+              setIsCategory={setIsCategory} 
+              handleOpen={handleOpen} 
+              setProductsData={setProductsData} 
+              productsData={productsData}
+              setIsProductTransactOpen={setIsProductTransactOpen}
+
+            />
+          
+          }/> 
+
+          <Route path="/notification" exact element={
+            <Notification />
+            
+            
+          }/>
+
+
+          <Route path="/product_validity" exact element={
+            <ProductValidity />
+            
+            
+          }/>
+
+
+
+      </Routes>
+  
 
     </div>
    

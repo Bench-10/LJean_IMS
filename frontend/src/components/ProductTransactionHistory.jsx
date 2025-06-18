@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-
+import { BsFunnelFill } from "react-icons/bs";
+ 
 function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
 
   const [openFilter, setOpenFilter] = useState(false);
@@ -68,13 +69,12 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
               onClick={() => {onClose(); setOpenFilter(false); closeFilterValue();}}>✕</button>
 
               {/*TITLE AND FILTER SECTION*/}
-              <div className='flex  justify-between items-center mt-2 pr-4' >
+              <div className='flex  justify-between items-center mt-2 pr-6' >
                 <h1 className='font-bold text-4xl'>Product History</h1>
-
                 <div className='relative'>
 
                   {/*FILTER POPUP */}
-                  <dialog className='absolute bg-transparent rounded-md flex-col z-50 bg-white top-[100%] left-[-1200%]' open={openFilter}>
+                  <dialog className='absolute bg-transparent rounded-md flex-col z-50 bg-white top-[80%] left-[-700%]' open={openFilter}>
                     <div className=' w-[160px] h-[210px]  border rounded-md px-3 py-4 shadow-md text-xs'>
                      <h1 className='font-bold text-md'>Filter</h1>
 
@@ -107,8 +107,8 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
                   </dialog>
                   
 
-                  <button className='text-sm border rounded-md' onClick={() => {openFilter ? closeFilterValue() : setOpenFilter(true)}}>
-                    |||
+                  <button className='' onClick={() => {openFilter ? closeFilterValue() : setOpenFilter(true)}}>
+                     <BsFunnelFill className='w-6 h-7 hover:text-gray-800'/> 
                   </button>
                 </div>
               </div>
