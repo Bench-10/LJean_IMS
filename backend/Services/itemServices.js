@@ -146,10 +146,12 @@ export const updateListCategory = async (categoryData, categoryId) =>{
 export const getProductHistory = async(dates) => {
     const { startDate, endDate } = dates;
 
+    const correctDateFormat = "TO_CHAR(date_added, 'YYYY-MM-DD') AS date_added";
+
 
     if (startDate === '' && endDate === '') {
         const {rows} = await SQLquery(`
-            SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
+            SELECT ${correctDateFormat}, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
             FROM Add_Stocks
             LEFT JOIN Inventory_product USING(product_id)
             LEFT JOIN Category USING(category_id)
@@ -162,7 +164,7 @@ export const getProductHistory = async(dates) => {
 
     if (startDate !== '' && endDate !== '') {
         const {rows} = await SQLquery(`
-            SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
+            SELECT ${correctDateFormat}, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
             FROM Add_Stocks
             LEFT JOIN Inventory_product USING(product_id)
             LEFT JOIN Category USING(category_id)
@@ -177,7 +179,7 @@ export const getProductHistory = async(dates) => {
 
     if (endDate === ''){
         const {rows} = await SQLquery(`
-            SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
+            SELECT ${correctDateFormat}, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
             FROM Add_Stocks
             LEFT JOIN Inventory_product USING(product_id)
             LEFT JOIN Category USING(category_id)
@@ -191,7 +193,7 @@ export const getProductHistory = async(dates) => {
 
     if (startDate === '') {
         const {rows} = await SQLquery(`
-            SELECT date_added, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
+            SELECT ${correctDateFormat}, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
             FROM Add_Stocks
             LEFT JOIN Inventory_product USING(product_id)
             LEFT JOIN Category USING(category_id)

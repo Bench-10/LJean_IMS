@@ -19,6 +19,7 @@ function App() {
   const [itemData, setItemData] = useState(null);
   const [productsData, setProductsData] = useState([]);
   const [listCategories, setListCategories] = useState([]);
+  const [isHome, setIsHome] = useState(false);
 
   
   //DISPLAY THE INVENTORY TABLE
@@ -121,7 +122,7 @@ function App() {
 
             />
         
-          }/> 
+          }/>
          
 
           <Route path="/notification" exact element={
