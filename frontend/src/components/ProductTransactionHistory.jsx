@@ -20,6 +20,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
   const applyFilter = () =>  {
     
     if (!startDate && !endDate){
+      setOpenFilter(false);
       return
     }
 
@@ -129,7 +130,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
                   <tbody className='bg-white '>
                     {productHistory.map((history, histoindx) => (
                       <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.date_added}</td>
+                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
                         <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
                         <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {history.h_unit_cost}</td>

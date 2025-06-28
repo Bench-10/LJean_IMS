@@ -23,6 +23,9 @@ router.put("/categories/:id", itemControllers.updateCategory);
 //PRODUCT HISTORY
 router.post("/product_history", itemControllers.getAllProductHistory);
 
+//GET FOR PRODUCT VALIDITY
+router.get("/product_validity", itemControllers.getAllProductValidity)
+
 
 
 export default router;

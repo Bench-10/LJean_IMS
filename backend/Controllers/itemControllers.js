@@ -116,3 +116,16 @@ export const getAllProductHistory = async (req, res) =>{
 };
 
 
+
+//PRODUCT VALIDITY
+export const getAllProductValidity = async (req, res) =>{
+    try {
+        const itemsValidity = await itemServices.getProductValidity();
+        res.status(200).json(itemsValidity);
+    } catch (error) {
+        console.error('Error fetching items: ', error);
+        res.status(500).jason({message: 'Internal Server Error'})
+    }
+};
+
+

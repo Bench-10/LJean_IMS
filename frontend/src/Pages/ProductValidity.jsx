@@ -1,6 +1,23 @@
-import React from 'react'
+import {React, useState, useEffect } from 'react';
+import axios from 'axios';
 
 function ProductValidity() {
+  const [productValidityList, setValidity] = useState([]);
+
+  const getProductInfo = async () =>{
+    try {
+      const data = await axios.get('http://localhost:3000/api/product_validity/');
+      setValidity(data.data);
+    } catch (error) {
+      console.log(error.message);
+      
+    }
+  }
+
+ useEffect(() =>{
+    getProductInfo();
+}, [])
+  
   
   return (
     <div className=" ml-[220px] p-8 max-h-screen" >
@@ -51,9 +68,57 @@ function ProductValidity() {
         <hr className="border-t-2 my-4 w-full border-gray-500"/>
 
 
+        <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
+          <table className="w-full divide-y divide-gray-200  text-sm">
+            <thead className="sticky top-0 bg-gray-100">
+              <tr>
+                
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
+                    DATE PURCHASED
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
+                    EXPIRY DATE
+                  </th>
+                  <th className="bg-green-500 pl-7 pr-4 py-2 text-left text-sm font-medium text-white">
+                    ITEM
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
+                    CATEGORY
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
+                    QUANTITY BOUGHT
+                  </th>
+                  
+               
+              </tr>
+            </thead>
+
+            
+            <tbody className="bg-white">
+            {productValidityList.map((validity, index) => (
+  
+                  <tr key={index} className={`hover:bg-gray-200/70 h-14`}>
+                    <td className="px-4 py-2 text-center"  >{validity.formated_date_added}</td>
+                    <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
+                    <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
+                    <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
+                    <td className="px-4 py-2 text-center"  >{validity.quantity_added}</td>
+                    
+                  </tr>
+              
+            ))}
+            </tbody>
+
+          </table>
+
+
         
 
-    </div>
+   
+      </div>
+
+      </div>
+    
 
   )
 }
