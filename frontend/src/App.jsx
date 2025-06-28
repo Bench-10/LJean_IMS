@@ -21,7 +21,15 @@ function App() {
   const [listCategories, setListCategories] = useState([]);
   const [isHome, setIsHome] = useState(false);
 
+
+
+  //PREVENTS SCRIPTS ATTACKS ON INPUT FIELDS
+  function sanitizeInput(input) {
+    return input.replace(/[<>\/"']/g, '');
+  }
+
   
+
   //DISPLAY THE INVENTORY TABLE
   const fetchProductsData = async () =>{
       try {
@@ -90,6 +98,7 @@ function App() {
          listCategories={listCategories} 
          setListCategories={setListCategories} 
          fetchProductsData={fetchProductsData}
+         sanitizeInput={sanitizeInput}
          
       />
 
@@ -101,6 +110,7 @@ function App() {
          onClose={() => setIsModalOpen(false)} 
          itemData={itemData}  
          listCategories={listCategories}
+         sanitizeInput={sanitizeInput}
          
       />
 
@@ -133,7 +143,10 @@ function App() {
 
 
           <Route path="/product_validity" exact element={
-            <ProductValidity />
+            <ProductValidity 
+              sanitizeInput={sanitizeInput}
+            
+            />
             
             
           }/>

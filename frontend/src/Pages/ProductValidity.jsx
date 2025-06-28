@@ -1,8 +1,10 @@
 import {React, useState, useEffect } from 'react';
 import axios from 'axios';
 
-function ProductValidity() {
+function ProductValidity({ sanitizeInput }) {
   const [productValidityList, setValidity] = useState([]);
+  const [searchValidity, setSearchValidity] = useState('');
+  
 
   const getProductInfo = async () =>{
     try {
@@ -14,10 +16,30 @@ function ProductValidity() {
     }
   }
 
- useEffect(() =>{
-    getProductInfo();
-}, [])
+  useEffect(() =>{
+      getProductInfo();
+  }, []);
+
+
   
+  
+  const handleSearch = (event) =>{
+    setSearchValidity(sanitizeInput(event.target.value));
+
+  }
+
+
+  const filteredValidityData = productValidityList.filter(validity =>
+
+    validity.product_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
+    validity.category_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
+    validity.formated_date_added.toLowerCase().includes(searchValidity.toLowerCase()) ||
+    validity.formated_product_validity.toLowerCase().includes(searchValidity.toLowerCase()) 
+    
+  );
+
+
+
   
   return (
     <div className=" ml-[220px] p-8 max-h-screen" >
@@ -35,8 +57,9 @@ function ProductValidity() {
             
             <input
               type="text"
-              placeholder="Search Item Name or Category"
-              className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
+              placeholder="Search Date Item Name or Category"
+              className={`border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9`}
+              onChange={handleSearch}
              
             />
 
@@ -80,7 +103,7 @@ function ProductValidity() {
                     EXPIRY DATE
                   </th>
                   <th className="bg-green-500 pl-7 pr-4 py-2 text-left text-sm font-medium text-white">
-                    ITEM
+                    ITEM NAME
                   </th>
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
                     CATEGORY
@@ -95,7 +118,7 @@ function ProductValidity() {
 
             
             <tbody className="bg-white">
-            {productValidityList.map((validity, index) => (
+            {filteredValidityData.map((validity, index) => (
   
                   <tr key={index} className={`hover:bg-gray-200/70 h-14`}>
                     <td className="px-4 py-2 text-center"  >{validity.formated_date_added}</td>

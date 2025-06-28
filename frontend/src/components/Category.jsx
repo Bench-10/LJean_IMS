@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios';
 
-function Category({isCategoryOpen, onClose, setListCategories, listCategories, fetchProductsData}) {
+function Category({isCategoryOpen, onClose, setListCategories, listCategories, fetchProductsData, sanitizeInput}) {
 
   const [category_name, setCategoryName] = useState('');
   const [editCategory_name, setEditcategoryName] = useState ('')
@@ -27,7 +27,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
 
   useEffect(() =>{
       generateCategories();
-      
+
   }, [])
 
 
@@ -102,7 +102,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
 
               <div className='flex justify-between w-full mt-8 gap-x-5 '>
                 <div className='w-[73%]'>
-                  <input type="text" placeholder='Category Name' className='w-full border rounded-md  bg-gray-100 border-gray-300 h-10 px-4' value={category_name} onChange={(e) => setCategoryName(e.target.value)}/>
+                  <input type="text" placeholder='Category Name' className='w-full border rounded-md  bg-gray-100 border-gray-300 h-10 px-4' value={category_name} onChange={(e) => setCategoryName(sanitizeInput(e.target.value))}/>
                 </div>
 
                  <div className='flex align-middle'>
@@ -172,7 +172,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
                           type="text" 
                           className="border-2 rounded-md px-3 py-2 border-gray-300 w-full" 
                           value={editCategory_name} 
-                          onChange={(e) => setEditcategoryName(e.target.value)}
+                          onChange={(e) => setEditcategoryName(sanitizeInput(e.target.value))}
                         />
                         <button 
                           className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"

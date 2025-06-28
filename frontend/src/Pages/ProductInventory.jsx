@@ -2,13 +2,13 @@ import React, { useEffect, useState }from 'react';
 import axios from 'axios';
 
 
-function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory, setIsProductTransactOpen}) {
+function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput}) {
   
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
 
   const handleSearch = (event) =>{
-    setSearchItem(event.target.value);
+    setSearchItem(sanitizeInput(event.target.value));
 
   }
 

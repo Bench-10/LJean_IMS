@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 
 
-function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategories}) {
+function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput}) {
   // CATEGORY OPTIONS (TEMPORARY)
 
   const [product_name, setItemName] = useState('');
@@ -185,7 +185,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
                 <div className='relative'>
 
-                  <input id='item' type="text"  placeholder='Item Name' className={inputClass('product_name')}  value={product_name}  onChange={(e) => setItemName(e.target.value)} />
+                  <input id='item' type="text"  placeholder='Item Name' className={inputClass('product_name')}  value={product_name}  onChange={(e) => setItemName(sanitizeInput(e.target.value))} />
 
                   {emptyField['product_name'] && (
                     <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please enter a product name!</div>
@@ -287,7 +287,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                           placeholder="Unit"
                           className={inputClass('unit')}
                           value={unit}
-                          onChange={(e) => setUnit(e.target.value)}
+                          onChange={(e) => setUnit(sanitizeInput(e.target.value))}
                         />
 
                          {emptyField['unit'] && (
