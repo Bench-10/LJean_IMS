@@ -1,4 +1,5 @@
 import {React, useState, useEffect } from 'react';
+import { RiErrorWarningLine } from "react-icons/ri";
 import axios from 'axios';
 
 function ProductValidity({ sanitizeInput }) {
@@ -118,9 +119,22 @@ function ProductValidity({ sanitizeInput }) {
 
             
             <tbody className="bg-white">
+
             {filteredValidityData.map((validity, index) => (
+
+                 
   
-                  <tr key={index} className={`hover:bg-gray-200/70 h-14`}>
+                  <tr
+                    key={index}
+                    className={
+                      validity.expy
+                        ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90 h-14'
+                        : validity.near_expy
+                        ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
+                        : 'hover:bg-gray-200/70 h-14'
+                    }
+                  >
+
                     <td className="px-4 py-2 text-center"  >{validity.formated_date_added}</td>
                     <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
                     <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
