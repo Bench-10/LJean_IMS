@@ -219,7 +219,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
                       <div className='relative'>
                         <input
-                          placeholder="Quantity"
+                          placeholder={`${mode === 'add' ? 'Quantity': 'Add Quantity or Enter 0'}`}
                           className={inputClass('quantity_added')}
                           value={quantity_added}
                           onChange={(e) => setQuantity(e.target.value)}

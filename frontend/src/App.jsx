@@ -129,6 +129,7 @@ function App() {
               setProductsData={setProductsData} 
               productsData={productsData}
               setIsProductTransactOpen={setIsProductTransactOpen}
+              sanitizeInput={sanitizeInput}
 
             />
         
