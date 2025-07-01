@@ -147,9 +147,30 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
   const inputClass = (field) => 
-    `bg-gray-100 border-gray-300 py-2 px-3 w-full rounded-md border border-t-2 ${
+    `bg-gray-100 border-gray-300 py-2 px-3 w-full rounded-md border border-2 ${
       emptyField[field] || notANumber[field] || invalidNumber[field] ? 'border-red-500' : ''
   } ${isExpiredEarly && field === 'product_validity' ? 'border-red-500' : ''}`;
+
+  
+  const label = (field) => `ml-1 text-[13px]  ${emptyField[field] ? 'text-red-500' : ''} ${isExpiredEarly && field === 'product_validity' ? 'text-red-500' : ''}`;
+
+
+
+  const errorflag = (field, field_warn) =>{
+    if (emptyField[field])
+      return <div className={`italic text-red-500 absolute ${field_warn === 'date' ? 'top-16':'top-9'} pl-2 text-xs mt-1`}>{`Please enter a ${field_warn}!`}</div>
+
+    else if (notANumber[field])
+      return <div className="italic text-red-500 absolute top-9 pl-2 text-xs mt-1">Must be a positive number!</div>
+
+
+    else if (invalidNumber[field])
+      return <div className="italic text-red-500 absolute top-9 pl-2 text-xs mt-1">Value must not be less than 1!</div>
+
+    else if (isExpiredEarly && field === 'product_validity')
+      return <div className="italic text-red-500 absolute top-16 pl-2 text-xs mt-1">Expiry date must be after purchase date!</div>
+      
+  }
 
 
   return (
@@ -165,7 +186,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
         <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen}>
-            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[500px] w-[600px] rounded-md p-7 animate-popup" >
+            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[555px] w-[600px] rounded-md p-7 animate-popup" >
 
 
               <div>
@@ -173,6 +194,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                   {mode === 'edit' ? 'EDIT ITEM' : 'ADD ITEM'}
                 </h3>
               </div>
+
 
 
               <div className="pb-4 pt-2 px-8">
@@ -183,41 +205,53 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                   onClick={onClose}>✕</button>
 
 
+                {/*PRODUCT NAME*/}
                 <div className='relative'>
 
-                  <input id='item' type="text"  placeholder='Item Name' className={inputClass('product_name')}  value={product_name}  onChange={(e) => setItemName(sanitizeInput(e.target.value))} />
+                  <input 
+                    id='item' 
+                    type="text"  
+                    placeholder='Item Name' 
+                    className={inputClass('product_name')}  
+                    value={product_name}  
+                    onChange={(e) => setItemName(sanitizeInput(e.target.value))} 
+                  />
 
-                  {emptyField['product_name'] && (
-                    <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please enter a product name!</div>
-                  )}
+                  {errorflag('product_name', 'product name')}
+
                 </div>
 
 
 
-                <div className="flex justify-between gap-x-5 mt-5">
+                <div className="flex justify-between gap-x-5 mt-6">
 
                     {/* Left column inputs */}
-                    <div className="flex flex-col gap-y-5 w-full">
+                    <div className="flex flex-col gap-y-6 w-full">
 
+
+                      {/*CATEGORY*/}
                       <div className='relative'>
                         <select
-                        className={inputClass('category_id')}
-                        value={category_id}
-                        onChange={(e) => setCategory(e.target.value)}
+                          className={inputClass('category_id')}
+                          value={category_id}
+                          onChange={(e) => setCategory(e.target.value)}
                         >
+
                           <option value="" >Select Category</option>
                             {listCategories.map((option) => (
                               <option key={option.category_id} value={option.category_id}>{option.category_name}</option>
                             ))}
-                          </select>
 
-                        {emptyField['category_id'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please select a category!</div>
-                        )}
+                        </select>
+
+                        {errorflag('category_id', 'category')}
+
                       </div>
-                      
 
+                      
+                      {/*QUANTITY ADDED*/}
                       <div className='relative'>
+
                         <input
                           placeholder={`${mode === 'add' ? 'Quantity': 'Add Quantity or Enter 0'}`}
                           className={inputClass('quantity_added')}
@@ -225,22 +259,14 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                           onChange={(e) => setQuantity(e.target.value)}
                         />
 
-                        {notANumber['quantity_added'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Must be a positive number!</div>
-                        )}
+                        {errorflag('quantity_added', 'value')}
 
-                        {emptyField['quantity_added'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please enter a value!</div>
-                        )}
-
-                        {invalidNumber['quantity_added'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Value must not be less than 1!</div>
-                        )}
-                     </div>
+                      </div>
 
 
+                      {/*UNIT COST*/}
+                      <div className='relative'>
 
-                     <div className='relative'>
                         <input
                           placeholder="Cost"
                           className={inputClass('unit_cost')}
@@ -248,40 +274,39 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                           onChange={(e) => setPurchasedPrice(e.target.value)}
                         />
 
-                        {notANumber['unit_cost'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Must be a positive number!</div>
-                        )}
+                        {errorflag('unit_cost', 'value')}
 
-                        {emptyField['unit_cost'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please enter a value!</div>
-                        )}
-
-                        {invalidNumber['unit_cost'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Value must not be less than 1!</div>
-                        )}
                       </div>
 
 
-
+                      {/*DATE ADDED*/}
                       <div className='relative'>
-                         <input
-                            type="date"
-                            placeholder="Date Purchased"
-                            className={inputClass('date_added')}
-                            value={date_added}
-                            onChange={(e) => setDatePurchased(e.target.value)}
-                          />
+                        
+                        <label htmlFor="date_added" className={label('date_added')}>Enter Date Added</label>
+                        
+                        <input
+                          id="date_added"
+                          type="date"
+                          placeholder="Date Purchased"
+                          className={inputClass('date_added')}
+                          value={date_added}
+                          onChange={(e) => setDatePurchased(e.target.value)}
+                        />
 
-                          {emptyField['date_added'] && (
-                            <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please select a date!</div>
-                          )}
+                        {errorflag('date_added', 'date')}
+
                       </div>
+
                     </div>
 
 
                     {/* Right column inputs */}
-                    <div className="flex flex-col gap-y-5 w-full">
+                    <div className="flex flex-col gap-y-6 w-full">
+
+
+                      {/*UNIT*/}
                       <div className='relative'>
+
                         <input
                           type="text"
                           placeholder="Unit"
@@ -290,14 +315,14 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                           onChange={(e) => setUnit(sanitizeInput(e.target.value))}
                         />
 
-                         {emptyField['unit'] && (
-                            <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please enter a value!</div>
-                         )}
+                         {errorflag('unit', 'unit')}
+
                       </div>
 
 
-
+                      {/*THRESHOLD*/}
                       <div className='relative'> 
+
                         <input
                           placeholder="Threshold"
                           className={inputClass('threshold')}
@@ -305,22 +330,14 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                           onChange={(e) => setThreshold(e.target.value)}
                         />
 
-                        {notANumber['threshold'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Must be a positive number!</div>
-                        )}
+                        {errorflag('threshold', 'value')}
 
-                        {emptyField['threshold'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please enter a value!</div>
-                        )}
-
-                        {invalidNumber['threshold'] && (
-                          <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Value must not be less than 1!</div>
-                        )}
                       </div>
 
                       
-
+                      {/*PRICE*/}
                       <div className='relative'>
+
                          <input
                             placeholder="Price"
                             className={inputClass('unit_price')}
@@ -328,23 +345,18 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                             onChange={(e) => setPrice(e.target.value)}
                           />
 
-                          {notANumber['unit_price'] && (
-                            <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Must be a positive number!</div>
-                          )}
+                          {errorflag('unit_price', 'value')}
 
-                          {emptyField['unit_price'] && (
-                            <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please enter a value!</div>
-                          )}
-
-                          {invalidNumber['unit_price'] && (
-                            <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Value must not be less than 1!</div>
-                          )}
                       </div>
 
 
-
+                      {/*PROCT VALIDITY*/}
                       <div className='relative'>
+
+                        <label htmlFor="product_validity" className={label('product_validity')}>Enter Product Validity</label>
+
                         <input
+                          id="product_validity"
                           type="date"
                           placeholder="Expiration Date"
                           className={inputClass('product_validity')}
@@ -352,28 +364,37 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                           onChange={(e) => setExpirationDate(e.target.value)}
                         />
 
-                        {emptyField['product_validity'] && (
-                            <div className="text-red-500 absolute top-9 pl-2 text-xs mt-1">Please select a date!</div>
-                        )}
+                        {errorflag('product_validity', 'date')}
 
-                        {isExpiredEarly && (
-                            <div className="text-red-500 absolute top-10 pl-2 text-xs mt-1">Expiry date must be after purchase date!</div>
-                          )}
                       </div>
+
                     </div>
+
                 </div>
+
                 <div className="absolute left-1/2 transform -translate-x-1/2 flex justify-end bottom-9">
+
                     {/*CONTROL MODAL*/}
                     <button type="submit" className={`${mode === 'edit' ? 'bg-yellow-400' :'bg-green-600'} rounded-lg text-white px-5 py-2 text-bottom`} > 
                       {mode === 'edit' ? 'UPDATE' : 'ADD'}
                     </button>
+
                 </div>
+
                </form>
+
               </div>
+
             </div>
+
         </dialog>
+
     </div>
+
   )
+
 }
+
+
 
 export default ModalForm
