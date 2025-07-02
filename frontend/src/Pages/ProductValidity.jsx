@@ -1,6 +1,7 @@
 import {React, useState, useEffect } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
 import axios from 'axios';
+import NoInfoFound from '../utils/NoInfoFound';
 
 function ProductValidity({ sanitizeInput }) {
   const [productValidityList, setValidity] = useState([]);
@@ -120,30 +121,60 @@ function ProductValidity({ sanitizeInput }) {
             
             <tbody className="bg-white">
 
-            {filteredValidityData.map((validity, index) => (
+              {filteredValidityData.length === 0 ? 
 
-                 
-  
-                  <tr
-                    key={index}
-                    className={
-                      validity.expy
-                        ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90 h-14'
-                        : validity.near_expy
-                        ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
-                        : 'hover:bg-gray-200/70 h-14'
-                    }
-                  >
+                (
+                 <NoInfoFound col={5}/>
+                ) :
 
-                    <td className="px-4 py-2 text-center"  >{validity.formated_date_added}</td>
-                    <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
-                    <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
-                    <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
-                    <td className="px-4 py-2 text-center"  >{validity.quantity_added}</td>
+                (
+                  filteredValidityData.map((validity, index) => (
+                    <tr
+                      key={index}
+                      className={
+                        validity.expy
+                          ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90 h-14'
+                          : validity.near_expy
+                          ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
+                          : 'hover:bg-gray-200/70 h-14'
+                      }
+                    >
+                      {(validity.expy || validity.near_expy) ? 
+                      
+                          ( <td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
+                            
+                                <div className='flex items-center'>
+                                  <RiErrorWarningLine className='h-[100%]'/>
+                                </div>
+
+                                <div>
+                                  {validity.formated_date_added}
+                                </div>
+                              
+                            </td>
+                          ) : 
+                            
+                          (
+                            <td className="px-4 py-2 text-center items-center "  > 
+                              {validity.formated_date_added}
+                            </td>
+                          )
                     
-                  </tr>
-              
-            ))}
+                       }
+                     
+
+                      <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
+                      <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
+                      <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
+                      <td className="px-4 py-2 text-center"  >{validity.quantity_added}</td>
+                      
+                    </tr>
+                    
+                  ))
+                  
+                )
+              }
+
             </tbody>
 
           </table>

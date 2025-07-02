@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BsFunnelFill } from "react-icons/bs";
+import NoInfoFound from '../utils/NoInfoFound';
  
 function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
 
@@ -128,16 +129,25 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
                     </tr>
                   </thead>
                   <tbody className='bg-white '>
-                    {productHistory.map((history, histoindx) => (
-                      <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {history.h_unit_cost}</td>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{history.quantity_added}</td>
-                        <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {history.value}</td>
-                      </tr>
-                    ))}
+                    {productHistory.length === 0 ?
+                      (
+                        <NoInfoFound col={6}/>
+                      ) :
+
+                      (
+                        productHistory.map((history, histoindx) => (
+                          <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {history.h_unit_cost}</td>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{history.quantity_added}</td>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {history.value}</td>
+                          </tr>
+                        ))
+                      )
+                    }
+                   
                   </tbody>
                 </table>
               </div>

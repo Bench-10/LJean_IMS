@@ -1,5 +1,6 @@
 import React, { useEffect, useState }from 'react';
 import axios from 'axios';
+import NoInfoFound from '../utils/NoInfoFound';
 
 
 function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput}) {
@@ -106,30 +107,39 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
 
             
             <tbody className="bg-white">
-              {filteredData.map((row, rowIndex) => (
+
+              {filteredData.length === 0 ? 
+                (
+                  <NoInfoFound col={10}/>
+                ) : 
+
+                (
+                  filteredData.map((row, rowIndex) => (
                 
-               
-                <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`}>
-                  <td className="px-4 py-2 text-center"  >{row.product_id}</td>
-                  <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
-                  <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
-                  <td className="px-4 py-2"  >{row.unit}</td>
-                  <td className="px-4 py-2 text-right"  >₱ {row.unit_price}</td>
-                  <td className="px-4 py-2 text-right"  >₱ {row.unit_cost}</td>
-                  <td className="px-4 py-2 text-right"  >{row.quantity}</td>
-                  <td className="px-4 py-2 text-center"  >{row.threshold}</td>
-                  <td className="px-4 py-2 text-center w-36"  >
-                    <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
-                      {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
-                        Edit
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`}>
+                      <td className="px-4 py-2 text-center"  >{row.product_id}</td>
+                      <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
+                      <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
+                      <td className="px-4 py-2"  >{row.unit}</td>
+                      <td className="px-4 py-2 text-right"  >₱ {row.unit_price}</td>
+                      <td className="px-4 py-2 text-right"  >₱ {row.unit_cost}</td>
+                      <td className="px-4 py-2 text-right"  >{row.quantity}</td>
+                      <td className="px-4 py-2 text-center"  >{row.threshold}</td>
+                      <td className="px-4 py-2 text-center w-36"  >
+                        <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
+                          {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
+                            Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) 
+              }
+              
             </tbody>
           </table>
            {error && <div className="flex font-bold justify-center px-4 py-4">{error}</div>} 

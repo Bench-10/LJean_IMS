@@ -44,7 +44,7 @@ function App() {
 
   //RENDERS THE TABLE
   useEffect(() =>{
-      fetchProductsData();
+    fetchProductsData()
   }, [listCategories]);
 
 
