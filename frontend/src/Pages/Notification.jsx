@@ -1,11 +1,39 @@
-import React from 'react'
+import { useEffect, useState, React} from 'react';
+import axios from 'axios';
+
+
+
 
 function Notification() {
-  return (
-    <div className=' ml-[220px] p-8 max-h-screen'>
 
-      <div className='mb-7'>
-         <h1 className='text-4xl font-bold mb-2'>
+  const [notify, setNotify] = useState([]);
+
+  const getTime = async () =>{
+    try {
+      const time = await axios.get('http://localhost:3000/api/notifications')
+      setNotify(time.data);
+    } catch (error) {
+      console.log(error.message);
+      
+    }
+
+  };
+
+
+  useEffect(() => {
+    getTime();
+  }, []);
+
+
+  const todayNotification = notify.filter(n => n.isDateToday);
+  const notTodayNotification = notify.filter(n => !n.isDateToday);
+
+
+  return (
+    <div className=' ml-[220px] px-8 py-5 max-h-screen'>
+
+      <div className='mb-6'>
+         <h1 className='text-4xl font-bold mb-1'>
             Notification
          </h1>
 
@@ -31,52 +59,42 @@ function Notification() {
           {/*TODAYS NOTIFICATION BLOCK CONTAINER*/}
           <div className='mt-3 flex flex-col gap-y-4'>
 
-             {/*TNOTIFICATION BLOCK */}
-            <div className='bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-red-800 rounded-lg shadow-lg'>
+            {/*NOTIFICATION BLOCK */}
+            {todayNotification.length === 0 ? 
+              (
+                <div className="text-gray-500 italic text-center">No notifications for today.</div>
+              ) :
 
-              <div className='mb-2'>
-                <h1 className='text-xl font-bold'>LOW STOCK</h1>
-              </div>
+              (
+                todayNotification.map((notification, index) => (
+                    <div key={index} className='bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-red-800 rounded-lg shadow-lg'>
 
-              <div className='mb-5'>
-                <span className=''>
-                  Product 1 has reached the minimun quantity of 200!
-                </span>
-              </div>
+                      <div className='mb-2'>
+                        <h1 className='text-xl font-bold'>{notification.alert_type}</h1>
+                      </div>
 
-              <div className='absolute right-8 bottom-2'>
-                <span className='text-xs italic'>
-                  5 mins ago
-                </span>
-              </div>
+                      <div className='mb-5'>
+                        <span className=''>
+                          {notification.message}
+                        </span>
+                      </div>
 
-            </div>
+                      <div className='absolute right-8 bottom-2'>
+                        <span className='text-xs italic'>
+                          {notification.alert_date_formatted}
+                        </span>
+                      </div>
 
+                  </div>
 
+                ))
+
+              )
             
-             {/*TNOTIFICATION BLOCK */}
-            <div className='bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-red-800 rounded-lg shadow-lg'>
-
-              <div className='mb-2'>
-                <h1 className='text-xl font-bold'>LOW STOCK</h1>
-              </div>
-
-              <div className='mb-5'>
-                <span className=''>
-                  Product 1 has reached the minimun quantity of 200!
-                </span>
-              </div>
-
-              <div className='absolute right-8 bottom-2'>
-                <span className='text-xs italic'>
-                  5 mins ago
-                </span>
-              </div>
-
-            </div>
-
+            }
 
           </div>
+
         </div>
 
         {/*PREVIOUS NOTIFICATION*/}
@@ -93,58 +111,49 @@ function Notification() {
           {/*PREVIOUS NOTIFICATION BLOCK CONTAINER */}
           <div className='mt-3 flex flex-col gap-y-4'>
 
-             {/*TNOTIFICATION BLOCK */}
-            <div className='bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-red-800 rounded-lg shadow-lg'>
+            {/*NOTIFICATION BLOCK */}
+            {notTodayNotification.length === 0 ? 
+                (
+                  <div className="text-gray-500 italic text-center mt-4">No notifications here.</div>
+                ) :
 
-              <div className='mb-2'>
-                <h1 className='text-xl font-bold'>LOW STOCK</h1>
-              </div>
+                (
+                  notTodayNotification.map((notification, index) => (
+                      <div key={index} className='bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-red-800 rounded-lg shadow-lg'>
 
-              <div className='mb-5'>
-                <span className=''>
-                  Product 1 has reached the minimun quantity of 200!
-                </span>
-              </div>
+                        <div className='mb-2'>
+                          <h1 className='text-xl font-bold'>{notification.alert_type}</h1>
+                        </div>
 
-              <div className='absolute right-8 bottom-2'>
-                <span className='text-xs italic'>
-                  5 mins ago
-                </span>
-              </div>
+                        <div className='mb-5'>
+                          <span className=''>
+                            {notification.message}
+                          </span>
+                        </div>
 
-            </div>
+                        <div className='absolute right-8 bottom-2'>
+                          <span className='text-xs italic'>
+                            {notification.alert_date_formatted}
+                          </span>
+                        </div>
 
+                    </div>
 
-            
-             {/*TNOTIFICATION BLOCK */}
-            <div className='bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-red-800 rounded-lg shadow-lg'>
-
-              <div className='mb-2'>
-                <h1 className='text-xl font-bold'>LOW STOCK</h1>
-              </div>
-
-              <div className='mb-5'>
-                <span className=''>
-                  Product 1 has reached the minimun quantity of 200!
-                </span>
-              </div>
-
-              <div className='absolute right-8 bottom-2'>
-                <span className='text-xs italic'>
-                  5 mins ago
-                </span>
-              </div>
-
-            </div>
-
+                  ))
+                )
+              
+              }
 
           </div>
+
         </div>
 
       </div>
       
     </div>
+
   )
+
 }
 
 export default Notification

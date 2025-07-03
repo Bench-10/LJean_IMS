@@ -1,11 +1,16 @@
 import { SQLquery } from '../db.js';
-import * as itemServices from '../Services/itemServices.js';
+import * as categoryServices from '../Services/categoryServices.js';
+import * as inventoryServices from '../Services/inventoryServices.js';
+import * as productHistoryServices from '../Services/productHistoryServices.js';
+import * as productValidityServices from '../Services/productValidityServices.js';
+import * as notificationServices from '../Services/notificationServices.js';
+
 
 
 //INVENTORY CONTROLLERS
 export const getAllItems = async (req, res) =>{
     try {
-        const items = await itemServices.getProductItems();
+        const items = await inventoryServices.getProductItems();
         res.status(200).json(items);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -18,7 +23,7 @@ export const getAllItems = async (req, res) =>{
 export const addItem = async (req, res) =>{
     try {
         const addedItemData = req.body;
-        const newItem = await itemServices.addProductItem(addedItemData);
+        const newItem = await inventoryServices.addProductItem(addedItemData);
         res.status(200).json(newItem);
     } catch (error) {
         await SQLquery('ROLLBACK');
@@ -34,7 +39,7 @@ export const updateItem = async (req, res) =>{
     try {
         const itemId = req.params.id;
         const updatedItemData = req.body;
-        const updatedItem = await itemServices.updateProductItem(updatedItemData, itemId);
+        const updatedItem = await inventoryServices.updateProductItem(updatedItemData, itemId);
 
         if (!updatedItem){
             send.res.status(404).json({message: 'Item no found'})
@@ -54,7 +59,7 @@ export const updateItem = async (req, res) =>{
 export const searchItem = async (req, res) =>{
     try {
         const searchItem = req.query.q;
-        const item = await itemServices.searchProductItem(searchItem);
+        const item = await inventoryServices.searchProductItem(searchItem);
         res.status(200).json(item);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -65,10 +70,12 @@ export const searchItem = async (req, res) =>{
 
 
 
+
+
 //CATEGORY CONTROLLERS
 export const getAllCategories = async (req, res) =>{
      try {
-        const categories = await itemServices.getAllCategories();
+        const categories = await categoryServices.getAllCategories();
         res.status(200).json(categories);
     } catch (error) {
         console.error('Error fetching list of categories: ', error);
@@ -80,7 +87,7 @@ export const getAllCategories = async (req, res) =>{
 export const addCAtegory = async (req, res) => {
     try {
         const addCategoryData = req.body;
-        const categories = await itemServices.addListCategory(addCategoryData);
+        const categories = await categoryServices.addListCategory(addCategoryData);
         res.status(200).json(categories);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -93,7 +100,7 @@ export const updateCategory = async (req, res) => {
     try {
         const categoryId = req.params.id;
         const updatedCategoryData = req.body;
-        const categories = await itemServices.updateListCategory(updatedCategoryData, categoryId);
+        const categories = await categoryServices.updateListCategory(updatedCategoryData, categoryId);
         res.status(200).json(categories);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -103,11 +110,13 @@ export const updateCategory = async (req, res) => {
 
 
 
+
+
 //PRODUCT HISTORY
 export const getAllProductHistory = async (req, res) =>{
     try {
         const dates = req.body;
-        const itemsHistory = await itemServices.getProductHistory(dates);
+        const itemsHistory = await productHistoryServices.getProductHistory(dates);
         res.status(200).json(itemsHistory);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -117,10 +126,12 @@ export const getAllProductHistory = async (req, res) =>{
 
 
 
+
+
 //PRODUCT VALIDITY
 export const getAllProductValidity = async (req, res) =>{
     try {
-        const itemsValidity = await itemServices.getProductValidity();
+        const itemsValidity = await productValidityServices.getProductValidity();
         res.status(200).json(itemsValidity);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -129,3 +140,15 @@ export const getAllProductValidity = async (req, res) =>{
 };
 
 
+
+
+
+export const getNotification = async (req, res) =>{
+    try {
+        const itemsValidity = await notificationServices.returnNotification();
+        res.status(200).json(itemsValidity);
+    } catch (error) {
+        console.error('Error fetching items: ', error);
+        res.status(500).jason({message: 'Internal Server Error'})
+    }
+};
