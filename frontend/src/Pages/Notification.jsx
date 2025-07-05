@@ -57,7 +57,7 @@ function Notification() {
           
 
           {/*TODAYS NOTIFICATION BLOCK CONTAINER*/}
-          <div className='mt-3 flex flex-col gap-y-4'>
+          <div className='mt-3 flex flex-col gap-y-4 py-3'>
 
             {/*NOTIFICATION BLOCK */}
             {todayNotification.length === 0 ? 
@@ -67,16 +67,16 @@ function Notification() {
 
               (
                 todayNotification.map((notification, index) => (
-                    <div key={index} className='bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-red-800 rounded-lg shadow-lg'>
+                    <div key={index} className={`bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-${notification.banner_color} rounded-lg shadow-lg`}>
 
                       <div className='mb-2'>
                         <h1 className='text-xl font-bold'>{notification.alert_type}</h1>
                       </div>
 
                       <div className='mb-5'>
-                        <span className=''>
+                        <p className=''>
                           {notification.message}
-                        </span>
+                        </p>
                       </div>
 
                       <div className='absolute right-8 bottom-2'>
@@ -109,26 +109,26 @@ function Notification() {
           </div>
 
           {/*PREVIOUS NOTIFICATION BLOCK CONTAINER */}
-          <div className='mt-3 flex flex-col gap-y-4'>
+          <div className='mt-3 flex flex-col gap-y-4 py-3'>
 
             {/*NOTIFICATION BLOCK */}
             {notTodayNotification.length === 0 ? 
                 (
-                  <div className="text-gray-500 italic text-center mt-4">No notifications here.</div>
+                  <div className="text-gray-500 italic text-center mt-2">No notifications here.</div>
                 ) :
 
                 (
                   notTodayNotification.map((notification, index) => (
-                      <div key={index} className='bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-red-800 rounded-lg shadow-lg'>
+                      <div key={index} className={`bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-${notification.banner_color} rounded-lg shadow-lg`}>
 
                         <div className='mb-2'>
                           <h1 className='text-xl font-bold'>{notification.alert_type}</h1>
                         </div>
 
                         <div className='mb-5'>
-                          <span className=''>
+                          <p className=''>
                             {notification.message}
-                          </span>
+                          </p>
                         </div>
 
                         <div className='absolute right-8 bottom-2'>

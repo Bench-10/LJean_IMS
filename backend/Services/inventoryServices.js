@@ -32,6 +32,10 @@ export const getProductItems = async() => {
 export const addProductItem = async (productData) => {
     const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity } = productData;
 
+    const productAddedNotifheader = "New Product";
+    const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
+    const color = 'green-600';
+
     await SQLquery('BEGIN');
 
     const insertToInventoryProducts = await SQLquery(
@@ -51,6 +55,14 @@ export const addProductItem = async (productData) => {
         [addedProductId, unit_price, unit_cost, quantity_added, date_added, product_validity]
     );
 
+    await SQLquery(
+        `INSERT INTO Inventory_Alerts 
+        (product_id, branch_id, alert_type, message, banner_color)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *`,
+        [addedProductId, branch_id, productAddedNotifheader, notifMessage, color]
+    );
+
     await SQLquery('COMMIT');
 
     const newProductRow = await getUpdatedInventoryList(addedProductId);
@@ -63,17 +75,43 @@ export const addProductItem = async (productData) => {
 export const updateProductItem = async (productData, itemId) => {
     const { product_name, category_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity } = productData;
 
-    await SQLquery('BEGIN');
+    const addStocksQuery = async () =>{
+
+        return await SQLquery(
+            `INSERT INTO Add_Stocks 
+            (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *`,
+            [itemId, unit_price, unit_cost, quantity_added, date_added, product_validity]
+        );
+
+    }
 
 
-    const previousData = await SQLquery('SELECT quantity, unit_price, unit_cost FROM Inventory_Product WHERE product_id =   $1', [itemId]
+    const previousData = await SQLquery('SELECT branch_id, quantity, unit_price, unit_cost FROM Inventory_Product WHERE product_id =   $1', [itemId]
     );
 
     const returnPreviousQuantity = Number(previousData.rows[0].quantity);   
     const returnPreviousPrice = Number(previousData.rows[0].unit_price);
-    const returnPreviousCost= Number(previousData.rows[0].unit_cost);
+    const returnPreviousCost = Number(previousData.rows[0].unit_cost);
+    const returnBranchId = Number(previousData.rows[0].branch_id);
 
     const quantity = returnPreviousQuantity + quantity_added;
+
+
+    // PRODUCT UPDATE BANNER TITLE
+    const productAddedNotifheader = "Product Update";
+
+    // UPDATE MESSAGES
+    const addqQunatityNotifMessage = `Additional ${quantity_added} ${unit} has been added to ${product_name} at a cost of ₱ ${unit_cost}.`;
+    const changePriceNotifMessage = `The price of ${product_name} has been changed from ₱ ${returnPreviousPrice} to ₱ ${unit_price}.`
+
+    // BANNER COLOR
+    const color = 'blue-700';
+
+
+    await SQLquery('BEGIN');
+
 
     await SQLquery(
         `UPDATE Inventory_Product SET 
@@ -85,17 +123,34 @@ export const updateProductItem = async (productData, itemId) => {
     );
 
 
-    if (quantity_added !== 0 || returnPreviousPrice !== unit_price || returnPreviousCost !== unit_cost){
+    if (quantity_added !== 0){
 
-         await SQLquery(
-            `INSERT INTO Add_Stocks 
-            (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity)
-            VALUES ($1, $2, $3, $4, $5, $6)
+        await addStocksQuery();
+
+        await SQLquery(
+            `INSERT INTO Inventory_Alerts 
+            (product_id, branch_id, alert_type, message, banner_color)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *`,
-            [itemId, unit_price, unit_cost, quantity_added, date_added, product_validity]
+            [itemId, returnBranchId, productAddedNotifheader, addqQunatityNotifMessage, color]
         );
 
     }
+
+    if (returnPreviousPrice !== unit_price){
+
+        await addStocksQuery();
+
+        await SQLquery(
+            `INSERT INTO Inventory_Alerts 
+            (product_id, branch_id, alert_type, message, banner_color)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *`,
+            [itemId, returnBranchId, productAddedNotifheader, changePriceNotifMessage, color]
+        );
+
+    }
+
    
    
     await SQLquery('COMMIT');

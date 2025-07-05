@@ -70,3 +70,16 @@ create table Inventory_Alerts(
 	foreign key(product_id) references Inventory_Product(product_id),
 	foreign key(branch_id) references Branch(branch_id)
 );
+
+
+create table Inventory_Alerts(
+	alert_id serial primary key,
+	product_id int,
+	branch_id int,
+	alert_type varchar(100),
+	message varchar(255),
+	banner_color varchar(25),
+	alert_date timestamp default NOW(),
+	foreign key(product_id) references Inventory_Product(product_id),
+	foreign key(branch_id) references Branch(branch_id)
+);

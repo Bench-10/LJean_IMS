@@ -39,7 +39,7 @@ function formatTime(timestamp) {
 export const returnNotification = async () =>{
 
     const {rows} = await SQLquery(`
-        SELECT alert_type, message, alert_date
+        SELECT alert_type, message, alert_date, banner_color
         FROM Inventory_Alerts
         ORDER BY alert_date DESC
 
