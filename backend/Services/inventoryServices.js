@@ -34,7 +34,7 @@ export const addProductItem = async (productData) => {
 
     const productAddedNotifheader = "New Product";
     const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
-    const color = 'green-600';
+    const color = 'green';
 
     await SQLquery('BEGIN');
 
@@ -107,7 +107,7 @@ export const updateProductItem = async (productData, itemId) => {
     const changePriceNotifMessage = `The price of ${product_name} has been changed from ₱ ${returnPreviousPrice} to ₱ ${unit_price}.`
 
     // BANNER COLOR
-    const color = 'blue-700';
+    const color = 'blue';
 
 
     await SQLquery('BEGIN');

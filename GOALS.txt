@@ -1,0 +1,18 @@
+###GOALS###
+
+- Login Page For Users
+
+- For Admin 
+
+- Compatible for different Branches
+
+- Proceed for making the billing
+
+- Noltification for Low Stock Alerts
+
+- For Monitoring Delivery
+
+- Manager Dashboard
+
+- Admin Dashboard
+

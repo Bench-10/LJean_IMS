@@ -19,14 +19,27 @@ function Notification() {
 
   };
 
-
+  //BEST FOR NOW
   useEffect(() => {
     getTime();
+
+    const intervalId = setInterval(() => {
+      getTime();
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, []);
+  
 
 
   const todayNotification = notify.filter(n => n.isDateToday);
   const notTodayNotification = notify.filter(n => !n.isDateToday);
+
+  const borderColorMap = {
+    'red': 'border-l-red-600',
+    'blue': 'border-l-blue-700',
+    'green': 'border-l-green-600',
+  };
 
 
   return (
@@ -67,7 +80,7 @@ function Notification() {
 
               (
                 todayNotification.map((notification, index) => (
-                    <div key={index} className={`bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-${notification.banner_color} rounded-lg shadow-lg`}>
+                    <div key={index} className={`bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 ${borderColorMap[notification.banner_color] || ''} rounded-lg shadow-lg`}>
 
                       <div className='mb-2'>
                         <h1 className='text-xl font-bold'>{notification.alert_type}</h1>
@@ -119,7 +132,7 @@ function Notification() {
 
                 (
                   notTodayNotification.map((notification, index) => (
-                      <div key={index} className={`bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 border-l-${notification.banner_color} rounded-lg shadow-lg`}>
+                      <div key={index} className={`bg-white relative flex flex-col px-8 py-4 border-2 border-gray-200 border-l-4 ${borderColorMap[notification.banner_color] || ''} rounded-lg shadow-lg`}>
 
                         <div className='mb-2'>
                           <h1 className='text-xl font-bold'>{notification.alert_type}</h1>

@@ -4,7 +4,7 @@ create table Branch (
 	address varchar(255) not null
 );
 
-insert into Branch (branch_id, branch_name, address) values(1, )
+insert into Branch (branch_id, branch_name, address) values(1, L-Jean Trading, Balagtas);
 
 
 create table Users (
