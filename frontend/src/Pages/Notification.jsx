@@ -39,6 +39,7 @@ function Notification() {
     'red': 'border-l-red-600',
     'blue': 'border-l-blue-700',
     'green': 'border-l-green-600',
+    'yellow': 'border-l-yellow-500',
   };
 
 
