@@ -29,6 +29,6 @@ app.get("/", (req, res) =>{
 
 
 //THIS NOTIFIES THE PRODUCT SHELFLIFE EVERY 12 AM
-cron.schedule('57 1 * * *', async () => {
+cron.schedule('0 0 * * *', async () => {
   notifyProductShelfLife();
 });
