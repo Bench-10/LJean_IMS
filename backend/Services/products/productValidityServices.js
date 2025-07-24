@@ -1,5 +1,5 @@
-import { SQLquery } from "../db.js";
-import { correctDateFormat } from "./Services_Utils/convertRedableDate.js";
+import { SQLquery } from "../../db.js";
+import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 
 
 

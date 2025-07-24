@@ -1,4 +1,4 @@
-import { SQLquery } from "../db.js";
+import { SQLquery } from "../../db.js";
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime.js';
 import isToday from 'dayjs/plugin/isToday.js';

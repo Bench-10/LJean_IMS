@@ -1,5 +1,6 @@
 import express from 'express';
 import * as itemControllers from '../Controllers/itemControllers.js';
+import * as userControllers from '../Controllers/userControllers.js';
 
 
 const router = express.Router();
@@ -26,12 +27,13 @@ router.post("/product_history", itemControllers.getAllProductHistory);
 
 
 //GET FOR PRODUCT VALIDITY
-router.get("/product_validity", itemControllers.getAllProductValidity)
+router.get("/product_validity", itemControllers.getAllProductValidity);
 
 
 
 //SHOW NOTIFICATIONS
-router.get("/notifications", itemControllers.getNotification)
+router.get("/notifications", itemControllers.getNotification);
+
 
 
 

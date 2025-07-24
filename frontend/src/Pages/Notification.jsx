@@ -1,5 +1,7 @@
 import { useEffect, useState, React} from 'react';
 import axios from 'axios';
+import { useAuth } from '../authentication/Authentication';
+import { MdOutlineLogout } from "react-icons/md";
 
 
 
@@ -7,6 +9,7 @@ import axios from 'axios';
 function Notification() {
 
   const [notify, setNotify] = useState([]);
+  const {user} = useAuth();
 
   const getTime = async () =>{
     try {
@@ -51,7 +54,7 @@ function Notification() {
             Notification
          </h1>
 
-         <h2 className='text-md font-semibold'>Welcome Bench Christian</h2>
+         <h2 className='text-md font-semibold'>{`Welcome ${user ? user.full_name:''}`}</h2>
       </div>
  
       {/*NOTIFICATION CONTAINER*/} 

@@ -8,6 +8,10 @@ import ProductValidity from "./Pages/ProductValidity";
 import Category from "./components/Category";
 import ProductTransactionHistory from "./components/ProductTransactionHistory";
 import { Routes, Route} from "react-router-dom";
+import Login from "./authentication/Login";
+import PageLayout from "./components/PageLayout";
+import Dashboard from "./Pages/Dashboard";
+import RouteProtection from "./utils/RouteProtection";
 
 
 
@@ -86,9 +90,9 @@ function App() {
 
   return (
 
-    <div>
+    <>
 
-      <NavBar />
+      {/*BRING BACK LATER IN THE DEVELOPMENT::: <NavBar />*/}
 
 
       {/*COMPONENTS*/}
@@ -119,45 +123,75 @@ function App() {
           onClose={() => setIsProductTransactOpen(false)}
       />
 
+      
+
        {/*EXPERIMENTAL */} {/*PAGES */}
       <Routes>
-          
-          <Route path="/" exact element={ 
-            <ProductInventory 
-              setIsCategory={setIsCategory} 
-              handleOpen={handleOpen} 
-              setProductsData={setProductsData} 
-              productsData={productsData}
-              setIsProductTransactOpen={setIsProductTransactOpen}
-              sanitizeInput={sanitizeInput}
 
-            />
+        <Route path="/" exact element={
+          <Login/>
+        }/>
+
+
+        <Route element={<PageLayout/>}>
+          <Route path="/inventory" exact element={ 
+              <RouteProtection>
+
+                  <ProductInventory 
+                    setIsCategory={setIsCategory} 
+                    handleOpen={handleOpen} 
+                    setProductsData={setProductsData} 
+                    productsData={productsData}
+                    setIsProductTransactOpen={setIsProductTransactOpen}
+                    sanitizeInput={sanitizeInput}
+
+                  />
+
+              </RouteProtection>
         
           }/>
          
 
           <Route path="/notification" exact element={
-            <Notification />
-            
+            <RouteProtection>
+
+               <Notification />
+
+            </RouteProtection>
             
           }/>
 
 
           <Route path="/product_validity" exact element={
-            <ProductValidity 
-              sanitizeInput={sanitizeInput}
-            
-            />
+            <RouteProtection>
+
+              <ProductValidity 
+                sanitizeInput={sanitizeInput}
+              
+              />
+
+            </RouteProtection>
             
             
           }/>
 
 
+          <Route path={"/dashboard"} exact element={
+            <RouteProtection>
+
+               <Dashboard/>
+
+
+            </RouteProtection>
+            
+          }/>
+
+
+        </Route>
 
       </Routes>
   
-
-    </div>
+    </>
    
 
 

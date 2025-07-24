@@ -1,9 +1,9 @@
 import { SQLquery } from '../db.js';
-import * as categoryServices from '../Services/categoryServices.js';
-import * as inventoryServices from '../Services/inventoryServices.js';
-import * as productHistoryServices from '../Services/productHistoryServices.js';
-import * as productValidityServices from '../Services/productValidityServices.js';
-import * as notificationServices from '../Services/notificationServices.js';
+import * as categoryServices from '../Services/products/categoryServices.js';
+import * as inventoryServices from '../Services/products/inventoryServices.js';
+import * as productHistoryServices from '../Services/products/productHistoryServices.js';
+import * as productValidityServices from '../Services/products/productValidityServices.js';
+import * as notificationServices from '../Services/products/notificationServices.js';
 
 
 

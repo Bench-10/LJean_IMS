@@ -1,62 +1,113 @@
 import React from 'react';
 import { IoMdNotifications } from "react-icons/io";
-import { MdOutlineInventory } from "react-icons/md";
+import { MdOutlineInventory, MdOutlineLogout, MdOutlineDashboard } from "react-icons/md";
 import { PiSealWarningBold } from "react-icons/pi";
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../authentication/Authentication';
 
 
 function NavBar() {
+  const navigate = useNavigate();
+  const {user, logout} = useAuth();
+
   return (
-    <nav className=" fixed top-0 left-0 h-screen w-[220px] bg-navBackground text-white p-3"> 
+    <nav className=" fixed top-0 left-0 bottom-0 w-[220px] bg-navBackground text-white p-3"> 
       {/*LOGO*/}
       <div>
          LOGO HERE
       </div>
 
       <hr className="mt-5 mb-6 border-1 border-white" />
-     
-      <div className=''>  
-        <ul className="flex flex-col gap-2 [&>a]:py-2 [&>a]:px-3 [&>a]:rounded-md [&>a]:transition-all [&>a]:border-l-4-transparent [&>a]:cursor-pointer [&>a:hover]:bg-[#254717] [&>a]:flex [&>a]:items-center [&>a]:gap-x-[7px]">
 
-      
-          <NavLink
-            to="/notification"
-            className={({ isActive }) =>
-              isActive
-                ? "border-l-8 bg-[#254717] border-l-green-400"
-                : ""
-            }
+      {/*SELECTED ROWS CONTAINER*/}
+      <div className='flex flex-col justify-between'>
+        {/*TOP HALF */}
+        <div>
+            <ul className="flex flex-col gap-2 [&>a]:py-2 [&>a]:px-3 [&>a]:rounded-md [&>a]:transition-all [&>a]:border-l-4-transparent [&>a]:cursor-pointer [&>a:hover]:bg-[#254717] [&>a]:flex [&>a]:items-center [&>a]:gap-x-[7px]">
+
+
+              {/*NOTIFICATION NAVIGATION*/}
+              {user && (user.role === 'Owner' || user.role === 'Inventory Staff') &&
+
+                  <NavLink
+                    to="/notification"
+                    className={({ isActive }) =>
+                      isActive
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <IoMdNotifications />Notification
+                  </NavLink>
+
+              }
+
+
+
+              {/*INVENTORY NAVIGATION*/}
+              {user && (user.role === 'Owner' || user.role === 'Inventory Staff') &&
+
+                  <NavLink
+                    to="/inventory"
+                    className={({ isActive }) =>
+                      isActive
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <MdOutlineInventory />Inventory
+                  </NavLink>
+
+              }
+
+
+
+              {/*PRODUCT VALIDITY NAVIGATION*/}
+              {user && (user.role === 'Owner' || user.role === 'Inventory Staff') &&
+
+                  <NavLink
+                    to="/product_validity"
+                    className={({ isActive }) =>
+                      isActive
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <PiSealWarningBold />Product Validity
+                  </NavLink>
+
+              }
+
+
+              {/*DASHBOARD NAVIGATION*/}
+              {user && (user.role === 'Owner') &&
+
+                  <NavLink
+                    to="/dashboard"
+                    className={({ isActive }) =>
+                      isActive
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <MdOutlineDashboard />Dasboard
+                  </NavLink>
+
+              }
+              
+
+            </ul>
+        </div>
+
+        {/*SECOND HALF*/}
+        <div className='flex justify-center'>
+          <button  
+            className='bg-green-600 py-2 px-9 rounded-md flex items-center justify-center gap-2'
+            onClick={() => logout()}
           >
-            <IoMdNotifications />Notification
-          </NavLink>
-
-
-
-          <NavLink
-            to="/"
-            className={({ isActive }) =>
-              isActive
-                ? "border-l-8 bg-[#254717] border-l-green-400"
-                : ""
-            }
-          >
-            <MdOutlineInventory />Inventory
-          </NavLink>
-
-
-
-          <NavLink
-            to="/product_validity"
-            className={({ isActive }) =>
-              isActive
-                ? "border-l-8 bg-[#254717] border-l-green-400"
-                : ""
-            }
-          >
-            <PiSealWarningBold />Product Validity
-          </NavLink>
-
-        </ul>
+            <MdOutlineLogout /> Logout
+          </button>
+        </div>
       </div>
     </nav>
   )

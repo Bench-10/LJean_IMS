@@ -1,4 +1,4 @@
-import { SQLquery } from "../db.js";
+import { SQLquery } from "../../db.js";
 
 
 //INVENTORY SERVICES

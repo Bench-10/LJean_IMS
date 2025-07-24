@@ -83,7 +83,7 @@ export const notifyProductShelfLife = async() =>{
                 FROM Inventory_alerts 
                 WHERE product_id = $1 
                 AND alert_type = $2
-                AND DATE(alert_date) BETWEEN ($3::date - INTERVAL '3 days') AND ($3::date) `,
+                AND DATE(alert_date) = ($3::date - INTERVAL '3 days')`,
                 [row.product_id, 'Near Expired', row.product_validity]
             );
 

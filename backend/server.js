@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import itemRoutes from './Routes/itemRoutes.js';
+import userRoutes from './Routes/userRoutes.js';
 import cron from "node-cron"
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 
@@ -16,7 +17,19 @@ app.use(express.json());
 
 const PORT = process.env.PORT;
 
+
+
+
+
+//FOR PRODUCT-RELATED DATA
 app.use('/api', itemRoutes);
+
+//FOR USER-RELATED DATA
+app.use('/api', userRoutes);
+
+
+
+
 
 app.listen(PORT, ()=>{
     console.log('Port '+ PORT + ' is currently running....' )
