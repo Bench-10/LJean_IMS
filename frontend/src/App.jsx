@@ -1,7 +1,6 @@
 import axios from "axios";
 import { useState, useEffect } from "react";
 import ModalForm from "./components/ModalForm";
-import NavBar from "./components/NavBar";
 import ProductInventory from "./Pages/ProductInventory";
 import Notification from "./Pages/Notification";
 import ProductValidity from "./Pages/ProductValidity";
@@ -12,6 +11,7 @@ import Login from "./authentication/Login";
 import PageLayout from "./components/PageLayout";
 import Dashboard from "./Pages/Dashboard";
 import RouteProtection from "./utils/RouteProtection";
+import UserManagement from "./Pages/UserManagement";
 
 
 
@@ -132,10 +132,10 @@ function App() {
           <Login/>
         }/>
 
-
-        <Route element={<PageLayout/>}>
+        
+        <Route element={<RouteProtection>  <PageLayout/>  </RouteProtection>}>
           <Route path="/inventory" exact element={ 
-              <RouteProtection>
+              <RouteProtection allowedRoles={['Owner', 'Inventory Staff', 'Branch Manager']}>
 
                   <ProductInventory 
                     setIsCategory={setIsCategory} 
@@ -153,7 +153,7 @@ function App() {
          
 
           <Route path="/notification" exact element={
-            <RouteProtection>
+            <RouteProtection allowedRoles={['Inventory Staff', 'Branch Manager']} >
 
                <Notification />
 
@@ -163,7 +163,7 @@ function App() {
 
 
           <Route path="/product_validity" exact element={
-            <RouteProtection>
+            <RouteProtection allowedRoles={['Inventory Staff', 'Branch Manager']} >
 
               <ProductValidity 
                 sanitizeInput={sanitizeInput}
@@ -177,13 +177,22 @@ function App() {
 
 
           <Route path={"/dashboard"} exact element={
-            <RouteProtection>
+            <RouteProtection allowedRoles={['Owner','Branch Manager']} >
 
                <Dashboard/>
 
 
             </RouteProtection>
             
+          }/>
+
+          <Route path="/user_management" exact element={ 
+              <RouteProtection allowedRoles={['Owner']}>
+
+                  <UserManagement/>
+
+              </RouteProtection>
+        
           }/>
 
 

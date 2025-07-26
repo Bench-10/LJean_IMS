@@ -1,10 +1,12 @@
 import React, { useEffect, useState }from 'react';
 import axios from 'axios';
 import NoInfoFound from '../utils/NoInfoFound';
+import { useAuth } from '../authentication/Authentication';
 
 
 function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput}) {
   
+  const {user} = useAuth();
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
 
@@ -48,16 +50,21 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
           </div>
 
           {/*CATEGORIES AND ADD ITEM */}
-          <div  className="ml-auto flex gap-4">
-            
-            {/*CATEGORIES BTN*/}
-            <button className='border border-[#61CBE0] text-[#61CBE0] font-medium hover:bg-[#61CBE0] hover:text-white px-5 rounded-md transition-all' onClick={() => setIsCategory(true)}>CATEGORIES</button>
+          {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
+          {user.role === 'Inventory Staff' &&
+          
+            <div  className="ml-auto flex gap-4">
+              
+              {/*CATEGORIES BTN*/}
+              <button className='border border-[#61CBE0] text-[#61CBE0] font-medium hover:bg-[#61CBE0] hover:text-white px-5 rounded-md transition-all' onClick={() => setIsCategory(true)}>CATEGORIES</button>
 
 
-            {/*ADD ITEM BTN*/}
-            <button className='border border-[#63FF4F] text-[#63FF4F] font-medium hover:bg-[#63FF4F] hover:text-white px-5 rounded-md transition-all' onClick={() => handleOpen('add')}>ADD ITEMS</button>
+              {/*ADD ITEM BTN*/}
+              <button className='border border-[#63FF4F] text-[#63FF4F] font-medium hover:bg-[#63FF4F] hover:text-white px-5 rounded-md transition-all' onClick={() => handleOpen('add')}>ADD ITEMS</button>
 
-          </div>
+            </div>
+
+          }
           
 
         </div>
@@ -98,9 +105,15 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-38">
                     STATUS
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-20">
-                    ACTION
-                  </th>
+
+                  {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
+                  {user.role === 'Inventory Staff' &&
+
+                    <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-20">
+                      ACTION
+                    </th>
+
+                  }
                
               </tr>
             </thead>
@@ -130,11 +143,18 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
                           {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}
                         </div>
                       </td>
-                      <td className="px-4 py-2 text-center">
-                        <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
-                            Edit
-                        </button>
-                      </td>
+
+                      {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
+                      {user.role === 'Inventory Staff' &&
+
+                        <td className="px-4 py-2 text-center">
+                          <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
+                              Edit
+                          </button>
+                        </td>
+
+                      }
+                      
                     </tr>
                   ))
                 ) 

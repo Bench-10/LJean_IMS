@@ -28,7 +28,8 @@ create table Users (
 INSERT INTO users(user_id, branch_id, role, first_name, last_name, cell_number) VALUES
 (1, 1, 'Inventory Staff', 'Cathy', 'Portillo', '09674529545'),
 (2, 2, 'Inventory Staff', 'Nicole', 'Lacsamana', '09674836545'),
-(3, 3, 'Inventory Staff', 'Louise', 'Ordunia', '09605621545');
+(3, 3, 'Inventory Staff', 'Louise', 'Ordunia', '09605621545'),
+(5, 1, 'Branch Manager', 'Bench', 'Dela Luna', '09674529545');
 
 
 

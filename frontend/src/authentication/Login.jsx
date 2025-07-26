@@ -1,17 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaUser, FaLock } from 'react-icons/fa';
-import Authentication from './Authentication';
 import './login.css';
 import { useAuth } from './Authentication'; 
 
 
 function Login() {
   const navigate = useNavigate();
-  const { loginAuthentication } = useAuth();
+  const { loginAuthentication, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
+
+
+  //PREVENTS THE USER FROM GOING BACK TO THE LOGIN PAGE AFTER A SUCCESSFUL LOGIN
+  useEffect(() => {
+    if (user && user.role) {
+      if (user.role === 'Inventory Staff' || user.role === 'Branch Manager') {
+        navigate('/notification', { replace: true });
+      } else if (user.role === 'Owner') {
+        navigate('/inventory', { replace: true });
+      }
+    }
+  }, [user, navigate]);
+
 
 
 
@@ -31,24 +43,13 @@ function Login() {
 
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
+
     //METHOD FROM AUTHENTICATION COMPONENT
     if (validateForm()){
-      const userRole = await loginAuthentication(username, password);
+      loginAuthentication(username, password);
 
-      if (userRole){
-        if (userRole === 'Inventory Staff'){
-          navigate('/notification', { replace: true })
-        }
-
-        if (userRole === 'Owner'){
-          navigate('/notification')
-        }
-        
-      } else if(!userRole){
-        console.log('wgrong')
-      }
     };
     
   };

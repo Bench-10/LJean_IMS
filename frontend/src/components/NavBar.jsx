@@ -2,16 +2,16 @@ import React from 'react';
 import { IoMdNotifications } from "react-icons/io";
 import { MdOutlineInventory, MdOutlineLogout, MdOutlineDashboard } from "react-icons/md";
 import { PiSealWarningBold } from "react-icons/pi";
-import { NavLink, useNavigate } from 'react-router-dom';
+import { FaUsersCog } from "react-icons/fa";
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../authentication/Authentication';
 
 
 function NavBar() {
-  const navigate = useNavigate();
   const {user, logout} = useAuth();
 
   return (
-    <nav className=" fixed top-0 left-0 bottom-0 w-[220px] bg-navBackground text-white p-3"> 
+    <nav className="fixed top-0 left-0 h-screen w-[220px] bg-navBackground text-white p-3 box-border"> 
       {/*LOGO*/}
       <div>
          LOGO HERE
@@ -20,14 +20,14 @@ function NavBar() {
       <hr className="mt-5 mb-6 border-1 border-white" />
 
       {/*SELECTED ROWS CONTAINER*/}
-      <div className='flex flex-col justify-between'>
+      <div className="flex flex-col justify-between h-[90%]">
         {/*TOP HALF */}
         <div>
             <ul className="flex flex-col gap-2 [&>a]:py-2 [&>a]:px-3 [&>a]:rounded-md [&>a]:transition-all [&>a]:border-l-4-transparent [&>a]:cursor-pointer [&>a:hover]:bg-[#254717] [&>a]:flex [&>a]:items-center [&>a]:gap-x-[7px]">
 
 
               {/*NOTIFICATION NAVIGATION*/}
-              {user && (user.role === 'Owner' || user.role === 'Inventory Staff') &&
+              {user && (user.role === 'Branch Manager' || user.role === 'Inventory Staff') &&
 
                   <NavLink
                     to="/notification"
@@ -45,7 +45,7 @@ function NavBar() {
 
 
               {/*INVENTORY NAVIGATION*/}
-              {user && (user.role === 'Owner' || user.role === 'Inventory Staff') &&
+              {user && (user.role === 'Branch Manager' || user.role === 'Owner' || user.role === 'Inventory Staff') &&
 
                   <NavLink
                     to="/inventory"
@@ -63,7 +63,7 @@ function NavBar() {
 
 
               {/*PRODUCT VALIDITY NAVIGATION*/}
-              {user && (user.role === 'Owner' || user.role === 'Inventory Staff') &&
+              {user && (user.role === 'Branch Manager' || user.role === 'Inventory Staff') &&
 
                   <NavLink
                     to="/product_validity"
@@ -80,7 +80,7 @@ function NavBar() {
 
 
               {/*DASHBOARD NAVIGATION*/}
-              {user && (user.role === 'Owner') &&
+              {user && (user.role === 'Branch Manager' || user.role === 'Owner') &&
 
                   <NavLink
                     to="/dashboard"
@@ -91,6 +91,23 @@ function NavBar() {
                     }
                   >
                     <MdOutlineDashboard />Dasboard
+                  </NavLink>
+
+              }
+
+
+              {/*USER MANAGEMENT NAVIGATION*/}
+              {user && (user.role === 'Owner') &&
+
+                  <NavLink
+                    to="/user_management"
+                    className={({ isActive }) =>
+                      isActive
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <FaUsersCog />User Management
                   </NavLink>
 
               }
