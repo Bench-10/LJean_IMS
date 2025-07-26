@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react'
+import { useAuth } from '../authentication/Authentication';
 
 
 function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput}) {
+
+  //GET USER INFORMATION
+  const { user } = useAuth();
+
+
   // CATEGORY OPTIONS (TEMPORARY)
 
   const [product_name, setItemName] = useState('');
   const [category_id, setCategory] = useState('');
-  const [branch_id, setBranch] = useState('1'); // TEMPORARY DATA
+  const [branch_id, setBranch] = useState(''); 
   const [quantity_added, setQuantity] = useState('');
   const [unit_cost, setPurchasedPrice] = useState('');
   const [date_added, setDatePurchased] = useState('');
@@ -33,7 +39,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       if (mode === 'add') {
           setItemName('');
           setCategory('');
-          setBranch('1');
+          setBranch(user.branch_id);
           setQuantity('');
           setPurchasedPrice('');
           setDatePurchased('');
@@ -41,12 +47,23 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
           setThreshold('');
           setPrice('');
           setExpirationDate('');
-        }
+      }
+
+      if (isModalOpen && mode === 'edit' && itemData){
+      setItemName(itemData.product_name);
+      setCategory(itemData.category_id);
+      setBranch(user.branch_id); //BRANCH ID FROM USER INFORMATION
+      setQuantity('');
+      setPurchasedPrice(itemData.unit_cost);
+      setUnit(itemData.unit);
+      setThreshold(itemData.threshold);
+      setPrice(itemData.unit_price);
+      setDatePurchased('');
+      setExpirationDate('');
+    } 
     }
-  }, [isModalOpen]); 
+  }, [isModalOpen, mode, itemData]); 
 
-
-  
 
 
   //HANDLES THE SUBMIT
@@ -129,22 +146,6 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     onClose();
   };
 
-  useEffect(() =>{
-    if (isModalOpen && mode === 'edit' && itemData){
-      setItemName(itemData.product_name);
-      setCategory(itemData.category_id);
-      setBranch('1');
-      setQuantity('');
-      setPurchasedPrice(itemData.unit_cost);
-      setUnit(itemData.unit);
-      setThreshold(itemData.threshold);
-      setPrice(itemData.unit_price);
-      setDatePurchased('');
-      setExpirationDate('');
-    } 
-
-  }, [isModalOpen, mode, itemData]);
-
 
   const inputClass = (field) => 
     `bg-gray-100 border-gray-300 py-2 px-3 w-full rounded-md border border-2 ${
@@ -185,7 +186,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
 
-        <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen}>
+        <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen && user.role === 'Inventory Staff'}>
             <div className="relative flex flex-col border border-gray-600/40 bg-white h-[555px] w-[600px] rounded-md p-7 animate-popup" >
 
 
