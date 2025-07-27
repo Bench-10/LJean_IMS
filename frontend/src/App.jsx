@@ -12,6 +12,7 @@ import PageLayout from "./components/PageLayout";
 import Dashboard from "./Pages/Dashboard";
 import RouteProtection from "./utils/RouteProtection";
 import UserManagement from "./Pages/UserManagement";
+import UserModalForm from "./components/UserModalForm";
 
 
 
@@ -58,6 +59,11 @@ function App() {
     setIsModalOpen(true);
     setModalMode(mode);
   };
+
+
+  const handleUserModalOpen = () =>{
+    setIsModalOpen(true);
+  }
 
 
   //ADD OR EDIT DATA TO THE DATABASE
@@ -107,6 +113,13 @@ function App() {
       />
 
 
+      <UserModalForm 
+        isModalOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      
+      />
+
+
       <ModalForm 
          isModalOpen={isModalOpen} 
          OnSubmit={handleSubmit} 
@@ -117,6 +130,7 @@ function App() {
          sanitizeInput={sanitizeInput}
          
       />
+
 
       <ProductTransactionHistory
           isProductTransactOpen={isProductTransactOpen}
@@ -185,12 +199,15 @@ function App() {
             </RouteProtection>
             
           }/>
-          
+
 
           <Route path="/user_management" exact element={ 
               <RouteProtection allowedRoles={['Owner']}>
 
-                  <UserManagement/>
+                  <UserManagement
+                    handleUserModalOpen={handleUserModalOpen}
+                  
+                  />
 
               </RouteProtection>
         

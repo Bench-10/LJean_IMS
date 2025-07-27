@@ -31,7 +31,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
   //CLEARS THE FORM EVERYTIME THE ADD ITEMS BUTTON IS PRESSED
   useEffect(() => {
-    if (isModalOpen) {
+    if (isModalOpen && user.role === 'Inventory Staff') {
       setInvalidNumber({});
       setIsExpiredEarly(false);
       setEmptyField({});
@@ -177,7 +177,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   return (
     <div>
 
-      {isModalOpen && (
+      {isModalOpen && user.role === 'Inventory Staff' &&(
         <div
           className="fixed inset-0 bg-black/35 bg-opacity-50 z-40"
           style={{ pointerEvents: 'auto' }}  onClick={onClose}
