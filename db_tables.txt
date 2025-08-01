@@ -39,7 +39,7 @@ create table Login_Credentials (
 	user_id int,
 	username varchar(255) not null,
 	password varchar(255) not null,
-	foreign key(user_id) references Users(user_id)
+	foreign key(user_id) references Users(user_id) on delete cascade
 );
 
 

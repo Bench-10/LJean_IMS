@@ -13,11 +13,14 @@ import Dashboard from "./Pages/Dashboard";
 import RouteProtection from "./utils/RouteProtection";
 import UserManagement from "./Pages/UserManagement";
 import UserModalForm from "./components/UserModalForm";
+import UserInformation from "./components/UserInformation";
 
 
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openUsers, setOpenUsers] = useState(false);
+  const [userDetailes, setUserDetailes] = useState([]);
   const [isCategoryOpen, setIsCategory] = useState(false);
   const [isProductTransactOpen, setIsProductTransactOpen] = useState(false);
   const [modalMode, setModalMode] = useState('add');
@@ -25,6 +28,8 @@ function App() {
   const [productsData, setProductsData] = useState([]);
   const [listCategories, setListCategories] = useState([]);
   const [isHome, setIsHome] = useState(false);
+  const [users, setUsers] = useState('');
+  
 
 
 
@@ -61,10 +66,6 @@ function App() {
   };
 
 
-  const handleUserModalOpen = () =>{
-    setIsModalOpen(true);
-  }
-
 
   //ADD OR EDIT DATA TO THE DATABASE
   const handleSubmit = async (newItem) =>{
@@ -94,6 +95,27 @@ function App() {
   };
 
 
+  //USER CREATION MODAL LOGIC
+  const handleUserModalOpen = (mode) =>{
+    setIsModalOpen(true);
+    setModalMode(mode);
+  }
+
+
+  //FOR ADDING USER
+  const fetchUsersinfo = async() =>{
+
+    const response = await axios.get('http://localhost:3000/api/users');
+    setUsers(response.data)
+
+  };
+
+
+  useEffect(() => {
+    fetchUsersinfo();
+  }, [])
+
+
   return (
 
     <>
@@ -115,7 +137,9 @@ function App() {
 
       <UserModalForm 
         isModalOpen={isModalOpen}
+        mode={modalMode}
         onClose={() => setIsModalOpen(false)}
+        fetchUsersinfo ={fetchUsersinfo}
       
       />
 
@@ -129,6 +153,13 @@ function App() {
          listCategories={listCategories}
          sanitizeInput={sanitizeInput}
          
+      />
+
+      <UserInformation
+        openUsers={openUsers}
+        userDetailes={userDetailes}
+        onClose={() => setOpenUsers(false)} 
+        
       />
 
 
@@ -206,6 +237,9 @@ function App() {
 
                   <UserManagement
                     handleUserModalOpen={handleUserModalOpen}
+                    setOpenUsers={setOpenUsers}
+                    setUserDetailes={setUserDetailes}
+                    users={users}
                   
                   />
 

@@ -1,25 +1,10 @@
-import { useState, useEffect } from "react";
 import { MdGroupAdd } from "react-icons/md";
-import axios from 'axios';
 import NoInfoFound from "../utils/NoInfoFound";
+import { GrView } from "react-icons/gr";
 
 
 
-function UserManagement({handleUserModalOpen}) {
-
-  const [users, setUsers] = useState('');
-
-  const fetchUsersinfo = async() =>{
-
-    const response = await axios.get('http://localhost:3000/api/users');
-    setUsers(response.data)
-
-  };
-
-
-  useEffect(() => {
-    fetchUsersinfo();
-  }, [])
+function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetailes}) {
 
 
 
@@ -50,7 +35,7 @@ function UserManagement({handleUserModalOpen}) {
           <div  className="ml-auto flex">
 
               {/*ADD NEW USER BTN*/}
-              <button className='inline-flex items-center border bg-[#29a419] text-white px-5 rounded-md transition-all' onClick={() => handleUserModalOpen()}><MdGroupAdd className="mr-2"/>ADD NEW USER</button>
+              <button className='inline-flex items-center border bg-[#29a419] text-white px-5 rounded-md transition-all' onClick={() => handleUserModalOpen('add')}><MdGroupAdd className="mr-2"/>ADD NEW USER</button>
 
           </div>
 
@@ -71,17 +56,20 @@ function UserManagement({handleUserModalOpen}) {
                   <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white">
                     NAME
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-64 ">
+                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-52 ">
                     BRANCH
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-64">
+                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-52">
                     ROLE
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-40">
+                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-44">
                     CELL NUMBER
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-60">
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-36">
                     STATUS
+                  </th>
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-44">
+                    ACTION
                   </th>
                   
                
@@ -98,12 +86,25 @@ function UserManagement({handleUserModalOpen}) {
                 (
                   users.map((row, rowIndex) => (
                 
-                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}` } >
+                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
                       <td className="px-4 py-2"  >{row.full_name}</td>
                       <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.branch}</td>
                       <td className="px-4 py-2 whitespace-nowrap"  >{row.role}</td>
                       <td className="px-4 py-2"  >{row.cell_number}</td>
-                      <td className="px-4 py-2 text-center"  >Active</td>
+                      <td className="px-4 py-2 text-center align-middle">
+                        <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${row.is_active ? 'bg-[#61E85C] text-green-700 ' : 'bg-[#f97878] text-red-900' }`}> 
+                            {row.is_active ? 'Active' : 'Inactive'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex justify-center items-center h-full">
+                          <button className="bg-blue-500 py-2 px-3 rounded-md text-xs flex items-center gap-2 text-white hover:bg-blue-400">
+                            <GrView />
+                            View More
+                          </button>
+                        </div>
+                      </td>
+                      
 
                     </tr>
                   ))

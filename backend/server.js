@@ -44,4 +44,4 @@ app.get("/", (req, res) =>{
 //THIS NOTIFIES THE PRODUCT SHELFLIFE EVERY 12 AM
 cron.schedule('0 0 * * *', async () => {
   notifyProductShelfLife();
-});
+}, { timezone: "Asia/Manila" });

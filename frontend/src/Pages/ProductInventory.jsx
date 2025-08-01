@@ -84,7 +84,7 @@ function ProductInventory({handleOpen, setProductsData, productsData, setIsCateg
                   <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white">
                     ITEM NAME
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-44">
+                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-48">
                     CATEGORY
                   </th>
                   <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-3">

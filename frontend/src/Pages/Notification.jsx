@@ -28,7 +28,7 @@ function Notification() {
 
     const intervalId = setInterval(() => {
       getTime();
-    }, 5000);
+    }, 60000);
 
     return () => clearInterval(intervalId);
   }, []);
