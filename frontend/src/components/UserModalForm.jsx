@@ -2,9 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { RxCross2 } from "react-icons/rx";
 import axios from 'axios';
-import e from 'cors';
 
-function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo}) {
+function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes}) {
 
 
   //USERINFO FIELDS
@@ -36,7 +35,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo}) {
   //USER ROLES
   const userRole = [
     'Branch Manager',
-    'Inventory Employee',
+    'Inventory Staff',
     'Sales Associate'
   ];
 
@@ -44,7 +43,31 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo}) {
   //FETCH THE DATA ONCE
   useEffect(() =>{
     fetchBranch();
-  }, []);
+
+    if (mode === 'add' && user.role === 'Owner'){
+        setFirstName('');
+        setLastname('');
+        setBranch('');
+        setRole('');
+        setCellNumber('');
+        setAddress('');
+        setUsername('');
+        setPassword('');
+    }
+
+
+    if (mode === 'edit' && user.role === 'Owner' && userDetailes){
+        setFirstName(userDetailes.first_name);
+        setLastname(userDetailes.last_name);
+        setBranch(userDetailes.branch_id);
+        setRole(userDetailes.role);
+        setCellNumber(userDetailes.cell_number);
+        setAddress(userDetailes.address);
+        setUsername(userDetailes.username);
+        setPassword(userDetailes.password);
+    }
+    
+  }, [isModalOpen]);
 
 
 
@@ -93,16 +116,16 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo}) {
     <div>
         {isModalOpen && user.role === 'Owner' &&(
             <div
-            className="fixed inset-0 bg-black/35 bg-opacity-50 z-40"
+            className="fixed inset-0 bg-black/35 bg-opacity-50 z-100"
             style={{ pointerEvents: 'auto' }}  onClick={onClose}
             />
         )}
 
-        <dialog className='bg-transparent fixed top-0 bottom-0  z-50 rounded-md animate-popup' open={isModalOpen && user.role === 'Owner'}>
+        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user.role === 'Owner'}>
             <div className='bg-white text-black w-[700px] rounded-md' >
                 {/*HEADER TITLE */}
                 <div className='bg-green-800 p-4 rounded-t-md flex justify-between items-center '>
-                    <h1 className='text-white font-bold text-2xl'>ADD NEW USER</h1>
+                    <h1 className='text-white font-bold text-2xl'>{mode === 'add' ? 'ADD NEW USER': 'EDIT USER INFORMATION'}</h1>
 
                     <div>
                         <RxCross2 className='text-white text-lg cursor-pointer' onClick={onClose}/>
@@ -273,7 +296,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo}) {
                     {/*REGISTER BUTTON*/}
                         <div className='mb-2 mt-12 w-full text-center'>
                             <button type='submit' className='py-2 px-6 bg-green-700 rounded-md text-white'>
-                                Register User
+                                {mode === 'add' ? 'Register User':'Update User'}
                             </button>
                         </div>
                     </form>

@@ -52,3 +52,17 @@ export const userCreationAccount = async (req, res) =>{
         res.status(500).json({message: 'Internal Server Error'})
     }
 }
+
+
+
+//DELETING AN ACCOUNT
+export const userDeletionAccount = async (req, res) =>{
+    try {
+        const userID = req.params.id;
+        const user = await userCreation.deleteUser(userID);
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Error to delete a user: ', error);
+        res.status(500).json({message: 'Internal Server Error'})
+    }
+}

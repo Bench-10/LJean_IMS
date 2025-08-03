@@ -116,6 +116,13 @@ function App() {
   }, [])
 
 
+  const deleteUser = async(userID) =>{
+    await axios.delete(`http://localhost:3000/api/delete_account/${userID}`);
+    fetchUsersinfo();
+
+  };
+
+
   return (
 
     <>
@@ -137,6 +144,7 @@ function App() {
 
       <UserModalForm 
         isModalOpen={isModalOpen}
+        userDetailes={userDetailes}
         mode={modalMode}
         onClose={() => setIsModalOpen(false)}
         fetchUsersinfo ={fetchUsersinfo}
@@ -159,6 +167,8 @@ function App() {
         openUsers={openUsers}
         userDetailes={userDetailes}
         onClose={() => setOpenUsers(false)} 
+        handleUserModalOpen={handleUserModalOpen}
+        deleteUser={deleteUser}
         
       />
 

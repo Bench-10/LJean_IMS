@@ -6,6 +6,12 @@ export default {
   ],
   theme: {
     extend: {
+      zIndex: {
+        '100': '100',
+        '200': '200',
+        '999': '999',
+        'max': '2147483647' 
+      },
       colors: {
         background: '#E6ECE6',
         navBackground: '#0A2C0A',

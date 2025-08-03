@@ -1,18 +1,27 @@
 import { SQLquery } from "../../db.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
+import * as passwordEncryption from '../Services_Utils/passwordEncryption.js';
 
 
 
 export const getAllUsers = async () =>{
     const { rows } = await SQLquery(`
-            SELECT user_id, Branch.branch_name as branch, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address
+            SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password
             FROM Users
-            JOIN Branch USING(branch_id)
+            JOIN Branch ON Branch.branch_id = Users.branch_id
+            JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
             WHERE role != 'Owner'
             ORDER BY hire_date;
         `);
 
-    return rows;
+    const usersWithDecryptedPasswords = await Promise.all(
+        rows.map(async (user) => ({
+            ...user,
+            password: await passwordEncryption.decryptPassword(user.password)
+        }))
+    );
+
+    return usersWithDecryptedPasswords;
 };
 
 

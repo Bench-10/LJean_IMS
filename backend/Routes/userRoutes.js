@@ -19,5 +19,8 @@ router.post("/authentication", userControllers.userCredentials);
 //USER CREATION
 router.post("/create_account", userControllers.userCreationAccount);
 
+//USER DELETION
+router.delete("/delete_account/:id", userControllers.userDeletionAccount);
+
 
 export default router;

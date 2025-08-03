@@ -49,3 +49,11 @@ export const createUserAccount = async (UserData) => {
 };
 
 
+
+export const deleteUser = async (userID) =>{
+
+    await SQLquery('DELETE FROM Users WHERE user_id = $1', [userID]);
+
+};
+
+
