@@ -171,7 +171,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     else if (isExpiredEarly && field === 'product_validity')
       return <div className="italic text-red-500 absolute top-16 pl-2 text-xs mt-1">Expiry date must be after purchase date!</div>
       
-  }
+  };
 
 
   return (

@@ -17,6 +17,10 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
   const [password, setPassword] = useState('');
 
 
+  //STATES FOR ERROR HANDLING
+  const [emptyField, setEmptyField] = useState({});
+
+
   //FOR USER ROLE AUTHENTICATION
   const {user} = useAuth();
   const [branches, setBranches] = useState([]);
@@ -43,6 +47,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
   //FETCH THE DATA ONCE
   useEffect(() =>{
     fetchBranch();
+    setEmptyField({});
 
     if (mode === 'add' && user.role === 'Owner'){
         setFirstName('');
@@ -70,13 +75,37 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
   }, [isModalOpen]);
 
 
+  const validateInputs = () => {
+    
+    const isEmptyField = {};
+    
+
+    //CHECK IF INPUT IS EMPTY
+    if (!String(first_name).trim()) isEmptyField.first_name = true;
+    if (!String(last_name).trim()) isEmptyField.last_name = true;
+    if (!String(branch).trim()) isEmptyField.branch = true;
+    if (!String(role).trim()) isEmptyField.role = true;
+    if (!String(cell_number).trim()) isEmptyField.cell_number = true;
+    if (!String(address).trim()) isEmptyField.address = true;
+    if (!String(username).trim()) isEmptyField.username = true;
+    if (!String(password).trim()) isEmptyField.password = true;
+
+    setEmptyField(isEmptyField);
+ 
+    if (Object.keys(isEmptyField).length > 0) return false; 
+
+    return true;
+
+  };
+
+
 
   const submitUserConfirmation = async (e) => {
      e.preventDefault();
 
-     console.log(username);
-     console.log(password);
-
+     if(!validateInputs()){
+        return;
+     }
 
 
      const userData = {
@@ -112,6 +141,14 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
      onClose();
   };
 
+  const inputDesign = (field) => `w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md ${emptyField[field] ? 'border-red-500' : ''}`;
+
+  const errorflag = (field, field_warn) =>{
+    if (emptyField[field])
+      return <div className={`italic text-red-500 absolute ${field_warn === 'date' ? 'top-16':'top-17'} pl-2 text-xs mt-1`}>{`Please enter a ${field_warn}!`}</div>
+      
+  };
+
   return (
     <div>
         {isModalOpen && user.role === 'Owner' &&(
@@ -145,16 +182,19 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
                             {/*LEFT PART*/}
                             <div className='flex flex-col gap-y-8 w-full'>
 
-                                <div>
+                                <div className='relative'>
 
                                     <h2 className='font-semibold text-green-900 text-lg'>First Name</h2>
 
                                     <input type="text" 
-                                    className='w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md'
+                                    className={inputDesign('first_name')}
                                     value={first_name}
                                     onChange={(e) => setFirstName(e.target.value)}
+                                    
 
                                     />
+
+                                    {errorflag('first_name', 'First Name')}
 
                                 </div>
 
@@ -167,7 +207,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
                                     <select 
                                         name="" 
                                         id="" 
-                                        className='w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md'
+                                        className={inputDesign('branch')}
                                         value={branch}
                                         onChange={(e) => setBranch(e.target.value)}
 
@@ -180,6 +220,9 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     </select>
 
+                                    {errorflag('branch', 'Branch')}
+
+
                                 </div>
 
 
@@ -190,11 +233,14 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     <input 
                                     type="text" 
-                                    className='w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md'
+                                    className={inputDesign('cell_number')}
                                     value={cell_number}
                                     onChange={(e) => setCellNumber(e.target.value)}
 
                                     />
+
+                                    {errorflag('cell_number', 'Cellphone Number')}
+
 
                                 </div>
 
@@ -206,11 +252,14 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     <input 
                                     type="text" 
-                                    className='w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md '
+                                    className={inputDesign('username')}
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
 
                                     />
+
+                                    {errorflag('username', 'Username')}
+
 
                                 </div>
 
@@ -226,11 +275,14 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     <input 
                                         type="text" 
-                                        className='w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md '
+                                        className={inputDesign('last_name')}
                                         value={last_name}
                                         onChange={(e) => setLastname(e.target.value)}
 
                                     />
+
+                                    {errorflag('last_name', 'Last Name')}
+
 
                                 </div>
 
@@ -243,7 +295,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
                                     <select 
                                         name="" 
                                         id="" 
-                                        className='w-full h-10 px-2 py-1 outline-green-700 border-gray-300 border-2 rounded-md'
+                                        className={inputDesign('role')}
                                         value={role}
                                         onChange={(e) => setRole(e.target.value)}
 
@@ -256,6 +308,9 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     </select>
 
+                                    {errorflag('role', 'User Role')}
+
+
                                 </div>
 
 
@@ -266,11 +321,14 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     <input 
                                         type="text" 
-                                        className='w-full h-10 px-2 py-1 outline-green-700 border-gray-300 border-2 rounded-md'
+                                        className={inputDesign('address')}
                                         value={address}
                                         onChange={(e) => setAddress(e.target.value)}
 
                                     />
+
+                                    {errorflag('address', 'Address')}
+
 
                                 </div>
 
@@ -280,11 +338,14 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     <input 
                                         type="text" 
-                                        className='w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md' 
+                                        className={inputDesign('password')} 
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
 
                                     />
+
+                                    {errorflag('password', 'Password')}
+
 
                                 </div>
                                 

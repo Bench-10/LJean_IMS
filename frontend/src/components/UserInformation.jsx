@@ -2,6 +2,7 @@ import React from 'react'
 import { useAuth } from '../authentication/Authentication'
 import { FiEdit } from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
+import { RxCross2 } from "react-icons/rx";
 
 function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser}) {
 
@@ -24,6 +25,10 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
               {/*HEADER */}
               <div className='bg-green-800 p-4 rounded-t-md flex justify-between items-center'>
                   <h1 className='text-white font-bold text-2xl'>USER DETAILES</h1> 
+
+                  <div>
+                    <RxCross2 className='text-white text-lg cursor-pointer' onClick={onClose}/>
+                  </div>
 
               </div>
 
@@ -60,7 +65,7 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                     <div className='p-5 bg-gray-100 rounded-md'>
                         <h1 className='mb-1 font-semibold text-xs'>PERMISSIONS</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.permissions}</span>
+                        <span className='text-xs font-semibold'>{userDetailes.permissions}</span>
 
                     </div>
 
@@ -111,7 +116,7 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
               </div>
 
               {/*BUTTONS */}
-              <div className='flex justify-center mb-7 p-11 gap-x-10 text-white' >
+              <div className='flex justify-center mb-5 p-11 gap-x-10 text-white' >
 
                 <button className='py-2 px-3 bg-blue-600 w-44 rounded-md flex items-center justify-center gap-2 hover:bg-blue-500' onClick={() => handleUserModalOpen('edit')}>
                     <FiEdit />Edit
