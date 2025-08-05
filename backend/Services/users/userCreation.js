@@ -1,10 +1,9 @@
 import { SQLquery } from "../../db.js";
-import { saltHashPassword } from "../Services_Utils/passwordHashing.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 
 
 export const createUserAccount = async (UserData) => {
-    const { branch, role, first_name, last_name, cell_number, is_active, address, username, password } = UserData;
+    const { branch, role, first_name, last_name, cell_number, address, username, password } = UserData;
 
     //CREATES A UNIQUE USER ID
     let user_id;
@@ -46,6 +45,38 @@ export const createUserAccount = async (UserData) => {
     );
 
     await SQLquery('COMMIT');
+};
+
+
+
+export const updateUserAccount = async (UserID, UserData) =>{
+    const { branch, role, first_name, last_name, cell_number, address, username, password } = UserData;
+
+    const securePassword = await passwordEncryption.encryptPassword(password);
+
+    let permissions;
+
+    if (role === 'Branch Manager')
+        permissions = 'View Dashboard/view Inventory/View Notification/View Product Validity/Confirm Inventory Changes';
+
+    if (role === 'Inventory Staff')
+        permissions = 'Manage Inventory/View Product Validity/View Notifications';
+
+    if (role === 'Sales Associate')
+        permissions = 'Manage Sales Transactions/Monitor Deliveries';
+
+
+    await SQLquery('BEGIN');
+
+
+    await SQLquery(`UPDATE Users SET branch_id = $1, role = $2, first_name = $3, last_name = $4, cell_number = $5, permissions = $6, address = $7 WHERE user_id = $8`,[branch, role, first_name, last_name, cell_number, permissions, address, UserID]);
+
+
+    await SQLquery(`UPDATE Login_Credentials SET username = $1, password = $2 WHERE user_id = $3 `,[username, securePassword, UserID]);
+
+
+    await SQLquery('COMMIT');
+
 };
 
 

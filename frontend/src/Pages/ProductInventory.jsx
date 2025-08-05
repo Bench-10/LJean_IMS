@@ -4,7 +4,7 @@ import NoInfoFound from '../utils/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 
 
-function ProductInventory({handleOpen, setProductsData, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput}) {
+function ProductInventory({handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput}) {
   
   const {user} = useAuth();
   const [error, setError] = useState();

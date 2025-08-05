@@ -1,10 +1,28 @@
 import { MdGroupAdd } from "react-icons/md";
 import NoInfoFound from "../utils/NoInfoFound";
 import { GrView } from "react-icons/gr";
+import { useState } from "react";
 
 
 
-function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetailes}) {
+function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetailes, sanitizeInput}) {
+
+
+
+  const [searchItem, setSearchItem] = useState('');
+  
+
+  const handleSearch = (event) =>{
+    setSearchItem(sanitizeInput(event.target.value));
+
+  }
+
+
+  const filteredUserData = users.filter((user) => 
+    user.full_name.toLowerCase().includes(searchItem.toLowerCase()) || 
+    user.branch.toLowerCase().includes(searchItem.toLowerCase()) || 
+    user.role.toLowerCase().includes(searchItem.toLowerCase())
+  );
 
 
 
@@ -25,8 +43,9 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
             
             <input
               type="text"
-              placeholder="Search Item Name or Category"
+              placeholder="Search Employee Name or Branch or Role"
               className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
+              onChange={handleSearch}
               
             />
 
@@ -78,13 +97,13 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
 
             <tbody className="bg-white">
 
-              {users.length === 0 ? 
+              {filteredUserData.length === 0 ? 
                 (
                   <NoInfoFound col={10}/>
                 ) : 
 
                 (
-                  users.map((row, rowIndex) => (
+                  filteredUserData.map((row, rowIndex) => (
                 
                     <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
                       <td className="px-4 py-2"  >{row.full_name}</td>

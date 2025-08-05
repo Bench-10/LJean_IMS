@@ -67,6 +67,20 @@ export const userCreationAccount = async (req, res) =>{
 
 
 
+export const userUpdateAccount = async (req, res) =>{
+    try {
+        const userID = req.params.id;
+        const userData = req.body;
+        const user = await userCreation.updateUserAccount(userID, userData);
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Error updating users: ', error);
+        res.status(500).json({message: 'Internal Server Error'})
+    }
+}
+
+
+
 //DELETING AN ACCOUNT
 export const userDeletionAccount = async (req, res) =>{
     try {

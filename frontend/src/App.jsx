@@ -25,10 +25,9 @@ function App() {
   const [isProductTransactOpen, setIsProductTransactOpen] = useState(false);
   const [modalMode, setModalMode] = useState('add');
   const [itemData, setItemData] = useState(null);
-  const [productsData, setProductsData] = useState([]);
+  const [productsData, setProductsData] = useState([])
   const [listCategories, setListCategories] = useState([]);
-  const [isHome, setIsHome] = useState(false);
-  const [users, setUsers] = useState('');
+  const [users, setUsers] = useState([]);
   
 
 
@@ -146,7 +145,7 @@ function App() {
         isModalOpen={isModalOpen}
         userDetailes={userDetailes}
         mode={modalMode}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {setIsModalOpen(false); setOpenUsers(false);}}
         fetchUsersinfo ={fetchUsersinfo}
       
       />
@@ -249,6 +248,7 @@ function App() {
                     handleUserModalOpen={handleUserModalOpen}
                     setOpenUsers={setOpenUsers}
                     setUserDetailes={setUserDetailes}
+                    sanitizeInput={sanitizeInput}
                     users={users}
                   
                   />

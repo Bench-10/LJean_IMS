@@ -134,6 +134,19 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
      };
 
 
+     if (mode === 'edit'){
+        try {
+        const response = await axios.put(`http://localhost:3000/api/update_account/${userDetailes.user_id}`, userData);
+        await fetchUsersinfo();
+        console.log('Item Added', response.data);
+        
+        } catch (error) {
+            console.error('Error adding Item', error);
+        }
+
+     };
+
+
 
 
 
