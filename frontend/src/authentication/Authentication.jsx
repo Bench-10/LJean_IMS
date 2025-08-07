@@ -20,7 +20,13 @@ function Authentication ({ children }) {
       localStorage.setItem('userInfo', JSON.stringify(userData));
       return userData.role ? userData.role : false;
     } catch (error) {
-      alert('Something went wrong. Please try again.');
+      // Handle specific authentication errors
+      if (error.response && error.response.status === 401) {
+        const errorMessage = error.response.data.error;
+        throw new Error(errorMessage);
+      }
+      // Handle other errors
+      throw new Error('Something went wrong. Please try again.');
     }
   };
 
