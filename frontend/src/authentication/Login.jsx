@@ -16,8 +16,7 @@ function Login() {
   const [isShaking, setIsShaking] = useState({});
   const [validFields, setValidFields] = useState({});
 
-
-//PREVENTS THE USER FROM GOING BACK TO THE LOGIN PAGE AFTER A SUCCESSFUL LOGIN
+  //PREVENTS THE USER FROM GOING BACK TO THE LOGIN PAGE AFTER A SUCCESSFUL LOGIN
   useEffect(() => {
     if (user && user.role) {
       if (user.role === 'Inventory Staff' || user.role === 'Branch Manager') {
@@ -34,13 +33,13 @@ function Login() {
   const handleUsernameChange = (e) => {
     const value = e.target.value;
     setUsername(value);
-    
+
     // Clear errors when user starts typing
     if (errors.username || authErrors.username) {
       setErrors(prev => ({ ...prev, username: '' }));
       setAuthErrors(prev => ({ ...prev, username: '' }));
     }
-    
+
     // Show valid state for non-empty input
     if (value.trim()) {
       setValidFields(prev => ({ ...prev, username: true }));
@@ -52,13 +51,13 @@ function Login() {
   const handlePasswordChange = (e) => {
     const value = e.target.value;
     setPassword(value);
-    
+
     // Clear errors when user starts typing
     if (errors.password || authErrors.password) {
       setErrors(prev => ({ ...prev, password: '' }));
       setAuthErrors(prev => ({ ...prev, password: '' }));
     }
-    
+
     // Show valid state for non-empty input
     if (value) {
       setValidFields(prev => ({ ...prev, password: true }));
@@ -66,6 +65,7 @@ function Login() {
       setValidFields(prev => ({ ...prev, password: false }));
     }
   };
+
 
   const validateForm = () => {
     const newErrors = {};
@@ -76,20 +76,17 @@ function Login() {
     if (!password) 
       newErrors.password = 'Please enter your password.';
 
-
     setErrors(newErrors);
-
     return Object.keys(newErrors).length === 0;
-
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    
     // Clear previous authentication errors
     setAuthErrors({});
     setIsShaking({});
-    
+
     // Validate form first
     if (!validateForm()) {
       return;
@@ -100,7 +97,7 @@ function Login() {
       await loginAuthentication(username, password);
     } catch (error) {
       const errorMessage = error.message;
-      
+
       // Handle specific authentication errors
       if (errorMessage === 'Invalid username') {
         setAuthErrors({ username: 'Please enter a valid username.' });
@@ -112,9 +109,9 @@ function Login() {
         setTimeout(() => setIsShaking({}), 500);
       } else {
         // Generic error - show on both fields
-        setAuthErrors({ 
+        setAuthErrors({
           username: 'Authentication failed.',
-          password: 'Please check your credentials.' 
+          password: 'Please check your credentials.'
         });
         setIsShaking({ username: true, password: true });
         setTimeout(() => setIsShaking({}), 500);
@@ -124,8 +121,6 @@ function Login() {
 
 
   return (
-
-    
     <div className="login-container">
       <div className="login-left"></div>
       <div className="login-right">
@@ -145,7 +140,7 @@ function Login() {
               value={username}
               onChange={handleUsernameChange}
               className={`${
-                errors.username || authErrors.username ? 'input-error' : 
+                errors.username || authErrors.username ? 'input-error' :
                 validFields.username ? 'input-valid' : ''
               }`}
             />
@@ -168,7 +163,7 @@ function Login() {
               value={password}
               onChange={handlePasswordChange}
               className={`${
-                errors.password || authErrors.password ? 'input-error' : 
+                errors.password || authErrors.password ? 'input-error' :
                 validFields.password ? 'input-valid' : ''
               }`}
             />

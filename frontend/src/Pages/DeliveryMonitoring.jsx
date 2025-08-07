@@ -9,7 +9,7 @@ function DeliveryMonitoring() {
             <IoIosConstruct className='size-24 mb-3'/>
             <h1 className='font-bold text-3xl mb-3'>Page in construction.</h1>
             <p>This page is for the Sales Associate only.</p>
-            
+                
         </div>
         
     </div>
