@@ -1,7 +1,5 @@
 ###GOALS###
 
-- Login Page For Users
-
 - For Admin, Admin Dashboard, and also user management
 
 - Can  be accessed by different Branches

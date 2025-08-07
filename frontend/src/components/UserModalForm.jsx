@@ -3,7 +3,12 @@ import { useAuth } from '../authentication/Authentication';
 import { RxCross2 } from "react-icons/rx";
 import axios from 'axios';
 
-function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes}) {
+function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes}) {
+
+
+  //FOR USER ROLE AUTHENTICATION
+  const {user} = useAuth();
+  const [branches, setBranches] = useState([]);
 
 
   //USERINFO FIELDS
@@ -19,11 +24,6 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
   //STATES FOR ERROR HANDLING
   const [emptyField, setEmptyField] = useState({});
-
-
-  //FOR USER ROLE AUTHENTICATION
-  const {user} = useAuth();
-  const [branches, setBranches] = useState([]);
 
   
   const fetchBranch = async() =>{
@@ -46,10 +46,12 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
   //FETCH THE DATA ONCE
   useEffect(() =>{
+    if (!user) return;
+
     fetchBranch();
     setEmptyField({});
 
-    if (mode === 'add' && user.role === 'Owner'){
+    if (isModalOpen && mode === 'add' && user.role === 'Owner'){
         setFirstName('');
         setLastname('');
         setBranch('');
@@ -61,7 +63,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
     }
 
 
-    if (mode === 'edit' && user.role === 'Owner' && userDetailes){
+    if (isModalOpen && mode === 'edit' && user.role === 'Owner' && userDetailes){
         setFirstName(userDetailes.first_name);
         setLastname(userDetailes.last_name);
         setBranch(userDetailes.branch_id);
@@ -72,7 +74,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
         setPassword(userDetailes.password);
     }
     
-  }, [isModalOpen]);
+  }, [isModalOpen, user]);
 
 
   const validateInputs = () => {
@@ -138,7 +140,8 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
         try {
         const response = await axios.put(`http://localhost:3000/api/update_account/${userDetailes.user_id}`, userData);
         await fetchUsersinfo();
-        console.log('Item Added', response.data);
+        await setUserDetailes(response.data);
+        
         
         } catch (error) {
             console.error('Error adding Item', error);
@@ -146,12 +149,8 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
      };
 
-
-
-
-
-
      onClose();
+
   };
 
   const inputDesign = (field) => `w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md ${emptyField[field] ? 'border-red-500' : ''}`;
@@ -219,7 +218,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     <select 
                                         name="" 
-                                        id="" 
+                                        id="branch_select" 
                                         className={inputDesign('branch')}
                                         value={branch}
                                         onChange={(e) => setBranch(e.target.value)}
@@ -307,7 +306,7 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
 
                                     <select 
                                         name="" 
-                                        id="" 
+                                        id="role_select" 
                                         className={inputDesign('role')}
                                         value={role}
                                         onChange={(e) => setRole(e.target.value)}

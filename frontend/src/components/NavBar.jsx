@@ -2,7 +2,7 @@ import React from 'react';
 import { IoMdNotifications } from "react-icons/io";
 import { MdOutlineInventory, MdOutlineLogout, MdOutlineDashboard } from "react-icons/md";
 import { PiSealWarningBold } from "react-icons/pi";
-import { FaUsersCog } from "react-icons/fa";
+import { FaUsersCog, FaMoneyBillWave, FaShippingFast} from "react-icons/fa";
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../authentication/Authentication';
 
@@ -108,6 +108,40 @@ function NavBar() {
                     }
                   >
                     <FaUsersCog />User Management
+                  </NavLink>
+
+              }
+
+
+              {/*SALES NAVIGATION*/}
+              {user && (user.role === 'Sales Associate') &&
+
+                  <NavLink
+                    to="/sales"
+                    className={({ isActive }) =>
+                      isActive
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <FaMoneyBillWave />Sales Transactions
+                  </NavLink>
+
+              }
+
+
+              {/*DELIVERY MONITORING NAVIGATION*/}
+              {user && (user.role === 'Sales Associate') &&
+
+                  <NavLink
+                    to="/delivery"
+                    className={({ isActive }) =>
+                      isActive
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <FaShippingFast />Deliveries
                   </NavLink>
 
               }

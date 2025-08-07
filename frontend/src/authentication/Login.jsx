@@ -24,6 +24,8 @@ function Login() {
         navigate('/notification', { replace: true });
       } else if (user.role === 'Owner') {
         navigate('/inventory', { replace: true });
+      } else {
+        navigate('/sales', { replace: true });
       }
     }
   }, [user, navigate]);

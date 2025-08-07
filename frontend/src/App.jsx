@@ -14,6 +14,9 @@ import RouteProtection from "./utils/RouteProtection";
 import UserManagement from "./Pages/UserManagement";
 import UserModalForm from "./components/UserModalForm";
 import UserInformation from "./components/UserInformation";
+import Sales from "./Pages/Sales";
+import DeliveryMonitoring from "./Pages/DeliveryMonitoring";
+import AddSaleModalForm from "./components/AddSaleModalForm";
 
 
 
@@ -130,6 +133,13 @@ function App() {
 
 
       {/*COMPONENTS*/}
+      <AddSaleModalForm
+         isModalOpen={isModalOpen}
+         onClose={() => setIsModalOpen(false)}
+      
+      />
+
+
       <Category 
          isCategoryOpen={isCategoryOpen} 
          onClose={() => setIsCategory(false)}  
@@ -145,8 +155,9 @@ function App() {
         isModalOpen={isModalOpen}
         userDetailes={userDetailes}
         mode={modalMode}
-        onClose={() => {setIsModalOpen(false); setOpenUsers(false);}}
+        onClose={() => setIsModalOpen(false)}
         fetchUsersinfo ={fetchUsersinfo}
+        setUserDetailes={setUserDetailes}
       
       />
 
@@ -179,7 +190,7 @@ function App() {
 
       
 
-       {/*EXPERIMENTAL */} {/*PAGES */}
+      {/*PAGES */}
       <Routes>
 
         <Route path="/" exact element={
@@ -187,6 +198,7 @@ function App() {
         }/>
 
         
+        {/*INVENTORY PAGE*/}
         <Route element={<RouteProtection>  <PageLayout/>  </RouteProtection>}>
           <Route path="/inventory" exact element={ 
               <RouteProtection allowedRoles={['Owner', 'Inventory Staff', 'Branch Manager']}>
@@ -206,6 +218,7 @@ function App() {
           }/>
          
 
+          {/*NOTIFICATION PAGE*/}
           <Route path="/notification" exact element={
             <RouteProtection allowedRoles={['Inventory Staff', 'Branch Manager']} >
 
@@ -216,6 +229,7 @@ function App() {
           }/>
 
 
+          {/*PRODUCT VALIDITY/SHELF LIFE PAGE*/}
           <Route path="/product_validity" exact element={
             <RouteProtection allowedRoles={['Inventory Staff', 'Branch Manager']} >
 
@@ -230,6 +244,7 @@ function App() {
           }/>
 
 
+          {/*DASHBOARD PAGE*/}
           <Route path={"/dashboard"} exact element={
             <RouteProtection allowedRoles={['Owner','Branch Manager']} >
 
@@ -241,6 +256,7 @@ function App() {
           }/>
 
 
+          {/*USER MANAGEMENT PAGE*/}
           <Route path="/user_management" exact element={ 
               <RouteProtection allowedRoles={['Owner']}>
 
@@ -252,6 +268,31 @@ function App() {
                     users={users}
                   
                   />
+
+              </RouteProtection>
+        
+          }/>
+
+
+          {/*SALES TRANSACTION PAGE*/}
+          <Route path="/sales" exact element={ 
+              <RouteProtection allowedRoles={['Sales Associate']}>
+
+                  <Sales
+                    setIsModalOpen={setIsModalOpen}
+                  
+                  />
+
+              </RouteProtection>
+        
+          }/>
+
+
+          {/*DELIVERY PAGE*/}
+          <Route path="/delivery" exact element={ 
+              <RouteProtection allowedRoles={['Sales Associate']}>
+
+                  <DeliveryMonitoring/>
 
               </RouteProtection>
         

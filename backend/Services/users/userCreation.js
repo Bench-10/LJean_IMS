@@ -1,5 +1,7 @@
 import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
+import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
+
 
 
 export const createUserAccount = async (UserData) => {
@@ -75,7 +77,27 @@ export const updateUserAccount = async (UserID, UserData) =>{
     await SQLquery(`UPDATE Login_Credentials SET username = $1, password = $2 WHERE user_id = $3 `,[username, securePassword, UserID]);
 
 
+    const { rows } = await SQLquery(`
+            SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password
+            FROM Users
+            JOIN Branch ON Branch.branch_id = Users.branch_id
+            JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
+            WHERE Users.user_id = $1
+            ORDER BY hire_date;
+        `, [UserID]);
+    
+    const usersWithDecryptedPasswords = await Promise.all(
+        rows.map(async (user) => ({
+            ...user,
+            password: await passwordEncryption.decryptPassword(user.password)
+        }))
+    );
+
+
     await SQLquery('COMMIT');
+
+    
+    return usersWithDecryptedPasswords[0];
 
 };
 

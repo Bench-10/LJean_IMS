@@ -31,7 +31,10 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
   //CLEARS THE FORM EVERYTIME THE ADD ITEMS BUTTON IS PRESSED
   useEffect(() => {
-    if (isModalOpen && user.role === 'Inventory Staff') {
+    if (!user) return;
+
+
+    if (isModalOpen &&  mode === 'add' && user.role === 'Inventory Staff') {
       setInvalidNumber({});
       setIsExpiredEarly(false);
       setEmptyField({});
@@ -50,17 +53,17 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       }
 
       if (isModalOpen && mode === 'edit' && itemData){
-      setItemName(itemData.product_name);
-      setCategory(itemData.category_id);
-      setBranch(user.branch_id); //BRANCH ID FROM USER INFORMATION
-      setQuantity('');
-      setPurchasedPrice(itemData.unit_cost);
-      setUnit(itemData.unit);
-      setThreshold(itemData.threshold);
-      setPrice(itemData.unit_price);
-      setDatePurchased('');
-      setExpirationDate('');
-    } 
+        setItemName(itemData.product_name);
+        setCategory(itemData.category_id);
+        setBranch(user.branch_id); //BRANCH ID FROM USER INFORMATION
+        setQuantity('');
+        setPurchasedPrice(itemData.unit_cost);
+        setUnit(itemData.unit);
+        setThreshold(itemData.threshold);
+        setPrice(itemData.unit_price);
+        setDatePurchased('');
+        setExpirationDate('');
+      } 
     }
   }, [isModalOpen, mode, itemData]); 
 

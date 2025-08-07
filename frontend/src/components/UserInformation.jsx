@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useAuth } from '../authentication/Authentication'
 import { FiEdit } from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
