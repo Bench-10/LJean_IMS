@@ -1,43 +1,42 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
+import { SQLquery } from "../../db.js";
+import bcrypt from 'bcrypt';
+import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 
 
-const AuthContext = createContext();
+export const userAuth = async(loginInformation) =>{
+
+    const {username, password} = loginInformation;
 
 
-function Authentication ({ children }) {
-  const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem('userInfo');
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
+    //CHECK FIRST IF USER EXISTS
+    const existingUser = await SQLquery(
+        `SELECT user_id, password FROM Login_Credentials WHERE username = $1`,
+        [username]
+    );
 
-
-  const loginAuthentication = async (username, password) => {
-    try {
-      const response = await axios.post('http://localhost:3000/api/authentication', { username, password });
-      const userData = response.data[0];
-      setUser(userData);
-      localStorage.setItem('userInfo', JSON.stringify(userData));
-      return userData.role ? userData.role : false;
-    } catch (error) {
-      alert('Something went wrong. Please try again.');
-    }
-  };
-
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('userInfo');
+    if (!existingUser.rowCount) {
+        return { error: "Invalid username" }; // just remove the 
     
-  };
+    }
 
-  return (
-    <AuthContext.Provider value={{user, loginAuthentication,  logout}}>
-      {children}
-    </AuthContext.Provider>
-  )
+
+    //CHECK IF THE ENTERED PASSWORD IS EQUIVALENT TO ITS HASHED VALUE
+    const encryptedPassword = existingUser.rows[0].password;
+    const decryptedPassword = await passwordEncryption.decryptPassword(encryptedPassword);
+
+    if (password != decryptedPassword) {
+        return { error: "Invalid password" };
+    }
+
+
+    // FETCH THE USER DETAILS INCLUDING BRANCH NAME
+    const userData = await SQLquery(
+        `SELECT u.user_id, u.branch_id, b.branch_name, u.role, u.first_name || ' ' || u.last_name AS full_name, u.cell_number 
+        FROM Users u
+        JOIN Branch b ON u.branch_id = b.branch_id
+        WHERE u.user_id = $1`,
+        [existingUser.rows[0].user_id]
+    );
+
+    return userData.rows;
 }
-
-
-export default Authentication;
-export const useAuth = () => useContext(AuthContext);
