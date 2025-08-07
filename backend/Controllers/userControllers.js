@@ -30,10 +30,22 @@ export const getUsers = async (req, res) =>{
 export const userCredentials = async (req, res) =>{
     try {
         const loginCredentials = req.body;
-        const user = await userAuthentication.userAuth(loginCredentials);
-        res.status(200).json(user);
+        const result = await userAuthentication.userAuth(loginCredentials);
+        
+        // Check if authentication returned an error
+        if (result.error) {
+            return res.status(401).json({ error: result.error });
+        }
+        
+        // Check if user data was returned
+        if (result && result.length > 0) {
+            return res.status(200).json(result);
+        }
+        
+        // Handle edge case where no error or user data is returned
+        return res.status(401).json({ error: 'Authentication failed' });
     } catch (error) {
-        console.error('Error fetching users: ', error);
+        console.error('Error during authentication: ', error);
         res.status(500).json({message: 'Internal Server Error'})
     }
 }
