@@ -15,7 +15,8 @@ export const userAuth = async(loginInformation) =>{
     );
 
     if (!existingUser.rowCount) {
-        return { error: "Invalid username or password" };
+        return { error: "Invalid username" }; 
+    
     }
 
 
@@ -24,15 +25,16 @@ export const userAuth = async(loginInformation) =>{
     const decryptedPassword = await passwordEncryption.decryptPassword(encryptedPassword);
 
     if (password != decryptedPassword) {
-        return { error: "Invalid username or password" };
+        return { error: "Invalid password" };
     }
 
 
-    // FETCH THE USER DETAILS
+    // FETCH THE USER DETAILS INCLUDING BRANCH NAME
     const userData = await SQLquery(
-        `SELECT user_id, branch_id, role, first_name || ' ' || last_name AS full_name, cell_number 
-        FROM Users
-        WHERE user_id = $1`,
+        `SELECT u.user_id, u.branch_id, b.branch_name, u.role, u.first_name || ' ' || u.last_name AS full_name, u.cell_number 
+        FROM Users u
+        JOIN Branch b ON u.branch_id = b.branch_id
+        WHERE u.user_id = $1`,
         [existingUser.rows[0].user_id]
     );
 
