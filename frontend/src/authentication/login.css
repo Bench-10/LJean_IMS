@@ -20,15 +20,19 @@
   align-items: center;
   justify-content: center;
   background-color: white;
+  padding: 40px 20px;
+  min-height: 100vh;
 }
 
 .company-name-box {
   border: 5px solid #304C1C;
   border-radius: 7px;
-  padding: 10px 100px;
+  padding: 20px 150px;
   position: relative;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
   text-align: center;
+  max-width: 100%;
+  width: fit-content;
 }
 
 .company-name-box h1 {
@@ -53,10 +57,12 @@
 /* Login form */
 .login-form {
   background-color: #f7f7f7;
-  padding: 30px;
+  padding: 35px 40px;
   border-radius: 12px;
-  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.2);
-  width: 540px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 580px;
+  margin: 0 auto;
 }
 
 .login-form label {
@@ -82,10 +88,48 @@
 
 .input-icon input {
   width: 100%;
-  padding: 12px 12px 12px 36px;
+  padding: 12px 40px 12px 36px;
   border: 1px solid #ccc;
   border-radius: 6px;
   font-size: 14px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Disable browser's default password visibility toggle */
+.input-icon input[type="password"]::-ms-reveal,
+.input-icon input[type="password"]::-ms-clear {
+  display: none;
+}
+
+.input-icon input[type="password"]::-webkit-credentials-auto-fill-button,
+.input-icon input[type="password"]::-webkit-strong-password-auto-fill-button {
+  display: none !important;
+}
+
+/* Hide Chrome's password visibility toggle */
+.input-icon input[type="password"]::-webkit-textfield-decoration-container {
+  visibility: hidden;
+}
+
+.input-icon input[type="text"]::-webkit-textfield-decoration-container {
+  visibility: hidden;
+}
+
+.input-icon input:focus {
+  outline: none;
+  border-color: #304C1C;
+  box-shadow: 0 0 0 2px rgba(48, 76, 28, 0.1);
+}
+
+/* Input validation states */
+.input-error {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1) !important;
+}
+
+.input-valid {
+  border-color: #28a745 !important;
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.1) !important;
 }
 
 .forgot-password {
@@ -104,18 +148,30 @@
 
 .login-btn {
   width: 100%;
-  padding: 12px;
-  background-color: #304C1C;
+  padding: 14px;
+  background: linear-gradient(135deg, #304C1C 0%, #4a7c59 50%, #5c9d5a 100%);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
-  margin-top: 20px;
+  margin-top: 25px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(48, 76, 28, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .login-btn:hover {
-  background-color: #5c9d5a;
+  background: linear-gradient(135deg, #5c9d5a 0%, #4a7c59 50%, #304C1C 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(48, 76, 28, 0.4);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(48, 76, 28, 0.3);
 }
 
 .signup-text {
@@ -134,12 +190,84 @@
 }
 
 
+/* Password toggle button */
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #888;
+  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  transition: color 0.3s ease;
+  z-index: 10;
+}
+
+.password-toggle:hover {
+  color: #304C1C;
+}
+
+.password-toggle:focus {
+  outline: none;
+  color: #304C1C;
+}
+
+/* Ensure no pseudo-elements or duplications */
+.password-toggle::before,
+.password-toggle::after {
+  display: none;
+}
+
+.password-toggle svg {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.password-toggle > * {
+  display: block;
+  position: relative;
+}
+
+/* Shake animation - subtle version */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.shake {
+  animation: shake 0.3s ease-in-out;
+}
+
+/* Enhanced error messages */
 .error-message {
-  color: red;
+  color: #dc3545;
   font-size: 0.85rem;
-  margin-top: 2px;
+  margin-top: 5px;
   margin-bottom: 10px;
   margin-left: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.error-icon {
+  font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 
