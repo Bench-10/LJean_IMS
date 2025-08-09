@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BsFunnelFill } from "react-icons/bs";
 import NoInfoFound from '../utils/NoInfoFound';
+import { useAuth } from '../authentication/Authentication';
  
 function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
 
@@ -9,6 +10,8 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [productHistory, setProductHistory] = useState([]);
+
+  const {user} = useAuth();
 
 
   const closeFilterValue = () =>{
@@ -44,7 +47,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
       const dates = {startDate, endDate}
 
       try {
-        const response = await axios.post('http://localhost:3000/api/product_history/', dates);
+        const response = await axios.post(`http://localhost:3000/api/product_history?branch_id=${user.branch_id}`, dates);
         setProductHistory(response.data);
       } catch (error) {
         setError(error.message);

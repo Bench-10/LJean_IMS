@@ -17,6 +17,7 @@ import UserInformation from "./components/UserInformation";
 import Sales from "./Pages/Sales";
 import DeliveryMonitoring from "./Pages/DeliveryMonitoring";
 import AddSaleModalForm from "./components/AddSaleModalForm";
+import { useAuth } from "./authentication/Authentication";
 
 
 
@@ -31,6 +32,9 @@ function App() {
   const [productsData, setProductsData] = useState([])
   const [listCategories, setListCategories] = useState([]);
   const [users, setUsers] = useState([]);
+
+
+  const {user} = useAuth();
   
 
 
@@ -45,7 +49,7 @@ function App() {
   //DISPLAY THE INVENTORY TABLE
   const fetchProductsData = async () =>{
       try {
-        const response = await axios.get('http://localhost:3000/api/items/');
+        const response = await axios.get(`http://localhost:3000/api/items?branch_id=${user.branch_id}`);
         setProductsData(response.data);
       } catch (error) {
         setError(error.message);
@@ -53,11 +57,10 @@ function App() {
       }
   };
 
-
   //RENDERS THE TABLE
   useEffect(() =>{
     fetchProductsData()
-  }, [listCategories]);
+  }, [listCategories, user]);
 
 
   //HANDLES OPENING ADD OR EDIT MODAL
@@ -135,7 +138,7 @@ function App() {
       {/*COMPONENTS*/}
       <AddSaleModalForm
          isModalOpen={isModalOpen}
-         onClose={() => setIsModalOpen(false)}
+         setIsModalOpen={setIsModalOpen}
       
       />
 

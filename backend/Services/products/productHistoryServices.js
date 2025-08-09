@@ -4,7 +4,7 @@ import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 
 
 //PRODUCT HISTORY
-export const getProductHistory = async(dates) => {
+export const getProductHistory = async(dates, branchId) => {
     const { startDate, endDate } = dates;
 
 
@@ -14,8 +14,9 @@ export const getProductHistory = async(dates) => {
             FROM Add_Stocks
             LEFT JOIN Inventory_product USING(product_id)
             LEFT JOIN Category USING(category_id)
+            WHERE branch_id = $1
             ORDER BY date_added DESC, add_id DESC
-        `);
+        `,[branchId]);
         return rows;
   
     }
@@ -27,9 +28,9 @@ export const getProductHistory = async(dates) => {
             FROM Add_Stocks
             LEFT JOIN Inventory_product USING(product_id)
             LEFT JOIN Category USING(category_id)
-            WHERE date_added BETWEEN $1 AND $2
+            WHERE (date_added BETWEEN $1 AND $2) AND branch_id = $3
             ORDER BY date_added DESC, add_id DESC
-        `, [startDate, endDate]);
+        `, [startDate, endDate, branchId]);
 
         return rows;
         
@@ -42,9 +43,9 @@ export const getProductHistory = async(dates) => {
             FROM Add_Stocks
             LEFT JOIN Inventory_product USING(product_id)
             LEFT JOIN Category USING(category_id)
-            WHERE date_added >= $1
+            WHERE date_added >= $1 AND branch_id = $2
             ORDER BY date_added DESC, add_id DESC
-        `, [startDate]);
+        `, [startDate, branchId]);
 
         return rows;
     }
@@ -56,9 +57,9 @@ export const getProductHistory = async(dates) => {
             FROM Add_Stocks
             LEFT JOIN Inventory_product USING(product_id)
             LEFT JOIN Category USING(category_id)
-            WHERE date_added <= $1
+            WHERE date_added <= $1 AND branch_id = $2
             ORDER BY date_added DESC, add_id DESC
-        `, [endDate]);
+        `, [endDate, branchId]);
 
         return rows;
     }

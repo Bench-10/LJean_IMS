@@ -3,13 +3,13 @@ import { SQLquery } from "../../db.js";
 
 
 //INVENTORY SERVICES
-const getUpdatedInventoryList =  async (productId) => {
+const getUpdatedInventoryList =  async (productId, branchId) => {
    const { rows } = await SQLquery(
-        `SELECT product_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
+        `SELECT product_id, branch_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
          FROM inventory_product
          LEFT JOIN Category USING(category_id)
-         WHERE product_id = $1`,
-        [productId]
+         WHERE product_id = $1 AND branch_id = $2`,
+        [productId, branchId],
     );
 
     return rows[0];
@@ -17,14 +17,31 @@ const getUpdatedInventoryList =  async (productId) => {
 
 
 
-export const getProductItems = async() => {
+export const getProductItems = async(branchId) => {
+
+    if (!branchId || branchId == 0){
+        const {rows} = await SQLquery(`
+            SELECT product_id, branch_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
+            FROM inventory_product
+            LEFT JOIN Category USING(category_id)
+            ORDER BY inventory_product.product_id ASC
+        `);
+
+        return rows;
+
+    }; 
+
+
     const {rows} = await SQLquery(`
-        SELECT product_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold FROM inventory_product
+        SELECT product_id, branch_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
+        FROM inventory_product
         LEFT JOIN Category USING(category_id)
+        WHERE branch_id = $1
         ORDER BY inventory_product.product_id ASC
-    `);
+    `,[branchId]);
 
     return rows;
+
 };
 
 
@@ -65,7 +82,7 @@ export const addProductItem = async (productData) => {
 
     await SQLquery('COMMIT');
 
-    const newProductRow = await getUpdatedInventoryList(addedProductId);
+    const newProductRow = await getUpdatedInventoryList(addedProductId, branch_id);
 
     return newProductRow;
 };
@@ -73,7 +90,7 @@ export const addProductItem = async (productData) => {
 
 
 export const updateProductItem = async (productData, itemId) => {
-    const { product_name, category_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity } = productData;
+    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity } = productData;
 
     const addStocksQuery = async () =>{
 
@@ -155,7 +172,7 @@ export const updateProductItem = async (productData, itemId) => {
    
     await SQLquery('COMMIT');
 
-    const updatedProductRow = await getUpdatedInventoryList(itemId);
+    const updatedProductRow = await getUpdatedInventoryList(itemId, branch_id);
 
     return  updatedProductRow;
 };

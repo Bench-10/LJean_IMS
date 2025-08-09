@@ -2,15 +2,18 @@ import {React, useState, useEffect } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
 import axios from 'axios';
 import NoInfoFound from '../utils/NoInfoFound';
+import { useAuth } from '../authentication/Authentication';
 
 function ProductValidity({ sanitizeInput }) {
   const [productValidityList, setValidity] = useState([]);
   const [searchValidity, setSearchValidity] = useState('');
+
+  const {user} = useAuth();
   
 
   const getProductInfo = async () =>{
     try {
-      const data = await axios.get('http://localhost:3000/api/product_validity/');
+      const data = await axios.get(`http://localhost:3000/api/product_validity?branch_id=${user.branch_id}`);
       setValidity(data.data);
     } catch (error) {
       console.log(error.message);

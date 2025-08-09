@@ -1,7 +1,7 @@
 import { useEffect, useState, React} from 'react';
 import axios from 'axios';
 import { useAuth } from '../authentication/Authentication';
-import { MdOutlineLogout } from "react-icons/md";
+
 
 
 
@@ -13,7 +13,7 @@ function Notification() {
 
   const getTime = async () =>{
     try {
-      const time = await axios.get('http://localhost:3000/api/notifications')
+      const time = await axios.get(`http://localhost:3000/api/notifications?branch_id=${user.branch_id}`)
       setNotify(time.data);
     } catch (error) {
       console.log(error.message);

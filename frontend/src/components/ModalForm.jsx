@@ -34,7 +34,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     if (!user) return;
 
 
-    if (isModalOpen &&  mode === 'add' && user.role === 'Inventory Staff') {
+    if (isModalOpen && user.role === 'Inventory Staff') {
       setInvalidNumber({});
       setIsExpiredEarly(false);
       setEmptyField({});

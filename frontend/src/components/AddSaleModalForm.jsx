@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { IoMdAdd } from "react-icons/io";
 
-function AddSaleModalForm({isModalOpen, onClose}) {
+function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
 
   const {user} = useAuth();
   const [rows, setRows] = React.useState([
@@ -10,8 +10,22 @@ function AddSaleModalForm({isModalOpen, onClose}) {
   ]);
 
 
+  //TO RESET THE FORM ONCE CLOSED
+  const closeModal = () =>{
+     setIsModalOpen(false);
+
+     setRows([{product: '', quantity: '', unit: '', unitPrice: '', amount: ''}]);
+  };
+
+  
+
   const submitSale = () =>{
     console.log(rows);
+
+    
+
+
+    closeModal();
   }
 
   return (
@@ -19,7 +33,7 @@ function AddSaleModalForm({isModalOpen, onClose}) {
         {isModalOpen && user.role === 'Sales Associate' &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-100"
-            style={{ pointerEvents: 'auto' }}  onClick={onClose}
+            style={{ pointerEvents: 'auto' }}  onClick={closeModal}
             />
         )}
 
@@ -38,17 +52,11 @@ function AddSaleModalForm({isModalOpen, onClose}) {
                     
                         {/*EXIT BUTTON*/}
                         <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 
-                        onClick={onClose}>✕</button>
-
-                        {/*SALES INFORMATION ID PLACEMENT*/}
-                        <div className='w-full text-center mb-6'>
-                            <h1 className='font-semibold text-lg'>Sales Information Id: 234455</h1>
-                        </div>
-
+                        onClick={closeModal}>✕</button>
 
 
                         {/*CUSTOMER INFORMATION*/}
-                        <div className='flex gap-x-2 mb-6'>
+                        <div className='flex gap-x-2 my-6'>
                             
                             <div className='w-full'>
                                 <h2 className='text-xs font-bold mb-2'>CHARGE TO</h2>

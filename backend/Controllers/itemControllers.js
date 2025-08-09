@@ -10,7 +10,8 @@ import * as notificationServices from '../Services/products/notificationServices
 //INVENTORY CONTROLLERS
 export const getAllItems = async (req, res) =>{
     try {
-        const items = await inventoryServices.getProductItems();
+        const branchId = req.query.branch_id;
+        const items = await inventoryServices.getProductItems(branchId);
         res.status(200).json(items);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -115,8 +116,9 @@ export const updateCategory = async (req, res) => {
 //PRODUCT HISTORY
 export const getAllProductHistory = async (req, res) =>{
     try {
+        const branchId = req.query.branch_id;
         const dates = req.body;
-        const itemsHistory = await productHistoryServices.getProductHistory(dates);
+        const itemsHistory = await productHistoryServices.getProductHistory(dates, branchId);
         res.status(200).json(itemsHistory);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -131,7 +133,8 @@ export const getAllProductHistory = async (req, res) =>{
 //PRODUCT VALIDITY
 export const getAllProductValidity = async (req, res) =>{
     try {
-        const itemsValidity = await productValidityServices.getProductValidity();
+        const branchId = req.query.branch_id;
+        const itemsValidity = await productValidityServices.getProductValidity(branchId);
         res.status(200).json(itemsValidity);
     } catch (error) {
         console.error('Error fetching items: ', error);
@@ -145,7 +148,8 @@ export const getAllProductValidity = async (req, res) =>{
 
 export const getNotification = async (req, res) =>{
     try {
-        const itemsValidity = await notificationServices.returnNotification();
+        const branchId = req.query.branch_id;
+        const itemsValidity = await notificationServices.returnNotification(branchId);
         res.status(200).json(itemsValidity);
     } catch (error) {
         console.error('Error fetching items: ', error);
