@@ -23,7 +23,7 @@ INSERT INTO Branch (branch_id, branch_name, address) VALUES (6, 'Seth and L-Jean
 
 
 
-CREATE TABLE Admins (
+CREATE TABLE Administrator (
     admin_id SERIAL PRIMARY KEY,
     role VARCHAR(30),
     username VARCHAR(225),
@@ -33,7 +33,7 @@ CREATE TABLE Admins (
 );
 
 
-INSERT INTO Admins (admin_id, role, username, password, first_name, last_name)
+INSERT INTO Administrator (admin_id, role, username, password, first_name, last_name)
 VALUES (1, 'Owner', 'admin123', '$2b$12$XohURN8fGR5.ZyHsBiEB3uINqdi1PAOiV1HfapBhWENyWDesb8G86', 'Bench Christian', 'Dela Luna'); --Pasword is: password
 
 
