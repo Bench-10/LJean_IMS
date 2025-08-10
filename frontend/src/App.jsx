@@ -49,7 +49,12 @@ function App() {
   //DISPLAY THE INVENTORY TABLE
   const fetchProductsData = async () =>{
       try {
-        const response = await axios.get(`http://localhost:3000/api/items?branch_id=${user.branch_id}`);
+        let response;
+        if (user.role !== 'Owner'){
+          response = await axios.get(`http://localhost:3000/api/items?branch_id=${user.branch_id}`);
+        } else {
+          response = await axios.get(`http://localhost:3000/api/items/`);
+        }
         setProductsData(response.data);
       } catch (error) {
         setError(error.message);

@@ -47,7 +47,12 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
       const dates = {startDate, endDate}
 
       try {
-        const response = await axios.post(`http://localhost:3000/api/product_history?branch_id=${user.branch_id}`, dates);
+        let response;
+        if (user.role !== 'Owner'){
+          response = await axios.post(`http://localhost:3000/api/product_history?branch_id=${user.branch_id}`, dates);
+        } else{
+          response = await axios.post(`http://localhost:3000/api/product_history/`, dates);
+        }
         setProductHistory(response.data);
       } catch (error) {
         setError(error.message);

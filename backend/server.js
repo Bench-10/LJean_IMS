@@ -6,7 +6,6 @@ import userRoutes from './Routes/userRoutes.js';
 import cron from "node-cron"
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 
-
 const app  = express();
 
 dotenv.config();
@@ -31,7 +30,7 @@ app.use('/api', userRoutes);
 
 
 
-app.listen(PORT, ()=>{
+app.listen(PORT, async ()=>{
     console.log('Port '+ PORT + ' is currently running....' )
 });
 

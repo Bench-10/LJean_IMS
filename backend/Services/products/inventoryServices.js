@@ -19,7 +19,7 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
 
 export const getProductItems = async(branchId) => {
 
-    if (!branchId || branchId == 0){
+    if (!branchId){
         const {rows} = await SQLquery(`
             SELECT product_id, branch_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
             FROM inventory_product
