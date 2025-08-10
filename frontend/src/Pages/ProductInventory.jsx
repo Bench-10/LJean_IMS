@@ -3,21 +3,28 @@ import NoInfoFound from '../utils/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 
 
-function ProductInventory({handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput}) {
+function ProductInventory({handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories}) {
   
   const {user} = useAuth();
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
 
   const handleSearch = (event) =>{
     setSearchItem(sanitizeInput(event.target.value));
 
   }
 
+  //FILTER BY CATEGORY
+  const filteredProducts = selectedCategory
+  ? productsData.filter(item => item.category_id === Number(selectedCategory))
+  : productsData;
 
-  const filteredData = productsData.filter(product => 
-    product.product_name.toLowerCase().includes(searchItem.toLowerCase()) ||
-    product.category_name.toLowerCase().includes(searchItem.toLowerCase())
+  
+
+  //FILTER BY SEARCH
+  const filteredData = filteredProducts.filter(product => 
+    product.product_name.toLowerCase().includes(searchItem.toLowerCase())
     
   );
 
@@ -35,18 +42,43 @@ function ProductInventory({handleOpen, productsData, setIsCategory, setIsProduct
 
 
         {/*SEARCH AND ADD*/}
-        <div className='flex w-full'>
-          {/*SEARCH */}
-          <div className='w-[400px]'>
-            
-            <input
-              type="text"
-              placeholder="Search Item Name or Category"
-              className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
-              onChange={handleSearch}
-            />
+        <div className='flex w-full '>
+          <div className='flex gap-x-9'>
+              {/*SEARCH */}
+              <div className='w-[400px]'>
+                
+                <input
+                  type="text"
+                  placeholder="Search Item Name or Category"
+                  className="border outline outline-1 outline-gray-400 focus:outline-green-700 transition-all px-3 py-0 rounded w-full h-9 leading-none align-middle"
+                  onChange={handleSearch}
+                />
+
+              </div>
+
+              <div className='flex gap-x-3 items-center h-9'>
+                <label className='block text-sm font-medium text-gray-700 whitespace-nowrap mb-0'>
+                  Filter by Category:
+                </label>
+                <select
+                  value={selectedCategory}
+                  onChange={e => setSelectedCategory(e.target.value)}
+                  className="border outline outline-1 outline-gray-400 focus:outline-green-700 transition-all px-3 py-0 rounded w-full h-9 leading-none align-middle"
+                >
+                  <option value="">All Categories</option>
+                  {listCategories.map(cat => (
+                    <option key={cat.category_id} value={cat.category_id}>
+                      {cat.category_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+
+              
 
           </div>
+          
 
           {/*CATEGORIES AND ADD ITEM */}
           {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
@@ -173,7 +205,9 @@ function ProductInventory({handleOpen, productsData, setIsCategory, setIsProduct
         </div>
 
       </div>
+
   )
+
 }
 
 export default ProductInventory;

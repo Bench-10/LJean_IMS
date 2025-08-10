@@ -57,7 +57,7 @@ function App() {
         }
         setProductsData(response.data);
       } catch (error) {
-        setError(error.message);
+        console.log(error.message);
         
       }
   };
@@ -218,6 +218,7 @@ function App() {
                     productsData={productsData}
                     setIsProductTransactOpen={setIsProductTransactOpen}
                     sanitizeInput={sanitizeInput}
+                    listCategories={listCategories}
 
                   />
 
