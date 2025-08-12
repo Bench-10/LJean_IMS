@@ -39,7 +39,7 @@ function formatTime(timestamp) {
 export const returnNotification = async (branchId) =>{
 
     const {rows} = await SQLquery(`
-        SELECT alert_type, message, alert_date, banner_color
+        SELECT alert_id, alert_type, message, alert_date, banner_color, is_read
         FROM Inventory_Alerts
         WHERE branch_id = $1
         ORDER BY alert_date DESC
@@ -57,4 +57,13 @@ export const returnNotification = async (branchId) =>{
 
     return formattedRows;
     
+};
+
+
+
+//MARKS THE NOTIFICATION AS READ IN THE DATABASE
+export const markAsRead = async (alerId) =>{
+
+  await SQLquery(`UPDATE Inventory_Alerts SET is_read = $1 WHERE alert_id = $2`,[true, alerId]);
+
 };

@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import itemRoutes from './Routes/itemRoutes.js';
 import userRoutes from './Routes/userRoutes.js';
-import cron from "node-cron"
+import saleRoutes from './Routes/saleRoutes.js';
+import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 
 const app  = express();
@@ -25,6 +26,9 @@ app.use('/api', itemRoutes);
 
 //FOR USER-RELATED DATA
 app.use('/api', userRoutes);
+
+//FOR SALE-RELATED DATA
+app.use('/api', saleRoutes)
 
 
 

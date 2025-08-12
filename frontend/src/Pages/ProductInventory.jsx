@@ -3,22 +3,32 @@ import NoInfoFound from '../utils/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 
 
-function ProductInventory({handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories}) {
+function ProductInventory({branches, handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories}) {
   
   const {user} = useAuth();
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState(() => user && user.role === 'Branch Manager' ? user.branch_id : '' );
 
   const handleSearch = (event) =>{
     setSearchItem(sanitizeInput(event.target.value));
 
   }
 
+
+  //CONTAINS ALL AVAILABLE PRODUCTS WHEN LOADED
+  let filteredProducts = productsData;
+
   //FILTER BY CATEGORY
-  const filteredProducts = selectedCategory
-  ? productsData.filter(item => item.category_id === Number(selectedCategory))
-  : productsData;
+  filteredProducts = selectedCategory
+  ? filteredProducts.filter(item => item.category_id === Number(selectedCategory))
+  : filteredProducts;
+
+  //FILTER BY BRANCH
+  filteredProducts = selectedBranch
+  ? filteredProducts.filter(item => item.branch_id === Number(selectedBranch))
+  : filteredProducts;
 
   
 
@@ -32,7 +42,7 @@ function ProductInventory({handleOpen, productsData, setIsCategory, setIsProduct
   return (
    
       
-      <div className=" ml-[220px] p-8 max-h-screen" >
+      <div className=" ml-[220px] px-8 py-2 max-h-screen" >
         {/*TITLE*/}
         <h1 className=' text-4xl font-bold text-green-900'>
           INVENTORY
@@ -74,8 +84,27 @@ function ProductInventory({handleOpen, productsData, setIsCategory, setIsProduct
                 </select>
               </div>
 
+              {(user.role === 'Owner' ||  user.role === 'Branch Manager') &&
 
+                <div className='flex gap-x-3 items-center h-9'>
+                  <label className='block text-sm font-medium text-gray-700 whitespace-nowrap mb-0'>
+                    Filter by Branch:
+                  </label>
+                  <select
+                    value={selectedBranch}
+                    onChange={e => setSelectedBranch(e.target.value)}
+                    className="border outline outline-1 outline-gray-400 focus:outline-green-700 transition-all px-3 py-0 rounded w-full h-9 leading-none align-middle"
+                  >
+                    {user.role === 'Owner' && <option value="">All Branch</option>}
+                    {branches.map(branch => (
+                      <option key={branch.branch_id} value={branch.branch_id}>
+                        {branch.branch_name}{branch.branch_id === user.branch_id ? ' (Your Branch)':''}
+                      </option>
+                    ))}
+                  </select> 
+                </div>
               
+              }   
 
           </div>
           

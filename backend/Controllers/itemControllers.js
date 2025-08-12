@@ -149,10 +149,25 @@ export const getAllProductValidity = async (req, res) =>{
 export const getNotification = async (req, res) =>{
     try {
         const branchId = req.query.branch_id;
-        const itemsValidity = await notificationServices.returnNotification(branchId);
-        res.status(200).json(itemsValidity);
+        const notification = await notificationServices.returnNotification(branchId);
+        res.status(200).json(notification);
     } catch (error) {
-        console.error('Error fetching items: ', error);
+        console.error('Error fetching notifications: ', error);
+        res.status(500).jason({message: 'Internal Server Error'})
+    }
+};
+
+
+
+
+
+export const markRead = async (req, res) =>{
+    try {
+        const alertId = req.params.id;
+        const mark = await notificationServices.markAsRead(alertId);
+        res.status(200).json(mark);
+    } catch (error) {
+        console.error('Error: ', error);
         res.status(500).jason({message: 'Internal Server Error'})
     }
 };

@@ -1,6 +1,5 @@
 import express from 'express';
 import * as itemControllers from '../Controllers/itemControllers.js';
-import * as userControllers from '../Controllers/userControllers.js';
 
 
 const router = express.Router();
@@ -31,9 +30,9 @@ router.get("/product_validity", itemControllers.getAllProductValidity);
 
 
 
-//SHOW NOTIFICATIONS
+//SHOW NOTIFICATIONSs
 router.get("/notifications", itemControllers.getNotification);
-
+router.put("/notifications/:id", itemControllers.markRead);
 
 
 

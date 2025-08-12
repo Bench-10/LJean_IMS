@@ -47,7 +47,7 @@ function ProductValidity({ sanitizeInput }) {
 
   
   return (
-    <div className=" ml-[220px] p-8 max-h-screen" >
+    <div className=" ml-[220px] px-8 py-2 max-h-screen" >
         {/*TITLE*/}
         <h1 className=' text-4xl font-bold text-green-900'>
           PRODUCT VALIDITY
@@ -104,7 +104,7 @@ function ProductValidity({ sanitizeInput }) {
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
                     DATE PURCHASED
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
                     EXPIRY DATE
                   </th>
                   <th className="bg-green-500 pl-7 pr-4 py-2 text-left text-sm font-medium text-white">
@@ -112,9 +112,6 @@ function ProductValidity({ sanitizeInput }) {
                   </th>
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
                     CATEGORY
-                  </th>
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
-                    QUANTITY BOUGHT
                   </th>
                   
                
@@ -169,7 +166,6 @@ function ProductValidity({ sanitizeInput }) {
                       <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
                       <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
                       <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
-                      <td className="px-4 py-2 text-center"  >{validity.quantity_added}</td>
                       
                     </tr>
                     

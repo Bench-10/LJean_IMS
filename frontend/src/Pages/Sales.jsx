@@ -6,7 +6,7 @@ function Sales({setIsModalOpen}) {
   const {user} = useAuth();
 
   return (
-    <div className=' ml-[220px] p-8 max-h-screen'>
+    <div className=' ml-[220px] px-8 py-2 max-h-screen'>
 
 
         <h1 className=' text-4xl font-bold text-green-900'>

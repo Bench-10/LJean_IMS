@@ -3,12 +3,11 @@ import { useAuth } from '../authentication/Authentication';
 import { RxCross2 } from "react-icons/rx";
 import axios from 'axios';
 
-function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes}) {
+function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes}) {
 
 
   //FOR USER ROLE AUTHENTICATION
   const {user} = useAuth();
-  const [branches, setBranches] = useState([]);
 
 
   //USERINFO FIELDS
@@ -25,16 +24,6 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
   //STATES FOR ERROR HANDLING
   const [emptyField, setEmptyField] = useState({});
 
-  
-  const fetchBranch = async() =>{
-    try {
-        const branch = await axios.get('http://localhost:3000/api/branches');
-        setBranches(branch.data);
-    } catch (error) {
-        console.log(error)
-    }
-  };
-
  
   //USER ROLES
   const userRole = [
@@ -48,7 +37,6 @@ function UserModalForm({isModalOpen, onClose, mode, fetchUsersinfo, userDetailes
   useEffect(() =>{
     if (!user) return;
 
-    fetchBranch();
     setEmptyField({});
 
     if (isModalOpen && mode === 'add' && user.role === 'Owner'){

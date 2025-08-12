@@ -69,6 +69,24 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
 
+  const constructionUnits = [
+    "kg",  
+    "g",  
+    "ton", 
+    "lb", 
+    "pc",   
+    "bag",   
+    "roll",  
+    "sheet", 
+    "bndl",  
+    "set", 
+    "lot",  
+    "can",   
+    "drum"  
+  ];
+
+
+
   //HANDLES THE SUBMIT
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -311,13 +329,19 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                       {/*UNIT*/}
                       <div className='relative'>
 
-                        <input
-                          type="text"
-                          placeholder="Unit"
+
+                        <select
                           className={inputClass('unit')}
                           value={unit}
                           onChange={(e) => setUnit(sanitizeInput(e.target.value))}
-                        />
+                        >
+
+                          <option value="" >Select Unit</option>
+                            {constructionUnits.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+
+                        </select>
 
                          {errorflag('unit', 'unit')}
 

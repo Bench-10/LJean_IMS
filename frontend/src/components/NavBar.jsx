@@ -1,5 +1,4 @@
 import React from 'react';
-import { IoMdNotifications } from "react-icons/io";
 import { MdOutlineInventory, MdOutlineLogout, MdOutlineDashboard } from "react-icons/md";
 import { PiSealWarningBold } from "react-icons/pi";
 import { FaUsersCog, FaMoneyBillWave, FaShippingFast} from "react-icons/fa";
@@ -24,23 +23,6 @@ function NavBar() {
         {/*TOP HALF */}
         <div>
             <ul className="flex flex-col gap-2 [&>a]:py-2 [&>a]:px-3 [&>a]:rounded-md [&>a]:transition-all [&>a]:border-l-4-transparent [&>a]:cursor-pointer [&>a:hover]:bg-[#254717] [&>a]:flex [&>a]:items-center [&>a]:gap-x-[7px]">
-
-
-              {/*NOTIFICATION NAVIGATION*/}
-              {user && (user.role === 'Branch Manager' || user.role === 'Inventory Staff') &&
-
-                  <NavLink
-                    to="/notification"
-                    className={({ isActive }) =>
-                      isActive
-                        ? "border-l-8 bg-[#254717] border-l-green-400"
-                        : ""
-                    }
-                  >
-                    <IoMdNotifications />Notification
-                  </NavLink>
-
-              }
 
 
 

@@ -1,24 +1,98 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { IoMdAdd } from "react-icons/io";
+import dayjs from 'dayjs';
 
-function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
+function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
 
   const {user} = useAuth();
+
+
+  const dateToday = dayjs().format("YYYY-MM-DD");
+  const dateTodayReadable = dayjs().format("MMMM D, YYYY");
+
+
+  //HEADER INFORMATION
+  const [chargeTo, setChargeTo] = useState('');
+  const [tin, setTin] = useState('');
+  const [address, setAddress] = useState('');
+  const [date, setDate] = useState(dateToday);
+
+
+  //PRODUCT INPUT INFORMATION
+  const [productSelected, setProductSelected] = useState([]);
   const [rows, setRows] = React.useState([
-    { product: '', quantity: '', unit: '', unitPrice: '', amount: '' }
+    { product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0 }
   ]);
+
+
+  //CALCULATING AMOUNT AND VAT
+  const [vat, setVat] = useState(0);
+  const [amountNetVat, setAmount] = useState(0);
+  const [totalAmountDue, setTotalAmountDue] = useState(0);
 
 
   //TO RESET THE FORM ONCE CLOSED
   const closeModal = () =>{
-     setIsModalOpen(false);
+    setIsModalOpen(false);
 
-     setRows([{product: '', quantity: '', unit: '', unitPrice: '', amount: ''}]);
+    setRows([{product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0}]);
+    setProductSelected([]);
+    setAmount(0);
+    setTotalAmountDue(0);
+    setChargeTo('');
+    setTin('');
+    setAddress('');
+    setDate('');
+    setVat(0);
+
+  };
+
+
+  const removeSpecificProduct = (index) =>{
+
   };
 
   
+  //MULTIPLY THE AMOUNT BY THE PRODUCT'S UNIT PRICE
+  const createAnAmount = (index) =>{
+    const productAmount = rows[index].quantity * rows[index].unitPrice
+    const newRows = [...rows];
+    newRows[index].amount = productAmount;
+    setRows(newRows);
 
+    totalAmount(newRows);
+
+  };
+
+
+  //ADDS ALL THE AMOUNT OF ALL THE PRODUCTS PRESENT IN THE SALE
+  const totalAmount=(newData)=>{
+
+    const final = newData.reduce((sum, product) => {
+      const value = Number(product.amount); 
+      return sum + (isNaN(value) ? 0 : value); 
+      
+    }, 0);
+
+    setAmount(final);
+    vatAmount(final)
+
+  };
+
+
+  //CALCULATES THE VAT(MIGHT CHANGE IN THE FUTURE)
+  const vatAmount =(amount) =>{
+    const vat = amount * 0.12;
+    setVat(vat);
+
+    //SETS THE TOTAL AMOUNT + VAT
+    setTotalAmountDue(amount + vat);
+    
+  };
+
+  
+  //SUBMIT THE DATA
   const submitSale = () =>{
     console.log(rows);
 
@@ -60,22 +134,49 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
                             
                             <div className='w-full'>
                                 <h2 className='text-xs font-bold mb-2'>CHARGE TO</h2>
-                                <input type="text" className='w-full border' />
+                                <input 
+                                  type="text" 
+                                  className='w-full border' 
+                                  value={chargeTo}
+                                  onChange={(e) => setChargeTo(e.target.value)}
+                                
+                                />
+
                             </div>
 
                             <div className='w-full'>
                                 <h2 className='text-xs font-bold mb-2'>TIN</h2>
-                                <input type="text" className='w-full border' />
+                                <input 
+                                  type="text" 
+                                  className='w-full border' 
+                                  value={tin}
+                                  onChange={(e) => setTin(e.target.value)}
+
+                                />
+
                             </div>
 
                             <div className='w-full'>
                                 <h2 className='text-xs font-bold mb-2'>ADDRESS</h2>
-                                <input type="text" className=' w-full border' />
+                                <input 
+                                  type="text" 
+                                  className='w-full border' 
+                                  value={address}
+                                  onChange={(e) => setAddress(e.target.value)}
+
+                                />
+
                             </div>
 
                             <div className='w-full'>
                                 <h2 className='text-xs font-bold mb-2'>DATE</h2>
-                                <input type="text" className=' w-full border' />
+                                <input 
+                                  type="text" 
+                                  className='w-full border' 
+                                  value={dateTodayReadable}
+                                  
+                                />
+
                             </div>
 
                         </div>
@@ -87,7 +188,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
                               type="button"
                               className="bg-green-600 py-2 px-4 text-white mb-6 rounded-sm"
                               onClick={() =>
-                                setRows([...rows, { product: '', quantity: '', unit: '', unitPrice: '', amount: '' }])
+                                setRows([...rows, { product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0 }])
                               }
                             >
                               <h1 className='text-xs font-medium flex items-center gap-x-2'><IoMdAdd />ADD NEW ROW</h1>
@@ -118,7 +219,6 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
                                           </th>
 
                                       </tr>
-                                      
 
                                   </thead>
 
@@ -126,19 +226,61 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
                                       {rows.map((row, idx) => (
                                         <tr key={idx}>
                                           <td className="px-2 py-3">
-                                            <input type="text" className="border w-full" value={row.product} onChange={e => {
-                                              const newRows = [...rows];
-                                              newRows[idx].product = e.target.value;
-                                              setRows(newRows);
-                                            }} />
+
+                                            <select
+                                              className="border w-full"
+                                              value={row.product_id}
+                                              onChange={e => {
+                                                const selectedProductId = e.target.value;
+                                                const selectedProduct = productsData.find(
+                                                  (product) => String(product.product_id) === selectedProductId
+                                                );
+                                                const newRows = [...rows];
+                                                newRows[idx].product_id = selectedProductId;
+                                                if (selectedProduct) {
+                                                  newRows[idx].unitPrice = selectedProduct.unit_price || '';
+                                                  newRows[idx].unit = selectedProduct.unit || '';
+                                                }
+                                                setRows(newRows);
+                                                setProductSelected([...productSelected, selectedProductId]);
+                                              }}
+                                            >
+
+                                              <option value="" onClick={removeSpecificProduct(idx)}>Select Product</option>
+                                              {productsData.map((product) => {
+                                                if (
+                                                  productSelected.includes(String(product.product_id)) &&
+                                                  String(row.product_id) !== String(product.product_id)
+                                                ) {
+                                                  return null;
+                                                }
+                                                return (
+                                                  <option key={product.product_id} value={product.product_id}>
+                                                    {product.product_name}
+                                                  </option>
+                                                );
+                                              })}
+
+                                            </select>
+
                                           </td>
+
+
                                           <td className="px-2">
                                             <input type="text" className="border w-full" value={row.quantity} onChange={e => {
                                               const newRows = [...rows];
                                               newRows[idx].quantity = e.target.value;
                                               setRows(newRows);
-                                            }} />
+                                            }} onKeyUp={() => createAnAmount(idx)}
+                                            onKeyDown={(e) => {
+                                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
+                                                e.preventDefault();
+                                              }
+                                            }}
+                                            />
                                           </td>
+
+
                                           <td className="px-2">
                                             <input type="text" className="border w-full" value={row.unit} onChange={e => {
                                               const newRows = [...rows];
@@ -146,22 +288,28 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
                                               setRows(newRows);
                                             }} />
                                           </td>
+
+
                                           <td className="px-2">
                                             <input type="text" className="border w-full" value={row.unitPrice} onChange={e => {
                                               const newRows = [...rows];
                                               newRows[idx].unitPrice = e.target.value;
                                               setRows(newRows);
-                                            }} />
+                                            }} readOnly />
                                           </td>
+
+
                                           <td className="px-2">
                                             <input type="text" className="border w-full" value={row.amount} onChange={e => {
                                               const newRows = [...rows];
                                               newRows[idx].amount = e.target.value;
                                               setRows(newRows);
-                                            }} />
+                                            }} onKeyUp={(e) => setAmount(e.target.value)} readOnly />
                                           </td>
+
                                         </tr>
                                       ))}
+
                                   </tbody>
 
                               </table>
@@ -179,12 +327,12 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
                                 <div className='flex gap-x-20'>
                                     {/*REGULAR VAT*/}
                                     <div>
-                                      VAT: 100
+                                      VAT: {vat}
                                     </div>
 
                                     {/*AMOUNT NET VAT*/}
                                     <div>
-                                      AMOUNT NET VAT: 1000
+                                      AMOUNT NET VAT: {amountNetVat}
                                     </div>
 
                                 </div>
@@ -192,7 +340,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
 
                                 {/*TOTAL AMOUNT*/}
                                 <div>
-                                  TOTAL AMOUNT DUE: 100000
+                                  TOTAL AMOUNT DUE:{totalAmountDue}
                                 </div>
                                 
                             </div>
@@ -204,7 +352,6 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen}) {
 
                             </div>
                         </div>
-
 
                     </form>
 

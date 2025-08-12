@@ -32,6 +32,9 @@ function App() {
   const [productsData, setProductsData] = useState([])
   const [listCategories, setListCategories] = useState([]);
   const [users, setUsers] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [notify, setNotify] = useState([]);
+  const [openNotif, setOpenNotif] = useState(false);
 
 
   const {user} = useAuth();
@@ -50,7 +53,7 @@ function App() {
   const fetchProductsData = async () =>{
       try {
         let response;
-        if (user.role !== 'Owner'){
+        if (user.role !== 'Owner' && user.role !== 'Branch Manager'){
           response = await axios.get(`http://localhost:3000/api/items?branch_id=${user.branch_id}`);
         } else {
           response = await axios.get(`http://localhost:3000/api/items/`);
@@ -64,7 +67,10 @@ function App() {
 
   //RENDERS THE TABLE
   useEffect(() =>{
-    fetchProductsData()
+
+    if (!user) return;
+    
+    fetchProductsData();
   }, [listCategories, user]);
 
 
@@ -105,11 +111,57 @@ function App() {
   };
 
 
+
+  //FOR NOTIFICATION DATA
+  const getTime = async () =>{
+    try {
+      const time = await axios.get(`http://localhost:3000/api/notifications?branch_id=${user.branch_id}`);
+      setNotify(time.data);
+    } catch (error) {
+      console.log(error.message);
+      
+    }
+
+  };
+
+
+
+  //BEST FOR NOW
+  useEffect(() => {
+
+    if (!user) return;
+    if (user.role === 'Owner') return;
+    if (user.role === 'Sales Associate') return;
+
+
+    getTime();
+
+    const intervalId = setInterval(() => {
+      getTime();
+    }, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [user]);
+
+
+
   //USER CREATION MODAL LOGIC
   const handleUserModalOpen = (mode) =>{
     setIsModalOpen(true);
     setModalMode(mode);
   }
+
+
+
+  //FETCHING THE BRANCH GLOBALLY
+  const fetchBranch = async() =>{
+    try {
+        const branch = await axios.get('http://localhost:3000/api/branches');
+        setBranches(branch.data);
+    } catch (error) {
+        console.log(error)
+    }
+  };
 
 
   //FOR ADDING USER
@@ -123,6 +175,7 @@ function App() {
 
   useEffect(() => {
     fetchUsersinfo();
+    fetchBranch();
   }, [])
 
 
@@ -131,6 +184,10 @@ function App() {
     fetchUsersinfo();
 
   };
+
+  //CANCULATE UNREAD NOTIFICATION
+  const unreadCount = notify.filter(notification => !notification.is_read).length;
+
 
 
   return (
@@ -143,6 +200,7 @@ function App() {
       {/*COMPONENTS*/}
       <AddSaleModalForm
          isModalOpen={isModalOpen}
+         productsData={productsData}
          setIsModalOpen={setIsModalOpen}
       
       />
@@ -163,6 +221,7 @@ function App() {
         isModalOpen={isModalOpen}
         userDetailes={userDetailes}
         mode={modalMode}
+        branches={branches}
         onClose={() => setIsModalOpen(false)}
         fetchUsersinfo ={fetchUsersinfo}
         setUserDetailes={setUserDetailes}
@@ -192,11 +251,22 @@ function App() {
 
 
       <ProductTransactionHistory
-          isProductTransactOpen={isProductTransactOpen}
-          onClose={() => setIsProductTransactOpen(false)}
+        isProductTransactOpen={isProductTransactOpen}
+        onClose={() => setIsProductTransactOpen(false)}
+
       />
 
-      
+
+      <Notification 
+        openNotif={openNotif}
+        notify={notify}
+        unreadCount={unreadCount}
+        setNotify={setNotify}
+        onClose={() => setOpenNotif(false)}
+
+      />
+
+  
 
       {/*PAGES */}
       <Routes>
@@ -207,7 +277,7 @@ function App() {
 
         
         {/*INVENTORY PAGE*/}
-        <Route element={<RouteProtection>  <PageLayout/>  </RouteProtection>}>
+        <Route element={<RouteProtection>  <PageLayout setOpenNotif={() => setOpenNotif(true)} unreadCount={unreadCount}/>  </RouteProtection>}>
           <Route path="/inventory" exact element={ 
               <RouteProtection allowedRoles={['Owner', 'Inventory Staff', 'Branch Manager']}>
 
@@ -219,6 +289,7 @@ function App() {
                     setIsProductTransactOpen={setIsProductTransactOpen}
                     sanitizeInput={sanitizeInput}
                     listCategories={listCategories}
+                    branches={branches}
 
                   />
 
@@ -226,17 +297,6 @@ function App() {
         
           }/>
          
-
-          {/*NOTIFICATION PAGE*/}
-          <Route path="/notification" exact element={
-            <RouteProtection allowedRoles={['Inventory Staff', 'Branch Manager']} >
-
-               <Notification />
-
-            </RouteProtection>
-            
-          }/>
-
 
           {/*PRODUCT VALIDITY/SHELF LIFE PAGE*/}
           <Route path="/product_validity" exact element={
