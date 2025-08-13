@@ -5,21 +5,27 @@ import { FaUsersCog, FaMoneyBillWave, FaShippingFast} from "react-icons/fa";
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../authentication/Authentication';
 
+// Import BranchLogo component
+import BranchLogo from './BranchLogo';
+
 
 function NavBar() {
   const {user, logout} = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 h-screen w-[220px] bg-navBackground text-white p-3 box-border"> 
-      {/*LOGO*/}
-      <div>
-         LOGO HERE
+      {/* Branch Logo */}
+      <div className="flex justify-center py-4">
+        <BranchLogo 
+          branchName={user?.branch_name || 'L-Jean Trading'}
+          className="h-16 w-auto" 
+        />
       </div>
 
       <hr className="mt-5 mb-6 border-1 border-white" />
 
       {/*SELECTED ROWS CONTAINER*/}
-      <div className="flex flex-col justify-between h-[90%]">
+      <div className="flex flex-col justify-between h-[calc(100vh-200px)]">
         {/*TOP HALF */}
         <div>
             <ul className="flex flex-col gap-2 [&>a]:py-2 [&>a]:px-3 [&>a]:rounded-md [&>a]:transition-all [&>a]:border-l-4-transparent [&>a]:cursor-pointer [&>a:hover]:bg-[#254717] [&>a]:flex [&>a]:items-center [&>a]:gap-x-[7px]">
