@@ -36,15 +36,16 @@ function formatTime(timestamp) {
 
 
 
-export const returnNotification = async (branchId) =>{
+export const returnNotification = async (branchId, userId) =>{
 
     const {rows} = await SQLquery(`
-        SELECT alert_id, alert_type, message, alert_date, banner_color, is_read
+        SELECT Inventory_Alerts.alert_id, alert_type, message, alert_date, banner_color, COALESCE(user_notification.is_read, false) AS is_read
         FROM Inventory_Alerts
-        WHERE branch_id = $1
-        ORDER BY alert_date DESC
-
-    `,[branchId]);
+        LEFT JOIN user_notification
+        ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1
+        WHERE Inventory_Alerts.branch_id = $2
+        ORDER BY Inventory_Alerts.alert_date DESC;
+    `,[userId, branchId]);
 
     //ADD A THE FORMATED TIME ON EACH ROW
     const formattedRows = rows.map(row => ({
@@ -62,8 +63,10 @@ export const returnNotification = async (branchId) =>{
 
 
 //MARKS THE NOTIFICATION AS READ IN THE DATABASE
-export const markAsRead = async (alerId) =>{
+export const markAsRead = async (userAndAlertID) =>{
 
-  await SQLquery(`UPDATE Inventory_Alerts SET is_read = $1 WHERE alert_id = $2`,[true, alerId]);
+  const { alert_id, user_id} = userAndAlertID;
+
+  await SQLquery(`INSERT INTO user_notification(user_id, alert_id) VALUES($1, $2)`,[user_id, alert_id]);
 
 };

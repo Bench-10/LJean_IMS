@@ -147,9 +147,10 @@ export const getAllProductValidity = async (req, res) =>{
 
 
 export const getNotification = async (req, res) =>{
-    try {
+    try { 
+        const userId = req.query.user_id;
         const branchId = req.query.branch_id;
-        const notification = await notificationServices.returnNotification(branchId);
+        const notification = await notificationServices.returnNotification(branchId, userId);
         res.status(200).json(notification);
     } catch (error) {
         console.error('Error fetching notifications: ', error);
@@ -163,8 +164,8 @@ export const getNotification = async (req, res) =>{
 
 export const markRead = async (req, res) =>{
     try {
-        const alertId = req.params.id;
-        const mark = await notificationServices.markAsRead(alertId);
+        const userAndAlertID = req.body;
+        const mark = await notificationServices.markAsRead(userAndAlertID);
         res.status(200).json(mark);
     } catch (error) {
         console.error('Error: ', error);

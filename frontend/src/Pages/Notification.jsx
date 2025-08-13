@@ -1,8 +1,12 @@
 import axios from 'axios';
 import { useEffect, useState, React} from 'react';
 import { IoMdClose } from "react-icons/io";
+import { useAuth } from '../authentication/Authentication';
 
 function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
+
+
+  const {user} = useAuth();
 
   const [visibleCount, setVisibleCount] = useState(15);
 
@@ -40,13 +44,20 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
   //FUNCTION THAT MARKS NOTIFICATION AS READ WHEN PRESSED
   const markedAsRead = async(alert_id) =>{
 
+    //CHECKS IF THE MESSAGE IS ALREADY READ TO PREVENT UNECCESSARY STATE AND UI CHANGES
+    const alertItem = notify.find(n => n?.alert_id === alert_id);
+    const isAlreadyRead = alertItem ? Boolean(alertItem.is_read) : false;
+
+    if (isAlreadyRead) return;
+
+
     //UPDATES TEH FRONTEND FOR INSTANT UI CHANGES
     setNotify(notify => notify.map(n => 
       n.alert_id === alert_id ? { ...n, is_read: true } : n
     ));
 
     //UPDATES THE BACKEND
-    await axios.put(`http://localhost:3000/api/notifications/${alert_id}`);
+    await axios.post(`http://localhost:3000/api/notifications`,{ alert_id: alert_id, user_id: user.user_id});
 
   };
 

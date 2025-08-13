@@ -69,7 +69,7 @@ function App() {
   useEffect(() =>{
 
     if (!user) return;
-    
+
     fetchProductsData();
   }, [listCategories, user]);
 
@@ -115,7 +115,7 @@ function App() {
   //FOR NOTIFICATION DATA
   const getTime = async () =>{
     try {
-      const time = await axios.get(`http://localhost:3000/api/notifications?branch_id=${user.branch_id}`);
+      const time = await axios.get(`http://localhost:3000/api/notifications?branch_id=${user.branch_id}&user_id=${user.user_id}`);
       setNotify(time.data);
     } catch (error) {
       console.log(error.message);

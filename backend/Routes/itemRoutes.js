@@ -32,7 +32,7 @@ router.get("/product_validity", itemControllers.getAllProductValidity);
 
 //SHOW NOTIFICATIONSs
 router.get("/notifications", itemControllers.getNotification);
-router.put("/notifications/:id", itemControllers.markRead);
+router.post("/notifications", itemControllers.markRead);
 
 
 

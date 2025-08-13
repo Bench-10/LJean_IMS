@@ -174,6 +174,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
                                   type="text" 
                                   className='w-full border' 
                                   value={dateTodayReadable}
+                                  readOnly
                                   
                                 />
 
