@@ -148,9 +148,10 @@ export const getAllProductValidity = async (req, res) =>{
 
 export const getNotification = async (req, res) =>{
     try { 
+        const hireDate = req.query.hire_date;
         const userId = req.query.user_id;
         const branchId = req.query.branch_id;
-        const notification = await notificationServices.returnNotification(branchId, userId);
+        const notification = await notificationServices.returnNotification(branchId, userId, hireDate);
         res.status(200).json(notification);
     } catch (error) {
         console.error('Error fetching notifications: ', error);

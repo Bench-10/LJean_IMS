@@ -9,7 +9,7 @@ router.get("/sale", saleControllers.getAllSaleInformation);
 
 
 //GETTING USERS
-router.post("/add_sale", saleControllers.addSaleInformation);
+router.post("/sale", saleControllers.addSaleInformation);
 
 
 

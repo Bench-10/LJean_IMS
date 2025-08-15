@@ -34,6 +34,7 @@ function App() {
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [notify, setNotify] = useState([]);
+  const [saleHeader,setSaleHeader ] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
 
 
@@ -89,6 +90,7 @@ function App() {
       try {
         const response = await axios.post('http://localhost:3000/api/items/', newItem);
         setProductsData((prevData) => [...prevData, response.data]);
+        getTime();
         console.log('Item Added', response.data);
         
       } catch (error) {
@@ -102,6 +104,7 @@ function App() {
         setProductsData((prevData) => 
           prevData.map((item) => (item.product_id === itemData.product_id ? response.data : item))
         );
+        getTime();
         console.log('Item Updated', response.data);
         
       } catch (error) {
@@ -112,10 +115,30 @@ function App() {
 
 
 
+  const fetchSaleRecords = async() =>{
+    try {
+      const saleHeader = await axios.get(`http://localhost:3000/api/sale?branch_id=${user.branch_id}`);
+      setSaleHeader(saleHeader.data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+
+  useEffect(() =>{
+
+    if (!user) return;
+    if (user.role !== 'Sales Associate') return;
+
+    fetchSaleRecords();
+  },[user]);
+
+
+
   //FOR NOTIFICATION DATA
   const getTime = async () =>{
     try {
-      const time = await axios.get(`http://localhost:3000/api/notifications?branch_id=${user.branch_id}&user_id=${user.user_id}`);
+      const time = await axios.get(`http://localhost:3000/api/notifications?branch_id=${user.branch_id}&user_id=${user.user_id}&hire_date=${user.hire_date}`);
       setNotify(time.data);
     } catch (error) {
       console.log(error.message);
@@ -132,7 +155,6 @@ function App() {
     if (!user) return;
     if (user.role === 'Owner') return;
     if (user.role === 'Sales Associate') return;
-
 
     getTime();
 
@@ -199,9 +221,10 @@ function App() {
 
       {/*COMPONENTS*/}
       <AddSaleModalForm
-         isModalOpen={isModalOpen}
-         productsData={productsData}
-         setIsModalOpen={setIsModalOpen}
+        isModalOpen={isModalOpen}
+        productsData={productsData}
+        setIsModalOpen={setIsModalOpen}
+        setSaleHeader={setSaleHeader}
       
       />
 
@@ -230,13 +253,13 @@ function App() {
 
 
       <ModalForm 
-         isModalOpen={isModalOpen} 
-         OnSubmit={handleSubmit} 
-         mode={modalMode} 
-         onClose={() => setIsModalOpen(false)} 
-         itemData={itemData}  
-         listCategories={listCategories}
-         sanitizeInput={sanitizeInput}
+        isModalOpen={isModalOpen} 
+        OnSubmit={handleSubmit} 
+        mode={modalMode} 
+        onClose={() => setIsModalOpen(false)} 
+        itemData={itemData}  
+        listCategories={listCategories}
+        sanitizeInput={sanitizeInput}
          
       />
 
@@ -348,6 +371,7 @@ function App() {
               <RouteProtection allowedRoles={['Sales Associate']}>
 
                   <Sales
+                    saleHeader={saleHeader}
                     setIsModalOpen={setIsModalOpen}
                   
                   />

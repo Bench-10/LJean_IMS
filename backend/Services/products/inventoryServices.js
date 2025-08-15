@@ -108,12 +108,11 @@ export const updateProductItem = async (productData, itemId) => {
     const previousData = await SQLquery('SELECT branch_id, quantity, unit_price, unit_cost FROM Inventory_Product WHERE product_id =   $1', [itemId]
     );
 
-    const returnPreviousQuantity = Number(previousData.rows[0].quantity);   
+
     const returnPreviousPrice = Number(previousData.rows[0].unit_price);
     const returnPreviousCost = Number(previousData.rows[0].unit_cost);
     const returnBranchId = Number(previousData.rows[0].branch_id);
 
-    const quantity = returnPreviousQuantity + quantity_added;
 
 
     // PRODUCT UPDATE BANNER TITLE
@@ -132,10 +131,10 @@ export const updateProductItem = async (productData, itemId) => {
 
     await SQLquery(
         `UPDATE Inventory_Product SET 
-        category_id = $1, product_name = $2, unit = $3, unit_price = $4, unit_cost = $5, quantity = $6, threshold = $7 
+        category_id = $1, product_name = $2, unit = $3, unit_price = $4, unit_cost = $5, quantity = quantity + $6, threshold = $7 
         WHERE product_id = $8
         RETURNING *`,
-        [category_id, product_name, unit, unit_price, unit_cost, quantity, threshold, itemId]
+        [category_id, product_name, unit, unit_price, unit_cost, quantity_added, threshold, itemId]
 
     );
 

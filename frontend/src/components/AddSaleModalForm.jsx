@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { IoMdAdd } from "react-icons/io";
+import  toTwoDecimals from '../utils/fixedDecimalPlaces.js';
 import dayjs from 'dayjs';
+import axios from 'axios';
 
-function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
+function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHeader}) {
+
 
   const {user} = useAuth();
 
@@ -19,6 +22,11 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
   const [date, setDate] = useState(dateToday);
 
 
+  useEffect(() =>{
+    setDate(dateToday)
+  },[isModalOpen]);
+
+
   //PRODUCT INPUT INFORMATION
   const [productSelected, setProductSelected] = useState([]);
   const [rows, setRows] = React.useState([
@@ -30,6 +38,15 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
   const [vat, setVat] = useState(0);
   const [amountNetVat, setAmount] = useState(0);
   const [totalAmountDue, setTotalAmountDue] = useState(0);
+  
+
+  //FOR SEARCHABLE DROPDOWN
+  const [searchTerms, setSearchTerms] = useState({});
+  const [showDropdowns, setShowDropdowns] = useState({});
+
+
+  //SEARCH TERM ERROR HANDLING
+  const [someEmpy, setSomeEmpty] = useState(false);
 
 
   //TO RESET THE FORM ONCE CLOSED
@@ -45,21 +62,23 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
     setAddress('');
     setDate('');
     setVat(0);
+    setProductSelected([]);
+    setSearchTerms({});
+    setShowDropdowns({});
 
   };
 
-
-  const removeSpecificProduct = (index) =>{
-
-  };
 
   
   //MULTIPLY THE AMOUNT BY THE PRODUCT'S UNIT PRICE
   const createAnAmount = (index) =>{
+
     const productAmount = rows[index].quantity * rows[index].unitPrice
     const newRows = [...rows];
     newRows[index].amount = productAmount;
     setRows(newRows);
+
+    
 
     totalAmount(newRows);
 
@@ -67,7 +86,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
 
 
   //ADDS ALL THE AMOUNT OF ALL THE PRODUCTS PRESENT IN THE SALE
-  const totalAmount=(newData)=>{
+  const totalAmount = (newData)=>{
 
     const final = newData.reduce((sum, product) => {
       const value = Number(product.amount); 
@@ -91,16 +110,148 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
     
   };
 
-  
-  //SUBMIT THE DATA
-  const submitSale = () =>{
-    console.log(rows);
+
+
+  //REMOVES THE SPECIFIC ROW
+  const removeSaleRow = (index) =>{
+
+    const newRows = rows.filter((_, i) => i !== index);
+    
+    
+    const newProductSelected = {};
+    Object.keys(productSelected).forEach(key => {
+      const keyIndex = parseInt(key);
+      if (keyIndex < index) {
+      
+        newProductSelected[keyIndex] = productSelected[keyIndex];
+      } else if (keyIndex > index) {
+       
+        newProductSelected[keyIndex - 1] = productSelected[keyIndex];
+      }
+      
+    });
 
     
+    const newSearchTerms = {};
+    Object.keys(searchTerms).forEach(key => {
+      const keyIndex = parseInt(key);
+      if (keyIndex < index) {
+       
+        newSearchTerms[keyIndex] = searchTerms[keyIndex];
+      } else if (keyIndex > index) {
+       
+        newSearchTerms[keyIndex - 1] = searchTerms[keyIndex];
+      }
+      
+    });
 
+
+    setProductSelected(newProductSelected);
+    setSearchTerms(newSearchTerms);
+    setRows(newRows);
+    totalAmount(newRows);
+
+  };
+
+
+  //HANDLES SEARCH INPUT FOR DROPDOWN
+  const handleSearchChange = (index, value) => {
+    setSearchTerms(prev => ({
+      ...prev,
+      [index]: value
+    }));
+    setShowDropdowns(prev => ({
+      ...prev,
+      [index]: true
+    }));
+
+
+  };
+
+
+  const handleEmptysearchterm = () =>{
+
+    const anyEmpty = Object.values(searchTerms).some(val => !val || val.trim() === "");
+    setSomeEmpty(anyEmpty);
+
+  };
+
+  useEffect(() =>{
+    handleEmptysearchterm();
+
+  }, [searchTerms]);
+
+
+  //HANDLES PRODUCT SELECTION FROM DROPDOWN
+  const selectProduct = (index, product) => {
+    const newRows = [...rows];
+    newRows[index].product_id = product.product_id;
+    newRows[index].unitPrice = product.unit_price || '';
+    newRows[index].unit = product.unit || '';
+    setRows(newRows);
+
+    createAnAmount(index);
+    
+    setProductSelected(prev => ({
+      ...prev,
+      [index]: String(product.product_id)
+    }));
+
+    setSearchTerms(prev => ({
+      ...prev,
+      [index]: product.product_name
+    }));
+
+    setShowDropdowns(prev => ({
+      ...prev,
+      [index]: false
+    }));
+  };
+
+
+  //FILTERS PRODUCTS BASED ON SEARCH TERM
+  const getFilteredProducts = (index) => {
+    const searchTerm = searchTerms[index] || '';
+    return productsData.filter(product => {
+      const isNotSelected = !Object.values(productSelected).includes(String(product.product_id)) || 
+                           String(rows[index].product_id) === String(product.product_id);
+      const matchesSearch = product.product_name.toLowerCase().includes(searchTerm.toLowerCase());
+      return isNotSelected && matchesSearch;
+    });
+  };
+
+
+
+  
+  //SUBMIT THE DATA
+  const submitSale = async () =>{
+    console.log(rows);
+
+    const headerInformationAndTotal = {
+      chargeTo,
+      tin,
+      address,
+      date,
+      branch_id: user.branch_id,
+      vat,
+      amountNetVat,
+      totalAmountDue,
+    };
+
+    const saleData = {
+      headerInformationAndTotal,
+      rows
+    };
+
+    console.log(headerInformationAndTotal);
+    console.log(saleData);
+
+
+    const data = await axios.post('http://localhost:3000/api/sale', saleData);
+    setSaleHeader((prevData) => [...prevData, data.data]);
 
     closeModal();
-  }
+  };
 
   return (
      <div>
@@ -219,6 +370,10 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
                                               AMOUNT
                                           </th>
 
+                                          <th className="px-4 py-2 text-center text-xs font-medium">
+                                              ACTION
+                                          </th>
+
                                       </tr>
 
                                   </thead>
@@ -228,41 +383,43 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
                                         <tr key={idx}>
                                           <td className="px-2 py-3">
 
-                                            <select
-                                              className="border w-full"
-                                              value={row.product_id}
-                                              onChange={e => {
-                                                const selectedProductId = e.target.value;
-                                                const selectedProduct = productsData.find(
-                                                  (product) => String(product.product_id) === selectedProductId
-                                                );
-                                                const newRows = [...rows];
-                                                newRows[idx].product_id = selectedProductId;
-                                                if (selectedProduct) {
-                                                  newRows[idx].unitPrice = selectedProduct.unit_price || '';
-                                                  newRows[idx].unit = selectedProduct.unit || '';
-                                                }
-                                                setRows(newRows);
-                                                setProductSelected([...productSelected, selectedProductId]);
-                                              }}
-                                            >
+                                            <div className='relative'>
+                                                <input 
+                                                  type="text" 
+                                                  className="border w-full "
+                                                  placeholder="Search products..."
+                                                  value={searchTerms[idx] || ''}
+                                                  onChange={(e) => handleSearchChange(idx, e.target.value)}
+                                                  onFocus={() => setShowDropdowns(prev => ({...prev, [idx]: true}))}
+                                                  onBlur={() => {
+                                                    
+                                                    setTimeout(() => {
+                                                      setShowDropdowns(prev => ({...prev, [idx]: false}));
+                                                    }, 150);
+                                                  }}
+                                                />
 
-                                              <option value="" onClick={removeSpecificProduct(idx)}>Select Product</option>
-                                              {productsData.map((product) => {
-                                                if (
-                                                  productSelected.includes(String(product.product_id)) &&
-                                                  String(row.product_id) !== String(product.product_id)
-                                                ) {
-                                                  return null;
-                                                }
-                                                return (
-                                                  <option key={product.product_id} value={product.product_id}>
-                                                    {product.product_name}
-                                                  </option>
-                                                );
-                                              })}
-
-                                            </select>
+                                                {showDropdowns[idx] && (
+                                                  <div className='absolute top-[100%] z-[200] bg-white w-[100%] border border-gray-300 max-h-40 overflow-y-auto shadow-lg'>
+                                                    {getFilteredProducts(idx).length > 0 ? (
+                                                      getFilteredProducts(idx).map((product) => (
+                                                        <div 
+                                                          key={product.product_id}
+                                                          className='p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100'
+                                                          onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            selectProduct(idx, product);
+                                                          }}
+                                                        >
+                                                          <div className='font-medium text-sm'>{product.product_name}</div>
+                                                        </div>
+                                                      ))
+                                                    ) : (
+                                                      <div className='p-2 text-gray-500 text-sm'>No products found</div>
+                                                    )}
+                                                  </div>
+                                                )}
+                                            </div>
 
                                           </td>
 
@@ -308,6 +465,12 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
                                             }} onKeyUp={(e) => setAmount(e.target.value)} readOnly />
                                           </td>
 
+
+                                          <td>
+                                            <button type='button' onClick={() => {removeSaleRow(idx)}}>Remove</button>
+
+                                          </td>
+
                                         </tr>
                                       ))}
 
@@ -328,12 +491,12 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
                                 <div className='flex gap-x-20'>
                                     {/*REGULAR VAT*/}
                                     <div>
-                                      VAT: {vat}
+                                      VAT: {toTwoDecimals(vat)}
                                     </div>
 
                                     {/*AMOUNT NET VAT*/}
                                     <div>
-                                      AMOUNT NET VAT: {amountNetVat}
+                                      AMOUNT NET VAT: {toTwoDecimals(amountNetVat)}
                                     </div>
 
                                 </div>
@@ -341,15 +504,24 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData}) {
 
                                 {/*TOTAL AMOUNT*/}
                                 <div>
-                                  TOTAL AMOUNT DUE:{totalAmountDue}
+                                  TOTAL AMOUNT DUE:{toTwoDecimals(totalAmountDue)}
                                 </div>
                                 
                             </div>
 
                             
                             {/*SUBMIT BUTTON*/}
-                            <div className='w-[50%] flex items-center justify-center'>
-                                <button type='submit' className='py-1 px-3 bg-green-700 text-white rounded-sm'>Confirm Sale</button>
+                            <div className='w-[50%] flex flex-col items-center justify-center'>
+                                <button 
+                                  disabled={!totalAmountDue  || !chargeTo || !tin || !address || someEmpy}
+                                  type='submit' 
+                                  className={`py-1 px-3 bg-green-700 text-white rounded-sm ${(!totalAmountDue  || !chargeTo || !tin || !address || someEmpy) ? 'bg-green-300 cursor-not-allowed': ''} transition-all`}>
+                                    Confirm Sale
+                                </button>
+
+                                {(!totalAmountDue  || !chargeTo || !tin || !address || someEmpy) &&
+                                  <p className='font-thin italic text-xs'>*Please complete the required fields</p>
+                                }
 
                             </div>
                         </div>

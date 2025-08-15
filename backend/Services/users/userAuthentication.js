@@ -28,7 +28,7 @@ export const userAuth = async(loginInformation) =>{
 
         // FETCH THE USER DETAILS INCLUDING BRANCH NAME
         const userData = await SQLquery(
-            `SELECT u.user_id, u.branch_id, b.branch_name, u.role, u.first_name || ' ' || u.last_name AS full_name, u.cell_number 
+            `SELECT u.user_id, u.branch_id, b.branch_name, u.role, u.first_name || ' ' || u.last_name AS full_name, u.cell_number, u.hire_date
             FROM Users u
             JOIN Branch b ON u.branch_id = b.branch_id
             WHERE u.user_id = $1`,
