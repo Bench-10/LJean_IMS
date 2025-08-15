@@ -178,3 +178,36 @@ CREATE TABLE user_notification (
     FOREIGN KEY (user_id) REFERENCES Users(user_id),
     FOREIGN KEY (alert_id) REFERENCES Inventory_Alerts(alert_id)
 );
+
+
+
+
+
+CREATE TABLE Sales_Information (
+    sales_information_id INT PRIMARY KEY,
+	branch_id INT,
+    charge_to VARCHAR(255),
+    tin VARCHAR(50),
+    address VARCHAR(255),
+    date DATE,
+    vat DECIMAL(10, 2),
+    amount_net_vat DECIMAL(10, 2),
+    total_amount_due DECIMAL(10, 2),
+	FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
+);
+
+
+
+
+
+CREATE TABLE Sales_Items (
+    product_item_id SERIAL PRIMARY KEY,
+    sales_information_id INT,
+    product_id INT,
+    quantity INT,
+    unit VARCHAR(50),
+    unit_price DECIMAL(10, 2),
+    amount DECIMAL(10, 2),
+	FOREIGN KEY(sales_information_id) REFERENCES Sales_Information(sales_information_id),
+	FOREIGN KEY(product_id) REFERENCES Inventory_Product(product_id)
+);
