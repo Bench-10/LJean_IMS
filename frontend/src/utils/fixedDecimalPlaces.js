@@ -6,7 +6,7 @@ export default function toTwoDecimals(num) {
 
   const n = Number(num);
 
-  if (isNaN(n)) return '';s
+  if (isNaN(n)) return '';
 
 
   return parseFloat(n.toFixed(2));
