@@ -341,7 +341,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                                 <input 
                                   type="text" 
                                   className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all' 
-                                  placeholder="Enter customer name"
+                                  
                                   value={chargeTo}
                                   onChange={(e) => setChargeTo(e.target.value)}
                                 />
@@ -352,7 +352,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                                 <input 
                                   type="text" 
                                   className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
-                                  placeholder="Tax Identification Number"
+                                  
                                   value={tin}
                                   onChange={(e) => setTin(e.target.value)}
                                 />
@@ -363,7 +363,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                                 <input 
                                   type="text" 
                                   className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
-                                  placeholder="Customer address"
+                                  
                                   value={address}
                                   onChange={(e) => setAddress(e.target.value)}
                                 />
@@ -593,7 +593,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
      </div>
   )
-  
+
 }
 
 export default AddSaleModalForm

@@ -122,7 +122,7 @@ create table Inventory_Product(
 
 
 CREATE TABLE Inventory_Product (
-    product_id SERIAL PRIMARY KEY,
+    product_id INT PRIMARY KEY, --NEW DATATYPE
     category_id INT NOT NULL,
     branch_id INT NOT NULL,
     product_name VARCHAR(255) NOT NULL,
@@ -134,6 +134,12 @@ CREATE TABLE Inventory_Product (
     FOREIGN KEY (category_id) REFERENCES Category(category_id),
     FOREIGN KEY (branch_id) REFERENCES Branch(branch_id)
 );
+
+--OR USE THIS IF DONT WANT TO RE-WRITE THE CODE AGAIN
+ALTER TABLE inventory_product
+ALTER COLUMN product_id DROP DEFAULT,
+ALTER COLUMN product_id TYPE INT;
+DROP SEQUENCE IF EXISTS inventory_product_product_id_seq;
 
 
 

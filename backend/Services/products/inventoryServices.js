@@ -53,23 +53,30 @@ export const addProductItem = async (productData) => {
     const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
     const color = 'green';
 
+    //CREATES A UNIQUE PRODUCT ID
+    let product_id;
+    let isUnique = false;
+    while (!isUnique) {
+        product_id = Math.floor(100000 + Math.random() * 900000); 
+        const check = await SQLquery('SELECT 1 FROM Inventory_Product WHERE product_id = $1', [product_id]);
+        if (check.rowCount === 0) isUnique = true;
+    }
+
     await SQLquery('BEGIN');
 
-    const insertToInventoryProducts = await SQLquery(
+    await SQLquery(
         `INSERT INTO Inventory_Product 
-        (category_id, branch_id, product_name, unit, unit_price, unit_cost, quantity, threshold)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [category_id, branch_id, product_name, unit, unit_price, unit_cost, quantity_added, threshold]
+        (product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, quantity, threshold)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, quantity_added, threshold]
     );   
-
-    const addedProductId = insertToInventoryProducts.rows[0].product_id;
 
     await SQLquery(
         `INSERT INTO Add_Stocks 
         (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *`,
-        [addedProductId, unit_price, unit_cost, quantity_added, date_added, product_validity]
+        [product_id, unit_price, unit_cost, quantity_added, date_added, product_validity]
     );
 
     await SQLquery(
@@ -77,12 +84,12 @@ export const addProductItem = async (productData) => {
         (product_id, branch_id, alert_type, message, banner_color)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *`,
-        [addedProductId, branch_id, productAddedNotifheader, notifMessage, color]
+        [product_id, branch_id, productAddedNotifheader, notifMessage, color]
     );
 
     await SQLquery('COMMIT');
 
-    const newProductRow = await getUpdatedInventoryList(addedProductId, branch_id);
+    const newProductRow = await getUpdatedInventoryList(product_id, branch_id);
 
     return newProductRow;
 };
