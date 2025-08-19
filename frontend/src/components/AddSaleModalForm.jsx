@@ -5,7 +5,7 @@ import  toTwoDecimals from '../utils/fixedDecimalPlaces.js';
 import dayjs from 'dayjs';
 import axios from 'axios';
 
-function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHeader}) {
+function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHeader, fetchProductsData}) {
 
 
   const {user} = useAuth();
@@ -27,11 +27,14 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
   },[isModalOpen]);
 
 
+
   //PRODUCT INPUT INFORMATION
   const [productSelected, setProductSelected] = useState([]);
   const [rows, setRows] = React.useState([
     { product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0 }
   ]);
+
+
 
 
   //CALCULATING AMOUNT AND VAT
@@ -47,7 +50,13 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
   //SEARCH TERM ERROR HANDLING
   const [someEmpy, setSomeEmpty] = useState(false);
+  const [emptyQuantity, setEmptyQuantiy] = useState(false);
 
+
+  //QUANTITY VALIDATION
+  const [exceedQuanity, setExceedQuanity] = useState([]);
+
+  
 
   //TO RESET THE FORM ONCE CLOSED
   const closeModal = () =>{
@@ -65,23 +74,64 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
     setProductSelected([]);
     setSearchTerms({});
     setShowDropdowns({});
+    setEmptyQuantiy(false);
+    setSomeEmpty(false);
+    setExceedQuanity([]);
 
   };
-
 
   
   //MULTIPLY THE AMOUNT BY THE PRODUCT'S UNIT PRICE
   const createAnAmount = (index) =>{
 
+    const currentId = rows[index].product_id;
+    
+    const product = productsData.find(p => p.product_id === currentId);
+
+    const availableQuantity = product ? product.quantity : 0;
+
+    const currentQuantity = rows[index].quantity;
+
+
+    if (currentId && currentQuantity > availableQuantity){
+      console.log('Exceed');
+
+      setExceedQuanity([...exceedQuanity, currentId]);
+
+      return;
+                                  
+
+
+    } else if(exceedQuanity.includes(currentId) && currentQuantity <= availableQuantity){
+      const updatedQuantityExceedingList = exceedQuanity.filter(q => q !== currentId)
+
+      setExceedQuanity(updatedQuantityExceedingList);
+    } 
+
+   
     const productAmount = rows[index].quantity * rows[index].unitPrice
     const newRows = [...rows];
     newRows[index].amount = productAmount;
+
+    preventEmptyQuantity(newRows);
     setRows(newRows);
 
     
-
     totalAmount(newRows);
 
+  };
+
+
+  //DISABLE BUTTON IF THERE ARE QUANTITY FEILDS THAT ARE CURRENTLY EMPTY
+  const preventEmptyQuantity = (updatedRows) =>{
+
+    const emptyQuantity = updatedRows.some(row => !row.product_id || row.product_id === ''  || !row.quantity || Number(row.quantity) === 0)
+
+    if (emptyQuantity) {
+      setEmptyQuantiy(true);
+    } else{
+      setEmptyQuantiy(false);
+    }
   };
 
 
@@ -109,7 +159,6 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
     setTotalAmountDue(amount + vat);
     
   };
-
 
 
   //REMOVES THE SPECIFIC ROW
@@ -220,12 +269,10 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
     });
   };
 
-
-
   
   //SUBMIT THE DATA
   const submitSale = async () =>{
-    console.log(rows);
+  
 
     const headerInformationAndTotal = {
       chargeTo,
@@ -240,18 +287,24 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
     const saleData = {
       headerInformationAndTotal,
-      rows
+      productRow: rows
     };
 
-    console.log(headerInformationAndTotal);
-    console.log(saleData);
+  
 
 
     const data = await axios.post('http://localhost:3000/api/sale', saleData);
     setSaleHeader((prevData) => [...prevData, data.data]);
 
+    setEmptyQuantiy(false);
+    setSomeEmpty(false);
     closeModal();
+
+    //RE-FETCH WITH THE LATEST PRODUCT DATA(FRONTEND)
+    fetchProductsData();
+
   };
+
 
   return (
      <div>
@@ -263,7 +316,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
         )}
 
         <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user.role === 'Sales Associate'}>
-            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[675px] w-[1000px] rounded-md py-7  px-3 animate-popup" >
+            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[760px] w-[1000px] rounded-md py-7  px-3 animate-popup" >
 
                 <div>
                     <h3 className="font-bold text-3xl py-4 text-center">
@@ -281,54 +334,49 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
 
                         {/*CUSTOMER INFORMATION*/}
-                        <div className='flex gap-x-2 my-6'>
+                        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-6 p-4 bg-gray-50 rounded-lg border border-gray-200'>
                             
                             <div className='w-full'>
-                                <h2 className='text-xs font-bold mb-2'>CHARGE TO</h2>
+                                <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Charge To</label>
                                 <input 
                                   type="text" 
-                                  className='w-full border' 
+                                  className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all' 
+                                  placeholder="Enter customer name"
                                   value={chargeTo}
                                   onChange={(e) => setChargeTo(e.target.value)}
-                                
                                 />
-
                             </div>
 
                             <div className='w-full'>
-                                <h2 className='text-xs font-bold mb-2'>TIN</h2>
+                                <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>TIN</label>
                                 <input 
                                   type="text" 
-                                  className='w-full border' 
+                                  className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
+                                  placeholder="Tax Identification Number"
                                   value={tin}
                                   onChange={(e) => setTin(e.target.value)}
-
                                 />
-
                             </div>
 
                             <div className='w-full'>
-                                <h2 className='text-xs font-bold mb-2'>ADDRESS</h2>
+                                <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Address</label>
                                 <input 
                                   type="text" 
-                                  className='w-full border' 
+                                  className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
+                                  placeholder="Customer address"
                                   value={address}
                                   onChange={(e) => setAddress(e.target.value)}
-
                                 />
-
                             </div>
 
                             <div className='w-full'>
-                                <h2 className='text-xs font-bold mb-2'>DATE</h2>
+                                <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Date</label>
                                 <input 
                                   type="text" 
-                                  className='w-full border' 
+                                  className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm bg-gray-100 text-gray-600 cursor-not-allowed'
                                   value={dateTodayReadable}
                                   readOnly
-                                  
                                 />
-
                             </div>
 
                         </div>
@@ -340,13 +388,18 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                               type="button"
                               className="bg-green-600 py-2 px-4 text-white mb-6 rounded-sm"
                               onClick={() =>
-                                setRows([...rows, { product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0 }])
+                                {setRows(prevRows => {
+                                  const updatedRows = [...prevRows, { product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0 }];
+                                  
+                                  preventEmptyQuantity(updatedRows);
+                                  return updatedRows;
+                                });}
                               }
                             >
                               <h1 className='text-xs font-medium flex items-center gap-x-2'><IoMdAdd />ADD NEW ROW</h1>
                             </button>
 
-                            <div className="h-[250px] overflow-y-auto border border-gray-200">
+                            <div className="h-[200px] overflow-y-auto border border-gray-200">
                               <table className="w-full divide-y divide-gray-200 text-sm">
                                   <thead className="sticky top-0 bg-gray-100">
                                       <tr>
@@ -424,18 +477,28 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                                           </td>
 
 
-                                          <td className="px-2">
-                                            <input type="text" className="border w-full" value={row.quantity} onChange={e => {
-                                              const newRows = [...rows];
-                                              newRows[idx].quantity = e.target.value;
-                                              setRows(newRows);
-                                            }} onKeyUp={() => createAnAmount(idx)}
-                                            onKeyDown={(e) => {
-                                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
-                                                e.preventDefault();
-                                              }
-                                            }}
-                                            />
+                                          <td className="px-2 relative">
+                                            <div className="relative">
+                                              <input type="text" className="border w-full" value={row.quantity} onChange={e => {
+                                                const newRows = [...rows];
+                                                newRows[idx].quantity = e.target.value;
+                                                setRows(newRows);
+                                              }} onKeyUp={() => createAnAmount(idx)}
+                                              onKeyDown={(e) => {
+                                                if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
+                                                  e.preventDefault();
+                                                }
+                                              }}
+                                              />
+                                              {exceedQuanity.includes(row.product_id) && (
+                                                <div
+                                                  className="absolute left-0 w-full text-xs text-red-600 mt-1 z-10 bg-white pointer-events-none"
+                                                  style={{ bottom: '-1.5em' }}
+                                                >
+                                                  *Not enough stock available
+                                                </div>
+                                              )}
+                                            </div>
                                           </td>
 
 
@@ -482,47 +545,41 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                         </div>
 
                         {/*TOTAL AND SUBMIT BUTTON*/}
-                        <div className='mt-4 flex w-full flex-1'>
-
-                            {/* TOTAL AMOUNT AND TAXES*/}
-                            <div className='w-full  flex flex-col justify-between'>
-
-                                {/*FOR VAT CALCULATIONS*/}
-                                <div className='flex gap-x-20'>
-                                    {/*REGULAR VAT*/}
-                                    <div>
-                                      VAT: {toTwoDecimals(vat)}
+                        <div className='mt-6'>
+                            {/* TOTAL CALCULATIONS SECTION*/}
+                            <div className='border border-gray-200 rounded-sm p-4 mb-4 bg-gray-50'>
+                                <div className='flex justify-between items-center mb-3'>
+                                    <div className='flex gap-x-12'>
+                                        <div className='text-sm'>
+                                            <span className='text-xs font-bold text-gray-600'>VAT:</span>
+                                            <span className='ml-2 font-medium'>{toTwoDecimals(vat)}</span>
+                                        </div>
+                                        <div className='text-sm'>
+                                            <span className='text-xs font-bold text-gray-600'>AMOUNT NET VAT:</span>
+                                            <span className='ml-2 font-medium'>{toTwoDecimals(amountNetVat)}</span>
+                                        </div>
                                     </div>
-
-                                    {/*AMOUNT NET VAT*/}
-                                    <div>
-                                      AMOUNT NET VAT: {toTwoDecimals(amountNetVat)}
+                                </div>
+                                <div className='border-t border-gray-300 pt-3'>
+                                    <div className='text-lg font-bold text-right'>
+                                        <span className='text-gray-700'>TOTAL AMOUNT DUE: </span>
+                                        <span className='text-green-700'>{toTwoDecimals(totalAmountDue)}</span>
                                     </div>
-
                                 </div>
-
-
-                                {/*TOTAL AMOUNT*/}
-                                <div>
-                                  TOTAL AMOUNT DUE:{toTwoDecimals(totalAmountDue)}
-                                </div>
-                                
                             </div>
 
-                            
                             {/*SUBMIT BUTTON*/}
-                            <div className='w-[50%] flex flex-col items-center justify-center'>
+                            <div className='text-center'>
                                 <button 
-                                  disabled={!totalAmountDue  || !chargeTo || !tin || !address || someEmpy}
+                                  disabled={!totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0}
                                   type='submit' 
-                                  className={`py-1 px-3 bg-green-700 text-white rounded-sm ${(!totalAmountDue  || !chargeTo || !tin || !address || someEmpy) ? 'bg-green-300 cursor-not-allowed': ''} transition-all`}>
+                                  className={`py-3 px-8 font-medium rounded-sm transition-all ${(!totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0) ? 'bg-green-200 text-green-600 cursor-not-allowed border border-green-200': 'bg-green-600 hover:bg-green-700 text-white border border-green-600 shadow-sm hover:shadow-md'}`}>
                                     Confirm Sale
                                 </button>
 
-                                {(!totalAmountDue  || !chargeTo || !tin || !address || someEmpy) &&
-                                  <p className='font-thin italic text-xs'>*Please complete the required fields</p>
+                                {(!totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0) &&
+                                  <p className='font-thin italic text-xs text-red-500 mt-3'>*Please complete the required fields</p>
                                 }
-
                             </div>
                         </div>
 
@@ -536,6 +593,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
      </div>
   )
+  
 }
 
 export default AddSaleModalForm

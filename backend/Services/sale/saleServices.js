@@ -12,6 +12,21 @@ export const viewSale = async (branchId) => {
 
 
 
+export const viewSelectedItem = async (saleId) => {
+   const { rows } = await SQLquery(`
+
+        SELECT product_id, Inventory_Product.product_name,  Sales_Items.quantity, Sales_Items.unit, Sales_Items.unit_price, amount 
+        FROM Sales_Items
+        LEFT JOIN Inventory_Product USING(product_id)
+        WHERE sales_information_id = $1;`
+    
+    , [saleId]);
+   
+   return rows;
+};
+
+
+
 //ADD SALE
 export const addSale = async (headerAndProducts) => {
 
@@ -37,11 +52,13 @@ export const addSale = async (headerAndProducts) => {
 
 
 
-    const values = [];
-    const placeholders = [];
+    
    
     if (productRow && productRow.length > 0) {
+
         
+        const values = [];
+        const placeholders = [];
         productRow.forEach((p, i) => {
           const baseIndex = i * 6;
           placeholders.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6})`);
@@ -64,7 +81,13 @@ export const addSale = async (headerAndProducts) => {
     await SQLquery('COMMIT');
 
 
-    const {rows} = await SQLquery(`SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due FROM Sales_Information WHERE branch_id = $1 AND sales_information_id = $2;`, [branch_id, sale_id]);
+    const {rows} = await SQLquery(`
+        
+        SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due 
+        FROM Sales_Information 
+        WHERE branch_id = $1 AND sales_information_id = $2;`
+
+    , [branch_id, sale_id]);
 
     return rows[0];
 

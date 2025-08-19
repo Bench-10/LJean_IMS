@@ -225,6 +225,7 @@ function App() {
         productsData={productsData}
         setIsModalOpen={setIsModalOpen}
         setSaleHeader={setSaleHeader}
+        fetchProductsData={fetchProductsData}
       
       />
 
@@ -373,6 +374,7 @@ function App() {
                   <Sales
                     saleHeader={saleHeader}
                     setIsModalOpen={setIsModalOpen}
+                    sanitizeInput={sanitizeInput}
                   
                   />
 

@@ -4,11 +4,15 @@ import * as saleControllers from '../Controllers/saleControllers.js';
 const router = express.Router();
 
 
-//GETTING BRANCHES
+//GETTING SALE
 router.get("/sale", saleControllers.getAllSaleInformation);
 
 
-//GETTING USERS
+//GETTING SALE
+router.get("/sale_items", saleControllers.getAllSaleItems);
+
+
+//ADDING A SALE
 router.post("/sale", saleControllers.addSaleInformation);
 
 
