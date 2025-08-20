@@ -153,9 +153,15 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                   <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
                     UNIT PRICE
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
-                    UNIT COST
-                  </th>
+
+                  {user.role === 'Branch Manager' &&
+
+                    <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
+                      UNIT COST
+                    </th> 
+
+                  }
+
                   <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-4">
                     QUANTITY
                   </th>
@@ -195,7 +201,11 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                       <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
                       <td className="px-4 py-2"  >{row.unit}</td>
                       <td className="px-4 py-2 text-right"  >₱ {row.unit_price}</td>
-                      <td className="px-4 py-2 text-right"  >₱ {row.unit_cost}</td>
+
+                      {user.role === 'Branch Manager' &&
+                        <td className="px-4 py-2 text-right"  >₱ {row.unit_cost}</td>
+                      }
+                      
                       <td className="px-4 py-2 text-right"  >{row.quantity}</td>
                       <td className="px-4 py-2 text-center"  >{row.threshold}</td>
                       <td className="px-4 py-2 text-center w-36"  >

@@ -276,6 +276,7 @@ function App() {
 
       <ProductTransactionHistory
         isProductTransactOpen={isProductTransactOpen}
+        sanitizeInput={sanitizeInput}
         onClose={() => setIsProductTransactOpen(false)}
 
       />

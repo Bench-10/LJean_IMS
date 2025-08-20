@@ -125,13 +125,16 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
   //DISABLE BUTTON IF THERE ARE QUANTITY FEILDS THAT ARE CURRENTLY EMPTY
   const preventEmptyQuantity = (updatedRows) =>{
 
+    if(!updatedRows){
+      setEmptyQuantiy(false);
+
+      return
+    };
+
     const emptyQuantity = updatedRows.some(row => !row.product_id || row.product_id === ''  || !row.quantity || Number(row.quantity) === 0)
 
-    if (emptyQuantity) {
-      setEmptyQuantiy(true);
-    } else{
-      setEmptyQuantiy(false);
-    }
+    setEmptyQuantiy(emptyQuantity);
+  
   };
 
 
@@ -530,7 +533,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
 
                                           <td>
-                                            <button type='button' onClick={() => {removeSaleRow(idx)}}>Remove</button>
+                                            <button type='button' onClick={() => {removeSaleRow(idx); preventEmptyQuantity()}}>Remove</button>
 
                                           </td>
 

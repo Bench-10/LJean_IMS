@@ -71,7 +71,7 @@ export const getProductHistory = async(dates, branchId) => {
 
 
 
-    if (startDate === '' && endDate === '') {
+    if ((startDate === '' && endDate === '')  || (!startDate && !endDate)) {
         const {rows} = await SQLquery(`
             SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_name, h_unit_cost, quantity_added, (h_unit_cost * quantity_added) AS value
             FROM Add_Stocks

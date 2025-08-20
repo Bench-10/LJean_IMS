@@ -4,12 +4,13 @@ import { BsFunnelFill } from "react-icons/bs";
 import NoInfoFound from '../utils/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
  
-function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
+function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInput }) {
 
   const [openFilter, setOpenFilter] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [productHistory, setProductHistory] = useState([]);
+  const [search, setSearch] = useState('');
 
   const {user} = useAuth();
 
@@ -24,6 +25,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
   const applyFilter = () =>  {
     
     if (!startDate && !endDate){
+      fetchProductHistory();
       setOpenFilter(false);
       return
     }
@@ -33,9 +35,10 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
       return
     }
 
-    if ((startDate > endDate) && !endDate){
+    if (startDate && !endDate){
       fetchProductHistory();
     }
+
 
     fetchProductHistory();
     setOpenFilter(false); 
@@ -67,6 +70,22 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
   }, [isProductTransactOpen]);
 
 
+  const handleSearch = (event) =>{
+    setSearch(sanitizeInput(event.target.value));
+
+  }
+
+
+  let currentProductHistory = productHistory;
+
+  
+  currentProductHistory = currentProductHistory.filter(product =>
+    product.product_name.toLowerCase().includes(search.toLowerCase())
+  );
+
+
+
+
   return (
     <div>
       
@@ -80,7 +99,20 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
 
               {/*TITLE AND FILTER SECTION*/}
               <div className='flex  justify-between items-center mt-2 pr-6' >
-                <h1 className='font-bold text-4xl'>Product History</h1>
+                <div className='flex flex-col sm:flex-row gap-2 sm:gap-x-8 items-center w-full'>
+                  <h1 className='font-bold text-3xl sm:text-4xl text-gray-800 tracking-tight'>Product History</h1>
+                  <div className='flex items-center w-full sm:w-auto mt-2 sm:mt-0'>
+                   
+                    <input 
+                      type="text" 
+                      className='h-9 w-full sm:w-64 border border-gray-300 rounded-md px-3 py-1 text-sm ' 
+                      placeholder="Search product name..."
+                      onChange={handleSearch} 
+                      value={search}
+                    />
+                  </div>
+                </div>
+                
                 <div className='relative'>
 
                   {/*FILTER POPUP */}
@@ -137,13 +169,13 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, }) {
                     </tr>
                   </thead>
                   <tbody className='bg-white '>
-                    {productHistory.length === 0 ?
+                    {currentProductHistory.length === 0 ?
                       (
                         <NoInfoFound col={6}/>
                       ) :
 
                       (
-                        productHistory.map((history, histoindx) => (
+                        currentProductHistory.map((history, histoindx) => (
                           <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
                             <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
                             <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>

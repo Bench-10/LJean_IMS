@@ -103,24 +103,6 @@ CREATE TABLE Category (
 
 
 
-create table Inventory_Product(
-	product_id serial primary key,
-	category_id int not null,
-	branch_id int not null,
-	product_name varchar(255) not null,
-	unit varchar(15) not null,
-	unit_price  decimal(10,2) not null,
-	unit_cost  decimal(10,2) not null,
-	quantity int not null,
-	threshold int not null,
-	foreign key(category_id) references Category(category_id),
-	foreign key(branch_id) references Branch(branch_id)
-);
-
-
-
-
-
 CREATE TABLE Inventory_Product (
     product_id INT PRIMARY KEY, --NEW DATATYPE
     category_id INT NOT NULL,
@@ -145,16 +127,16 @@ DROP SEQUENCE IF EXISTS inventory_product_product_id_seq;
 
 
 
-CREATE TABLE Inventory_Alerts (
-    alert_id SERIAL PRIMARY KEY,
-    product_id INT,
-    branch_id INT,
-    alert_type VARCHAR(100),
-    message VARCHAR(255),
-    alert_date TIMESTAMP DEFAULT NOW(),
-    is_read BOOL,
-    FOREIGN KEY (product_id) REFERENCES Inventory_Product(product_id),
-    FOREIGN KEY (branch_id) REFERENCES Branch(branch_id)
+
+CREATE TABLE Add_Stocks(
+	add_id SERIAL PRIMARY KEY,
+	product_id int not null,
+	h_unit_price DECIMAL(10,2) not null,
+	h_unit_cost DECIMAL(10,2) not null,
+	quantity_added INT not null,
+	date_added DATE not null,
+	product_validity DATE not null,
+	FOREIGN KEY (product_id) REFERENCES Inventory_Product(product_id)
 );
 
 
