@@ -21,6 +21,14 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
     setStartDate('');
   };
 
+  const handleClose = () =>{
+    setSearch('');
+    setStartDate('');
+    setEndDate('');
+    onClose();
+    setOpenFilter(false); 
+  };
+
 
   const applyFilter = () =>  {
     
@@ -95,7 +103,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
 
           <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[1000px] rounded-md p-7 pb-14 border-gray-300 animate-popup">
             <button type='button' className=" absolute right-2 top-2 " 
-              onClick={() => {onClose(); setOpenFilter(false); closeFilterValue();}}>✕</button>
+              onClick={() => {onClose(); setOpenFilter(false); closeFilterValue(); handleClose();}}>✕</button>
 
               {/*TITLE AND FILTER SECTION*/}
               <div className='flex  justify-between items-center mt-2 pr-6' >
