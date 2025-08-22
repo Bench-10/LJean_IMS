@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import NoInfoFound from '../utils/NoInfoFound';
 import axios from 'axios';
+import {currencyFormat} from '../utils/formatCurrency.js';
+
 
 function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
 
@@ -183,10 +185,10 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
                                       soldItems.map((items, itemIndex) => (
                                         <tr key={itemIndex} className="hover:bg-gray-50 text-sm">
                                             <td className="px-3 py-2 text-left">{items.product_name}</td>
-                                            <td className="px-3 py-2 text-center">{items.quantity}</td>
+                                            <td className="px-3 py-2 text-center">{items.quantity.toLocaleString()}</td>
                                             <td className="px-3 py-2 text-center">{items.unit}</td>
-                                            <td className="px-3 py-2 text-right">₱ {items.unit_price}</td>
-                                            <td className="px-3 py-2 text-right">₱ {items.amount}</td>
+                                            <td className="px-3 py-2 text-right">{currencyFormat(items.unit_price)}</td>
+                                            <td className="px-3 py-2 text-right">{currencyFormat(items.amount)}</td>
                                         </tr>
                                       ))
                                       
@@ -219,15 +221,15 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
                                 <div className="space-y-3">
                                     <div className="flex justify-between py-2 border-b border-gray-200 text-base">
                                         <span className="font-medium text-gray-600">Amount Net VAT:</span>
-                                        <span className="font-semibold">₱ {saleData.amountNet}</span>
+                                        <span className="font-semibold">{currencyFormat(saleData.amountNet)}</span>
                                     </div>
                                     <div className="flex justify-between py-2 border-b border-gray-200 text-base">
                                         <span className="font-medium text-gray-600">VAT (10%):</span>
-                                        <span className="font-semibold">₱ {saleData.vat}</span>
+                                        <span className="font-semibold">{currencyFormat(saleData.vat)}</span>
                                     </div>
                                     <div className="flex justify-between py-3 text-xl font-bold border-t-2 border-gray-400 mt-2">
                                         <span>TOTAL AMOUNT DUE:</span>
-                                        <span className="text-green-700">₱ {saleData.total}</span>
+                                        <span className="text-green-700">{currencyFormat(saleData.total)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -332,9 +334,9 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
                       <td className="px-4 py-2 whitespace-nowrap"  >{row.tin}</td>
                       <td className="px-4 py-2"  >{row.address}</td>
                       <td className="px-4 py-2 text-right"  >{row.formated_date}</td>
-                      <td className="px-4 py-2 text-right"  >₱ {row.amount_net_vat}</td>
-                      <td className="px-4 py-2 text-right"  >₱ {row.vat}</td>
-                      <td className="px-4 py-2 text-right"  >₱ {row.total_amount_due}</td>
+                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.amount_net_vat)}</td>
+                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.vat)}</td>
+                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.total_amount_due)}</td>
                       <td className="px-4 py-2 text-center">
                         <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" >
                             View

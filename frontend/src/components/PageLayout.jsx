@@ -6,13 +6,13 @@ import GlobalBanner from './GlobalBanner';
 
 function PageLayout({setOpenNotif, unreadCount}) {
   return (
-    <>
-        <GlobalBanner setOpenNotif={setOpenNotif} unreadCount={unreadCount}/>
-        <NavBar/>
-        <main>
-            <Outlet /> 
-        </main>
-    </>
+    <div className='flex flex-col h-screen overflow-hidden'>
+      <GlobalBanner setOpenNotif={setOpenNotif} unreadCount={unreadCount}/>
+      <NavBar/>
+      <main className='flex-1 overflow-hidden min-h-0'>
+        <Outlet />
+      </main>
+    </div>
   )
 }
 

@@ -1,19 +1,15 @@
 import React from 'react';
-import { IoIosConstruct } from "react-icons/io";
+import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard.jsx';
+import { useAuth } from '../authentication/Authentication';
 
 function Dashboard() {
+  const { user } = useAuth();
+  const isOwner = user?.role === 'Owner' || user?.role === 'owner' || user?.role === 'ADMIN';
+  const branchId = isOwner ? undefined : user?.branch_id; // owner can view all
   return (
-    <div className='ml-[220px] flex justify-center items-center h-screen'>
-    
-        <div className='flex flex-col justify-center items-center text-gray-500'>
-            <IoIosConstruct className='size-24 mb-3'/>
-            <h1 className='font-bold text-3xl mb-3'>Page in construction.</h1>
-            <p>This page is for manager and owner only.</p>
-            
-        </div>
-        
+    <div className='ml-[220px] px-6 py-8 h-full overflow-hidden bg-[#eef2ee] flex flex-col'>
+      <AnalyticsDashboard branchId={branchId} canSelectBranch={isOwner} />
     </div>
-
   )
 }
 

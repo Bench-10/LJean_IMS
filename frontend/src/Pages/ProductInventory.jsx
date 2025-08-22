@@ -1,6 +1,7 @@
 import React, { useState }from 'react';
 import NoInfoFound from '../utils/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
+import {currencyFormat} from '../utils/formatCurrency.js';
 
 
 function ProductInventory({branches, handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories}) {
@@ -200,14 +201,14 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                       <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
                       <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
                       <td className="px-4 py-2"  >{row.unit}</td>
-                      <td className="px-4 py-2 text-right"  >₱ {row.unit_price}</td>
+                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_price)}</td>
 
                       {user.role === 'Branch Manager' &&
-                        <td className="px-4 py-2 text-right"  >₱ {row.unit_cost}</td>
+                        <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_cost)}</td>
                       }
                       
-                      <td className="px-4 py-2 text-right"  >{row.quantity}</td>
-                      <td className="px-4 py-2 text-center"  >{row.threshold}</td>
+                      <td className="px-4 py-2 text-right"  >{row.quantity.toLocaleString()}</td>
+                      <td className="px-4 py-2 text-center"  >{row.threshold.toLocaleString()}</td>
                       <td className="px-4 py-2 text-center w-36"  >
                         <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
                           {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}

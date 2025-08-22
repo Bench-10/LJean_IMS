@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { IoMdAdd } from "react-icons/io";
 import  toTwoDecimals from '../utils/fixedDecimalPlaces.js';
+import {currencyFormat} from '../utils/formatCurrency.js';
 import dayjs from 'dayjs';
 import axios from 'axios';
+
 
 function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHeader, fetchProductsData}) {
 
@@ -555,18 +557,18 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                                     <div className='flex gap-x-12'>
                                         <div className='text-sm'>
                                             <span className='text-xs font-bold text-gray-600'>VAT:</span>
-                                            <span className='ml-2 font-medium'>{toTwoDecimals(vat)}</span>
+                                            <span className='ml-2 font-medium'>{currencyFormat(toTwoDecimals(vat))}</span>
                                         </div>
                                         <div className='text-sm'>
                                             <span className='text-xs font-bold text-gray-600'>AMOUNT NET VAT:</span>
-                                            <span className='ml-2 font-medium'>{toTwoDecimals(amountNetVat)}</span>
+                                            <span className='ml-2 font-medium'>{currencyFormat(toTwoDecimals(amountNetVat))}</span>
                                         </div>
                                     </div>
                                 </div>
                                 <div className='border-t border-gray-300 pt-3'>
                                     <div className='text-lg font-bold text-right'>
                                         <span className='text-gray-700'>TOTAL AMOUNT DUE: </span>
-                                        <span className='text-green-700'>{toTwoDecimals(totalAmountDue)}</span>
+                                        <span className='text-green-700'>{currencyFormat(toTwoDecimals(totalAmountDue))}</span>
                                     </div>
                                 </div>
                             </div>

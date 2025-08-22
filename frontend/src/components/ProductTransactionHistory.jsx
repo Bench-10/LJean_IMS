@@ -3,6 +3,7 @@ import axios from 'axios';
 import { BsFunnelFill } from "react-icons/bs";
 import NoInfoFound from '../utils/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
+import {currencyFormat} from '../utils/formatCurrency.js';
  
 function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInput }) {
 
@@ -188,9 +189,9 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
                             <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
                             <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
                             <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {history.h_unit_cost}</td>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{history.quantity_added}</td>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>₱ {history.value}</td>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'> {currencyFormat(history.h_unit_cost)}</td>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{history.quantity_added.toLocaleString()}</td>
+                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{currencyFormat(history.value)}</td>
                           </tr>
                         ))
                       )
