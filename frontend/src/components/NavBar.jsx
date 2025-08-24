@@ -2,7 +2,7 @@ import React from 'react';
 import { MdOutlineInventory, MdOutlineLogout, MdOutlineDashboard } from "react-icons/md";
 import { PiSealWarningBold } from "react-icons/pi";
 import { FaUsersCog, FaMoneyBillWave, FaShippingFast} from "react-icons/fa";
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../authentication/Authentication';
 
 // Import BranchLogo component
@@ -11,6 +11,10 @@ import BranchLogo from './BranchLogo';
 
 function NavBar() {
   const {user, logout} = useAuth();
+  
+  const location = useLocation();
+
+  const currentLocaion = location.pathname === '/branches';
 
   return (
     <nav className="fixed top-0 left-0 h-screen w-[220px] bg-navBackground text-white p-3 box-border"> 
@@ -56,7 +60,7 @@ function NavBar() {
                   <NavLink
                     to="/product_validity"
                     className={({ isActive }) =>
-                      isActive
+                      isActive 
                         ? "border-l-8 bg-[#254717] border-l-green-400"
                         : ""
                     }
@@ -73,7 +77,7 @@ function NavBar() {
                   <NavLink
                     to="/dashboard"
                     className={({ isActive }) =>
-                      isActive
+                      (isActive || currentLocaion)
                         ? "border-l-8 bg-[#254717] border-l-green-400"
                         : ""
                     }

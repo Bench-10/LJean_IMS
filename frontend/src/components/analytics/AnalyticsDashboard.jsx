@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, AreaChart, Area, Legend, Cell } from 'recharts';
 import {currencyFormat} from '../../utils/formatCurrency.js';
+import { NavLink } from "react-router-dom";
 
 /* Layout wrapper to mimic existing style (cards, spacing) */
 const Card = ({ title, children, className='' }) => (
@@ -40,6 +41,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0 });
   const [categoryName, setCategoryName] = useState('All Products');
 
+
   useEffect(()=>{ fetchAll(); }, [branchId, interval, categoryFilter]);
   const [allBranches, setAllBranches] = useState([]);
   useEffect(()=>{ if(canSelectBranch) loadBranches(); }, [canSelectBranch]);
@@ -57,9 +59,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         axios.get(`${base}/restock-trends`, { params }),
         axios.get(`${base}/inventory-levels`, { params }),
         axios.get(`${base}/top-products`, { params: { ...params, limit: 7 } }),
-  axios.get(`${base}/category-distribution`, { params: { branch_id: branchId } }),
-  axios.get(`${base}/kpis`, { params: { branch_id: branchId, category_id: categoryFilter || undefined } })
+        axios.get(`${base}/category-distribution`, { params: { branch_id: branchId } }),
+        axios.get(`${base}/kpis`, { params: { branch_id: branchId, category_id: categoryFilter || undefined } })
       ]);
+
       setSalesPerformance(sales.data);
       setRestockTrends(restock.data);
       setInventoryLevels(levels.data);
@@ -98,7 +101,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       const d = new Date(Number(ymMatch[1]), Number(ymMatch[2]) - 1, 1);
       if(!isNaN(d)) return d.toLocaleDateString('en-US', { month:'short' });
     }
-    return p; // fallback
+    return p; 
   };
 
   const formatByInterval = (d) => {
@@ -123,19 +126,33 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   return (
   <div className="flex flex-col gap-5 flex-1 min-h-0">
 
-      <div className="flex flex-wrap gap-3 items-center -mt-4">
-        {canSelectBranch && (
-          <select value={branchId || ''} onChange={e=>window.location.reload()} className="border px-3 py-2 rounded text-sm bg-white h-10 min-w-[160px]">
-            <option value="">All Branches</option>
-            {allBranches.map(b => <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>)}
+      <div className="flex flex-wrap items-center justify-between" >
+
+        {(!branchId) &&
+
+            <NavLink to="/branches" className={`relative py-1 px-2 border-2 rounded-md border-gray-600 transition-all cursor-pointer hover:text-white hover:bg-gray-600`} >
+
+              <span className="text-sm">
+                  View Branch Anlytics
+              </span>
+            </NavLink>
+        
+        }
+
+        <div className="flex flex-wrap gap-3 items-center ">
+
+          <CategorySelect categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} onCategoryNameChange={setCategoryName} />
+
+          <select value={interval} onChange={e=>setInterval(e.target.value)} className="border px-3 py-2 rounded text-sm bg-white h-10 min-w-[130px]">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
           </select>
-        )}
-  <CategorySelect categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} onCategoryNameChange={setCategoryName} />
-        <select value={interval} onChange={e=>setInterval(e.target.value)} className="border px-3 py-2 rounded text-sm bg-white h-10 min-w-[130px]">
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-        </select>
+        </div>
+        
+
+
+        
       </div>
 
       {/* KPI CARDS*/}
@@ -163,10 +180,15 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   <div className="grid grid-cols-12 gap-5 flex-1 min-h-0 overflow-hidden">
   <Card title={categoryName} className="col-span-4 h-full">
           <div className="flex-1 min-h-0 h-full">
+          
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={topProducts} barSize={14} margin={{ top: 10, right: 5, left: 5, bottom: 5 }} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-              <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+              {(() => {
+                const max = topProducts.reduce((m,p)=> Math.max(m, Number(p.sales_amount)||0), 0);
+                const padded = max === 0 ? 1 : Math.ceil((max * 1.1)/100)*100; 
+                return <XAxis type="number" domain={[0, padded]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
+              })()}
               <YAxis dataKey="product_name" type="category" tick={{ fontSize: 14 }} width={110} axisLine={false} tickLine={false} />
               <Tooltip formatter={(v)=>currencyFormat(v)} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
               <Bar dataKey="sales_amount" radius={[0,4,4,0]}>

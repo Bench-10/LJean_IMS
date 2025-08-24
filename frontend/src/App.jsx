@@ -6,7 +6,7 @@ import Notification from "./Pages/Notification";
 import ProductValidity from "./Pages/ProductValidity";
 import Category from "./components/Category";
 import ProductTransactionHistory from "./components/ProductTransactionHistory";
-import { Routes, Route} from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Login from "./authentication/Login";
 import PageLayout from "./components/PageLayout";
 import Dashboard from "./Pages/Dashboard";
@@ -18,6 +18,7 @@ import Sales from "./Pages/Sales";
 import DeliveryMonitoring from "./Pages/DeliveryMonitoring";
 import AddSaleModalForm from "./components/AddSaleModalForm";
 import { useAuth } from "./authentication/Authentication";
+import BranchAnalyticsCards from "./Pages/BranchAnalyticsCards";
 
 
 
@@ -350,6 +351,18 @@ function App() {
           }/>
 
 
+
+          {/*BRANCHES PAGE*/}
+          <Route path="/branches" exact element={ 
+              <RouteProtection allowedRoles={['Owner']}>
+
+                  <BranchAnalyticsCards/>
+
+              </RouteProtection>
+        
+          }/>
+
+
           {/*USER MANAGEMENT PAGE*/}
           <Route path="/user_management" exact element={ 
               <RouteProtection allowedRoles={['Owner']}>
@@ -394,7 +407,7 @@ function App() {
         
           }/>
 
-
+          
         </Route>
 
       </Routes>
