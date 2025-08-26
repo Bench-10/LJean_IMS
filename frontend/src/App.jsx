@@ -19,6 +19,7 @@ import DeliveryMonitoring from "./Pages/DeliveryMonitoring";
 import AddSaleModalForm from "./components/AddSaleModalForm";
 import { useAuth } from "./authentication/Authentication";
 import BranchAnalyticsCards from "./Pages/BranchAnalyticsCards";
+import BranchKPI from "./Pages/BranchKPI.jsx";
 
 
 
@@ -361,6 +362,11 @@ function App() {
               </RouteProtection>
         
           }/>
+          <Route path="/branch-analytics/:branchId" exact element={
+            <RouteProtection allowedRoles={['Owner']}>
+              <BranchKPI />
+            </RouteProtection>
+          } />
 
 
           {/*USER MANAGEMENT PAGE*/}

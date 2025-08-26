@@ -14,7 +14,7 @@ function NavBar() {
   
   const location = useLocation();
 
-  const currentLocaion = location.pathname === '/branches';
+  const currentLocaion = location.pathname === '/branches' || location.pathname.startsWith('/branch-analytics');
 
   return (
     <nav className="fixed top-0 left-0 h-screen w-[220px] bg-navBackground text-white p-3 box-border"> 

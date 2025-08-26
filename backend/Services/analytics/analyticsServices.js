@@ -199,6 +199,6 @@ export async function fetchKPIs({ branch_id, category_id, range }) {
 
 
 export async function fetchBranches(){
-  const { rows } = await SQLquery('SELECT branch_id, branch_name FROM Branch ORDER BY branch_name ASC');
+  const { rows } = await SQLquery('SELECT branch_id, branch_name, address FROM Branch ORDER BY branch_name ASC');
   return rows;
 }

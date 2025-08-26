@@ -1,57 +1,70 @@
-import React from 'react';
-import { NavLink } from "react-router-dom";
+import React, { useEffect, useState } from 'react';
+import { NavLink, useNavigate } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
+import axios from 'axios';
 
 function BranchAnalyticsCards() {
-  return (
-    <div className='ml-[220px] px-6 py-3 h-full overflow-hidden bg-[#eef2ee] flex flex-col'>
+    const [branches, setBranches] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const navigate = useNavigate();
 
-        <div className="flex flex-wrap items-center" >
-            <NavLink to="/dashboard" className={` flex  gap-x-2 items-center relative py-1 px-2 border-2 rounded-md border-gray-600 transition-all cursor-pointer hover:text-white hover:bg-gray-600`} >
-                <IoArrowBack />
-                <span className="text-sm">
-                    Go back
-                </span>
-            </NavLink>
-        </div>
+    useEffect(()=>{ loadBranches(); }, []);
+    async function loadBranches(){
+        try {
+            setLoading(true); setError(null);
+            const res = await axios.get('http://localhost:3000/api/analytics/branches');
+            setBranches(res.data);
+        } catch(e){ setError('Failed to load branches'); }
+        finally { setLoading(false); }
+    }
 
-        {/* BRANCH CARD CONTAINER */}
-        <div className='grid grid-cols-1 gap-12 mt-5 px-12 sm:grid-cols-2 lg:grid-cols-3 gap-4"'>
-            {/*BRANCH CARD*/}
-            <div className='bg-white p-5 border-2 border-green-600 rounded-md '>
-                {/*BRANCH IMAGE */}
-                <div className='h-32 bg-gray-300 rounded-sm'>
-                  try
-                </div>
+    return (
+    <div className='ml-[220px] px-6 py-6 h-full flex flex-col bg-[#eef2ee] min-h-0'>
 
-                {/*BRANCH INFORMATION */}
-                <div className='flex flex-col gap-y-7 text-center mt-5'>
-                    {/*BRANCH TITLE */}
-                    <div>
-                        <h1 className='text-green-700 text-md font-bold'>LJEAN TRADING</h1>
-                    </div>
-
-                     {/*BRANCH ADDRESS */}
-                    <div>
-                        <h3 className='text-sm'>dasdasdasd</h3>
-                    </div>
-
-                      {/*vIEW ANALYTICS BUTTON */}
-                    <div>
-                        <button className='border-2 border-green-700 bg-green-100 py-2 px-5 rounded-md text-sm text-green-800 font-semibold'>View Analytics</button>
-                    </div>
-
-                </div>
+            <div className="flex flex-wrap items-center mb-4" >
+                <NavLink to="/dashboard" className='flex gap-x-2 items-center relative py-1 px-2 border-2 rounded-md border-gray-600 transition-all cursor-pointer hover:text-white hover:bg-gray-600'>
+                    <IoArrowBack />
+                    <span className="text-sm">Back to Overview</span>
+                </NavLink>
             </div>
 
-            
+            <h1 className="text-lg font-semibold text-gray-700 mb-4">Select a Branch</h1>
+
+            {loading && <div className="text-sm text-gray-500">Loading branches...</div>}
+
+            {error && <div className="text-sm text-red-600">{error}</div>}
+
+            <div className='grid grid-cols-1 gap-6 mt-2 sm:grid-cols-2 lg:grid-cols-3 overflow-auto pr-1 min-h-0 flex-1'>
+
+                {branches.map(b => (
+                    <div key={b.branch_id} className='bg-white p-5 border border-green-600/50 rounded-md flex flex-col'>
+
+                        {/*IMAGE HERE */}
+                        <div className='h-28  bg-gray-200 rounded-sm flex items-center justify-center text-green-800 text-sm font-semibold'>
+                            {b.branch_name.charAt(0)}
+                        </div>
 
 
-             
+                        {/*BRTANCH INFORMATION*/}
+                        <div className='flex flex-col justify-between text-center mt-4 flex-1'>
+
+                            <h2 className='text-green-700 text-md font-bold'>{b.branch_name}</h2>
+
+                            <p className='text-xs'>{b.address}</p>
+
+                            <button onClick={()=>navigate(`/branch-analytics/${b.branch_id}`)} 
+                            
+                            className='border border-green-700 bg-green-50 hover:bg-green-600 hover:text-white transition-colors py-2 px-5 rounded-md text-sm text-green-800 font-semibold'>View Analytics</button>
+                        </div>
+                    </div>
+                ))}
+                {!loading && !error && branches.length === 0 && (
+                    <div className='text-sm text-gray-500'>No branches found.</div>
+                )}
+            </div>
         </div>
-        
-    </div>
-  )
+    );
 }
 
-export default BranchAnalyticsCards
+export default BranchAnalyticsCards;
