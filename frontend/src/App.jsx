@@ -252,7 +252,7 @@ function App() {
         openAddDelivery={openAddDelivery}
         saleHeader={saleHeader}
         deliveryData={deliveryData}
-        setDeliveryData={setDeliveryData}
+        getDeliveries={getDeliveries}
         onClose={() => setAddDelivery(false)}  
 
       />

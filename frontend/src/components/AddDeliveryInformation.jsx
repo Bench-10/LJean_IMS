@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../authentication/Authentication';
 
 
-function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, deliveryData, setDeliveryData}) {
+function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, deliveryData, getDeliveries}) {
 
     const { user } = useAuth();
 
@@ -40,7 +40,7 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
 
         
         const response = await axios.post('http://localhost:3000/api/delivery/', payload);
-        setDeliveryData((prevData) => [...prevData, response.data]);
+        getDeliveries()
         console.log('New Delivery Added', response.data);
 
 
