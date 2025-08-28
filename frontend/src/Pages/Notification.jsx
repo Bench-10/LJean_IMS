@@ -66,7 +66,7 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
   return (
     <>
         {openNotif && (
-          <div className="fixed inset-0 bg-black/50 z-[998]" onClick={onClose} />
+          <div className="fixed inset-0 bg-black/50 z-[998] backdrop-blur-[1px]" onClick={onClose} />
         )}
 
         {openNotif && (

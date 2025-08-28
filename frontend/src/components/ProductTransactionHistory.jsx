@@ -98,7 +98,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   return (
     <div>
       
-      {isProductTransactOpen && <div className='fixed inset-0 bg-black/35 bg-opacity-50 z-40' onClick={() => {onClose(); closeFilterValue();}}/>}
+      {isProductTransactOpen && <div className='fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]' onClick={() => {onClose(); closeFilterValue();}}/>}
 
       <dialog className='bg-transparent fixed top-0 bottom-0  z-50' open={isProductTransactOpen}>
 

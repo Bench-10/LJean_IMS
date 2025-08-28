@@ -200,7 +200,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
       {isModalOpen && user.role === 'Inventory Staff' &&(
         <div
-          className="fixed inset-0 bg-black/35 bg-opacity-50 z-40"
+          className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
           style={{ pointerEvents: 'auto' }}  onClick={onClose}
         />
        )}

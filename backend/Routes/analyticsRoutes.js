@@ -3,37 +3,37 @@ import * as analyticsControllers from '../Controllers/analyticsControllers.js';
 
 const router = express.Router();
 
-// Inventory levels over time (stock history)
+//INVENTORY LEVELS
 router.get('/analytics/inventory-levels', analyticsControllers.getInventoryLevels);
 
 
 
-// Sales performance (time series)
+//SALES(NOT YET POLISHED)
 router.get('/analytics/sales-performance', analyticsControllers.getSalesPerformance);
 
 
 
-// Restock trends (aggregate add_stocks)
+//FOR RESTOCK
 router.get('/analytics/restock-trends', analyticsControllers.getRestockTrends);
 
 
 
-// Top products by sales amount
+//TOP PRODUCTS BY SALES AMOUNT
 router.get('/analytics/top-products', analyticsControllers.getTopProducts);
 
 
 
-// Category distribution of inventory value
+//BY CATEGORY
 router.get('/analytics/category-distribution', analyticsControllers.getCategoryDistribution);
 
 
 
-// KPI metrics (total sales, investment, profit placeholder)
+//KPI
 router.get('/analytics/kpis', analyticsControllers.getKPIs);
 
 
 
-// Branch list (for owner view)
+//BRANCH LIST FOR OWNERS VIEWING
 router.get('/analytics/branches', analyticsControllers.getBranches);
 
 export default router;

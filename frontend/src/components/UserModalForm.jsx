@@ -153,7 +153,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
     <div>
         {isModalOpen && user.role === 'Owner' &&(
             <div
-            className="fixed inset-0 bg-black/35 bg-opacity-50 z-100"
+            className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]"
             style={{ pointerEvents: 'auto' }}  onClick={onClose}
             />
         )}

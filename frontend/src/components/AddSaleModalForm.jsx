@@ -315,7 +315,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
      <div>
         {isModalOpen && user.role === 'Sales Associate' &&(
             <div
-            className="fixed inset-0 bg-black/35 bg-opacity-50 z-100"
+            className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]"
             style={{ pointerEvents: 'auto' }}  onClick={closeModal}
             />
         )}
@@ -470,6 +470,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                                                           }}
                                                         >
                                                           <div className='font-medium text-sm'>{product.product_name}</div>
+                                                          <div className='font-light text-xs'> Quantity: {product.quantity}</div>
                                                         </div>
                                                       ))
                                                     ) : (

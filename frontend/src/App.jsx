@@ -20,6 +20,7 @@ import AddSaleModalForm from "./components/AddSaleModalForm";
 import { useAuth } from "./authentication/Authentication";
 import BranchAnalyticsCards from "./Pages/BranchAnalyticsCards";
 import BranchKPI from "./Pages/BranchKPI.jsx";
+import AddDeliveryInformation from "./components/AddDeliveryInformation.jsx";
 
 
 
@@ -38,6 +39,8 @@ function App() {
   const [notify, setNotify] = useState([]);
   const [saleHeader,setSaleHeader ] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
+  const [openAddDelivery, setAddDelivery] = useState(false);
+  const [deliveryData, setDeliveryData] = useState([]);
 
 
   const {user} = useAuth();
@@ -127,12 +130,28 @@ function App() {
   };
 
 
+
+  const getDeliveries = async () => {
+    try {
+
+      const data = await axios.get(`http://localhost:3000/api/delivery`);
+      setDeliveryData(data.data);
+
+    } catch (error) {
+      console.log(error);
+    }
+    
+
+  }
+
+
   useEffect(() =>{
 
     if (!user) return;
     if (user.role !== 'Sales Associate') return;
 
     fetchSaleRecords();
+    getDeliveries();
   },[user]);
 
 
@@ -218,9 +237,6 @@ function App() {
 
     <>
 
-      {/*BRING BACK LATER IN THE DEVELOPMENT::: <NavBar />*/}
-
-
       {/*COMPONENTS*/}
       <AddSaleModalForm
         isModalOpen={isModalOpen}
@@ -229,6 +245,16 @@ function App() {
         setSaleHeader={setSaleHeader}
         fetchProductsData={fetchProductsData}
       
+      />
+
+
+      <AddDeliveryInformation 
+        openAddDelivery={openAddDelivery}
+        saleHeader={saleHeader}
+        deliveryData={deliveryData}
+        setDeliveryData={setDeliveryData}
+        onClose={() => setAddDelivery(false)}  
+
       />
 
 
@@ -407,7 +433,13 @@ function App() {
           <Route path="/delivery" exact element={ 
               <RouteProtection allowedRoles={['Sales Associate']}>
 
-                  <DeliveryMonitoring/>
+                  <DeliveryMonitoring
+                    deliveryData={deliveryData}
+                    getDeliveries={getDeliveries}
+                    setAddDelivery={setAddDelivery}
+                    sanitizeInput={sanitizeInput}
+
+                  />
 
               </RouteProtection>
         

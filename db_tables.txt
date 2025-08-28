@@ -199,3 +199,17 @@ CREATE TABLE Sales_Items (
 	FOREIGN KEY(sales_information_id) REFERENCES Sales_Information(sales_information_id),
 	FOREIGN KEY(product_id) REFERENCES Inventory_Product(product_id)
 );
+
+
+
+
+
+CREATE TABLE Delivery (
+    delivery_id INT PRIMARY KEY,
+    sales_information_id INT,
+    branch_id INT,
+    destination_address VARCHAR(255),
+    delivered_date DATE,
+    courier_name VARCHAR(255),
+    is_delivered BOOL
+);

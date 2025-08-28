@@ -5,6 +5,7 @@ import itemRoutes from './Routes/itemRoutes.js';
 import userRoutes from './Routes/userRoutes.js';
 import saleRoutes from './Routes/saleRoutes.js';
 import analyticsRoutes from './Routes/analyticsRoutes.js';
+import deliveryRoutes from './Routes/deliveryRoutes.js';
 import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 
@@ -30,6 +31,9 @@ app.use('/api', userRoutes);
 
 //FOR SALE-RELATED DATA
 app.use('/api', saleRoutes)
+
+//FOR DELIVERY-RELATED DATA
+app.use('/api', deliveryRoutes)
 
 // ANALYTICS (historical inventory + sales aggregates)
 app.use('/api', analyticsRoutes);
