@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../authentication/Authentication';
+import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 
 
 function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, deliveryData, getDeliveries}) {
 
     const { user } = useAuth();
+
+    //FOR DIALOG
+    const [openDialog, setDialog] = useState(false);
+    const [dialogMode, setDialogMode] = useState('');
+
 
     const [courierName, setCourierName] = useState('');
     const [salesId, setSalesId] = useState('');
@@ -27,8 +33,8 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
 
 
 
-    async function handleSubmit(e) {
-        e.preventDefault();
+    async function handleSubmit() {
+
         const payload = { 
             courierName, 
             salesId: Number(salesId), 
@@ -47,14 +53,30 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
         onClose();
     }
 
+
     if (!openAddDelivery) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
+
+
+            {openDialog && 
+            
+                <ConfirmationDialog
+                mode={dialogMode}
+                message={"Are you sure you want to add this ?"}
+                submitFunction={() => {handleSubmit()}}
+                onClose={() => {setDialog(false); setDialogMode('')}}
+    
+                />
+            
+            }
+
+
             {/*OVERLAY */}
             <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
 
-            {/*MODAL PANEL */}
+            {/*MODAL PANEL */}  
             <div
                 
                 role="dialog"
@@ -64,7 +86,7 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
             >
                 <h1 className="text-[30px] font-extrabold tracking-wide leading-none mb-10">DELIVERY DETAILS</h1>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={(e) => {e.preventDefault(); setDialog(true); setDialogMode('add');}} className="space-y-6">
                     {/*COURIER NAME AND SALE ID */}
                     <div className="flex flex-col sm:flex-row gap-5">
                         <input

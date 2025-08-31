@@ -1,9 +1,10 @@
-import React from 'react';
+import {React, useState} from 'react';
 import { MdOutlineInventory, MdOutlineLogout, MdOutlineDashboard } from "react-icons/md";
 import { PiSealWarningBold } from "react-icons/pi";
 import { FaUsersCog, FaMoneyBillWave, FaShippingFast} from "react-icons/fa";
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../authentication/Authentication';
+import LogoutDialog from './dialogs/LogoutDialog';
 
 // Import BranchLogo component
 import BranchLogo from './BranchLogo';
@@ -11,6 +12,9 @@ import BranchLogo from './BranchLogo';
 
 function NavBar() {
   const {user, logout} = useAuth();
+
+  const [showDialog, setShowDialog] = useState(false);
+
   
   const location = useLocation();
 
@@ -146,12 +150,14 @@ function NavBar() {
         <div className='flex justify-center'>
           <button  
             className='bg-green-600 py-2 px-9 rounded-md flex items-center justify-center gap-2'
-            onClick={() => logout()}
+            onClick={() => setShowDialog(true)}
           >
             <MdOutlineLogout /> Logout
           </button>
         </div>
       </div>
+
+      {showDialog && <LogoutDialog onClose={() => setShowDialog(false)} logout={() => logout()} />}
     </nav>
   )
 }

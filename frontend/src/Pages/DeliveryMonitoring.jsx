@@ -2,6 +2,8 @@ import {React, useEffect, useState} from 'react'
 import NoInfoFound from '../utils/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 import axios from 'axios';
+import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery';
+import ConfirmationDialog from '../components/dialogs/ConfirmationDialog';
 
 
 
@@ -12,12 +14,63 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
 
   const {user} = useAuth();
 
+
+  //THIS IS TO OPEN THE DETAILED INFORMATION FOR ITEMS IN DELIVERIES
+  const [openDeliveryInfo, setOpeneliveryInfo] = useState(false);
+  const [modalType, setModalType] = useState("");
+
+
+  //FOR DIALOG
+  const [openDialog, setDialog] = useState(false);
+  const [dialogMode, setDialogMode] = useState('');
+  const [dialogSaleId, setDialogSalesId] = useState('');
+
+
+
+  //HEADER INFORMATION FOR DELIVERY
+  const [deliveryInfoData, setDeliveryInfoData ] = useState({delivery_id: '', courier_name: '', sale_id: '', address: '', date: ''})
+
+
+  //VIEW THE PRUDUCTS UNDER SALE ID
+  const openDetailes = async (Info) =>{
+
+    setDeliveryInfoData({
+      delivery_id: Info.delivery_id, 
+      courier_name: Info.courier_name, 
+      sale_id: Info.sales_information_id, 
+      address: Info.destination_address, 
+      date: Info.formated_delivered_date
+
+    });
+
+    setOpeneliveryInfo(true);
+
+  };
+
+  const closeDeliveryProducts = () => {
+    setOpeneliveryInfo(false);
+    setModalType("")
+  
+    setDeliveryInfoData({
+      sale_id: '', 
+      chargeTo: '', 
+      tin: '', 
+      address: '', 
+      date: '', 
+      amountNet: '', 
+      vat: '', 
+      total: ''
+    });
+
+
+  };
+
   const setToDelivered = async (id) =>{
     
-    await axios.put(`http://localhost:3000/api/delivery/${id}`, { is_delivered: true });
+    await axios.put(`http://localhost:3000/api/delivery/${Number(id)}`, { is_delivered: true });
 
     getDeliveries((prevData) => 
-        prevData.map((item) => (item.sales_information_id === id ? {...item, is_delivered: true} : item))
+        prevData.map((item) => (item.sales_information_id === Number(id) ? {...item, is_delivered: true} : item))
     );
 
 
@@ -36,7 +89,7 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
   let deliveryInformation = deliveryData;
 
   const filteredData = deliveryInformation.filter(data => 
-    
+
     String(data.delivery_id).toLowerCase().includes(search.toLowerCase()) ||
     String(data.sales_information_id).toLowerCase().includes(search.toLowerCase()) ||
     String(data.destination_address).toLowerCase().includes(search.toLowerCase()) ||
@@ -50,6 +103,30 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
   
   return (
     <div className=" ml-[220px] px-8 py-2 max-h-screen" >
+
+
+      {openDialog && 
+            
+          <ConfirmationDialog
+            mode={dialogMode}
+            message={"Are you sure to set this as delivered ?"}
+            submitFunction={() => {setToDelivered(dialogSaleId)}}
+            onClose={() => {setDialog(false); setDialogMode('')}}
+
+          />
+      
+      }
+
+      <ViewingSalesAndDelivery 
+        openModal={openDeliveryInfo}
+        type={modalType}
+        closeModal={() => closeDeliveryProducts()} 
+        user={user}
+        headerInformation={deliveryInfoData}
+        sale_id={deliveryInfoData.sale_id}
+
+      />
+
         {/*TITLE*/}
         <h1 className=' text-4xl font-bold text-green-900'>
           DELIVERY
@@ -141,7 +218,7 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
 
                 (
                   filteredData.map((row, idx) => (
-                    <tr key={idx} className={`hover:bg-gray-200/70 h-14 ${(idx + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`}>
+                    <tr key={idx} className={`hover:bg-gray-200/70 h-14 ${(idx + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}` } onClick={() => {openDetailes(row); setModalType("other")}}>
                       <td className="px-4 py-2 text-left">{row.delivery_id}</td>
                       <td className="px-4 py-2 font-medium whitespace-nowrap text-left"  >{row.courier_name}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-left">{row.sales_information_id}</td>
@@ -150,8 +227,13 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
                       <td className="px-4 py-2 text-center">
                         <button 
                         className={`${!row.is_delivered ? 'bg-amber-400 text-white' : 'border-2 border-green-700/70 text-green-700/70 font-semibold'} rounded-md px-4 py-2`}
-                        onClick={() => {
-                          if (!row.is_delivered) setToDelivered(row.sales_information_id);
+                        onClick={(e) => {
+                          if (!row.is_delivered) {
+                            e.stopPropagation();
+                            setDialogSalesId(row.sales_information_id)
+                            setDialog(true); 
+                            setDialogMode('edit');
+                          }
                         }}
                         
                         >

@@ -1,16 +1,37 @@
-import React, { useEffect } from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '../authentication/Authentication'
 import { FiEdit } from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
 import { RxCross2 } from "react-icons/rx";
+import ConfirmationDialog from './dialogs/ConfirmationDialog';
 
 function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser}) {
 
   const {user} = useAuth();
 
 
+  //FOR DIALOG
+  const [openDialog, setDialog] = useState(false);
+  const message = `Are you sure you wan to  delete the account for ${userDetailes.full_name} ?`;
+
+
   return (
     <div>
+
+
+        {openDialog && 
+                  
+            <ConfirmationDialog
+            mode={"delete"}
+            message={message}
+            submitFunction={() => {deleteUser(userDetailes.user_id); onClose();}}
+            onClose={() => {setDialog(false);}}
+
+            />
+        
+        }
+
+
         {openUsers && user.role === 'Owner' &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
@@ -123,7 +144,7 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
                 </button>
 
 
-                <button className='py-2 px-3 bg-red-600 w-44 rounded-md flex items-center justify-center gap-2 hover:bg-red-500' onClick={() => {deleteUser(userDetailes.user_id); onClose()}}>
+                <button className='py-2 px-3 bg-red-600 w-44 rounded-md flex items-center justify-center gap-2 hover:bg-red-500' onClick={() => {setDialog(true)}}>
                     <MdDelete />Delete
                 </button>
 

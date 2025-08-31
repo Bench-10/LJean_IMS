@@ -136,7 +136,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
         {/*TABLE */}
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
           <table className="w-full divide-y divide-gray-200  text-sm">
-            <thead className="sticky top-0 bg-gray-100">
+            <thead className="sticky top-0 bg-gray-100 ">
               <tr>
                 
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-24">

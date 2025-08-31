@@ -4,8 +4,14 @@ import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 
 
 //GET DELIVARY DATA
-export const getDeliveryData = async() =>{
-    const {rows: delivery} = await SQLquery(`SELECT delivery_id, sales_information_id, branch_id, destination_address, ${correctDateFormat("delivered_date")}, courier_name, is_delivered FROM Delivery ORDER BY delivered_date`);
+export const getDeliveryData = async(branchId) =>{
+    const {rows: delivery} = await SQLquery(`
+        SELECT delivery_id, sales_information_id, branch_id, destination_address, ${correctDateFormat("delivered_date")}, courier_name, is_delivered 
+        FROM Delivery 
+        WHERE branch_id = $1
+        ORDER BY delivered_date`,   
+        [branchId]
+    );
 
     return delivery;
 };

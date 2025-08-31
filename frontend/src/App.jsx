@@ -134,7 +134,7 @@ function App() {
   const getDeliveries = async () => {
     try {
 
-      const data = await axios.get(`http://localhost:3000/api/delivery`);
+      const data = await axios.get(`http://localhost:3000/api/delivery?branch_id=${user.branch_id}`);
       setDeliveryData(data.data);
 
     } catch (error) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../authentication/Authentication';
+import ConfirmationDialog from './dialogs/ConfirmationDialog';
 
 
 function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput}) {
@@ -27,6 +28,11 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const [notANumber, setNotANumber] = useState({});
   const [invalidNumber, setInvalidNumber] = useState({});
   const [isExpiredEarly, setIsExpiredEarly] = useState(false);
+
+
+  //FOR DIALOG
+  const [openDialog, setDialog] = useState(false);
+  const message =  mode === 'add' ? "Are you sure you want to add this ?": "Are you sure you want to edit this ?";
 
 
   //CLEARS THE FORM EVERYTIME THE ADD ITEMS BUTTON IS PRESSED
@@ -87,10 +93,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
 
-  //HANDLES THE SUBMIT
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const validateInputs = () => {
 
     // THIS VARIABLES STORE THE ERROR INPUTS
     const isEmptyField = {};
@@ -145,6 +148,16 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     if (Object.keys(isnotANumber).length > 0) return;
     if (Object.keys(invalidNumberValue).length > 0) return;
     if (isExpiryEarly) return;
+
+
+    setDialog(true)
+
+  };
+
+
+
+  //HANDLES THE SUBMIT
+  const handleSubmit = async () => {
   
 
     //RUNS IF THERE ARE NO INVALID INPUTS
@@ -198,6 +211,18 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   return (
     <div>
 
+      {openDialog && 
+                  
+          <ConfirmationDialog
+          mode={mode}
+          message={message}
+          submitFunction={() => {handleSubmit()}}
+          onClose={() => {setDialog(false);}}
+
+          />
+      
+      }
+
       {isModalOpen && user.role === 'Inventory Staff' &&(
         <div
           className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
@@ -221,7 +246,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
               <div className="pb-4 pt-2 px-8">
                 {/*FORMS */}
-                <form method="dialog" onSubmit={handleSubmit}>
+                <form onSubmit={(e) => {e.preventDefault(); validateInputs();}}>
                 
                 <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 
                   onClick={onClose}>✕</button>

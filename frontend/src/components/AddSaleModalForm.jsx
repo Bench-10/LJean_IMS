@@ -3,6 +3,7 @@ import { useAuth } from '../authentication/Authentication';
 import { IoMdAdd } from "react-icons/io";
 import  toTwoDecimals from '../utils/fixedDecimalPlaces.js';
 import {currencyFormat} from '../utils/formatCurrency.js';
+import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 import dayjs from 'dayjs';
 import axios from 'axios';
 
@@ -22,6 +23,11 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
   const [tin, setTin] = useState('');
   const [address, setAddress] = useState('');
   const [date, setDate] = useState(dateToday);
+
+
+  //FOR DIALOG
+  const [openDialog, setDialog] = useState(false);
+  const [dialogMode, setDialogMode] = useState('');
 
 
   useEffect(() =>{
@@ -311,8 +317,25 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
   };
 
 
+
+
+  if (!user) return; // PREVENRTS RENDERING THE REST OF THE COMPONENT IF USER IS STILL EMPTY
+
+
   return (
      <div>
+        {openDialog && 
+
+          <ConfirmationDialog
+            mode={dialogMode}
+            message={"Are you sure you want to add the informaion to the sale?"}
+            submitFunction={() => submitSale()}
+            onClose={() => {setDialog(false); setDialogMode('')}}
+
+          />
+        
+        }
+
         {isModalOpen && user.role === 'Sales Associate' &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]"
@@ -320,18 +343,27 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
             />
         )}
 
-        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user.role === 'Sales Associate'}>
+        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user && user.role === 'Sales Associate' }>
             <div className="relative flex flex-col border border-gray-600/40 bg-white h-[760px] w-[1000px] rounded-md py-7  px-3 animate-popup" >
 
                 <div>
                     <h3 className="font-bold text-3xl py-4 text-center">
                     ADD SALE
                     </h3>
+
+                    <div className="col-span-4 flex gap-x-10 justify-center">
+                        <div className="text-xs text-gray-500 font-semibold">
+                            Branch: <span className="text-gray-700 text-md">{user.branch_name}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 font-semibold mt-1 md:mt-0">
+                            Branch Address: <span className="text-gray-700">{user.address}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="pb-4 pt-2 px-8 w-full flex-1 flex flex-col">
                     {/*FORMS */}
-                    <form method="dialog" onSubmit={submitSale} className='w-full flex-1 flex flex-col'>
+                    <form onSubmit={(e) => {e.preventDefault(); setDialog(true); setDialogMode('add')}} className='w-full flex-1 flex flex-col'>
                     
                         {/*EXIT BUTTON*/}
                         <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 

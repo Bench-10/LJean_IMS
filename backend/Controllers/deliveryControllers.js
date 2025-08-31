@@ -3,8 +3,8 @@ import * as deliveryServices from '../Services/delivery/deliveryServices.js';
 
 export const getDeliveries = async (req, res) =>{
     try {
-
-        const data = await deliveryServices.getDeliveryData();
+        const branchId = req.query.branch_id;
+        const data = await deliveryServices.getDeliveryData(branchId);
         
         res.status(200).json(data);
 

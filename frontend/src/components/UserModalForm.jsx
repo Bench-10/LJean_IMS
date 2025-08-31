@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { RxCross2 } from "react-icons/rx";
 import axios from 'axios';
+import ConfirmationDialog from './dialogs/ConfirmationDialog';
 
 function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes}) {
 
@@ -31,6 +32,11 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
     'Inventory Staff',
     'Sales Associate'
   ];
+
+
+  //FOR DIALOG
+  const [openDialog, setDialog] = useState(false);
+  const message =  mode === 'add' ? "Are you sure you want to add this ?": "Are you sure you want to add this ?";
 
 
   //FETCH THE DATA ONCE
@@ -82,21 +88,15 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
     setEmptyField(isEmptyField);
  
-    if (Object.keys(isEmptyField).length > 0) return false; 
+    if (Object.keys(isEmptyField).length > 0) return; 
 
-    return true;
+    setDialog(true);
 
   };
 
 
 
-  const submitUserConfirmation = async (e) => {
-     e.preventDefault();
-
-     if(!validateInputs()){
-        return;
-     }
-
+  const submitUserConfirmation = async () => {
 
      const userData = {
         first_name,
@@ -151,6 +151,20 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
   return (
     <div>
+
+        {openDialog && 
+            
+            <ConfirmationDialog
+            mode={mode}
+            message={message}
+            submitFunction={() => {submitUserConfirmation()}}
+            onClose={() => {setDialog(false);}}
+
+            />
+        
+        }
+
+
         {isModalOpen && user.role === 'Owner' &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]"
@@ -173,7 +187,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
                 {/*FORM BODY*/}
                 <div className='p-7 '>
 
-                    <form action="dialog" onSubmit={submitUserConfirmation}>
+                    <form action="dialog" onSubmit={(e) => {e.preventDefault(); validateInputs();}}>
 
                         {/*FEILDS CONTAINER*/}
                         <div className='flex gap-x-9 w-full'>
