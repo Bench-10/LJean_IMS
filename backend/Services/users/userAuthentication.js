@@ -1,6 +1,14 @@
 import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 import {decodeHashedPassword} from '../Services_Utils/passwordHashing.js';
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc.js";
+import timezone from "dayjs/plugin/timezone.js";
+
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 
 
 export const userAuth = async(loginInformation) =>{
@@ -24,6 +32,16 @@ export const userAuth = async(loginInformation) =>{
             return { error: "Invalid password" };
 
         };
+
+        // RECORDS CURRENT TIME AND DAY using dayjs
+        const formatted = dayjs().tz('Asia/Manila').format('dddd, MMMM D, YYYY, hh:mm A');
+
+        await SQLquery(
+            `UPDATE Users 
+            SET is_active = $1, last_login = $2
+            WHERE user_id = $3`,
+            [true, formatted, existingUser.rows[0].user_id]
+        );
 
 
         // FETCH THE USER DETAILS INCLUDING BRANCH NAME
@@ -64,5 +82,15 @@ export const userAuth = async(loginInformation) =>{
     );
 
     return adminData.rows;
+
+};
+
+
+
+export const userLastLogout = async(userId, active) =>{
+
+    const {activity} = active;
+
+    await SQLquery("UPDATE Users SET is_active = $1 WHERE user_id = $2", [activity, userId]);
 
 };

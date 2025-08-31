@@ -53,6 +53,21 @@ export const userCredentials = async (req, res) =>{
 
 
 
+export const userLogout = async (req, res) =>{
+    try {
+        const userId = req.params.id
+        const activity = req.body;
+        const result = await userAuthentication.userLastLogout(userId, activity);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error during user logout: ', error);
+        res.status(500).json({message: 'Internal Server Error'})
+    }
+}
+
+
+
+
 //CREAING AN ACCOUNT
 export const userCreationAccount = async (req, res) =>{
     try {

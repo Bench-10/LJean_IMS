@@ -31,8 +31,14 @@ function Authentication ({ children }) {
   };
 
 
-  const logout = () => {
+  const logout = async () => {
+
+    if (user.role !== 'Owner'){
+      await axios.put(`http://localhost:3000/api/authentication/${user.user_id}`, { activity: false });
+    }
+
     setUser(null);
+
     localStorage.removeItem('userInfo');
     
   };

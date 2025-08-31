@@ -16,6 +16,10 @@ router.get("/users", userControllers.getUsers);
 router.post("/authentication", userControllers.userCredentials);
 
 
+//USER LOGOUT
+router.put("/authentication/:id", userControllers.userLogout);
+
+
 //USER CREATION
 router.post("/create_account", userControllers.userCreationAccount);
 

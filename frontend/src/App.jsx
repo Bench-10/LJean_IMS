@@ -216,10 +216,15 @@ function App() {
   };
 
 
+  //IMPROVE THIS IN THE FUTURE(IMPORTANT)
   useEffect(() => {
+
+    if (!user) return;
+
     fetchUsersinfo();
     fetchBranch();
-  }, [])
+  }, [user])
+
 
 
   const deleteUser = async(userID) =>{
