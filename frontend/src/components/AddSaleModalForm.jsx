@@ -24,6 +24,10 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
   const [address, setAddress] = useState('');
   const [date, setDate] = useState(dateToday);
 
+  //IF PWD OR SENIOR CITIZEN
+  const [seniorApplied, setSeniorApplied] = useState(false);
+  const [seniorPw, setSeniorPw] = useState('');
+
 
   //FOR DIALOG
   const [openDialog, setDialog] = useState(false);
@@ -46,6 +50,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
 
   //CALCULATING AMOUNT AND VAT
+  const [seniorPwdDisc, setSeniorPwdDisc] = useState(0);
   const [vat, setVat] = useState(0);
   const [amountNetVat, setAmount] = useState(0);
   const [totalAmountDue, setTotalAmountDue] = useState(0);
@@ -85,6 +90,10 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
     setEmptyQuantiy(false);
     setSomeEmpty(false);
     setExceedQuanity([]);
+    setSeniorApplied(false);
+    setSeniorPw('');
+    setSeniorPwdDisc(0);
+
 
   };
 
@@ -102,7 +111,6 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
 
     if (currentId && currentQuantity > availableQuantity){
-      console.log('Exceed');
 
       setExceedQuanity([...exceedQuanity, currentId]);
 
@@ -123,6 +131,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
     preventEmptyQuantity(newRows);
     setRows(newRows);
+    console.log(newRows);
 
     
     totalAmount(newRows);
@@ -166,8 +175,34 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
     const vat = amount * 0.12;
     setVat(vat);
 
-    //SETS THE TOTAL AMOUNT + VAT
-    setTotalAmountDue(amount + vat);
+  
+
+    //APPLY DISCOUNT
+    discount(amount + vat, seniorApplied)
+    
+  };
+
+
+  //WITH PWD SENIOR DISCOUNT
+  const discount = (total_amount, isSenior) =>{
+
+    if (!total_amount) return;
+
+    if (!isSenior){
+      //SETS THE TOTAL AMOUNT + VAT
+       setSeniorPwdDisc(0);
+       setTotalAmountDue(total_amount);
+       return;
+    };
+
+    const seniorPwdDiscount = total_amount * 0.20;
+
+    setSeniorPwdDisc(seniorPwdDiscount);
+
+    const withDiscount = total_amount - seniorPwdDiscount
+
+    //SETS THE TOTAL AMOUNT + VAT WITTH PWD DISCOUNT
+    setTotalAmountDue(withDiscount);
     
   };
 
@@ -291,9 +326,13 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
       address,
       date,
       branch_id: user.branch_id,
+      seniorPw,
       vat,
       amountNetVat,
+      seniorPwdDisc,
       totalAmountDue,
+      
+
     };
 
     const saleData = {
@@ -344,14 +383,15 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
         )}
 
         <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user && user.role === 'Sales Associate' }>
-            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[760px] w-[1000px] rounded-md py-7  px-3 animate-popup" >
+            <div className="relative flex flex-col border border-gray-600/40 bg-white  w-[1000px] rounded-md py-7  px-3 animate-popup" >
+            
 
-                <div>
-                    <h3 className="font-bold text-3xl py-4 text-center">
-                    ADD SALE
+                <div className='text-left ml-8'>
+                    <h3 className="font-bold text-3xl py-4 ">
+                      CHARGE SALES INVOICE
                     </h3>
 
-                    <div className="col-span-4 flex gap-x-10 justify-center">
+                    <div className="col-span-4 flex gap-x-10 justify-left">
                         <div className="text-xs text-gray-500 font-semibold">
                             Branch: <span className="text-gray-700 text-md">{user.branch_name}</span>
                         </div>
@@ -369,54 +409,88 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                         <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 
                         onClick={closeModal}>✕</button>
 
-
+                        
                         {/*CUSTOMER INFORMATION*/}
-                        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-6 p-4 bg-gray-50 rounded-lg border border-gray-200'>
+
+                        <div className='flex flex-col'>
+                          <div className='flex justify-end gap-x-4'>
+                              {seniorApplied && (
+                                <input
+                                    placeholder="Enter PWD/Senior ID"
+                                    value={seniorPw}
+                                    onChange={(e) => {setSeniorPw(e.target.value);}}
+                                    className="h-8 border border-gray-300 rounded px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                                />
+                            )}
+                              <label className="inline-flex items-center gap-2 text-sm">
+                                  <input
+                                      type="checkbox"
+                                      checked={seniorApplied}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setSeniorApplied(checked);
+
+                                        if (checked){
+                                          discount(amountNetVat+vat, true)
+                                        } else {
+                                          setSeniorPwdDisc(0);
+                                          setTotalAmountDue(amountNetVat + vat);
+                                        }
+                                      }}
+                                      className="form-checkbox h-4 w-4 text-amber-500"
+                                  />
+                                  <span className="font-medium">PWD/Senior citizen</span>
+                              </label>
+                          </div>
                             
-                            <div className='w-full'>
-                                <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Charge To</label>
-                                <input 
-                                  type="text" 
-                                  className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all' 
-                                  
-                                  value={chargeTo}
-                                  onChange={(e) => setChargeTo(e.target.value)}
-                                />
-                            </div>
+                            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-6 p-4 bg-gray-50 rounded-lg border border-gray-200'>
+                            
+                              <div className='w-full'>
+                                  <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Charge To</label>
+                                  <input 
+                                    type="text" 
+                                    className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all' 
+                                    
+                                    value={chargeTo}
+                                    onChange={(e) => setChargeTo(e.target.value)}
+                                  />
+                              </div>
 
-                            <div className='w-full'>
-                                <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>TIN</label>
-                                <input 
-                                  type="text" 
-                                  className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
-                                  
-                                  value={tin}
-                                  onChange={(e) => setTin(e.target.value)}
-                                />
-                            </div>
+                              <div className='w-full'>
+                                  <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>TIN</label>
+                                  <input 
+                                    type="text" 
+                                    className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
+                                    
+                                    value={tin}
+                                    onChange={(e) => setTin(e.target.value)}
+                                  />
+                              </div>
 
-                            <div className='w-full'>
-                                <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Address</label>
-                                <input 
-                                  type="text" 
-                                  className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
-                                  
-                                  value={address}
-                                  onChange={(e) => setAddress(e.target.value)}
-                                />
-                            </div>
+                              <div className='w-full'>
+                                  <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Address</label>
+                                  <input 
+                                    type="text" 
+                                    className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all'
+                                    
+                                    value={address}
+                                    onChange={(e) => setAddress(e.target.value)}
+                                  />
+                              </div>
 
-                            <div className='w-full'>
-                                <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Date</label>
-                                <input 
-                                  type="text" 
-                                  className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm bg-gray-100 text-gray-600 cursor-not-allowed'
-                                  value={dateTodayReadable}
-                                  readOnly
-                                />
-                            </div>
+                              <div className='w-full'>
+                                  <label className='block text-xs font-semibold mb-2 text-gray-700 uppercase tracking-wide'>Date</label>
+                                  <input 
+                                    type="text" 
+                                    className='w-full border border-gray-300 rounded-sm px-3 py-2 text-sm bg-gray-100 text-gray-600 cursor-not-allowed'
+                                    value={dateTodayReadable}
+                                    readOnly
+                                  />
+                              </div>
 
+                          </div>
                         </div>
+                        
 
 
                         {/*PRODUCT INFORMATION*/}
@@ -596,6 +670,12 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                                             <span className='text-xs font-bold text-gray-600'>AMOUNT NET VAT:</span>
                                             <span className='ml-2 font-medium'>{currencyFormat(toTwoDecimals(amountNetVat))}</span>
                                         </div>
+                                        {seniorApplied && 
+                                          <div className='text-sm'>
+                                              <span className='text-xs font-bold text-gray-600'>SENIOR/PWD DISCOUNT</span>
+                                              <span className='ml-2 font-medium text-red-500'> -{currencyFormat(toTwoDecimals(seniorPwdDisc))}</span>
+                                          </div>
+                                        }
                                     </div>
                                 </div>
                                 <div className='border-t border-gray-300 pt-3'>
@@ -609,13 +689,13 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
                             {/*SUBMIT BUTTON*/}
                             <div className='text-center'>
                                 <button 
-                                  disabled={!totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0}
+                                  disabled={(seniorApplied && !seniorPw) ||!totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0}
                                   type='submit' 
-                                  className={`py-3 px-8 font-medium rounded-sm transition-all ${(!totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0) ? 'bg-green-200 text-green-600 cursor-not-allowed border border-green-200': 'bg-green-600 hover:bg-green-700 text-white border border-green-600 shadow-sm hover:shadow-md'}`}>
+                                  className={`py-3 px-8 font-medium rounded-sm transition-all  disabled:bg-green-200 disabled:text-green-600 disabled:cursor-not-allowed disabled:border disabled:border-green-200  bg-green-600 hover:bg-green-700 text-white border border-green-600 shadow-sm hover:shadow-md`}>
                                     Confirm Sale
                                 </button>
 
-                                {(!totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0) &&
+                                {((seniorApplied && !seniorPw) || !totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0) &&
                                   <p className='font-thin italic text-xs text-red-500 mt-3'>*Please complete the required fields</p>
                                 }
                             </div>

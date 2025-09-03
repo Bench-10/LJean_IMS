@@ -41,6 +41,7 @@ function App() {
   const [openNotif, setOpenNotif] = useState(false);
   const [openAddDelivery, setAddDelivery] = useState(false);
   const [deliveryData, setDeliveryData] = useState([]);
+  const [deliveryEditData, setDeliveryEdit] = useState([]);
 
 
   const {user} = useAuth();
@@ -233,6 +234,16 @@ function App() {
 
   };
 
+
+  //DELIVERY EDIT
+  const deliveryEdit = (mode, data) =>{
+    setModalMode(mode);
+    setDeliveryEdit(data);
+    setAddDelivery(true);
+
+  };
+
+
   //CANCULATE UNREAD NOTIFICATION
   const unreadCount = notify.filter(notification => !notification.is_read).length;
 
@@ -255,10 +266,12 @@ function App() {
 
       <AddDeliveryInformation 
         openAddDelivery={openAddDelivery}
+        mode={modalMode}
         saleHeader={saleHeader}
         deliveryData={deliveryData}
+        deliveryEditData={deliveryEditData}
         getDeliveries={getDeliveries}
-        onClose={() => setAddDelivery(false)}  
+        onClose={() => {setAddDelivery(false); setModalMode('add')}}  
 
       />
 
@@ -443,6 +456,7 @@ function App() {
                     getDeliveries={getDeliveries}
                     setAddDelivery={setAddDelivery}
                     sanitizeInput={sanitizeInput}
+                    deliveryEdit={deliveryEdit}
 
                   />
 

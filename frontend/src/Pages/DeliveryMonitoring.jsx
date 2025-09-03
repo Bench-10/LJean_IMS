@@ -1,14 +1,13 @@
 import {React, useEffect, useState} from 'react'
 import NoInfoFound from '../utils/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
-import axios from 'axios';
 import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery';
-import ConfirmationDialog from '../components/dialogs/ConfirmationDialog';
+import { TbTruckDelivery } from "react-icons/tb";
 
 
 
 
-function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, sanitizeInput}) {
+function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, deliveryEdit }) {
 
   const [search, setSearchDelivery] = useState('');
 
@@ -18,12 +17,6 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
   //THIS IS TO OPEN THE DETAILED INFORMATION FOR ITEMS IN DELIVERIES
   const [openDeliveryInfo, setOpeneliveryInfo] = useState(false);
   const [modalType, setModalType] = useState("");
-
-
-  //FOR DIALOG
-  const [openDialog, setDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState('');
-  const [dialogSaleId, setDialogSalesId] = useState('');
 
 
 
@@ -65,17 +58,7 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
 
   };
 
-  const setToDelivered = async (id) =>{
-    
-    await axios.put(`http://localhost:3000/api/delivery/${Number(id)}`, { is_delivered: true });
-
-    getDeliveries((prevData) => 
-        prevData.map((item) => (item.sales_information_id === Number(id) ? {...item, is_delivered: true} : item))
-    );
-
-
-    
-  };
+  
 
 
   const handleSearch = (event) =>{
@@ -103,19 +86,6 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
   
   return (
     <div className=" ml-[220px] px-8 py-2 max-h-screen" >
-
-
-      {openDialog && 
-            
-          <ConfirmationDialog
-            mode={dialogMode}
-            message={"Are you sure to set this as delivered ?"}
-            submitFunction={() => {setToDelivered(dialogSaleId)}}
-            onClose={() => {setDialog(false); setDialogMode('')}}
-
-          />
-      
-      }
 
       <ViewingSalesAndDelivery 
         openModal={openDeliveryInfo}
@@ -161,7 +131,10 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
             <div  className="ml-auto flex gap-4">
               
               {/*ADD ITEM BTN*/}
-              <button className='border border-[#63FF4F] text-[#63FF4F] font-medium hover:bg-[#63FF4F] hover:text-white px-5 rounded-md transition-all' onClick={() => setAddDelivery(true)} >+ NEW DELIVERY</button>
+              <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all' onClick={() => setAddDelivery(true)} >
+                <TbTruckDelivery />
+                ADD DELIVERY
+              </button>
 
             </div>
 
@@ -226,18 +199,14 @@ function DeliveryMonitoring({setAddDelivery, getDeliveries, deliveryData, saniti
                       <td className="px-4 py-2 text-left">{row.formated_delivered_date}</td>
                       <td className="px-4 py-2 text-center">
                         <button 
-                        className={`${!row.is_delivered ? 'bg-amber-400 text-white' : 'border-2 border-green-700/70 text-green-700/70 font-semibold'} rounded-md px-4 py-2`}
+                        className={`${row.is_pending ? 'bg-amber-400 text-white' : row.is_delivered ?  'border-2 border-green-700/70 text-green-700/70 font-semibold'  : 'border-2 border-red-700/70 text-red-700/70 font-semibold'} rounded-md px-4 py-2`}
                         onClick={(e) => {
-                          if (!row.is_delivered) {
                             e.stopPropagation();
-                            setDialogSalesId(row.sales_information_id)
-                            setDialog(true); 
-                            setDialogMode('edit');
-                          }
+                            deliveryEdit('edit', row);
                         }}
                         
                         >
-                            {!row.is_delivered ? 'Delivering...' : 'Delivered'}
+                            {row.is_pending ? 'Delivering...' : row.is_delivered ? 'Delivered' : 'Undelivered'}
                         </button>
                       </td>
                       

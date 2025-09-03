@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import NoInfoFound from '../utils/NoInfoFound';
 import axios from 'axios';
 import { currencyFormat } from '../utils/formatCurrency';
+import { BsTelephoneFill } from "react-icons/bs";
+import { RiCellphoneFill } from "react-icons/ri";
+import { MdEmail } from "react-icons/md";
 
 function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInformation, sale_id}) {
 
@@ -16,7 +19,9 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
         const soldItems = await axios.get(`http://localhost:3000/api/sale_items?sale_id=${sale_id}`);
 
         setSoldItems(soldItems.data);
-    }   
+    }
+    
+  if (!user) return;
 
 
   return (
@@ -29,7 +34,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
         )}
 
         <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={openModal}>
-            <div className={`relative flex flex-col border border-gray-600/40 bg-white ${type === "sales" ? "h-[750px]" : "h-[550px]"} w-[1000px] rounded-md py-5 px-3 animate-popup`}> 
+            <div className={`relative flex flex-col border border-gray-600/40 bg-white w-[1000px] rounded-md py-5 px-3 animate-popup`}> 
                 
 
               
@@ -45,11 +50,44 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                     
                     {/*SALE HEADERS SECTION */}
                     <div className="mb-4">
-                        <h2 className="text-xl font-semibold mb-3 text-gray-700 border-b pb-2">
-                            {type === "sales" ? "Sales Information > " + user.branch_name : "Delivery Information > " + user.branch_name}
-                        </h2>
+
+                        {/*HEADER INFORMATION */}
+                        <div>
+                            {/*TITLES */}
+                            <div className='flex flex-col text-center gap-y-4'>
+                                <div className='text-4xl font-bold text-green-900'>
+                                    {user.branch_name.toUpperCase()}
+                                </div>
+
+                                <div className='text-xl font-semibold'>
+                                    {user.address}
+                                </div>
+
+                                <div className='flex justify-center gap-x-5 text-xs'>
+
+                                    <div className='flex items-center gap-x-2'>
+                                        <BsTelephoneFill />
+                                        {user.telephone_num}
+                                    </div>
+
+                                    <div className='flex items-center gap-x-2'>
+                                        <RiCellphoneFill />
+                                        {user.cellphone_num}
+                                    </div>
+
+                                    <div className='flex items-center gap-x-2'>
+                                        <MdEmail />
+                                        {user.branch_email}
+                                    </div>
+                                </div>
+                            </div>
+                            <h2 className="text-md font-bold mt-5 mb-3 text-gray-700 border-b pb-2 ">
+                                {type === "sales" ? "CHARGE SALES INVOICE" : "DELIVERY DETAILS"}
+                            </h2>
+                        </div>
                         
-                        <div className="grid grid-cols-2 gap-3 mb-3">
+                        
+                        <div className={`grid ${String(headerInformation.seniorPwdNumber).toLowerCase() !== 'none' ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mb-3`}>
                             <div>
                                 <label className="text-xs font-bold text-gray-600">SALE ID</label>
                                 <div className="p-2 bg-gray-50 border rounded text-sm">
@@ -62,6 +100,16 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                     {headerInformation.date}
                                 </div>
                             </div>
+
+                            {(String(headerInformation.seniorPwdNumber).toLowerCase() !== 'none' && type === "sales") &&
+                                <div>
+                                    <label className="text-xs font-bold text-gray-600">Senior/Pwd Number</label>
+                                    <div className="p-2 bg-gray-50 border rounded text-sm">
+                                        {headerInformation.seniorPwdNumber}
+                                    </div>
+                                </div>
+                            }
+                             
                         </div>
 
                         <div className="grid grid-cols-3 gap-3">
@@ -92,7 +140,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                             {type === "sales" ? "Items Sold" : "Products To Deliver" }
                         </h2>
                         
-                        <div className="flex-1 overflow-y-auto border border-gray-200 mb-2 rounded-lg shadow-sm">
+                        <div className="h-50 overflow-auto border border-gray-200 mb-2 rounded-lg shadow-sm">
                             <table className="w-full divide-y divide-gray-200 text-sm">
                                 <thead className="sticky top-0 bg-gray-100 shadow-sm">
                                     <tr>
@@ -164,7 +212,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                   }
                                     
                                 </tbody>
-                                
+
                             </table>
 
                         </div>
@@ -201,6 +249,12 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                             <span className="font-medium text-gray-600">VAT (10%):</span>
                                             <span className="font-semibold">{currencyFormat(headerInformation.vat)}</span>
                                         </div>
+                                        {(String(headerInformation.seniorPwdNumber).toLowerCase() !== 'none' && type === "sales") && (
+                                            <div className="flex justify-between py-2 border-b border-gray-200 text-base">
+                                                <span className="font-medium text-amber-600">Senior Discount (20%):</span>
+                                                <span className="font-semibold text-amber-600">-{currencyFormat(headerInformation.seniorPwdDiscount)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between py-3 text-xl font-bold border-t-2 border-gray-400 mt-2">
                                             <span>TOTAL AMOUNT DUE:</span>
                                             <span className="text-green-700">{currencyFormat(headerInformation.total)}</span>

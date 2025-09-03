@@ -27,7 +27,7 @@ function ConfirmationDialog({mode, message, submitFunction, onClose}) {
                     {mode === "add" ? <IoAddCircle /> : mode === "edit" ?  <FaEdit /> : <MdDeleteOutline /> } 
                   </div>
                   <h2 className="text-xl font-semibold text-gray-900">
-                    {mode === 'add' ? "Confirm new data ?" : mode === 'add' ? "Confirm changes ?" : "Delete Data ?" }
+                    {mode === 'add' ? "Confirm new data ?" : mode === 'edit' ? "Confirm changes ?" : "Delete Data ?" }
                   </h2>
                 </div>
                 <button

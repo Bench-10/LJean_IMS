@@ -117,11 +117,11 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
             <div  className="ml-auto flex gap-4">
               
               {/*CATEGORIES BTN*/}
-              <button className='border border-[#61CBE0] text-[#61CBE0] font-medium hover:bg-[#61CBE0] hover:text-white px-5 rounded-md transition-all' onClick={() => setIsCategory(true)}>CATEGORIES</button>
+              <button className='bg-[#007278] text-white font-medium hover:bg-[#009097] px-5 rounded-md transition-all' onClick={() => setIsCategory(true)}>CATEGORIES</button>
 
 
               {/*ADD ITEM BTN*/}
-              <button className='border border-[#63FF4F] text-[#63FF4F] font-medium hover:bg-[#63FF4F] hover:text-white px-5 rounded-md transition-all' onClick={() => handleOpen('add')}>ADD ITEMS</button>
+              <button className='bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all' onClick={() => handleOpen('add')}>ADD ITEMS</button>
 
             </div>
 

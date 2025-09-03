@@ -5,19 +5,30 @@ CREATE TABLE Branch (
     branch_id INT PRIMARY KEY,
     branch_name VARCHAR(255) NOT NULL,
     address VARCHAR(255) NOT NULL
+    cellphone_num VARCHAR(20) NOT NULL,
+    telephone_num VARCHAR(20) NOT NULL,
+    branch_email VARCHAR(100) NOT NULL;
 );
 
 
-INSERT INTO Branch (branch_id, branch_name, address) VALUES (1, 'L-Jean Trading', 'Balagtas, Batangas');
 
-INSERT INTO Branch (branch_id, branch_name, address) VALUES (2, 'Vinseth Trading', 'Banaba South, Batangas');
+INSERT INTO Branch (branch_id, branch_name, address, telephone_num, cellphone_num, branch_email) 
+VALUES (1, 'L-Jean Trading', 'Balagtas, Batangas', '(043) 123-4567', '(+63) 912-345-6789', 'ljeantrading@trading.com');
 
-INSERT INTO Branch (branch_id, branch_name, address) VALUES (3, 'MaraJean Trading', 'Libjo Central, Batangas');
+INSERT INTO Branch (branch_id, branch_name, address, telephone_num, cellphone_num, branch_email) 
+VALUES (2, 'Vinseth Trading', 'Banaba South, Batangas', '(043) 234-5678', '(+63) 923-456-7890', 'vinsethtrading@trading.com');
 
-INSERT INTO Branch (branch_id, branch_name, address) VALUES (4, 'El Jean Construction Supply', 'San Antonio San Pascual, Batangas');
-INSERT INTO Branch (branch_id, branch_name, address) VALUES (5, 'Cams Trading', 'Mababang Ludlod Taal, Batangas');
+INSERT INTO Branch (branch_id, branch_name, address, telephone_num, cellphone_num, branch_email) 
+VALUES (3, 'MaraJean Trading', 'Libjo Central, Batangas', '(043) 345-6789', '(+63) 934-567-8901', 'marajeantrading@trading.com');
 
-INSERT INTO Branch (branch_id, branch_name, address) VALUES (6, 'Seth and L-Jean Trading', 'Banay-Banay San Jose, Batangas');
+INSERT INTO Branch (branch_id, branch_name, address, telephone_num, cellphone_num, branch_email) 
+VALUES (4, 'El Jean Construction Supply', 'San Antonio San Pascual, Batangas', '(043) 456-7890', '(+63) 945-678-9012', 'eljeanconstruction@trading.com');
+
+INSERT INTO Branch (branch_id, branch_name, address, telephone_num, cellphone_num, branch_email) 
+VALUES (5, 'Cams Trading', 'Mababang Ludlod Taal, Batangas', '(043) 706-0892', '(+63) 927-074-4142', 'ljeantrading@yahoo.com');
+
+INSERT INTO Branch (branch_id, branch_name, address, telephone_num, cellphone_num, branch_email) 
+VALUES (6, 'Seth and L-Jean Trading', 'Banay-Banay San Jose, Batangas', '(043) 567-8901', '(+63) 956-789-0123', 'sethljeantrading@trading.com');
 
 
 
@@ -212,4 +223,5 @@ CREATE TABLE Delivery (
     delivered_date DATE,
     courier_name VARCHAR(255),
     is_delivered BOOL
+    is_pending BOOL
 );

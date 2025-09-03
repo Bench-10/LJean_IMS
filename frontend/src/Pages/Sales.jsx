@@ -4,6 +4,7 @@ import NoInfoFound from '../utils/NoInfoFound';
 import axios from 'axios';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery.jsx';
+import { FaCashRegister } from "react-icons/fa6";
 
 
 function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
@@ -19,7 +20,7 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
 
 
   //HEADER AND TOTAL INFORMATION
-  const [saleData, setSaleData ] = useState({sale_id: '', chargeTo: '', tin: '', address: '', date: '', amountNet: '', vat: '', total: ''})
+  const [saleData, setSaleData ] = useState({sale_id: '', chargeTo: '', tin: '', address: '', date: '', seniorPwdNumber: '', amountNet: '', vat: '', total: '', seniorPwdDiscount: ''})
 
 
   //VIEW THE PRUDUCTS UNDER SALE ID
@@ -31,9 +32,11 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
       tin: sailInfo.tin, 
       address: sailInfo.address, 
       date: sailInfo.formated_date, 
+      seniorPwdNumber: sailInfo.dicount_pwd_senior_number,
       amountNet: sailInfo.amount_net_vat, 
       vat: sailInfo.vat, 
-      total: sailInfo.total_amount_due
+      total: sailInfo.total_amount_due,
+      seniorPwdDiscount: sailInfo.senior_pwd_discount
 
     });
 
@@ -51,9 +54,11 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
       tin: '', 
       address: '', 
       date: '', 
+      seniorPwdNumber: '',
       amountNet: '', 
       vat: '', 
-      total: ''
+      total: '',
+      seniorPwdDiscount: ''
     });
 
 
@@ -118,7 +123,9 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
 
 
               {/*ADD SALE BTN*/}
-              <button className='border border-[#63FF4F] text-[#63FF4F] font-medium hover:bg-[#63FF4F] hover:text-white px-5 rounded-md transition-all'  onClick={() => setIsModalOpen(true)}> ADD SALE</button>
+              <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all'  onClick={() => setIsModalOpen(true)}> 
+                <FaCashRegister /> ADD SALE
+              </button>
 
             </div>
 
@@ -158,9 +165,6 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
                   <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-28">
                     TOTAL AMOUNT
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-28">
-                    ACTION
-                  </th>
 
               </tr>
             </thead>
@@ -184,12 +188,7 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
                       <td className="px-4 py-2 text-right"  >{row.formated_date}</td>
                       <td className="px-4 py-2 text-right"  >{currencyFormat(row.amount_net_vat)}</td>
                       <td className="px-4 py-2 text-right"  >{currencyFormat(row.vat)}</td>
-                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.total_amount_due)}</td>
-                      <td className="px-4 py-2 text-center">
-                        <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" >
-                            View
-                        </button>
-                      </td>
+                      <td className="px-5 py-2 text-right"  >{currencyFormat(row.total_amount_due)}</td>
 
                     </tr>
                   ))

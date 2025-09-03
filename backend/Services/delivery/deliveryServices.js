@@ -6,10 +6,10 @@ import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 //GET DELIVARY DATA
 export const getDeliveryData = async(branchId) =>{
     const {rows: delivery} = await SQLquery(`
-        SELECT delivery_id, sales_information_id, branch_id, destination_address, ${correctDateFormat("delivered_date")}, courier_name, is_delivered 
+        SELECT delivery_id, sales_information_id, branch_id, destination_address, ${correctDateFormat("delivered_date")}, courier_name, TO_CHAR(delivered_date, 'YYYY-MM-DD') AS delivered_date, is_delivered, is_pending
         FROM Delivery 
         WHERE branch_id = $1
-        ORDER BY delivered_date`,   
+        ORDER BY delivered_date DESC`,   
         [branchId]
     );
 
@@ -42,10 +42,11 @@ export const addDeliveryData = async(data) =>{
             destination_address, 
             delivered_date,
             courier_name,
-            is_delivered)
+            is_delivered,
+            is_pending)
 
-            VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *
-        `, [delivery_id, salesId, currentBranch, address, deliveredDate, courierName, status]
+            VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
+        `, [delivery_id, salesId, currentBranch, address, deliveredDate, courierName, status.is_delivered, status.pending]
     );
 
 
@@ -60,8 +61,16 @@ export const addDeliveryData = async(data) =>{
 //SET DELIVERIES TO DELIVERED
 export const setToDelivered  = async(saleID, update) =>{
 
-    const {is_delivered} = update;
+    const {courierName, deliveredDate, status } = update;
 
-    await SQLquery('UPDATE Delivery SET is_delivered = $1 WHERE sales_information_id = $2 RETURNING*', [is_delivered, saleID]);
+    const {rows: updateDelivery} = await SQLquery(`
+        UPDATE Delivery 
+        SET courier_name = $1, delivered_date = $2, is_delivered = $3, is_pending = $4
+        WHERE sales_information_id = $5 RETURNING *`,
+        [courierName, deliveredDate, status.is_delivered, status.pending, saleID]
+    );
+
+
+    return updateDelivery[0]; 
 
 };
