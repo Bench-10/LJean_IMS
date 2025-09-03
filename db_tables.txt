@@ -192,6 +192,8 @@ CREATE TABLE Sales_Information (
     vat DECIMAL(10, 2),
     amount_net_vat DECIMAL(10, 2),
     total_amount_due DECIMAL(10, 2),
+    dicount_pwd_senior_number VARCHAR(225),
+    senior_pwd_discount DECIMAL(10,2)
 	FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
 );
 
