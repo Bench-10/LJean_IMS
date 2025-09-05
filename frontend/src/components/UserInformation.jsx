@@ -32,14 +32,14 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
         }
 
 
-        {openUsers && user.role === 'Owner' &&(
+        {openUsers && user.role.some(role => ['Owner'].includes(role)) &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
             style={{ pointerEvents: 'auto' }}  onClick={onClose}
             />
         )}
 
-        <dialog className="bg-transparent fixed top-0 bottom-0  z-50 animate-popup" open={openUsers && user.role === 'Owner'}>
+        <dialog className="bg-transparent fixed top-0 bottom-0  z-50 animate-popup" open={openUsers && user.role.some(role => ['Owner'].includes(role))}>
 
             <div className='bg-white rounded-lg w-[900px]'>
               

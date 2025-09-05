@@ -16,7 +16,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
   const [last_name, setLastname] = useState('');
   const [branch, setBranch] = useState('');
   const [role, setRole] = useState('');
-  const [cell_number, setCellNumber] = useState('');
+  const [cell_number, setCellNumber] = useState('');    
   const [address, setAddress] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +45,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
     setEmptyField({});
 
-    if (isModalOpen && mode === 'add' && user.role === 'Owner'){
+    if (isModalOpen && mode === 'add' && user.role.some(role => ['Owner'].includes(role))){
         setFirstName('');
         setLastname('');
         setBranch('');
@@ -57,7 +57,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
     }
 
 
-    if (isModalOpen && mode === 'edit' && user.role === 'Owner' && userDetailes){
+    if (isModalOpen && mode === 'edit' && user.role.some(role => ['Owner'].includes(role)) && userDetailes){
         setFirstName(userDetailes.first_name);
         setLastname(userDetailes.last_name);
         setBranch(userDetailes.branch_id);
@@ -165,14 +165,14 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
         }
 
 
-        {isModalOpen && user.role === 'Owner' &&(
+        {isModalOpen && user.role.some(role => ['Owner'].includes(role)) &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]"
             style={{ pointerEvents: 'auto' }}  onClick={onClose}
             />
         )}
 
-        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user.role === 'Owner'}>
+        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user.role.some(role => ['Owner'].includes(role))}>
             <div className='bg-white text-black w-[700px] rounded-md' >
                 {/*HEADER TITLE */}
                 <div className='bg-green-800 p-4 rounded-t-md flex justify-between items-center '>

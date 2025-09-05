@@ -19,7 +19,7 @@ function Login() {
   //PREVENTS THE USER FROM GOING BACK TO THE LOGIN PAGE AFTER A SUCCESSFUL LOGIN
   useEffect(() => {
     if (user && user.role) {
-      if (user.role !== 'Sales Associate') {
+      if (user.role.some(role => ['Inventory Staff', 'Owner', 'Branch Manager'].includes(role))) {
         navigate('/inventory', { replace: true });
       } else {
         navigate('/sales', { replace: true });

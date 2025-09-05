@@ -40,7 +40,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     if (!user) return;
 
 
-    if (isModalOpen && user.role === 'Inventory Staff') {
+    if (isModalOpen && user.role.some(role => ['Inventory Staff'].includes(role))) {
       setInvalidNumber({});
       setIsExpiredEarly(false);
       setEmptyField({});
@@ -223,7 +223,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       
       }
 
-      {isModalOpen && user.role === 'Inventory Staff' &&(
+      {isModalOpen && user.role.some(role => ['Inventory Staff'].includes(role)) &&(
         <div
           className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
           style={{ pointerEvents: 'auto' }}  onClick={onClose}
@@ -232,7 +232,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
 
-        <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen && user.role === 'Inventory Staff'}>
+        <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen && user.role.some(role => ['Inventory Staff'].includes(role))}>
             <div className="relative flex flex-col border border-gray-600/40 bg-white h-[555px] w-[600px] rounded-md p-7 animate-popup" >
 
 

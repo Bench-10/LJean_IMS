@@ -60,7 +60,7 @@ function App() {
   const fetchProductsData = async () =>{
       try {
         let response;
-        if (user.role !== 'Owner' && user.role !== 'Branch Manager'){
+        if (!user.role.some(role => ['Branch Manager', 'Owner'].includes(role))){
           response = await axios.get(`http://localhost:3000/api/items?branch_id=${user.branch_id}`);
         } else {
           response = await axios.get(`http://localhost:3000/api/items/`);
@@ -149,7 +149,7 @@ function App() {
   useEffect(() =>{
 
     if (!user) return;
-    if (user.role !== 'Sales Associate') return;
+    if (!user.role.some(role => ['Sales Associate'].includes(role))) return;
 
     fetchSaleRecords();
     getDeliveries();
@@ -175,8 +175,7 @@ function App() {
   useEffect(() => {
 
     if (!user) return;
-    if (user.role === 'Owner') return;
-    if (user.role === 'Sales Associate') return;
+    if (!user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) return;
 
     getTime();
 

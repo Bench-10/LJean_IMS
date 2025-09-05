@@ -9,9 +9,17 @@ function RouteProtection({allowedRoles = [], children}) {
 
   //ALWAYS ROUTE TO THE LOGIN PART IF THERE IS NO USER
   if (!user) return <Navigate to="/" replace />;
+
   
   //THIS WILL RETURN IF LOGIN BUT DONT HAVE ACCESS TO THE PAGE
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) 
+  if (
+    allowedRoles.length > 0 &&
+    (
+      Array.isArray(user.role)
+        ? !user.role.some(role => allowedRoles.includes(role))
+        : !allowedRoles.includes(user.role)
+    )
+  ) 
     return (
         <div className='ml-[220px] flex justify-center items-center h-screen'>
 

@@ -60,7 +60,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
 
       try {
         let response;
-        if (user.role !== 'Owner'){
+        if (!user.role.some(role => ['Owner'].includes(role))){
           response = await axios.post(`http://localhost:3000/api/product_history?branch_id=${user.branch_id}`, dates);
         } else{
           response = await axios.post(`http://localhost:3000/api/product_history/`, dates);

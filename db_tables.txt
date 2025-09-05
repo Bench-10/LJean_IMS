@@ -48,6 +48,11 @@ INSERT INTO Administrator (admin_id, role, username, password, first_name, last_
 VALUES (1, 'Owner', 'admin123', '$2b$12$XohURN8fGR5.ZyHsBiEB3uINqdi1PAOiV1HfapBhWENyWDesb8G86', 'Bench Christian', 'Dela Luna'); --Pasword is: password
 
 
+ALTER TABLE administrator --TURN VARCHAR TO AN ARRAY
+ALTER COLUMN role TYPE TEXT[]
+USING string_to_array(role, ',');
+
+
 
 
 
@@ -82,6 +87,11 @@ INSERT INTO Users (
 
 (5, 1, 'Branch Manager', 'Bench', 'Dela Luna', '09674529545',
  TRUE, '2022-12-01', '2025-08-06 08:45:00', 'read,write,manage', '1010 Mango Blvd');
+
+
+ALTER TABLE users --TURN VARCHAR TO AN ARRAY
+ALTER COLUMN role TYPE TEXT[]
+USING string_to_array(role, ',');
 
 
 

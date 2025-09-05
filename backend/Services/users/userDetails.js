@@ -26,7 +26,7 @@ export const getAllUsers = async () =>{
             FROM Users
             JOIN Branch ON Branch.branch_id = Users.branch_id
             JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
-            WHERE role != 'Owner'
+            WHERE NOT ('Owner' = ANY(role))
             ORDER BY hire_date;
         `);
 

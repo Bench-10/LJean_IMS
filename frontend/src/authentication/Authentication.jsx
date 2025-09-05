@@ -33,7 +33,7 @@ function Authentication ({ children }) {
 
   const logout = async () => {
 
-    if (user.role !== 'Owner'){
+    if (!user.role.some(role => ['Owner'].includes(role))){
       await axios.put(`http://localhost:3000/api/authentication/${user.user_id}`, { activity: false });
     }
 

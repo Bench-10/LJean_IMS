@@ -117,7 +117,7 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
 
 
           {/*APEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
-          {user.role === 'Sales Associate' &&
+          {user.role.some(role => ['Sales Associate'].includes(role)) &&
           
             <div  className="ml-auto flex gap-4">
 

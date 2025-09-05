@@ -27,7 +27,7 @@ function GlobalBanner({setOpenNotif, unreadCount}) {
                     </h2>
 
                     <p className='text-gray-500 text-sm'>
-                        {user?.role} • {new Date().toLocaleDateString('en-US', { 
+                        {user.role.length > 1 ? user.role.join(" / ") : user.role} • {new Date().toLocaleDateString('en-US', { 
                             weekday: 'long', 
                             year: 'numeric', 
                             month: 'long', 
@@ -40,7 +40,7 @@ function GlobalBanner({setOpenNotif, unreadCount}) {
                 </div>
 
 
-               {(user.role === 'Inventory Staff' || user.role === 'Branch Manager') &&
+               {(user.role.some(role => ['Inventory Staff', 'Branch Manager'].includes(role))) &&
                     <div className='relative p-2 border-2 rounded-md border-gray-600 hover:text-white hover:bg-gray-600 transition-all cursor-pointer' onClick={setOpenNotif}>
                         <IoMdNotifications />
                         {unreadCount > 0 && (

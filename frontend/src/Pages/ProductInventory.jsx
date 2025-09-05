@@ -10,7 +10,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState(() => user && user.role === 'Branch Manager' ? user.branch_id : '' );
+  const [selectedBranch, setSelectedBranch] = useState(() => user && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id : '' );
 
   const handleSearch = (event) =>{
     setSearchItem(sanitizeInput(event.target.value));
@@ -68,41 +68,39 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
               </div>
 
               <div className='flex gap-x-3 items-center h-9'>
-                <label className='block text-sm font-medium text-gray-700 whitespace-nowrap mb-0'>
-                  Filter by Category:
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={e => setSelectedCategory(e.target.value)}
-                  className="border outline outline-1 outline-gray-400 focus:outline-green-700 transition-all px-3 py-0 rounded w-full h-9 leading-none align-middle"
-                >
-                  <option value="">All Categories</option>
-                  {listCategories.map(cat => (
-                    <option key={cat.category_id} value={cat.category_id}>
-                      {cat.category_name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative w-44">
+                  <label className="absolute left-1 top-[-11px] bg-white px-1 text-xs font-medium text-gray-700 pointer-events-none transition-all">Filter by Category:</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={e => setSelectedCategory(e.target.value)}
+                    className="border outline outline-1 outline-gray-400 focus:outline-green-700 transition-all px-3 py-0 rounded w-full h-9 leading-none align-middle text-sm"
+                  >
+                    <option value="">All Categories</option>
+                    {listCategories.map(cat => (
+                      <option key={cat.category_id} value={cat.category_id}>
+                        {cat.category_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {(user.role === 'Owner' ||  user.role === 'Branch Manager') &&
+              {(user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
 
-                <div className='flex gap-x-3 items-center h-9'>
-                  <label className='block text-sm font-medium text-gray-700 whitespace-nowrap mb-0'>
-                    Filter by Branch:
-                  </label>
+                <div className="relative w-44">
+                  <label className="absolute left-1 top-[-11px] bg-white px-1 text-xs font-medium text-gray-700 pointer-events-none transition-all">Filter by Branch:</label>
                   <select
                     value={selectedBranch}
                     onChange={e => setSelectedBranch(e.target.value)}
-                    className="border outline outline-1 outline-gray-400 focus:outline-green-700 transition-all px-3 py-0 rounded w-full h-9 leading-none align-middle"
+                    className="border outline outline-1 outline-gray-400 focus:outline-green-700 transition-all px-3 py-0 rounded w-full h-9 leading-none align-middle text-sm"
                   >
-                    {user.role === 'Owner' && <option value="">All Branch</option>}
+                    {user.role.some(role => ['Owner'].includes(role)) && <option value="">All Branch</option>}
                     {branches.map(branch => (
                       <option key={branch.branch_id} value={branch.branch_id}>
                         {branch.branch_name}{branch.branch_id === user.branch_id ? ' (Your Branch)':''}
                       </option>
                     ))}
-                  </select> 
+                  </select>
                 </div>
               
               }   
@@ -112,7 +110,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
 
           {/*CATEGORIES AND ADD ITEM */}
           {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-          {user.role === 'Inventory Staff' &&
+          {user.role.some(role => ['Inventory Staff'].includes(role)) &&
           
             <div  className="ml-auto flex gap-4">
               
@@ -155,7 +153,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                     UNIT PRICE
                   </th>
 
-                  {user.role === 'Branch Manager' &&
+                  {user.role.some(role => ['Branch Manager'].includes(role)) &&
 
                     <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
                       UNIT COST
@@ -174,7 +172,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                   </th>
 
                   {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-                  {user.role === 'Inventory Staff' &&
+                  {user.role.some(role => ['Inventory Staff'].includes(role)) &&
 
                     <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-20">
                       ACTION
@@ -203,7 +201,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                       <td className="px-4 py-2"  >{row.unit}</td>
                       <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_price)}</td>
 
-                      {user.role === 'Branch Manager' &&
+                      {user.role.some(role => ['Branch Manager'].includes(role)) &&
                         <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_cost)}</td>
                       }
                       
@@ -216,7 +214,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                       </td>
 
                       {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-                      {user.role === 'Inventory Staff' &&
+                      {user.role.some(role => ['Inventory Staff'].includes(role)) &&
 
                         <td className="px-4 py-2 text-center">
                           <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
