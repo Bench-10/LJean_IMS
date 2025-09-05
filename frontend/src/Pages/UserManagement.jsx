@@ -108,7 +108,15 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
                     <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
                       <td className="px-4 py-2"  >{row.full_name}</td>
                       <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.branch}</td>
-                      <td className="px-4 py-2 whitespace-nowrap"  >{row.role}</td>
+                      <td className="px-4 py-2 whitespace-nowrap"  >
+
+                          {Array.isArray(row.role)
+                              ? (row.role.length > 1
+                                  ? row.role.join(", ")
+                                  : row.role[0] || "")
+                              : row || ""}
+
+                        </td>
                       <td className="px-4 py-2"  >{row.cell_number}</td>
                       <td className="px-4 py-2 text-center align-middle">
                         <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${row.is_active ? 'bg-[#61E85C] text-green-700 ' : 'bg-[#f97878] text-red-900' }`}> 

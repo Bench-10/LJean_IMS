@@ -93,6 +93,10 @@ ALTER TABLE users --TURN VARCHAR TO AN ARRAY
 ALTER COLUMN role TYPE TEXT[]
 USING string_to_array(role, ',');
 
+ALTER TABLE users
+ALTER COLUMN permissions TYPE TEXT[]
+USING string_to_array(permissions, ',');
+
 
 
 

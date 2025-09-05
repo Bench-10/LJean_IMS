@@ -86,7 +86,13 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                     <div className='p-5 bg-gray-100 rounded-md'>
                         <h1 className='mb-1 font-semibold text-xs'>PERMISSIONS</h1>
-                        <span className='text-xs font-semibold'>{userDetailes.permissions}</span>
+                        <span className='text-xs font-semibold'>
+                          {Array.isArray(userDetailes.permissions)
+                            ? (userDetailes.permissions.length > 1
+                                ? userDetailes.permissions.join(", ")
+                                : userDetailes.permissions[0] || "")
+                            : userDetailes.permissions || ""}
+                        </span>
 
                     </div>
 
@@ -108,7 +114,13 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                     <div className='p-5 bg-gray-100 rounded-md'>
                         <h1 className='mb-1 font-semibold text-xs'>ROLE</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.role}</span>
+                        <span className='text-lg font-semibold'>
+                        {Array.isArray(userDetailes.role)
+                            ? (userDetailes.role.length > 1
+                                ? userDetailes.role.join(", ")
+                                : userDetailes.role[0] || "")
+                            : userDetailes.role || ""}
+                        </span>
 
                     </div>
 

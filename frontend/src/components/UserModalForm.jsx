@@ -15,7 +15,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
   const [first_name, setFirstName] = useState('');
   const [last_name, setLastname] = useState('');
   const [branch, setBranch] = useState('');
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState({isManager: false, isInventoryStaff: false, isSalesAssociate: false});
   const [cell_number, setCellNumber] = useState('');    
   const [address, setAddress] = useState('');
   const [username, setUsername] = useState('');
@@ -45,27 +45,51 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
     setEmptyField({});
 
+
     if (isModalOpen && mode === 'add' && user.role.some(role => ['Owner'].includes(role))){
         setFirstName('');
         setLastname('');
         setBranch('');
-        setRole('');
+        setRole({isManager: false, isInventoryStaff: false, isSalesAssociate: false});
         setCellNumber('');
         setAddress('');
         setUsername('');
         setPassword('');
+
+        return;
     }
 
 
+
     if (isModalOpen && mode === 'edit' && user.role.some(role => ['Owner'].includes(role)) && userDetailes){
+
+
+        let setDbUserRoles = {isManager: false, isInventoryStaff: false, isSalesAssociate: false};
+
+    
+        if(userDetailes.role.some(role => ['Branch Manager'].includes(role))){
+            setDbUserRoles.isManager = true;
+        }
+
+        if(userDetailes.role.some(role => ['Inventory Staff'].includes(role))){
+            setDbUserRoles.isInventoryStaff = true;
+        }
+
+        if(userDetailes.role.some(role => ['Sales Associate'].includes(role))){
+            setDbUserRoles.isSalesAssociate = true;
+        }
+
+
         setFirstName(userDetailes.first_name);
         setLastname(userDetailes.last_name);
         setBranch(userDetailes.branch_id);
-        setRole(userDetailes.role);
+        setRole(setDbUserRoles);
         setCellNumber(userDetailes.cell_number);
         setAddress(userDetailes.address);
         setUsername(userDetailes.username);
         setPassword(userDetailes.password);
+
+        return;
     }
     
   }, [isModalOpen, user]);
@@ -80,7 +104,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
     if (!String(first_name).trim()) isEmptyField.first_name = true;
     if (!String(last_name).trim()) isEmptyField.last_name = true;
     if (!String(branch).trim()) isEmptyField.branch = true;
-    if (!String(role).trim()) isEmptyField.role = true;
+    if (!Object.values(role).some(Boolean)) isEmptyField.role = true;
     if (!String(cell_number).trim()) isEmptyField.cell_number = true;
     if (!String(address).trim()) isEmptyField.address = true;
     if (!String(username).trim()) isEmptyField.username = true;
@@ -145,7 +169,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
   const errorflag = (field, field_warn) =>{
     if (emptyField[field])
-      return <div className={`italic text-red-500 absolute ${field_warn === 'date' ? 'top-16':'top-17'} pl-2 text-xs mt-1`}>{`Please enter a ${field_warn}!`}</div>
+      return <div className={`italic text-red-500 absolute ${field_warn === 'date' ? 'top-16':'top-17'} pl-2 text-xs mt-1`}>{`Please ${field === 'role' ? 'pick' : 'enter'} a ${field_warn}!`}</div>
       
   };
 
@@ -306,21 +330,62 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
                                     <h2 className='font-semibold text-green-900 text-lg'>User Role</h2>
 
-                                    <select 
-                                        name="" 
-                                        id="role_select" 
-                                        className={inputDesign('role')}
-                                        value={role}
-                                        onChange={(e) => setRole(e.target.value)}
+                                    <div className='flex items-center gap-x-2 '>
+                                        Branch Manager
+                                        <input
+                                            type="checkbox"
+                                            checked={role.isManager}
+                                            onChange={(e) => {
 
-                                    >
+                                                setRole(prev => ({
+                                                    ...prev,
+                                                    isManager: e.target.checked
+                                                }));
+                                                
+                                            }}
+                                            className="form-checkbox h-4 w-4 text-amber-500"
+                                        />
+                                    </div>
 
-                                        <option value="">--Select the user role--</option>
-                                        {userRole.map((role) => (
-                                            <option key={role} value={role}>{role}</option>
-                                        ))}
+                                    
+                           
+                                    <div className='flex items-center gap-x-2 '>
+                                        Inventory Staff
+                                        <input
+                                            type="checkbox"
+                                            checked={role.isInventoryStaff}
+                                            onChange={(e) => {
 
-                                    </select>
+                                                setRole(prev => ({
+                                                    ...prev,
+                                                    isInventoryStaff: e.target.checked
+                                                }));
+
+                                                
+                                                
+                                            }}
+                                            className="form-checkbox h-4 w-4 text-amber-500"
+                                        />
+                                    </div>
+
+
+                                    <div className='flex items-center gap-x-2 '>
+                                        Sales Associate
+                                        <input
+                                            type="checkbox"
+                                            checked={role.isSalesAssociate}
+                                            onChange={(e) => {
+
+                                                setRole(prev => ({
+                                                    ...prev,
+                                                    isSalesAssociate: e.target.checked
+                                                }));
+                                                
+                                            }}
+                                            className="form-checkbox h-4 w-4 text-amber-500"
+                                        />
+                                    </div>
+
 
                                     {errorflag('role', 'User Role')}
 

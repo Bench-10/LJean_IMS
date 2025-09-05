@@ -7,6 +7,8 @@ import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 export const createUserAccount = async (UserData) => {
     const { branch, role, first_name, last_name, cell_number, address, username, password } = UserData;
 
+    const {isManager, isInventoryStaff, isSalesAssociate} = role;
+
     //CREATES A UNIQUE USER ID
     let user_id;
     let isUnique = false;
@@ -17,17 +19,46 @@ export const createUserAccount = async (UserData) => {
     }
 
 
-    let permissions;
 
-    if (role === 'Branch Manager')
-        permissions = 'View Dashboard/view Inventory/View Notification/View Product Validity/Confirm Inventory Changes';
+    let allowedRoles = [];
 
-    if (role === 'Inventory Staff')
-        permissions = 'Manage Inventory/View Product Validity/View Notifications';
+    const addRole = (condition, roleName) => {
+        if (condition && !allowedRoles.includes(roleName)) {
+            allowedRoles.push(roleName);
+        }
+    };
 
-    if (role === 'Sales Associate')
-        permissions = 'Manage Sales Transactions/Monitor Deliveries';
+    addRole(isManager, "Branch Manager");
+    addRole(isInventoryStaff, "Inventory Staff");
+    addRole(isSalesAssociate, "Sales Associate");
 
+
+
+
+    let permissions = [];
+
+    if (isManager)
+        permissions.push(
+            "View Dashboard",
+            "View Inventory",
+            "View Notification",
+            "View Product Validity",
+            "Confirm Inventory Changes"
+        );
+
+    if (isInventoryStaff)
+        permissions.push(
+            "Manage Inventory",
+            "View Product Validity",
+            "View Notifications"
+        );
+
+    if (isSalesAssociate)
+        permissions.push(
+            "Manage Sales Transactions",
+            "Monitor Deliveries",
+        );
+        
 
 
     const securePassword = await passwordEncryption.encryptPassword(password);
@@ -37,7 +68,7 @@ export const createUserAccount = async (UserData) => {
     await SQLquery(
         `INSERT INTO Users(user_id, branch_id, role, first_name, last_name, cell_number, is_active, last_login, permissions, address) 
         VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [user_id, branch, role, first_name, last_name, cell_number, false, 'Not yet logged in.', permissions, address]
+        [user_id, branch, allowedRoles, first_name, last_name, cell_number, false, 'Not yet logged in.', permissions, address]
     );
 
     await SQLquery(
@@ -54,24 +85,57 @@ export const createUserAccount = async (UserData) => {
 export const updateUserAccount = async (UserID, UserData) =>{
     const { branch, role, first_name, last_name, cell_number, address, username, password } = UserData;
 
+    const {isManager, isInventoryStaff, isSalesAssociate} = role;
+
     const securePassword = await passwordEncryption.encryptPassword(password);
 
-    let permissions;
 
-    if (role === 'Branch Manager')
-        permissions = 'View Dashboard/view Inventory/View Notification/View Product Validity/Confirm Inventory Changes';
+    let allowedRoles = [];
 
-    if (role === 'Inventory Staff')
-        permissions = 'Manage Inventory/View Product Validity/View Notifications';
+    const addRole = (condition, roleName) => {
+        if (condition && !allowedRoles.includes(roleName)) {
+            allowedRoles.push(roleName);
+        }
+    };
 
-    if (role === 'Sales Associate')
-        permissions = 'Manage Sales Transactions/Monitor Deliveries';
+    addRole(isManager, "Branch Manager");
+    addRole(isInventoryStaff, "Inventory Staff");
+    addRole(isSalesAssociate, "Sales Associate");
+
+
+
+    let permissions = [];
+
+    if (isManager)
+        permissions.push(
+            "View Dashboard",
+            "View Inventory",
+            "View Notification",
+            "View Product Validity",
+            "Confirm Inventory Changes"
+        );
+
+    if (isInventoryStaff)
+        permissions.push(
+            "Manage Inventory",
+            "View Product Validity",
+            "View Notifications"
+        );
+
+    if (isSalesAssociate)
+        permissions.push(
+            "Manage Sales Transactions",
+            "Monitor Deliveries",
+        );
 
 
     await SQLquery('BEGIN');
 
 
-    await SQLquery(`UPDATE Users SET branch_id = $1, role = $2, first_name = $3, last_name = $4, cell_number = $5, permissions = $6, address = $7 WHERE user_id = $8`,[branch, role, first_name, last_name, cell_number, permissions, address, UserID]);
+    await SQLquery(`UPDATE Users SET role = '{}', permissions = '{}' WHERE user_id = $1 `,[UserID]);
+
+
+    await SQLquery(`UPDATE Users SET branch_id = $1, role = $2, first_name = $3, last_name = $4, cell_number = $5, permissions = $6, address = $7 WHERE user_id = $8`,[branch, allowedRoles, first_name, last_name, cell_number, permissions, address, UserID]);
 
 
     await SQLquery(`UPDATE Login_Credentials SET username = $1, password = $2 WHERE user_id = $3 `,[username, securePassword, UserID]);
