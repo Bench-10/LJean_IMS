@@ -65,7 +65,7 @@ export const userAuth = async(loginInformation) =>{
     );
 
     if (!isAdmin.rowCount){
-        return { error: "Username not exist" };
+        return { error: "Invalid username" };
 
     };
 
