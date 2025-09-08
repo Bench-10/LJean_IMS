@@ -36,4 +36,10 @@ router.get('/analytics/kpis', analyticsControllers.getKPIs);
 //BRANCH LIST FOR OWNERS VIEWING
 router.get('/analytics/branches', analyticsControllers.getBranches);
 
+
+
+//DELIVERY INFORMATION
+router.get('/analytics/delivery', analyticsControllers.numberOfDeliveriesByDate);
+
+
 export default router;

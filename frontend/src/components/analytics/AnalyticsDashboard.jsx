@@ -7,7 +7,8 @@ import Delivery from './charts/Delivery.jsx';
 import { TbTruckDelivery } from "react-icons/tb";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
 
-/* Layout wrapper to mimic existing style (cards, spacing) */
+
+
 const Card = ({ title, children, className='' }) => (
   <div className={`flex flex-col border border-gray-200 rounded-md bg-white p-4 shadow-sm ${className}`}>
     {title && <h2 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase mb-2">{title}</h2>}
@@ -43,6 +44,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [categories, setCategories] = useState([]);
   const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0 });
   const [categoryName, setCategoryName] = useState('All Products');
+  const [deliveryData, setDeliveryData] = useState([]);
 
 
   //SWITCH TO DIFFERENT TYPE OF ANALYTICS
@@ -61,13 +63,14 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   if (branchId) params.branch_id = branchId;
     if (categoryFilter) params.category_id = categoryFilter;
     try {
-      const [sales, restock, levels, top, cat, kpi] = await Promise.all([
+      const [sales, restock, levels, top, cat, kpi, delivery] = await Promise.all([
         axios.get(`${base}/sales-performance`, { params }),
         axios.get(`${base}/restock-trends`, { params }),
         axios.get(`${base}/inventory-levels`, { params }),
         axios.get(`${base}/top-products`, { params: { ...params, limit: 7 } }),
         axios.get(`${base}/category-distribution`, { params: { branch_id: branchId } }),
-        axios.get(`${base}/kpis`, { params: { branch_id: branchId, category_id: categoryFilter || undefined } })
+        axios.get(`${base}/kpis`, { params: { branch_id: branchId, category_id: categoryFilter || undefined } }),
+        axios.get(`${base}/delivery`, { params: { ...(branchId ? { branch_id: branchId } : {}), format: interval } })
       ]);
 
       setSalesPerformance(sales.data);
@@ -76,6 +79,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       setTopProducts(top.data);
       setCategoryDist(cat.data);
       setKpis(kpi.data);
+  // Ensure counts are numbers for the chart
+  setDeliveryData(delivery.data.map(d => ({ ...d, number_of_deliveries: Number(d.number_of_deliveries) })));
       
       if (cat.data && cat.data.length && categories.length === 0) {
         
@@ -155,6 +160,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
           </select>
         </div>
 
@@ -242,14 +248,14 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
         (
           <TopProducts 
-          topProducts={topProducts} 
-          salesPerformance={salesPerformance} 
-          formatPeriod={formatPeriod} 
-          restockTrends={restockTrends} 
-          Card={Card} 
-          categoryName={categoryName}
+            topProducts={topProducts} 
+            salesPerformance={salesPerformance} 
+            formatPeriod={formatPeriod} 
+            restockTrends={restockTrends} 
+            Card={Card} 
+            categoryName={categoryName}
 
-        />
+          />
         )
 
        }
@@ -258,7 +264,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
        { currentCharts === "delivery" && 
 
         (
-          <Delivery/>
+          <Delivery
+            Card={Card}
+            deliveryData={deliveryData}
+          />
         )
        
        }

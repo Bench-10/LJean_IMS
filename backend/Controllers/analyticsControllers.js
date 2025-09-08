@@ -1,5 +1,5 @@
 import * as analyticsServices from '../Services/analytics/analyticsServices.js';
-
+import * as deliveryAnalyticsServices from '../Services/analytics/deliveryAnalyticsServices.js';
 
 
 
@@ -122,6 +122,25 @@ export const getBranches = async (_req, res) => {
   try {
 
     const rows = await analyticsServices.fetchBranches();
+    res.json(rows);
+
+  } catch (err) {
+    console.error('Branches error', err);
+    res.status(500).json({ message: 'Internal Server Error' });
+
+  }
+
+};
+
+
+
+
+//FOR FETCHING DELIVERY BY DATE
+export const numberOfDeliveriesByDate = async (req, res) => {
+  try {
+
+    const { branch_id, format } = req.query;
+    const rows = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id);
     res.json(rows);
 
   } catch (err) {
