@@ -234,6 +234,50 @@ function App() {
   };
 
 
+
+  //DISABLE AND ENABLE ACCOUNT
+  const disableEnableAccount = async() =>{
+    
+    //RE-ENABLE ACCOUNT
+    if (!user.role.some(role => ['Owner'].includes(role))) return;
+
+    if (userDetailes.is_disabled){
+        
+        await axios.put(`http://localhost:3000/api/disable/${userDetailes.user_id}`, {isDisabled: false})
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.user_id === userDetailes.user_id
+              ? { ...user, is_disabled: false }
+              : user
+          )
+        );
+
+        setUserDetailes((prev) => ({
+            ...prev,
+            is_disabled: false,
+          }));
+
+    } else {
+
+        await axios.put(`http://localhost:3000/api/disable/${userDetailes.user_id}`, {isDisabled: true})
+          setUsers((prev) =>
+            prev.map((user) =>
+              user.user_id === userDetailes.user_id
+                ? { ...user, is_disabled: true }
+                : user
+            )
+          );
+
+          setUserDetailes((prev) => ({
+            ...prev,
+            is_disabled: true,
+          }));
+
+    }
+
+  }
+
+
   //DELIVERY EDIT
   const deliveryEdit = (mode, data) =>{
     setModalMode(mode);
@@ -294,6 +338,7 @@ function App() {
         onClose={() => setIsModalOpen(false)}
         fetchUsersinfo ={fetchUsersinfo}
         setUserDetailes={setUserDetailes}
+        setOpenUsers={setOpenUsers}
       
       />
 
@@ -315,6 +360,7 @@ function App() {
         onClose={() => setOpenUsers(false)} 
         handleUserModalOpen={handleUserModalOpen}
         deleteUser={deleteUser}
+        disableEnableAccount={disableEnableAccount}
         
       />
 

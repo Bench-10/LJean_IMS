@@ -36,7 +36,7 @@ VALUES (6, 'Seth and L-Jean Trading', 'Banay-Banay San Jose, Batangas', '(043) 5
 
 CREATE TABLE Administrator (
     admin_id SERIAL PRIMARY KEY,
-    role VARCHAR(30),
+    role TEXT[],
     username VARCHAR(225),
     password VARCHAR(225),
     first_name VARCHAR(100),
@@ -44,13 +44,11 @@ CREATE TABLE Administrator (
 );
 
 
+update administrator set username = 'admin123@gmail.com'
+
+
 INSERT INTO Administrator (admin_id, role, username, password, first_name, last_name)
-VALUES (1, 'Owner', 'admin123', '$2b$12$XohURN8fGR5.ZyHsBiEB3uINqdi1PAOiV1HfapBhWENyWDesb8G86', 'Bench Christian', 'Dela Luna'); --Pasword is: password
-
-
-ALTER TABLE administrator --TURN VARCHAR TO AN ARRAY
-ALTER COLUMN role TYPE TEXT[]
-USING string_to_array(role, ',');
+VALUES (1, ARRAY[Owner'], 'admin123', '$2b$12$XohURN8fGR5.ZyHsBiEB3uINqdi1PAOiV1HfapBhWENyWDesb8G86', 'Bench Christian', 'Dela Luna'); --Pasword is: password
 
 
 
@@ -59,43 +57,24 @@ USING string_to_array(role, ',');
 CREATE TABLE Users (
     user_id INT PRIMARY KEY,
     branch_id INT NOT NULL,
-    role VARCHAR(255) NOT NULL,
+    role TEXT[] NOT NULL,
     first_name VARCHAR(255) NOT NULL,
     last_name VARCHAR(255) NOT NULL,
     cell_number VARCHAR(255) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     hire_date DATE DEFAULT CURRENT_DATE,
     last_login VARCHAR(40),
-    permissions VARCHAR(255),
+    permissions TEXT[],
     address VARCHAR(255),
+    is_disabled BOOL,
     FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
 );
 
 
-INSERT INTO Users (
-    user_id, branch_id, role, first_name, last_name, cell_number,
-    is_active, hire_date, last_login, permissions, address
-) VALUES
-(1, 1, 'Inventory Staff', 'Cathy', 'Portillo', '09674529545',
- TRUE, '2023-01-15', '2025-08-06 09:00:00', 'read,write', '123 Main St'),
+ALTER TABLE Users -- NEW EDIT
+ADD COLUMN is_disabled bool
 
-(2, 2, 'Inventory Staff', 'Nicole', 'Lacsamana', '09674836545',
- TRUE, '2023-02-01', '2025-08-05 15:30:00', 'read', '456 Pine Rd'),
-
-(3, 3, 'Inventory Staff', 'Louise', 'Ordunia', '09605621545',
- FALSE, '2023-03-10', NULL, 'read', '789 Elm Ave'),
-
-(5, 1, 'Branch Manager', 'Bench', 'Dela Luna', '09674529545',
- TRUE, '2022-12-01', '2025-08-06 08:45:00', 'read,write,manage', '1010 Mango Blvd');
-
-
-ALTER TABLE users --TURN VARCHAR TO AN ARRAY
-ALTER COLUMN role TYPE TEXT[]
-USING string_to_array(role, ',');
-
-ALTER TABLE users
-ALTER COLUMN permissions TYPE TEXT[]
-USING string_to_array(permissions, ',');
+UPDATE users SET is_disabled = false
 
 
 
@@ -107,13 +86,6 @@ CREATE TABLE Login_Credentials (
     password VARCHAR(255) NOT NULL,
     FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
 );
-
-
-INSERT INTO Login_Credentials (user_id, username, password) VALUES
-(1, 'cathy.p', '3f32a3be7731fa62caa6c8c18a696678:d3cc7560bf234d4b87a20daeef8b4033'),--cathy123
-(2, 'nicole.l', 'dd021916d595656228a614b648bf9d20:0605369925550b5f86a2e13bfaa7b5ce'),--nicole123
-(3, 'louise.o', 'b49d297ac727b22043975b17d9427126:836449099c7430e55bc7d53ea9e6395f'),--louise123
-(5, 'bench.d', '65b1a872bd00a5efbf1253ff5505a539:6d615f06b1d15dab62388f76f6a522a2');--bench123
 
 
 

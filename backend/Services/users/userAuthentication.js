@@ -24,6 +24,22 @@ export const userAuth = async(loginInformation) =>{
 
     if (existingUser.rowCount) {
 
+        //CHECK IF USER ACCOUNT IS CURRENTLY DISABLED
+        const checkDisabled = await SQLquery(
+            `SELECT u.is_disabled
+                FROM users u
+                LEFT JOIN login_credentials lc ON u.user_id = lc.user_id
+                WHERE lc.username = $1`,
+            [username]
+            
+        )
+
+        if (checkDisabled.rowCount && checkDisabled.rows[0].is_disabled){
+
+            return { error: "Account Disabled" };
+
+        };
+
         //CHECK IF THE ENTERED PASSWORD IS EQUIVALENT TO ITS HASHED VALUE
         const encryptedPassword = existingUser.rows[0].password;
         const decryptedPassword = await passwordEncryption.decryptPassword(encryptedPassword);
@@ -32,6 +48,7 @@ export const userAuth = async(loginInformation) =>{
             return { error: "Invalid password" };
 
         };
+
 
         // RECORDS CURRENT TIME AND DAY using dayjs
         const formatted = dayjs().tz('Asia/Manila').format('dddd, MMMM D, YYYY, hh:mm A');

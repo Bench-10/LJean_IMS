@@ -1,6 +1,7 @@
 import * as userDetails from '../Services/users/userDetails.js';
 import * as userAuthentication from '../Services/users/userAuthentication.js';
 import * as userCreation from '../Services/users/userCreation.js';
+import * as disableEnableAccount from '../Services/users/disableEnableAccount.js';
 
 
 export const getBranches = async (req, res) =>{
@@ -68,6 +69,22 @@ export const userLogout = async (req, res) =>{
 
 
 
+//CHECKING FOR EXISTING USERNAME
+export const checkExistingAccount = async (req, res) =>{
+    try {
+        const username = req.query.username;
+        const ifExisting = await userCreation.checkExistingUsername(username);
+        res.status(200).json(ifExisting);
+    } catch (error) {
+        console.error('Error creating users: ', error);
+        res.status(500).json({message: 'Internal Server Error'})
+    }
+}
+
+
+
+
+
 //CREAING AN ACCOUNT
 export const userCreationAccount = async (req, res) =>{
     try {
@@ -104,6 +121,36 @@ export const userDeletionAccount = async (req, res) =>{
         res.status(200).json(user);
     } catch (error) {
         console.error('Error to delete a user: ', error);
+        res.status(500).json({message: 'Internal Server Error'})
+    }
+}
+
+
+
+//DISABLING AND ENABLING AN ACCOUNT WITH OWNER CONTROLL
+export const disableStatus = async (req, res) =>{
+    try {
+        const userID = req.params.id;
+        const status = req.body.isDisabled;
+        const user = await disableEnableAccount.disableEnableAccount(userID, status);
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Error to disable/enable a user: ', error);
+        res.status(500).json({message: 'Internal Server Error'})
+    }
+}
+
+
+
+//DISABLING AN ACCOUNT WITH OWNER CONTROLL
+export const disableStatusOnAttempt = async (req, res) =>{
+    try {
+        const username = req.params.username;
+        const status = req.body.isDisabled;
+        const user = await disableEnableAccount.disableAccountOnAttempt(username, status);
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Error to disable/enable a user: ', error);
         res.status(500).json({message: 'Internal Server Error'})
     }
 }

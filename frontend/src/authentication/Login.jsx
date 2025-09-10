@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import AccountDisabledPopUp from '../components/dialogs/AccountDisabledPopUp';
 import { FaUser, FaLock, FaEye, FaExclamationCircle } from 'react-icons/fa';
 import './login.css';
 import { useAuth } from './Authentication'; 
+import TooMuchAttempts from '../components/dialogs/TooMuchAttempts';
+import axios from 'axios';
 
 
 function Login() {
@@ -15,6 +18,13 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isShaking, setIsShaking] = useState({});
   const [validFields, setValidFields] = useState({});
+  const [usernameWithInvalidPass, setUsernameWithInvalidPass] = useState('');
+
+  //FOR NOTIFYING THAT ACCOUNT IS DISABLED
+  const [disabledDialog, setDisabledDialog] = useState(false);
+  const [showTooManyAttempts, setShowTooManyAttempts] = useState(false);
+
+  const trials = useRef(0);
 
   //PREVENTS THE USER FROM GOING BACK TO THE LOGIN PAGE AFTER A SUCCESSFUL LOGIN
   useEffect(() => {
@@ -26,6 +36,7 @@ function Login() {
       }
     }
   }, [user, navigate]);
+
 
   // Clear errors when user starts typing
   const handleUsernameChange = (e) => {
@@ -68,8 +79,13 @@ function Login() {
   const validateForm = () => {
     const newErrors = {};
 
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!(regex.test(username.trim())))
+      newErrors.username = 'Please enter correct Email format.';
+
     if (!username.trim()) 
-      newErrors.username = 'Please enter your Username.';
+      newErrors.username = 'Please enter your Email.';
 
     if (!password) 
       newErrors.password = 'Please enter your password.';
@@ -101,11 +117,35 @@ function Login() {
         setAuthErrors({ username: 'Please enter a valid username.' });
         setIsShaking({ username: true });
         setTimeout(() => setIsShaking({}), 500);
-      } else if (errorMessage === 'Invalid password') {
+      } else if (errorMessage === 'Account Disabled') {
+
+        setDisabledDialog(true);
+
+      }else if (errorMessage === 'Invalid password') {
         setAuthErrors({ password: 'Password is incorrect.' });
         setIsShaking({ password: true });
         setTimeout(() => setIsShaking({}), 500);
-      } else {
+
+        if (usernameWithInvalidPass.length === 0 || username !== usernameWithInvalidPass){
+          trials.current = 1;
+          setUsernameWithInvalidPass(username);
+          return;
+        }
+
+        if (usernameWithInvalidPass === username){
+          if(trials.current > 10){
+            
+            await axios.put(`http://localhost:3000/api/disable_on_attempt/${username}`, {isDisabled: true})
+            setShowTooManyAttempts(true);
+            return;
+          } 
+
+          trials.current += 1;
+
+          return;
+        }
+
+      }  else {
         // Generic error - show on both fields
         setAuthErrors({
           username: 'Authentication failed.',
@@ -114,12 +154,25 @@ function Login() {
         setIsShaking({ username: true, password: true });
         setTimeout(() => setIsShaking({}), 500);
       }
+
+      trials.current = 0;
+      setUsernameWithInvalidPass('');
     }
   };
 
 
   return (
     <div className="login-container">
+
+      <AccountDisabledPopUp
+        open={disabledDialog}
+        onClose={() => setDisabledDialog(false)}
+      />
+      <TooMuchAttempts 
+        open={showTooManyAttempts} 
+        onClose={() => setShowTooManyAttempts(false)} 
+      />
+
       <div className="login-left"></div>
       <div className="login-right">
         <div className="company-name-box">

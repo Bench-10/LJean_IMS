@@ -1,17 +1,21 @@
 import React, { useState } from 'react'
 import { useAuth } from '../authentication/Authentication'
 import { FiEdit } from "react-icons/fi";
-import { MdDelete } from "react-icons/md";
+import { MdDelete, MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
 import { RxCross2 } from "react-icons/rx";
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
+import EnableDisableAccountDialog from './dialogs/EnableDisableAccountDialog';
 
-function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser}) {
+function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser, disableEnableAccount}) {
 
   const {user} = useAuth();
+
+  
 
 
   //FOR DIALOG
   const [openDialog, setDialog] = useState(false);
+  const [openAccountStatusDialog, setOpenAccountStatusDialog] = useState(false);
   const message = `Are you sure you wan to  delete the account for ${userDetailes.full_name} ?`;
 
 
@@ -32,6 +36,17 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
         }
 
 
+
+        {openAccountStatusDialog && 
+        
+            <EnableDisableAccountDialog
+                onClose={() => setOpenAccountStatusDialog(false)}
+                status={userDetailes.is_disabled}
+                action={()=> {disableEnableAccount(); onClose();}}
+            />
+        }
+
+
         {openUsers && user.role.some(role => ['Owner'].includes(role)) &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
@@ -45,7 +60,7 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
               
               {/*HEADER */}
               <div className='bg-green-800 p-4 rounded-t-md flex justify-between items-center'>
-                  <h1 className='text-white font-bold text-2xl'>USER DETAILES</h1> 
+                  <h1 className='text-white font-bold text-2xl'>USER DETAILES {userDetailes.is_disabled ? '(Account currently disabled)': ''}</h1> 
 
                   <div>
                     <RxCross2 className='text-white text-lg cursor-pointer' onClick={onClose}/>
@@ -153,6 +168,11 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                 <button className='py-2 px-3 bg-blue-600 w-44 rounded-md flex items-center justify-center gap-2 hover:bg-blue-500' onClick={() => handleUserModalOpen('edit')}>
                     <FiEdit />Edit
+                </button>
+
+                <button className={`py-2 px-3 ${userDetailes.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'}   w-auto rounded-md flex items-center justify-center gap-2`} onClick={() => setOpenAccountStatusDialog(true)}>
+                   {userDetailes.is_disabled ? <MdOutlineDesktopWindows /> : <MdOutlineDesktopAccessDisabled />}
+                   {userDetailes.is_disabled ? "Re-enable account" : "Disable account"}
                 </button>
 
 

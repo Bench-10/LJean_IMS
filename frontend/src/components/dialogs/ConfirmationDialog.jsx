@@ -7,10 +7,10 @@ import { MdDeleteOutline } from "react-icons/md";
 function ConfirmationDialog({mode, message, submitFunction, onClose}) {
   return ReactDOM.createPortal(
     
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-44">
             {/* Overlay */}
             <div 
-              className="fixed inset-0 bg-black/35 bg-opacity-50 z-[9999] backdrop-blur-[1px]" 
+              className="fixed inset-0 bg-black/35 bg-opacity-50 z-[9999] backdrop-blur-sm" 
               onClick={onClose}
             />  
             
@@ -49,14 +49,14 @@ function ConfirmationDialog({mode, message, submitFunction, onClose}) {
                 <div className="flex gap-3 justify-end">
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 font-medium rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type='button'
                     onClick={(e) => {submitFunction(); e.stopPropagation(); onClose();}}
-                    className={`${mode === "add" ? "bg-green-600 hover:bg-green-700" : mode === "edit" ?"bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700"}px-6 py-2  text-white rounded-lg transition-colors flex items-center gap-2 min-w-[100px] justify-center`}
+                    className={`${mode === "add" ? "bg-green-600 hover:bg-green-700" : mode === "edit" ?"bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700"}px-6 py-2  text-white rounded-lg transition-colors flex font-medium items-center gap-2 min-w-[100px] justify-center`}
                   >
                     Confirm
                   </button>

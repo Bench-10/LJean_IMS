@@ -16,6 +16,7 @@ export const getAllUsers = async () =>{
                 role, 
                 cell_number, 
                 is_active, 
+                is_disabled,
                 ${correctDateFormat('hire_date')}, 
                 last_login, 
                 permissions, 

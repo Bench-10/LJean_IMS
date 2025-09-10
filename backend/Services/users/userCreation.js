@@ -4,6 +4,19 @@ import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 
 
 
+
+export const checkExistingUsername = async (username) =>{
+    const existingUsername = await SQLquery('SELECT 1 FROM Login_Credentials WHERE username = $1',[username]);
+
+    if (existingUsername.rowCount){
+        return {result : true};
+    }
+
+    return {result : false};
+}
+
+
+
 export const createUserAccount = async (UserData) => {
     const { branch, role, first_name, last_name, cell_number, address, username, password } = UserData;
 

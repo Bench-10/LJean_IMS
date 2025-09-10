@@ -20,6 +20,10 @@ router.post("/authentication", userControllers.userCredentials);
 router.put("/authentication/:id", userControllers.userLogout);
 
 
+//CHECK IF USERNAME IS ALREADY IN THE DATABASE
+router.get("/existing_account", userControllers.checkExistingAccount);
+
+
 //USER CREATION
 router.post("/create_account", userControllers.userCreationAccount);
 
@@ -30,6 +34,14 @@ router.put("/update_account/:id", userControllers.userUpdateAccount);
 
 //USER DELETION
 router.delete("/delete_account/:id", userControllers.userDeletionAccount);
+
+
+//DIABLE/ENABLE USER ACCOUNT USING ADMIN 
+router.put("/disable/:id", userControllers.disableStatus);
+
+
+//DIABLE/ENABLE USER ACCOUNT
+router.put("/disable_on_attempt/:username", userControllers.disableStatusOnAttempt);
 
 
 export default router;

@@ -105,7 +105,7 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
                 (
                   filteredUserData.map((row, rowIndex) => (
                 
-                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
+                    <tr key={rowIndex} className={`${!row.is_disabled ? 'hover:bg-gray-200/70': ''} h-14 ${row.is_disabled ? 'bg-red-200': (rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer ${row.is_disabled ? 'text-red-900':''}` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
                       <td className="px-4 py-2"  >{row.full_name}</td>
                       <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.branch}</td>
                       <td className="px-4 py-2 whitespace-nowrap"  >

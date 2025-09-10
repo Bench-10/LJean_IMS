@@ -7,10 +7,10 @@ function LogoutDialog({onClose, logout }) {
 
  
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-44">
       {/* Overlay */}
       <div 
-        className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]" 
+        className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-sm" 
         onClick={onClose}
       />  
       
@@ -49,22 +49,29 @@ function LogoutDialog({onClose, logout }) {
           <div className="flex gap-3 justify-end">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="px-4 py-2 text-gray-700 font-medium bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={logout}
-              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2 min-w-[100px] justify-center"
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2 min-w-[100px] justify-center font-medium"
             >
               Logout
             </button>
+
           </div>
+
         </div>
+
       </div>
+
     </div>,
+
     document.body
+
   )
+
 }
 
 export default LogoutDialog

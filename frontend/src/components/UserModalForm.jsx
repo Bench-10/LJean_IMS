@@ -4,7 +4,7 @@ import { RxCross2 } from "react-icons/rx";
 import axios from 'axios';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 
-function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes}) {
+function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes, setOpenUsers}) {
 
 
   //FOR USER ROLE AUTHENTICATION
@@ -24,6 +24,9 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
   //STATES FOR ERROR HANDLING
   const [emptyField, setEmptyField] = useState({});
+  const [invalidEmail, setInvalidEmail] = useState(false)
+  const [usernameExisting, setUsernameExisting] = useState(false);
+  const [passwordCheck, setPasswordCheck] = useState('');
 
  
   //USER ROLES
@@ -55,6 +58,9 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
         setAddress('');
         setUsername('');
         setPassword('');
+        setPasswordCheck('');
+        setUsernameExisting(false);
+        setInvalidEmail(false);
 
         return;
     }
@@ -88,6 +94,9 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
         setAddress(userDetailes.address);
         setUsername(userDetailes.username);
         setPassword(userDetailes.password);
+        passwordStrength(userDetailes.password);
+        setUsernameExisting(false);
+        setInvalidEmail(false);
 
         return;
     }
@@ -95,7 +104,52 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
   }, [isModalOpen, user]);
 
 
-  const validateInputs = () => {
+  const passwordStrength = (value) => {
+    if (value.length < 8){
+
+        if (passwordCheck === 'Password must be at least 8 characters!'){
+            return;
+        }
+
+        setPasswordCheck('Password must be at least 8 characters!');
+        
+        return;
+
+    };
+
+
+    if (!(/\d/.test(value))){
+
+        if (passwordCheck === 'Password must have at least one number!'){
+            return;
+        }
+
+        setPasswordCheck('Password must have at least one number!');
+ 
+        return;
+
+    }
+
+
+    if (!(/[^a-zA-Z0-9]/.test(value))){
+
+        if (passwordCheck === 'Password contain one special character!'){
+            return;
+        }
+        
+        setPasswordCheck('Password contain one special character!');
+        
+        return;
+    }
+
+
+    setPasswordCheck('');
+
+
+  };
+
+
+  const validateInputs = async () => {
     
     const isEmptyField = {};
     
@@ -110,9 +164,51 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
     if (!String(username).trim()) isEmptyField.username = true;
     if (!String(password).trim()) isEmptyField.password = true;
 
+
+    
+
+ 
+
     setEmptyField(isEmptyField);
+
  
     if (Object.keys(isEmptyField).length > 0) return; 
+
+
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!(re.test(username.trim()))){
+
+        setInvalidEmail(true); 
+        
+        return;
+    } 
+
+
+    if (passwordCheck && passwordCheck.length !== 0) return;
+
+
+    if (mode === 'add'|| (userDetailes.username !== username) ){
+
+
+        //CHECK IF USERNAME ALREADY EXIST
+        const response = await axios.get('http://localhost:3000/api/existing_account', { params: {username}});
+
+        if (response.data.result){
+
+            setUsernameExisting(true);
+
+            return; 
+
+        } else {
+
+            setUsernameExisting(false);
+
+        }
+
+    }
+
+    
 
     setDialog(true);
 
@@ -161,15 +257,24 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
      };
 
-     onClose();
+     onClose(); 
 
   };
 
-  const inputDesign = (field) => `w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md ${emptyField[field] ? 'border-red-500' : ''}`;
+  const inputDesign = (field) => `w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md ${emptyField[field] ? 'border-red-500' :  (field === 'username' && usernameExisting ) ? 'border-red-500' : (field === 'username' && invalidEmail ) ? 'border-red-500': (field === 'password' && passwordCheck && passwordCheck.length !== 0 ) ? 'border-red-500' : '' }`;
 
   const errorflag = (field, field_warn) =>{
     if (emptyField[field])
       return <div className={`italic text-red-500 absolute ${field_warn === 'date' ? 'top-16':'top-17'} pl-2 text-xs mt-1`}>{`Please ${field === 'role' ? 'pick' : 'enter'} a ${field_warn}!`}</div>
+
+    if (field === 'username' && usernameExisting )
+      return <div className={`italic text-red-500 absolute  pl-2 text-xs mt-1`}>{`${field_warn} already exist. Please try another one!`}</div>
+
+    if (field === 'username' && invalidEmail )
+      return <div className={`italic text-red-500 absolute  pl-2 text-xs mt-1`}>{`Not a valid email!`}</div>
+
+    if (field === 'password' && passwordCheck && passwordCheck.length !== 0 )
+      return <div className={`italic text-red-500 absolute  pl-2 text-xs mt-1`}>{passwordCheck}</div>
       
   };
 
@@ -179,10 +284,10 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
         {openDialog && 
             
             <ConfirmationDialog
-            mode={mode}
-            message={message}
-            submitFunction={() => {submitUserConfirmation()}}
-            onClose={() => {setDialog(false);}}
+                mode={mode}
+                message={message}
+                submitFunction={() => {submitUserConfirmation(); setOpenUsers(false);}}
+                onClose={() => {setDialog(false);}}
 
             />
         
@@ -286,7 +391,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
                                 <div>
 
-                                    <h2 className='font-semibold text-green-900 text-lg'>Username</h2>
+                                    <h2 className='font-semibold text-green-900 text-lg'>Email</h2>
 
                                     <input 
                                     type="text" 
@@ -296,7 +401,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
                                     />
 
-                                    {errorflag('username', 'Username')}
+                                    {errorflag('username', 'Email')}
 
 
                                 </div>
@@ -419,11 +524,17 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
                                         type="text" 
                                         className={inputDesign('password')} 
                                         value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
+                                        onChange={(e) => {
+                                            setPassword(e.target.value)
+                                            passwordStrength(e.target.value)
+                                        }}
 
                                     />
 
                                     {errorflag('password', 'Password')}
+
+
+                                    
 
 
                                 </div>
