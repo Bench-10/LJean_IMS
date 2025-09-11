@@ -13,6 +13,15 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
   const {user} = useAuth();
 
+  let productsToSell = productsData;
+
+  //THIS PREVENTS USER WITH COMBINE ROLES OF MANAGER AND SALES ASSOCIATE TO SELL PRODUCTS FROM ALL BRANCHES
+  if (user && user.role.some(role => ['Branch Manager'].includes(role))){
+    
+    productsToSell = productsData.filter(product => product.branch_id === user.branch_id);
+
+  }
+
 
   const dateToday = dayjs().format("YYYY-MM-DD");
   const dateTodayReadable = dayjs().format("MMMM D, YYYY");
@@ -103,7 +112,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
 
     const currentId = rows[index].product_id;
     
-    const product = productsData.find(p => p.product_id === currentId);
+    const product = productsToSell.find(p => p.product_id === currentId);
 
     const availableQuantity = product ? product.quantity : 0;
 
@@ -307,7 +316,7 @@ function AddSaleModalForm({isModalOpen, setIsModalOpen, productsData, setSaleHea
   //FILTERS PRODUCTS BASED ON SEARCH TERM
   const getFilteredProducts = (index) => {
     const searchTerm = searchTerms[index] || '';
-    return productsData.filter(product => {
+    return productsToSell.filter(product => {
       const isNotSelected = !Object.values(productSelected).includes(String(product.product_id)) || 
                            String(rows[index].product_id) === String(product.product_id);
       const matchesSearch = product.product_name.toLowerCase().includes(searchTerm.toLowerCase());
