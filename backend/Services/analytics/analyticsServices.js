@@ -167,6 +167,7 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
   }
   
   if (category_id) {
+    // Sales within date range (category + optional branch)
     const conditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];
     const params = [start, end, category_id];
     if (branch_id) { conditions.push('s.branch_id = $4'); params.push(branch_id); }
@@ -177,13 +178,16 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
       JOIN Sales_Information s USING(sales_information_id)
       JOIN Inventory_Product ip USING(product_id)
       ${where};`, params);
-    const investConditions = ['ip.category_id = $1'];
-    const investParams = [category_id];
-    if (branch_id) { investConditions.push('ip.branch_id = $2'); investParams.push(branch_id); }
+
+    // Dynamic investment within date range from Add_Stocks (category + optional branch)
+    const investConditions = ['a.date_added BETWEEN $1 AND $2', 'ip.category_id = $3'];
+    const investParams = [start, end, category_id];
+    if (branch_id) { investConditions.push('ip.branch_id = $4'); investParams.push(branch_id); }
     const investWhere = 'WHERE ' + investConditions.join(' AND ');
     const { rows: investRows } = await SQLquery(`
-      SELECT COALESCE(SUM(quantity * unit_cost),0) AS total_investment
-      FROM Inventory_Product ip
+      SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
+      FROM Add_Stocks a
+      JOIN Inventory_Product ip USING(product_id)
       ${investWhere};`, investParams);
     const total_sales = Number(salesRows[0].total_sales || 0);
     const total_investment = Number(investRows[0].total_investment || 0);
@@ -191,17 +195,22 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
     return { total_sales, total_investment, total_profit, range: { start, end } };
   }
 
-  const branchFilter = branch_id ? 'WHERE branch_id = $1' : '';
+  // Overall (no category filter)
   const salesParams = branch_id ? [start, end, branch_id] : [start, end];
   const salesBranchFilter = branch_id ? 'AND s.branch_id = $3' : '';
   const { rows: salesRows } = await SQLquery(`
     SELECT COALESCE(SUM(total_amount_due),0) AS total_sales
     FROM Sales_Information s
     WHERE s.date BETWEEN $1 AND $2 ${salesBranchFilter};`, salesParams);
+
+  // Dynamic investment within date range from Add_Stocks (optional branch)
+  const investParams = branch_id ? [start, end, branch_id] : [start, end];
+  const investBranchFilter = branch_id ? 'AND ip.branch_id = $3' : '';
   const { rows: investRows } = await SQLquery(`
-    SELECT COALESCE(SUM(quantity * unit_cost),0) AS total_investment
-    FROM Inventory_Product ip
-    ${branchFilter};`, branch_id ? [branch_id] : []);
+    SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
+    FROM Add_Stocks a
+    JOIN Inventory_Product ip USING(product_id)
+    WHERE a.date_added BETWEEN $1 AND $2 ${investBranchFilter};`, investParams);
   const total_sales = Number(salesRows[0].total_sales || 0);
   const total_investment = Number(investRows[0].total_investment || 0);
   const total_profit = total_sales - total_investment;

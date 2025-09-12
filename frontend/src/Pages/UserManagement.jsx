@@ -87,9 +87,6 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-36">
                     STATUS
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-44">
-                    ACTION
-                  </th>
                   
                
               </tr>
@@ -119,19 +116,10 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
                         </td>
                       <td className="px-4 py-2"  >{row.cell_number}</td>
                       <td className="px-4 py-2 text-center align-middle">
-                        <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${row.is_active ? 'bg-[#61E85C] text-green-700 ' : 'bg-[#f97878] text-red-900' }`}> 
-                            {row.is_active ? 'Active' : 'Inactive'}
+                        <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${row.is_active ? 'bg-[#61E85C] text-green-700 ' : row.is_disabled ? 'bg-red-400 text-red-800' : 'bg-gray-200 text-gray-500' }`}> 
+                            {row.is_active ? 'Active' : row.is_disabled ? 'Disabled' : 'Inactive'}
                         </div>
                       </td>
-                      <td className="px-4 py-2">
-                        <div className="flex justify-center items-center h-full">
-                          <button className="bg-blue-500 py-2 px-3 rounded-md text-xs flex items-center gap-2 text-white hover:bg-blue-400">
-                            <GrView />
-                            View More
-                          </button>
-                        </div>
-                      </td>
-                      
 
                     </tr>
                   ))

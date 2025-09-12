@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
+dayjs.extend(isoWeek);
 import axios from 'axios';
 import {currencyFormat} from '../../utils/formatCurrency.js';
 import { NavLink } from "react-router-dom";
@@ -46,15 +49,16 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   
   // Delivery specific controls
   const [deliveryInterval, setDeliveryInterval] = useState('monthly');
-  const todayISO = new Date().toISOString().slice(0,10);
-  const monthStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
+  // Use dayjs to avoid timezone shifts
+  const todayISO = dayjs().format('YYYY-MM-DD');
+  const monthStartISO = dayjs().startOf('month').format('YYYY-MM-DD');
   const [deliveryRangeMode, setDeliveryRangeMode] = useState('preset');
   const [deliveryPreset, setDeliveryPreset] = useState('current_month');
   const [deliveryStartDate, setDeliveryStartDate] = useState(monthStartISO);
   const [deliveryEndDate, setDeliveryEndDate] = useState(todayISO);
   
   // KPI & Top Products range handling
-  const [rangeMode, setRangeMode] = useState('preset'); // preset | custom
+  const [rangeMode, setRangeMode] = useState('preset'); 
   const [preset, setPreset] = useState('current_month');
   const [startDate, setStartDate] = useState(monthStartISO);
   const [endDate, setEndDate] = useState(todayISO);
@@ -76,22 +80,24 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
   async function fetchAll(){
     const base = 'http://localhost:3000/api/analytics';
-    // Resolve KPI/Top Product date range
+    
     let start_date = startDate;
     let end_date = endDate;
     if(rangeMode === 'preset') {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const today = dayjs().startOf('day');
       let s = today;
-      if(preset === 'current_day') s = today;
-      else if(preset === 'current_week') {
-        const dow = today.getDay();
-        const offset = (dow === 0 ? -6 : 1 - dow);
-        s = new Date(today); s.setDate(s.getDate() + offset);
-      } else if(preset === 'current_month') s = new Date(today.getFullYear(), today.getMonth(), 1);
-      else if(preset === 'current_year') s = new Date(today.getFullYear(), 0, 1);
-      start_date = s.toISOString().slice(0,10);
-      end_date = today.toISOString().slice(0,10);
+      if (preset === 'current_day') {
+        s = today;
+      } else if (preset === 'current_week') {
+       
+        s = today.isoWeekday(1).startOf('day');
+      } else if (preset === 'current_month') {
+        s = today.startOf('month');
+      } else if (preset === 'current_year') {
+        s = today.startOf('year');
+      }
+      start_date = s.format('YYYY-MM-DD');
+      end_date = today.format('YYYY-MM-DD');
     }
 
     // Sales performance uses salesInterval
@@ -108,7 +114,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     if (branchId) paramsLevels.branch_id = branchId;
 
     const paramsTop = { branch_id: branchId, category_id: categoryFilter || undefined, start_date, end_date, limit: 7 };
-    const paramsKPI = { branch_id: branchId, category_id: categoryFilter || undefined, start_date, end_date };
+    const paramsKPI = { 
+      branch_id: branchId, 
+      category_id: categoryFilter || undefined, 
+      start_date, 
+      end_date,
+      preset: rangeMode === 'preset' ? preset : 'custom'
+    };
     
     // Delivery uses its own interval only - no date range filtering
     const paramsDelivery = { 
@@ -183,6 +195,28 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
    
     return d.toLocaleDateString('en-US', { month:'short' });
 
+  };
+
+  // Helper function to format percentage change with comparison text
+  const formatPercentageChange = (change, preset) => {
+    if (!change && change !== 0) return null;
+    
+    const isPositive = change >= 0;
+    const arrow = isPositive ? '↑' : '↓';
+    const color = isPositive ? 'text-green-600' : 'text-red-600';
+    const absChange = Math.abs(change);
+    
+    let periodText = '';
+    if (preset === 'current_day') periodText = 'vs yesterday';
+    else if (preset === 'current_week') periodText = 'vs last week';
+    else if (preset === 'current_month') periodText = 'vs last month';
+    else if (preset === 'current_year') periodText = 'vs last year';
+    
+    return (
+      <p className={`text-[11px] ${color} font-medium mt-1`}>
+        {arrow} {absChange.toFixed(1)}% {periodText}
+      </p>
+    );
   };
 
   
@@ -287,8 +321,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
               </p>
 
-
-              <p className="text-[11px] text-green-600 font-medium mt-1">↑ 5.3% vs last month</p>
+              {kpis.showComparison && kpis.sales_change !== undefined ? 
+                formatPercentageChange(kpis.sales_change, kpis.preset) :
+                <p className="text-[11px] text-gray-400 font-medium mt-1">No comparison data</p>
+              }
 
             </div>
 
@@ -297,7 +333,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <div className="absolute left-0 top-0 bottom-0 w-2 bg-yellow-400" />
               <h3 className="text-[13px] font-semibold text-gray-700">Total Investment</h3>
               <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{currencyFormat(kpis.total_investment)}</p>
-              <p className="text-[11px] text-green-600 font-medium mt-1">↑ 5.3% vs last month</p>
+              {kpis.showComparison && kpis.investment_change !== undefined ? 
+                formatPercentageChange(kpis.investment_change, kpis.preset) :
+                <p className="text-[11px] text-gray-400 font-medium mt-1">No comparison data</p>
+              }
 
             </div>
 
@@ -307,7 +346,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-400" />
               <h3 className="text-[13px] font-semibold text-gray-700">Total Profit</h3>
               <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit): currencyFormat(0)}</p>
-              <p className="text-[11px] text-green-600 font-medium mt-1">↑ 5.3% vs last month</p>
+              {kpis.showComparison && kpis.profit_change !== undefined ? 
+                formatPercentageChange(kpis.profit_change, kpis.preset) :
+                <p className="text-[11px] text-gray-400 font-medium mt-1">No comparison data</p>
+              }
 
             </div>
 

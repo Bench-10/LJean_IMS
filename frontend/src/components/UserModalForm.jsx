@@ -27,6 +27,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
   const [invalidEmail, setInvalidEmail] = useState(false)
   const [usernameExisting, setUsernameExisting] = useState(false);
   const [passwordCheck, setPasswordCheck] = useState('');
+  const [cellCheck, setCellCheck] = useState(false);
 
  
   //USER ROLES
@@ -152,6 +153,8 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
   const validateInputs = async () => {
     
     const isEmptyField = {};
+
+    setCellCheck(false);
     
 
     //CHECK IF INPUT IS EMPTY
@@ -165,11 +168,18 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
     if (!String(password).trim()) isEmptyField.password = true;
 
 
-    
-
  
 
     setEmptyField(isEmptyField);
+
+
+    const firstTwo = cell_number.substring(0, 2);
+
+
+    if (cell_number.length !== 11 || firstTwo !== "09" || /[a-zA-Z]/.test(cell_number)  ) {
+        setCellCheck(true);
+        return
+    }
 
  
     if (Object.keys(isEmptyField).length > 0) return; 
@@ -211,7 +221,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
     
 
     setDialog(true);
-
+    
   };
 
 
@@ -258,10 +268,11 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
      };
 
      onClose(); 
+     setCellCheck(false);
 
   };
 
-  const inputDesign = (field) => `w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md ${emptyField[field] ? 'border-red-500' :  (field === 'username' && usernameExisting ) ? 'border-red-500' : (field === 'username' && invalidEmail ) ? 'border-red-500': (field === 'password' && passwordCheck && passwordCheck.length !== 0 ) ? 'border-red-500' : '' }`;
+  const inputDesign = (field) => `w-full h-10 p-2 outline-green-700 border-gray-300 border-2 rounded-md ${emptyField[field] ? 'border-red-500' :  (field === 'username' && usernameExisting ) ? 'border-red-500' : (field === 'username' && invalidEmail ) ? 'border-red-500': (field === 'password' && passwordCheck && passwordCheck.length !== 0 ) ? 'border-red-500' : (field === 'cell_number' && cellCheck) ? 'border-red-500' :'' }`;
 
   const errorflag = (field, field_warn) =>{
     if (emptyField[field])
@@ -275,6 +286,9 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
     if (field === 'password' && passwordCheck && passwordCheck.length !== 0 )
       return <div className={`italic text-red-500 absolute  pl-2 text-xs mt-1`}>{passwordCheck}</div>
+
+    if (field === 'cell_number' && cellCheck)
+      return <div className={`italic text-red-500 absolute  pl-2 text-xs mt-1`}>Incorrect format! Must be ex. (09123456789)</div>
       
   };
 
@@ -308,7 +322,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
                     <h1 className='text-white font-bold text-2xl'>{mode === 'add' ? 'ADD NEW USER': 'EDIT USER INFORMATION'}</h1>
 
                     <div>
-                        <RxCross2 className='text-white text-lg cursor-pointer' onClick={onClose}/>
+                        <RxCross2 className='text-white text-lg cursor-pointer' onClick={() => {onClose(); setCellCheck(false);}}/>
                     </div>
                 </div>
 

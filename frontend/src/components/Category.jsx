@@ -102,7 +102,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
 
               <div className='flex justify-between w-full mt-8 gap-x-5 '>
                 <div className='w-[73%]'>
-                  <input type="text" placeholder='Category Name' className='w-full border rounded-md  bg-gray-100 border-gray-300 h-10 px-4' value={category_name} onChange={(e) => setCategoryName(sanitizeInput(e.target.value))}/>
+                  <input type="text" placeholder='Category Name' className='w-full border rounded-md  bg-gray-100 border-gray-300 h-10 px-4 outline-green-700' value={category_name} onChange={(e) => setCategoryName(sanitizeInput(e.target.value))}/>
                 </div>
 
                  <div className='flex align-middle'>
