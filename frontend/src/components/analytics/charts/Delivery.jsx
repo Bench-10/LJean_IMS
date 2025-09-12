@@ -1,34 +1,53 @@
 import React from 'react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend, Cell } from 'recharts';
 
-function Delivery({Card, deliveryData}) {
+function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval}) {
   return (
     <>
-      <Card title={"Delivery"} className="col-span-full h-full">
-          <ResponsiveContainer width="100%" height="100%">
-            
-            <BarChart
-              data={deliveryData}
-              margin={{ top: 10, right: 5, left: 5, bottom: 25 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval={0}  textAnchor="end" />
+      <Card title={"Delivery Analytics"} className="col-span-full h-full">
+          <div className="flex flex-col h-full">
+            {/* Delivery Controls */}
+            <div className="flex justify-end mb-4 p-2 bg-gray-50 rounded-md">
+              {/* Interval selector only */}
+              <select 
+                value={deliveryInterval} 
+                onChange={e => setDeliveryInterval(e.target.value)} 
+                className="text-xs border rounded px-2 py-1 bg-white"
+              >
+                <option value="daily">Daily</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
 
-              {(() => {
-                const max = deliveryData.reduce((m,p) => Math.max(m, Number(p.number_of_deliveries)|| 0 ), 0);
+            {/* Chart */}
+            <div className="flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                
+                <BarChart
+                  data={deliveryData}
+                  margin={{ top: 10, right: 5, left: 5, bottom: 25 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval={0}  textAnchor="end" />
 
-                if (max === 0 ) return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                  {(() => {
+                    const max = deliveryData.reduce((m,p) => Math.max(m, Number(p.number_of_deliveries)|| 0 ), 0);
 
-                const padded = Math.ceil(max * 1.2); 
+                    if (max === 0 ) return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
 
-                return <YAxis  domain={[0, padded]} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                    const padded = Math.ceil(max * 1.2); 
 
-              })()}
-              
-              <Tooltip />
-              <Bar dataKey="number_of_deliveries" fill="#4ade80" />
-            </BarChart>
-          </ResponsiveContainer>
+                    return <YAxis  domain={[0, padded]} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+
+                  })()}
+                  
+                  <Tooltip />
+                  <Bar dataKey="number_of_deliveries" fill="#4ade80" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
       </Card>
     </>
   )

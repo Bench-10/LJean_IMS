@@ -21,17 +21,43 @@ export default function OwnerAnalytics(){
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  // KPI range handling (same as branch analytics)
+  const todayISO = new Date().toISOString().slice(0,10);
+  const monthStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
+  const [rangeMode, setRangeMode] = useState('preset');
+  const [preset, setPreset] = useState('current_month');
+  const [startDate, setStartDate] = useState(monthStartISO);
+  const [endDate, setEndDate] = useState(todayISO);
 
 
-  useEffect(()=>{ fetchAll(); }, [interval]);
+
+  useEffect(()=>{ fetchAll(); }, [interval, preset, rangeMode, startDate, endDate]);
   async function fetchAll(){
     try {
 
       setLoading(true); setError(null);
 
+      // Resolve KPI date range 
+      let start_date = startDate;
+      let end_date = endDate;
+      if(rangeMode === 'preset') {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        let s = today;
+        if(preset === 'current_day') s = today;
+        else if(preset === 'current_week') {
+          const dow = today.getDay();
+          const offset = (dow === 0 ? -6 : 1 - dow);
+          s = new Date(today); s.setDate(s.getDate() + offset);
+        } else if(preset === 'current_month') s = new Date(today.getFullYear(), today.getMonth(), 1);
+        else if(preset === 'current_year') s = new Date(today.getFullYear(), 0, 1);
+        start_date = s.toISOString().slice(0,10);
+        end_date = today.toISOString().slice(0,10);
+      }
+
       const range = '6m';
       const [kpiRes, salesRes] = await Promise.all([
-        axios.get('http://localhost:3000/api/analytics/kpis', { params: { range } }),
+        axios.get('http://localhost:3000/api/analytics/kpis', { params: { start_date, end_date } }),
         axios.get('http://localhost:3000/api/analytics/sales-performance', { params: { interval, range } })
       ]);
 
@@ -66,6 +92,34 @@ export default function OwnerAnalytics(){
         <h1 className="text-lg font-semibold text-gray-700">Overall Performance (All Branches)</h1>
 
         <div className='flex items-center gap-3 ml-auto'>
+          {/* KPI Range Controls */}
+          <div className="flex items-center gap-2 bg-white border rounded-md px-2 py-1">
+            <label className="text-[11px] text-gray-600 font-semibold">Mode</label>
+            <select value={rangeMode} onChange={e=>setRangeMode(e.target.value)} className="text-xs border rounded px-1 py-1">
+              <option value="preset">Preset</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          {rangeMode === 'preset' && (
+            <select value={preset} onChange={e=>setPreset(e.target.value)} className="border px-2 py-2 rounded text-xs bg-white h-10 min-w-[140px]">
+              <option value="current_day">Current Day</option>
+              <option value="current_week">Current Week</option>
+              <option value="current_month">Current Month</option>
+              <option value="current_year">Current Year</option>
+            </select>
+          )}
+          {rangeMode === 'custom' && (
+            <div className="flex items-center gap-2 bg-white border rounded-md px-2 py-1">
+              <div className="flex flex-col text-[10px] text-gray-500">
+                <span>Start</span>
+                <input type="date" value={startDate} max={endDate} onChange={e=>setStartDate(e.target.value)} className="text-xs border rounded px-1 py-1" />
+              </div>
+              <div className="flex flex-col text-[10px] text-gray-500">
+                <span>End</span>
+                <input type="date" value={endDate} min={startDate} max={todayISO} onChange={e=>setEndDate(e.target.value)} className="text-xs border rounded px-1 py-1" />
+              </div>
+            </div>
+          )}
           
           <button onClick={()=>navigate('/branches')} className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-md">View Branch Analytics</button>
         </div>

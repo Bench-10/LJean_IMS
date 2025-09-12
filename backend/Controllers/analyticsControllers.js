@@ -64,8 +64,8 @@ export const getTopProducts = async (req, res) => {
 
   try {
 
-    const { branch_id, category_id, limit = 10, range = '3m' } = req.query;
-    const rows = await analyticsServices.fetchTopProducts({ branch_id, category_id, limit, range });
+    const { branch_id, category_id, limit = 10, range = '3m', start_date, end_date } = req.query;
+    const rows = await analyticsServices.fetchTopProducts({ branch_id, category_id, limit, range, start_date, end_date });
     res.json(rows);
 
   } catch (err) {
@@ -102,8 +102,8 @@ export const getCategoryDistribution = async (req, res) => {
 
 export const getKPIs = async (req, res) => {
   try {
-  const { branch_id, category_id, range = '1m' } = req.query;
-  const rows = await analyticsServices.fetchKPIs({ branch_id, category_id, range });
+  const { branch_id, category_id, range = '1m', start_date, end_date } = req.query;
+  const rows = await analyticsServices.fetchKPIs({ branch_id, category_id, range, start_date, end_date });
     res.json(rows);
 
   } catch (err) {
@@ -139,8 +139,8 @@ export const getBranches = async (_req, res) => {
 export const numberOfDeliveriesByDate = async (req, res) => {
   try {
 
-    const { branch_id, format } = req.query;
-    const rows = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id);
+    const { branch_id, format, start_date, end_date } = req.query;
+    const rows = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id, start_date, end_date);
     res.json(rows);
 
   } catch (err) {

@@ -89,7 +89,7 @@ export const userAuth = async(loginInformation) =>{
     const isValidAdmin = await decodeHashedPassword(password, isAdmin.rows[0].password);
 
     if (!isValidAdmin){
-        return { error: "Admin access denied" };
+        return { error: "Invalid password" };
     };
 
     const adminData = await SQLquery(

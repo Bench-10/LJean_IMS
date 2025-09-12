@@ -108,8 +108,15 @@ export async function fetchRestockTrends({ branch_id, interval, range }) {
 
 
 
-export async function fetchTopProducts({ branch_id, category_id, limit, range }) {
-  const { start, end } = buildDateRange(range);
+export async function fetchTopProducts({ branch_id, category_id, limit, range, start_date, end_date }) {
+  // Use custom dates if provided, otherwise use range
+  let start, end;
+  if (start_date && end_date) {
+    start = start_date;
+    end = end_date;
+  } else {
+    ({ start, end } = buildDateRange(range));
+  }
   const conditions = ['s.date BETWEEN $1 AND $2'];
   const params = [start, end];
   let idx = 3;
@@ -149,8 +156,15 @@ export async function fetchCategoryDistribution({ branch_id }) {
 
 
 
-export async function fetchKPIs({ branch_id, category_id, range }) {
-  const { start, end } = buildDateRange(range);
+export async function fetchKPIs({ branch_id, category_id, range, start_date, end_date }) {
+  // Use custom dates if provided, otherwise use range
+  let start, end;
+  if (start_date && end_date) {
+    start = start_date;
+    end = end_date;
+  } else {
+    ({ start, end } = buildDateRange(range));
+  }
   
   if (category_id) {
     const conditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];

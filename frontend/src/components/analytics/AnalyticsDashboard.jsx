@@ -39,19 +39,36 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [inventoryLevels, setInventoryLevels] = useState([]);
   const [categoryDist, setCategoryDist] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
-  const [interval, setInterval] = useState('monthly');
+  
+  // Graph intervals (separate from KPI/Top Products)
+  const [salesInterval, setSalesInterval] = useState('monthly');
+  const [restockInterval, setRestockInterval] = useState('monthly');
+  
+  // Delivery specific controls
+  const [deliveryInterval, setDeliveryInterval] = useState('monthly');
+  const todayISO = new Date().toISOString().slice(0,10);
+  const monthStartISO = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
+  const [deliveryRangeMode, setDeliveryRangeMode] = useState('preset');
+  const [deliveryPreset, setDeliveryPreset] = useState('current_month');
+  const [deliveryStartDate, setDeliveryStartDate] = useState(monthStartISO);
+  const [deliveryEndDate, setDeliveryEndDate] = useState(todayISO);
+  
+  // KPI & Top Products range handling
+  const [rangeMode, setRangeMode] = useState('preset'); // preset | custom
+  const [preset, setPreset] = useState('current_month');
+  const [startDate, setStartDate] = useState(monthStartISO);
+  const [endDate, setEndDate] = useState(todayISO);
   const [categoryFilter, setCategoryFilter] = useState(''); 
   const [categories, setCategories] = useState([]);
   const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0 });
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
 
-
   //SWITCH TO DIFFERENT TYPE OF ANALYTICS
   const [currentCharts, setCurrentCharts] = useState("sale");
 
 
-  useEffect(()=>{ fetchAll(); }, [branchId, interval, categoryFilter]);
+  useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryRangeMode, deliveryPreset, deliveryStartDate, deliveryEndDate]);
   const [allBranches, setAllBranches] = useState([]);
   useEffect(()=>{ if(canSelectBranch) loadBranches(); }, [canSelectBranch]);
   async function loadBranches(){
@@ -59,18 +76,75 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
   async function fetchAll(){
     const base = 'http://localhost:3000/api/analytics';
-  const params = { interval};
-  if (branchId) params.branch_id = branchId;
-    if (categoryFilter) params.category_id = categoryFilter;
+    // Resolve KPI/Top Product date range
+    let start_date = startDate;
+    let end_date = endDate;
+    if(rangeMode === 'preset') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let s = today;
+      if(preset === 'current_day') s = today;
+      else if(preset === 'current_week') {
+        const dow = today.getDay();
+        const offset = (dow === 0 ? -6 : 1 - dow);
+        s = new Date(today); s.setDate(s.getDate() + offset);
+      } else if(preset === 'current_month') s = new Date(today.getFullYear(), today.getMonth(), 1);
+      else if(preset === 'current_year') s = new Date(today.getFullYear(), 0, 1);
+      start_date = s.toISOString().slice(0,10);
+      end_date = today.toISOString().slice(0,10);
+    }
+
+    // Resolve Delivery date range
+    let deliveryStart = deliveryStartDate;
+    let deliveryEnd = deliveryEndDate;
+    if(deliveryRangeMode === 'preset') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let s = today;
+      if(deliveryPreset === 'current_day') s = today;
+      else if(deliveryPreset === 'current_week') {
+        const dow = today.getDay();
+        const offset = (dow === 0 ? -6 : 1 - dow);
+        s = new Date(today); s.setDate(s.getDate() + offset);
+      } else if(deliveryPreset === 'current_month') s = new Date(today.getFullYear(), today.getMonth(), 1);
+      else if(deliveryPreset === 'current_year') s = new Date(today.getFullYear(), 0, 1);
+      deliveryStart = s.toISOString().slice(0,10);
+      deliveryEnd = today.toISOString().slice(0,10);
+    }
+
+    // Sales performance uses salesInterval
+    const paramsSales = { interval: salesInterval };
+    if (branchId) paramsSales.branch_id = branchId;
+    if (categoryFilter) paramsSales.category_id = categoryFilter;
+
+    // Restock trends uses restockInterval  
+    const paramsRestock = { interval: restockInterval };
+    if (branchId) paramsRestock.branch_id = branchId;
+
+    // Inventory levels don't need interval
+    const paramsLevels = {};
+    if (branchId) paramsLevels.branch_id = branchId;
+
+    const paramsTop = { branch_id: branchId, category_id: categoryFilter || undefined, start_date, end_date, limit: 7 };
+    const paramsKPI = { branch_id: branchId, category_id: categoryFilter || undefined, start_date, end_date };
+    
+    // Delivery uses its own date range and interval
+    const paramsDelivery = { 
+      ...(branchId ? { branch_id: branchId } : {}), 
+      format: deliveryInterval,
+      start_date: deliveryStart,
+      end_date: deliveryEnd
+    };
+
     try {
       const [sales, restock, levels, top, cat, kpi, delivery] = await Promise.all([
-        axios.get(`${base}/sales-performance`, { params }),
-        axios.get(`${base}/restock-trends`, { params }),
-        axios.get(`${base}/inventory-levels`, { params }),
-        axios.get(`${base}/top-products`, { params: { ...params, limit: 7 } }),
+        axios.get(`${base}/sales-performance`, { params: paramsSales }),
+        axios.get(`${base}/restock-trends`, { params: paramsRestock }),
+        axios.get(`${base}/inventory-levels`, { params: paramsLevels }),
+        axios.get(`${base}/top-products`, { params: paramsTop }),
         axios.get(`${base}/category-distribution`, { params: { branch_id: branchId } }),
-        axios.get(`${base}/kpis`, { params: { branch_id: branchId, category_id: categoryFilter || undefined } }),
-        axios.get(`${base}/delivery`, { params: { ...(branchId ? { branch_id: branchId } : {}), format: interval } })
+        axios.get(`${base}/kpis`, { params: paramsKPI }),
+        axios.get(`${base}/delivery`, { params: paramsDelivery })
       ]);
 
       setSalesPerformance(sales.data);
@@ -90,14 +164,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     }
   }
 
-  
   const formatPeriod = (raw) => {
     if(raw == null) return '';
     let p = raw;
     
     if(p instanceof Date) {
       if(isNaN(p)) return '';
-      return formatByInterval(p);
+      return formatByInterval(p, salesInterval);
     }
     
     p = String(p);
@@ -105,7 +178,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     const isoMatch = p.match(/^(\d{4}-\d{2}-\d{2})(T.*)?$/);
     if(isoMatch) {
       const d = new Date(isoMatch[1] + 'T00:00:00');
-      if(!isNaN(d)) return formatByInterval(d);
+      if(!isNaN(d)) return formatByInterval(d, salesInterval);
     }
    
     const ymMatch = p.match(/^(\d{4})-(\d{2})$/);
@@ -116,9 +189,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     return p; 
   };
 
-  const formatByInterval = (d) => {
-    if(interval === 'daily') return d.toLocaleDateString('en-US', { month:'short', day:'numeric' }); // Aug 5
-    if(interval === 'weekly') {
+  const formatByInterval = (d, intervalType = salesInterval) => {
+    if(intervalType === 'daily') return d.toLocaleDateString('en-US', { month:'short', day:'numeric' }); // Aug 5
+    if(intervalType === 'weekly') {
      
       const day = new Date(d);
     
@@ -153,15 +226,35 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         }
 
         <div className={`flex flex-wrap gap-3 items-center ${!branchId ? 'justify-between' : ''}`}>
-
           <CategorySelect categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} onCategoryNameChange={setCategoryName} />
-
-          <select value={interval} onChange={e=>setInterval(e.target.value)} className="border px-3 py-2 rounded text-sm bg-white h-10 min-w-[130px]">
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-          </select>
+          {/* KPI & Top Products Range Controls */}
+          <div className="flex items-center gap-2 bg-white border rounded-md px-2 py-1">
+            <label className="text-[11px] text-gray-600 font-semibold">Mode</label>
+            <select value={rangeMode} onChange={e=>setRangeMode(e.target.value)} className="text-xs border rounded px-1 py-1">
+              <option value="preset">Preset</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          {rangeMode === 'preset' && (
+            <select value={preset} onChange={e=>setPreset(e.target.value)} className="border px-2 py-2 rounded text-xs bg-white h-10 min-w-[140px]">
+              <option value="current_day">Current Day</option>
+              <option value="current_week">Current Week</option>
+              <option value="current_month">Current Month</option>
+              <option value="current_year">Current Year</option>
+            </select>
+          )}
+          {rangeMode === 'custom' && (
+            <div className="flex items-center gap-2 bg-white border rounded-md px-2 py-1">
+              <div className="flex flex-col text-[10px] text-gray-500">
+                <span>Start</span>
+                <input type="date" value={startDate} max={endDate} onChange={e=>setStartDate(e.target.value)} className="text-xs border rounded px-1 py-1" />
+              </div>
+              <div className="flex flex-col text-[10px] text-gray-500">
+                <span>End</span>
+                <input type="date" value={endDate} min={startDate} max={todayISO} onChange={e=>setEndDate(e.target.value)} className="text-xs border rounded px-1 py-1" />
+              </div>
+            </div>
+          )}
         </div>
 
 
@@ -241,7 +334,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       </div>
   
       {/*CHARTS CONTAINAER*/}
-      <div className="grid grid-cols-12 gap-5 flex-1 min-h-0 overflow-hidden">
+  <div className="grid grid-cols-12 gap-5 flex-1 min-h-0 overflow-hidden">
        
 
        { currentCharts === "sale" && 
@@ -254,7 +347,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             restockTrends={restockTrends} 
             Card={Card} 
             categoryName={categoryName}
-
+            salesInterval={salesInterval}
+            setSalesInterval={setSalesInterval}
+            restockInterval={restockInterval}
+            setRestockInterval={setRestockInterval}
           />
         )
 
@@ -267,6 +363,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
           <Delivery
             Card={Card}
             deliveryData={deliveryData}
+            deliveryInterval={deliveryInterval}
+            setDeliveryInterval={setDeliveryInterval}
           />
         )
        

@@ -2,13 +2,12 @@ import React from 'react';
 import { currencyFormat } from '../../../utils/formatCurrency';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, AreaChart, Area, Legend, Cell } from 'recharts';
 
-function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName }) {
+function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval }) {
   return (
     <>
     
-    <Card title={categoryName} className="col-span-4 h-full">
+        <Card title={categoryName} className="col-span-4 h-full">
             <div className="flex-1 min-h-0 h-full">
-            
 
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topProducts} barSize={14} margin={{ top: 10, right: 5, left: 5, bottom: 5 }} layout="vertical">
@@ -38,6 +37,15 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
             <Card title="Sales Performance" className="col-span-8 h-full">
             <div className="flex flex-col h-full gap-6">
+                {/* Sales Performance Filter */}
+                <div className="flex justify-end">
+                    <select value={salesInterval} onChange={e=>setSalesInterval(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                    </select>
+                </div>
 
                 <div className="flex-1 min-h-0">
 
@@ -78,8 +86,16 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                 </div>
 
             <div>
-
-                <h3 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase mb-2">Demand Forecasting (Future Slot)</h3>
+                {/* Restock Trends Filter */}
+                <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase">Demand Forecasting (Future Slot)</h3>
+                    <select value={restockInterval} onChange={e=>setRestockInterval(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                    </select>
+                </div>
                 <div className="h-52">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={restockTrends} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
