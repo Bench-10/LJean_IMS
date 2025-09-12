@@ -139,12 +139,18 @@ export const getBranches = async (_req, res) => {
 export const numberOfDeliveriesByDate = async (req, res) => {
   try {
 
-    const { branch_id, format, start_date, end_date } = req.query;
+    const { branch_id, format = 'monthly', start_date, end_date } = req.query;
+    
+    console.log('Delivery request params:', { branch_id, format, start_date, end_date });
+    
     const rows = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id, start_date, end_date);
+    
+    console.log('Delivery response data:', rows);
+    
     res.json(rows);
 
   } catch (err) {
-    console.error('Branches error', err);
+    console.error('Delivery analytics error', err);
     res.status(500).json({ message: 'Internal Server Error' });
 
   }

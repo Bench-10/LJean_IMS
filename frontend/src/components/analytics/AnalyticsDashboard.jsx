@@ -68,7 +68,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [currentCharts, setCurrentCharts] = useState("sale");
 
 
-  useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryRangeMode, deliveryPreset, deliveryStartDate, deliveryEndDate]);
+  useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval]);
   const [allBranches, setAllBranches] = useState([]);
   useEffect(()=>{ if(canSelectBranch) loadBranches(); }, [canSelectBranch]);
   async function loadBranches(){
@@ -94,24 +94,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       end_date = today.toISOString().slice(0,10);
     }
 
-    // Resolve Delivery date range
-    let deliveryStart = deliveryStartDate;
-    let deliveryEnd = deliveryEndDate;
-    if(deliveryRangeMode === 'preset') {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      let s = today;
-      if(deliveryPreset === 'current_day') s = today;
-      else if(deliveryPreset === 'current_week') {
-        const dow = today.getDay();
-        const offset = (dow === 0 ? -6 : 1 - dow);
-        s = new Date(today); s.setDate(s.getDate() + offset);
-      } else if(deliveryPreset === 'current_month') s = new Date(today.getFullYear(), today.getMonth(), 1);
-      else if(deliveryPreset === 'current_year') s = new Date(today.getFullYear(), 0, 1);
-      deliveryStart = s.toISOString().slice(0,10);
-      deliveryEnd = today.toISOString().slice(0,10);
-    }
-
     // Sales performance uses salesInterval
     const paramsSales = { interval: salesInterval };
     if (branchId) paramsSales.branch_id = branchId;
@@ -128,12 +110,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     const paramsTop = { branch_id: branchId, category_id: categoryFilter || undefined, start_date, end_date, limit: 7 };
     const paramsKPI = { branch_id: branchId, category_id: categoryFilter || undefined, start_date, end_date };
     
-    // Delivery uses its own date range and interval
+    // Delivery uses its own interval only - no date range filtering
     const paramsDelivery = { 
       ...(branchId ? { branch_id: branchId } : {}), 
-      format: deliveryInterval,
-      start_date: deliveryStart,
-      end_date: deliveryEnd
+      format: deliveryInterval
     };
 
     try {

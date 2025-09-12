@@ -7,7 +7,7 @@ function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval}) {
       <Card title={"Delivery Analytics"} className="col-span-full h-full">
           <div className="flex flex-col h-full">
             {/* Delivery Controls */}
-            <div className="flex justify-end mb-4 p-2 bg-gray-50 rounded-md">
+            <div className="flex justify-end mb-4 p-2rounded-md">
               {/* Interval selector only */}
               <select 
                 value={deliveryInterval} 
