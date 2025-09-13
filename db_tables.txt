@@ -147,10 +147,17 @@ CREATE TABLE Inventory_Alerts (
     alert_type VARCHAR(100),
     message VARCHAR(255),
     banner_color VARCHAR(25),
+    user_id INT,
+    user_full_name VARCHAR(100),
     alert_date TIMESTAMP DEFAULT NOW(),
     FOREIGN KEY (product_id) REFERENCES Inventory_Product(product_id),
     FOREIGN KEY (branch_id) REFERENCES Branch(branch_id)
 );
+
+
+ALTER TABLE Inventory_Alerts
+ADD COLUMN user_id INT,
+ADD COLUMN user_full_name VARCHAR(100)
 
 
 
