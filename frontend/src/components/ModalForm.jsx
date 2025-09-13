@@ -171,7 +171,9 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       quantity_added: Number(quantity_added),
       threshold: Number(threshold),
       date_added,
-      product_validity
+      product_validity,
+      userID: user.user_id,
+      fullName: user.full_name
     };
 
 

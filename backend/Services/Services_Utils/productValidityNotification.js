@@ -48,10 +48,10 @@ export const notifyProductShelfLife = async() =>{
             if (existing.rowCount === 0){
                 await SQLquery(
                     `INSERT INTO Inventory_Alerts 
-                    (product_id, branch_id, alert_type, message, banner_color)
-                    VALUES ($1, $2, $3, $4, $5)
+                    (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
                     RETURNING *`,
-                    [row.product_id, row.branch_id,'Expired',`${notificationMessage}`, 'red']
+                    [row.product_id, row.branch_id,'Expired',`${notificationMessage}`, 'red', 0 , 'System']
                 );
             };
         };
@@ -91,10 +91,10 @@ export const notifyProductShelfLife = async() =>{
             if (existing.rowCount === 0){
                 await SQLquery(
                     `INSERT INTO Inventory_Alerts 
-                    (product_id, branch_id, alert_type, message, banner_color)
-                    VALUES ($1, $2, $3, $4, $5)
+                    (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
                     RETURNING *`,
-                    [row.product_id, row.branch_id, 'Near Expired',`${notificationMessage}`, 'yellow']
+                    [row.product_id, row.branch_id, 'Near Expired',`${notificationMessage}`, 'yellow', 0, 'System']
                 );
             };
         };

@@ -39,13 +39,13 @@ function formatTime(timestamp) {
 export const returnNotification = async (branchId, userId, hireDate) =>{
 
     const {rows} = await SQLquery(`
-        SELECT Inventory_Alerts.alert_id, alert_type, message, alert_date, banner_color, COALESCE(user_notification.is_read, false) AS is_read
+        SELECT Inventory_Alerts.alert_id, alert_type, message, alert_date, banner_color, COALESCE(user_notification.is_read, false) AS is_read, user_full_name, Inventory_Alerts.user_id
         FROM Inventory_Alerts
         LEFT JOIN user_notification
         ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1
-        WHERE Inventory_Alerts.branch_id = $2 AND Inventory_Alerts.alert_date >= $3
+        WHERE Inventory_Alerts.branch_id = $2 AND Inventory_Alerts.alert_date >= $3 AND Inventory_Alerts.user_id != $4
         ORDER BY Inventory_Alerts.alert_date DESC;
-    `,[userId, branchId, hireDate]);
+    `,[userId, branchId, hireDate, userId]);
 
     //ADD A THE FORMATED TIME ON EACH ROW
     const formattedRows = rows.map(row => ({

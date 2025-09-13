@@ -47,7 +47,7 @@ export const getProductItems = async(branchId) => {
 
 
 export const addProductItem = async (productData) => {
-    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity } = productData;
+    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity, userID, fullName } = productData;
 
     const productAddedNotifheader = "New Product";
     const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
@@ -81,10 +81,10 @@ export const addProductItem = async (productData) => {
 
     await SQLquery(
         `INSERT INTO Inventory_Alerts 
-        (product_id, branch_id, alert_type, message, banner_color)
-        VALUES ($1, $2, $3, $4, $5)
+        (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
-        [product_id, branch_id, productAddedNotifheader, notifMessage, color]
+        [product_id, branch_id, productAddedNotifheader, notifMessage, color, userID, fullName]
     );
 
     await SQLquery('COMMIT');
@@ -97,7 +97,7 @@ export const addProductItem = async (productData) => {
 
 
 export const updateProductItem = async (productData, itemId) => {
-    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity } = productData;
+    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity, userID, fullName } = productData;
 
     const addStocksQuery = async () =>{
 
@@ -152,10 +152,10 @@ export const updateProductItem = async (productData, itemId) => {
 
         await SQLquery(
             `INSERT INTO Inventory_Alerts 
-            (product_id, branch_id, alert_type, message, banner_color)
-            VALUES ($1, $2, $3, $4, $5)
+            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [itemId, returnBranchId, productAddedNotifheader, addqQunatityNotifMessage, color]
+            [itemId, returnBranchId, productAddedNotifheader, addqQunatityNotifMessage, color, userID, fullName]
         );
 
     }
@@ -166,10 +166,10 @@ export const updateProductItem = async (productData, itemId) => {
 
         await SQLquery(
             `INSERT INTO Inventory_Alerts 
-            (product_id, branch_id, alert_type, message, banner_color)
-            VALUES ($1, $2, $3, $4, $5)
+            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [itemId, returnBranchId, productAddedNotifheader, changePriceNotifMessage, color]
+            [itemId, returnBranchId, productAddedNotifheader, changePriceNotifMessage, color, userID, fullName]
         );
 
     }
