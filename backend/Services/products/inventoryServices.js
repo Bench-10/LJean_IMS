@@ -1,4 +1,5 @@
 import { SQLquery } from "../../db.js";
+import { broadcastNotification } from "../../server.js";
 
 
 
@@ -79,13 +80,26 @@ export const addProductItem = async (productData) => {
         [product_id, unit_price, unit_cost, quantity_added, date_added, product_validity]
     );
 
-    await SQLquery(
+    const alertResult = await SQLquery(
         `INSERT INTO Inventory_Alerts 
         (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
         [product_id, branch_id, productAddedNotifheader, notifMessage, color, userID, fullName]
     );
+
+    // SENDS DATA TO ALL USERS IN THE BRANCH
+    if (alertResult.rows[0]) {
+        broadcastNotification(branch_id, {
+            alert_id: alertResult.rows[0].alert_id,
+            alert_type: productAddedNotifheader,
+            message: notifMessage,
+            banner_color: color,
+            user_full_name: fullName,
+            alert_date: alertResult.rows[0].alert_date,
+            isDateToday: true
+        });
+    }
 
     await SQLquery('COMMIT');
 
@@ -150,7 +164,7 @@ export const updateProductItem = async (productData, itemId) => {
 
         await addStocksQuery();
 
-        await SQLquery(
+        const alertResult = await SQLquery(
             `INSERT INTO Inventory_Alerts 
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -158,19 +172,49 @@ export const updateProductItem = async (productData, itemId) => {
             [itemId, returnBranchId, productAddedNotifheader, addqQunatityNotifMessage, color, userID, fullName]
         );
 
+        // SENDS DATA TO ALL USERS IN THE BRANCH
+        if (alertResult.rows[0]) {
+            broadcastNotification(returnBranchId, {
+                alert_id: alertResult.rows[0].alert_id,
+                alert_type: productAddedNotifheader,
+                message: addqQunatityNotifMessage,
+                banner_color: color,
+                user_id: alertResult.rows[0].user_id,
+                user_full_name: fullName,
+                alert_date: alertResult.rows[0].alert_date,
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            });
+        }
+
     }
 
     if (returnPreviousPrice !== unit_price){
 
         await addStocksQuery();
 
-        await SQLquery(
+        const alertResult = await SQLquery(
             `INSERT INTO Inventory_Alerts 
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
             [itemId, returnBranchId, productAddedNotifheader, changePriceNotifMessage, color, userID, fullName]
         );
+
+        // Broadcast the notification to all users in the branch
+        if (alertResult.rows[0]) {
+            broadcastNotification(returnBranchId, {
+                alert_id: alertResult.rows[0].alert_id,
+                alert_type: productAddedNotifheader,
+                message: changePriceNotifMessage,
+                banner_color: color,
+                user_id: alertResult.rows[0].user_id,
+                user_full_name: fullName,
+                alert_date: alertResult.rows[0].alert_date,
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            });
+        }
 
     }
 

@@ -1,4 +1,5 @@
 import { SQLquery } from "../../db.js";
+import { broadcastNotification } from "../../server.js";
 
 
 //FUNCTION THAT AUTOMATICALLY GENERATE NOTIFICATION FOR PRODUCT SHELF LIFE
@@ -46,13 +47,28 @@ export const notifyProductShelfLife = async() =>{
 
             //IF THERE IS NOTHING EXISTING IN THE NOTIFICATION THEN IT ADDS A NEW NOTIFICATION
             if (existing.rowCount === 0){
-                await SQLquery(
+                const alertResult = await SQLquery(
                     `INSERT INTO Inventory_Alerts 
                     (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                     RETURNING *`,
                     [row.product_id, row.branch_id,'Expired',`${notificationMessage}`, 'red', 0 , 'System']
                 );
+
+                // SENDS DATA TO ALL USERS IN THE BRANCH
+                if (alertResult.rows[0]) {
+                    broadcastNotification(row.branch_id, {
+                        alert_id: alertResult.rows[0].alert_id,
+                        alert_type: 'Expired',
+                        message: notificationMessage,
+                        banner_color: 'red',
+                        user_id: alertResult.rows[0].user_id,
+                        user_full_name: 'System',
+                        alert_date: alertResult.rows[0].alert_date,
+                        isDateToday: true,
+                        alert_date_formatted: 'Just now'
+                    });
+                }
             };
         };
 
@@ -89,13 +105,28 @@ export const notifyProductShelfLife = async() =>{
 
 
             if (existing.rowCount === 0){
-                await SQLquery(
+                const alertResult = await SQLquery(
                     `INSERT INTO Inventory_Alerts 
                     (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                     RETURNING *`,
                     [row.product_id, row.branch_id, 'Near Expired',`${notificationMessage}`, 'yellow', 0, 'System']
                 );
+
+                // SENDS DATA TO ALL USERS IN THE BRANCH
+                if (alertResult.rows[0]) {
+                    broadcastNotification(row.branch_id, {
+                        alert_id: alertResult.rows[0].alert_id,
+                        alert_type: 'Near Expired',
+                        message: notificationMessage,
+                        banner_color: 'yellow',
+                        user_id: alertResult.rows[0].user_id,
+                        user_full_name: 'System',
+                        alert_date: alertResult.rows[0].alert_date,
+                        isDateToday: true,
+                        alert_date_formatted: 'Just now'
+                    });
+                }
             };
         };
     };

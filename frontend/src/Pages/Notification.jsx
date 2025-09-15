@@ -1,7 +1,8 @@
 import axios from 'axios';
-import { useEffect, useState, React} from 'react';
+import { useEffect, useState, React, useRef} from 'react';
 import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
+import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp';
 
 function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
 
@@ -9,6 +10,60 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
   const {user} = useAuth();
 
   const [visibleCount, setVisibleCount] = useState(15);
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState('');
+  const prevLengthRef = useRef(notify.length);
+
+  // REQUEST FOR NOTIFICATION
+  useEffect(() => {
+    if ('Notification' in window && window.Notification.permission !== 'granted') {
+      window.Notification.requestPermission();
+    }
+  }, []);
+
+  // CHECK IF THERE IS NEW NOTIFICATION
+  useEffect(() => {
+
+    // PREVENTS THE NOTIFICATION TO POPUP EVERY REFRESH
+    if (prevLengthRef.current === 0 ) {prevLengthRef.current = notify.length; return };
+
+
+    if (notify.length > prevLengthRef.current) {
+      const newNotification = notify[0]; 
+      if (newNotification) {
+
+        const notifMessage = `${newNotification.user_full_name}: ${newNotification.message}`;
+        
+        // SHOW IN-APP NOTIFICATION
+        setPopupMessage(notifMessage);
+
+        setShowPopup(true);
+
+
+        //  BROWSER NOTIFICATION
+        if ('Notification' in window && window.Notification.permission === 'granted') {
+          const notification = new window.Notification('LJean Notification', {
+            body: newNotification.message,
+            icon: '/src/assets/images/ljean.png',
+            tag: newNotification.alert_id 
+          });
+
+       
+          setTimeout(() => notification.close(), 5000);
+        }
+
+         setTimeout(() => {
+          setShowPopup(false);
+        }, 5000); 
+
+
+       
+      }
+
+    }
+    prevLengthRef.current = notify.length;
+  }, [notify]);
+
 
 
   //SHOWS MORE NOFICATION WHEN SCROLLED
@@ -65,6 +120,13 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
 
   return (
     <>
+        {showPopup && !openNotif && (
+          <InAppNotificationPopUp 
+            title={'New Notification'}
+            message={popupMessage}
+          />
+        )}
+
         {openNotif && (
           <div className="fixed inset-0 bg-black/50 z-[998] backdrop-blur-[1px]" onClick={onClose} />
         )}

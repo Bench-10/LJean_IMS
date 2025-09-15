@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useState, useEffect } from "react";
+import { io } from "socket.io-client";
 import ModalForm from "./components/ModalForm";
 import ProductInventory from "./Pages/ProductInventory";
 import Notification from "./Pages/Notification";
@@ -40,19 +41,65 @@ function App() {
   const [saleHeader,setSaleHeader ] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
   const [openAddDelivery, setAddDelivery] = useState(false);
+  const [openInAppNotif, setOpenInAppNotif] = useState(false);
+  const [inAppNotifMessage, setInAppNotifMessage] = useState('');
   const [deliveryData, setDeliveryData] = useState([]);
   const [deliveryEditData, setDeliveryEdit] = useState([]);
 
+  // Socket connection
+  const [socket, setSocket] = useState(null);
 
   const {user} = useAuth();
   
-
-
 
   //PREVENTS SCRIPTS ATTACKS ON INPUT FIELDS
   function sanitizeInput(input) {
     return input.replace(/[<>\/"']/g, '');
   }
+
+
+  // WEB SOCKET CONNECTION
+  useEffect(() => {
+    if (!user) return;
+
+    const newSocket = io('http://localhost:3000');
+    
+    newSocket.on('connect', () => {
+      console.log('Connected to server');
+     
+      newSocket.emit('join-branch', {
+        userId: user.user_id,
+        branchId: user.branch_id,
+        role: user.role
+      });
+    });
+
+    // LISTEN FOR NEW NOTIFICATION
+    newSocket.on('new-notification', (notification) => {
+      console.log('New notification received:', notification);
+      
+   
+      setNotify(prevNotify => {
+        // CHECK IF NOTIFICATION ALREADY EXIST
+        const exists = prevNotify.some(notif => notif.alert_id === notification.alert_id);
+        
+        if (!exists && user.user_id !== notification.user_id) {
+          return [notification, ...prevNotify];
+        }
+        return prevNotify;
+      });
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from server');
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.close();
+    };
+  }, [user]);
 
   
 
@@ -96,8 +143,18 @@ function App() {
       try {
         const response = await axios.post('http://localhost:3000/api/items/', newItem);
         setProductsData((prevData) => [...prevData, response.data]);
-        getTime();
         console.log('Item Added', response.data);
+
+        const message = `${response.data.product_name} has been successfuly added to the Inventory!`;
+
+        setOpenInAppNotif(true);
+
+        setInAppNotifMessage(message);
+
+        setTimeout(() => {
+          setOpenInAppNotif(false);
+          setInAppNotifMessage('');
+        }, 5000); 
         
       } catch (error) {
          console.error('Error adding Item', error);
@@ -110,8 +167,18 @@ function App() {
         setProductsData((prevData) => 
           prevData.map((item) => (item.product_id === itemData.product_id ? response.data : item))
         );
-        getTime();
         console.log('Item Updated', response.data);
+
+        const message = `${response.data.product_name} has been successfuly updated to the Inventory!`;
+
+        setOpenInAppNotif(true);
+
+        setInAppNotifMessage(message);
+
+        setTimeout(() => {
+          setOpenInAppNotif(false);
+          setInAppNotifMessage('');
+        }, 5000); 
         
       } catch (error) {
          console.error('Error adding Item', error);
@@ -176,15 +243,11 @@ function App() {
 
     if (!user) return;
     if (!user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) return;
-
+    if (!openNotif) return;
+    
     getTime();
 
-    const intervalId = setInterval(() => {
-      getTime();
-    }, 60000);
-
-    return () => clearInterval(intervalId);
-  }, [user]);
+  }, [user, openNotif]);
 
 
 
@@ -406,6 +469,9 @@ function App() {
                     sanitizeInput={sanitizeInput}
                     listCategories={listCategories}
                     branches={branches}
+                    mode={modalMode}
+                    openInAppNotif={openInAppNotif}
+                    message={inAppNotifMessage}
 
                   />
 

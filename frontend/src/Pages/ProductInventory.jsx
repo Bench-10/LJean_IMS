@@ -1,10 +1,11 @@
 import React, { useState }from 'react';
 import NoInfoFound from '../utils/NoInfoFound';
+import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp.jsx';
 import { useAuth } from '../authentication/Authentication';
 import {currencyFormat} from '../utils/formatCurrency.js';
 
 
-function ProductInventory({branches, handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories}) {
+function ProductInventory({branches, handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories, openInAppNotif, mode, message}) {
   
   const {user} = useAuth();
   const [error, setError] = useState();
@@ -44,6 +45,15 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
    
       
       <div className=" ml-[220px] px-8 py-2 max-h-screen" >
+
+        {openInAppNotif &&
+            <InAppNotificationPopUp 
+              title={mode}
+              message={message}
+            
+            />
+        }
+
         {/*TITLE*/}
         <h1 className=' text-4xl font-bold text-green-900'>
           INVENTORY
