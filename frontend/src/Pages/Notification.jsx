@@ -191,10 +191,9 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
 
                               <div className='mb-4'>
                                 <p className='text-gray-600 text-sm leading-relaxed'>
-                                  {user.role.some(role => ['Branch Manager'].includes(role)) && notification.user_full_name
-                                    ? <span><strong>{notification.user_full_name}: </strong>{notification.message || ''}</span>
-                                    : <span>{notification.message || ''}</span>
-                                  }
+                                  <span>
+                                    <strong>{notification.user_full_name}: </strong>{notification.message || ''}
+                                  </span>
                                  
                                 </p>
                               </div>
@@ -250,10 +249,9 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
 
                                 <div className='mb-4'>
                                   <p className='text-gray-600 text-sm leading-relaxed'>
-                                      {user.role.some(role => ['Branch Manager'].includes(role)) && notification.user_full_name && notification.user_id !== 0
-                                        ? <span><strong>{notification.user_full_name}: </strong>{notification.message || ''}</span>
-                                        : <span>{notification.message || ''}</span>
-                                      }
+                                       <span>
+                                        <strong>{notification.user_full_name}: </strong>{notification.message || ''}
+                                       </span>
                                   </p>
                                 </div>
 

@@ -27,6 +27,7 @@ import AddDeliveryInformation from "./components/AddDeliveryInformation.jsx";
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openSaleModal, setOpenSaleModal] = useState(false);
   const [openUsers, setOpenUsers] = useState(false);
   const [userDetailes, setUserDetailes] = useState([]);
   const [isCategoryOpen, setIsCategory] = useState(false);
@@ -243,11 +244,16 @@ function App() {
 
     if (!user) return;
     if (!user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) return;
-    if (!openNotif) return;
     
     getTime();
 
-  }, [user, openNotif]);
+    const intervalId = setInterval(() => {
+      getTime();
+    }, 60000);
+
+    return () => clearInterval(intervalId);
+
+  }, [user]);
 
 
 
@@ -361,9 +367,9 @@ function App() {
 
       {/*COMPONENTS*/}
       <AddSaleModalForm
-        isModalOpen={isModalOpen}
+        openSaleModal={openSaleModal}
         productsData={productsData}
-        setIsModalOpen={setIsModalOpen}
+        setOpenSaleModal={setOpenSaleModal}
         setSaleHeader={setSaleHeader}
         fetchProductsData={fetchProductsData}
       
@@ -549,7 +555,7 @@ function App() {
 
                   <Sales
                     saleHeader={saleHeader}
-                    setIsModalOpen={setIsModalOpen}
+                    setOpenSaleModal={setOpenSaleModal}
                     sanitizeInput={sanitizeInput}
                   
                   />

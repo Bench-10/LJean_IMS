@@ -7,7 +7,7 @@ import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery.jsx';
 import { FaCashRegister } from "react-icons/fa6";
 
 
-function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
+function Sales({setOpenSaleModal, saleHeader, sanitizeInput}) {
 
   const {user} = useAuth();
 
@@ -123,7 +123,7 @@ function Sales({setIsModalOpen, saleHeader, sanitizeInput}) {
 
 
               {/*ADD SALE BTN*/}
-              <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all'  onClick={() => setIsModalOpen(true)}> 
+              <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all'  onClick={() => setOpenSaleModal(true)}> 
                 <FaCashRegister /> ADD SALE
               </button>
 

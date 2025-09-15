@@ -95,9 +95,12 @@ export const addProductItem = async (productData) => {
             alert_type: productAddedNotifheader,
             message: notifMessage,
             banner_color: color,
+            user_id: alertResult.rows[0].user_id,
             user_full_name: fullName,
             alert_date: alertResult.rows[0].alert_date,
-            isDateToday: true
+            isDateToday: true,
+            alert_date_formatted: 'Just now'
+            
         });
     }
 

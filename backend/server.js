@@ -120,6 +120,6 @@ app.get("/", (req, res) =>{
 
 
 //THIS NOTIFIES THE PRODUCT SHELFLIFE EVERY 12 AM
-cron.schedule('20 11 * * *', async () => {
+cron.schedule('05 0 * * *', async () => {
   notifyProductShelfLife();
 }, { timezone: "Asia/Manila" });
