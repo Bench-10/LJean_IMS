@@ -1,5 +1,6 @@
 import { SQLquery } from '../../db.js';
 import { correctDateFormat } from '../Services_Utils/convertRedableDate.js';
+import dayjs from 'dayjs';
 
 
 function buildDateRange(range){
@@ -157,7 +158,7 @@ export async function fetchCategoryDistribution({ branch_id }) {
 
 
 export async function fetchKPIs({ branch_id, category_id, range, start_date, end_date }) {
-  // Use custom dates if provided, otherwise use range
+
   let start, end;
   if (start_date && end_date) {
     start = start_date;
@@ -165,9 +166,25 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
   } else {
     ({ start, end } = buildDateRange(range));
   }
+
+
+  // CALCULATING DATE DIFFERENCE USING DAY.JS
+  const startDate = dayjs(start);
+  const endDate = dayjs(end);
+  const daysDifference = endDate.diff(startDate, 'day') + 1; 
+
+
+  // SETTING PREVIOUS DATE
+  const prevEndDate = startDate.subtract(1, 'day');
+  const prevStartDate = prevEndDate.subtract(daysDifference - 1, 'day');
+  
+  // PREVIOUS DATES (LASTT MONTH, WEEK, YEAR, DAY)
+  const prevStart = prevStartDate.format('YYYY-MM-DD');
+  const prevEnd = prevEndDate.format('YYYY-MM-DD');  
+  
   
   if (category_id) {
-    // Sales within date range (category + optional branch)
+    // CURRENT SALES
     const conditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];
     const params = [start, end, category_id];
     if (branch_id) { conditions.push('s.branch_id = $4'); params.push(branch_id); }
@@ -179,7 +196,23 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
       JOIN Inventory_Product ip USING(product_id)
       ${where};`, params);
 
-    // Dynamic investment within date range from Add_Stocks (category + optional branch)
+
+
+    //PREVIOUS SALES
+    const prevConditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];
+    const prevParams = [prevStart, prevEnd, category_id];
+    if (branch_id) { prevConditions.push('s.branch_id = $4'); prevParams.push(branch_id); }
+    const prevWhere = 'WHERE ' + prevConditions.join(' AND ');
+    const { rows: prevSalesRows } = await SQLquery(`
+      SELECT COALESCE(SUM(si.amount),0) AS total_sales
+      FROM Sales_Items si
+      JOIN Sales_Information s USING(sales_information_id)
+      JOIN Inventory_Product ip USING(product_id)
+      ${prevWhere};`, prevParams);
+
+
+
+    //CURRENT INVESTMENTS
     const investConditions = ['a.date_added BETWEEN $1 AND $2', 'ip.category_id = $3'];
     const investParams = [start, end, category_id];
     if (branch_id) { investConditions.push('ip.branch_id = $4'); investParams.push(branch_id); }
@@ -189,32 +222,84 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
       FROM Add_Stocks a
       JOIN Inventory_Product ip USING(product_id)
       ${investWhere};`, investParams);
+
+
+
+    // PRIVIOUS INVESTMENTS
+    const prevInvestConditions = ['a.date_added BETWEEN $1 AND $2', 'ip.category_id = $3'];
+    const prevInvestParams = [prevStart, prevEnd, category_id];
+    if (branch_id) { prevInvestConditions.push('ip.branch_id = $4'); prevInvestParams.push(branch_id); }
+    const prevInvestWhere = 'WHERE ' + prevInvestConditions.join(' AND ');
+    const { rows: prevInvestRows } = await SQLquery(`
+      SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
+      FROM Add_Stocks a
+      JOIN Inventory_Product ip USING(product_id)
+      ${prevInvestWhere};`, prevInvestParams);
+
     const total_sales = Number(salesRows[0].total_sales || 0);
     const total_investment = Number(investRows[0].total_investment || 0);
     const total_profit = total_sales - total_investment;
-    return { total_sales, total_investment, total_profit, range: { start, end } };
+
+    
+    const prev_total_sales = Number(prevSalesRows[0].total_sales || 0);
+    const prev_total_investment = Number(prevInvestRows[0].total_investment || 0);
+    const prev_total_profit = prev_total_sales - prev_total_investment;
+
+
+
+    return { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit,  range: { start, end }};
+
   }
 
-  // Overall (no category filter)
+  // CURRENT SALE (NO CATEGORY FILTER)
   const salesParams = branch_id ? [start, end, branch_id] : [start, end];
   const salesBranchFilter = branch_id ? 'AND s.branch_id = $3' : '';
   const { rows: salesRows } = await SQLquery(`
     SELECT COALESCE(SUM(total_amount_due),0) AS total_sales
     FROM Sales_Information s
-    WHERE s.date BETWEEN $1 AND $2 ${salesBranchFilter};`, salesParams);
+    WHERE s.date BETWEEN $1 AND $2 ${salesBranchFilter};`,
+    salesParams);
 
-  // Dynamic investment within date range from Add_Stocks (optional branch)
+  // PREVIOUS SALE (NO CATEGORY FILTER)
+  const prevSalesParams = branch_id ? [prevStart, prevEnd, branch_id] : [prevStart, prevEnd];
+  const { rows: prevSalesRows } = await SQLquery(`
+    SELECT COALESCE(SUM(total_amount_due),0) AS total_sales
+    FROM Sales_Information s
+    WHERE s.date BETWEEN $1 AND $2 ${salesBranchFilter};`, 
+    prevSalesParams);
+
+  // CURRENT INVESTMENT
   const investParams = branch_id ? [start, end, branch_id] : [start, end];
   const investBranchFilter = branch_id ? 'AND ip.branch_id = $3' : '';
   const { rows: investRows } = await SQLquery(`
     SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
     FROM Add_Stocks a
     JOIN Inventory_Product ip USING(product_id)
-    WHERE a.date_added BETWEEN $1 AND $2 ${investBranchFilter};`, investParams);
+    WHERE a.date_added BETWEEN $1 AND $2 ${investBranchFilter};`,
+     investParams);
+
+  // PREVIOUS INVENTMENT
+  const prevInvestParams = branch_id ? [prevStart, prevEnd, branch_id] : [prevStart, prevEnd];
+  const { rows: prevInvestRows } = await SQLquery(`
+    SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
+    FROM Add_Stocks a
+    JOIN Inventory_Product ip USING(product_id)
+    WHERE a.date_added BETWEEN $1 AND $2 ${investBranchFilter};`,
+     prevInvestParams);
+
+
   const total_sales = Number(salesRows[0].total_sales || 0);
   const total_investment = Number(investRows[0].total_investment || 0);
   const total_profit = total_sales - total_investment;
-  return { total_sales, total_investment, total_profit, range: { start, end } };
+
+
+  const prev_total_sales = Number(prevSalesRows[0].total_sales || 0);
+  const prev_total_investment = Number(prevInvestRows[0].total_investment || 0);
+  const prev_total_profit = prev_total_sales - prev_total_investment;
+
+
+  return { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit,  range: { start, end }};
+
 }
 
 

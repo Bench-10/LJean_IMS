@@ -8,7 +8,7 @@ import { NavLink } from "react-router-dom";
 import TopProducts from './charts/TopProducts.jsx';
 import Delivery from './charts/Delivery.jsx';
 import { TbTruckDelivery } from "react-icons/tb";
-import { FaRegMoneyBillAlt } from "react-icons/fa";
+import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown } from "react-icons/fa";
 
 
 
@@ -64,7 +64,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [endDate, setEndDate] = useState(todayISO);
   const [categoryFilter, setCategoryFilter] = useState(''); 
   const [categories, setCategories] = useState([]);
-  const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0 });
+  const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0, prev_total_sales:0, prev_total_investment:0, prev_total_profit:0});
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
 
@@ -219,6 +219,27 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     );
   };
 
+
+  //COMPARES PREVIOUS VALUES FROM THE CURRENT
+  const compareValues = (current, previous) => {
+    if (previous === 0) return "No comparison available";
+
+    const percentageChange = ((current - previous) / previous) * 100;
+
+    if (percentageChange > 0) {
+
+      return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(percentageChange.toFixed(2)).toLocaleString()} Increase!</span>)
+
+    } else if (percentageChange < 0) {
+
+      return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(percentageChange.toFixed(2)).toLocaleString()} Decrease!</span>)
+
+    } else {
+
+      return "No change compared to last month";
+    }
+  }
+
   
   const latestDate = inventoryLevels.length>0 ? inventoryLevels[inventoryLevels.length-1].date : null;
   const latestSnapshot = latestDate ? inventoryLevels.filter(r=> r.date=== latestDate) : [];
@@ -323,7 +344,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
               {kpis.showComparison && kpis.sales_change !== undefined ? 
                 formatPercentageChange(kpis.sales_change, kpis.preset) :
-                <p className="text-[11px] text-gray-400 font-medium mt-1">No comparison data</p>
+                <p className="text-[11px] text-gray-400 font-medium mt-1">
+                  {compareValues(kpis.total_profit, kpis.prev_total_sales)}
+                </p>  
               }
 
             </div>
@@ -335,7 +358,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{currencyFormat(kpis.total_investment)}</p>
               {kpis.showComparison && kpis.investment_change !== undefined ? 
                 formatPercentageChange(kpis.investment_change, kpis.preset) :
-                <p className="text-[11px] text-gray-400 font-medium mt-1">No comparison data</p>
+                <p className="text-[11px] text-gray-400 font-medium mt-1">
+                  {compareValues(kpis.total_investment, kpis.prev_total_investment)}
+                </p>
               }
 
             </div>
@@ -348,7 +373,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit): currencyFormat(0)}</p>
               {kpis.showComparison && kpis.profit_change !== undefined ? 
                 formatPercentageChange(kpis.profit_change, kpis.preset) :
-                <p className="text-[11px] text-gray-400 font-medium mt-1">No comparison data</p>
+                <p className="text-[11px] text-gray-400 font-medium mt-1">
+                  {compareValues(kpis.total_profit, kpis.prev_total_profit)}
+                </p>
               }
 
             </div>
