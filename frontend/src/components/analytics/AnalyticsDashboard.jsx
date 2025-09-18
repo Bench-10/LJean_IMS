@@ -8,7 +8,7 @@ import { NavLink } from "react-router-dom";
 import TopProducts from './charts/TopProducts.jsx';
 import Delivery from './charts/Delivery.jsx';
 import { TbTruckDelivery } from "react-icons/tb";
-import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown } from "react-icons/fa";
+import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown, FaShoppingCart, FaPiggyBank, FaWallet } from "react-icons/fa";
 
 
 
@@ -37,6 +37,7 @@ const CategorySelect = ({ categoryFilter, setCategoryFilter, onCategoryNameChang
 };
 
 export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) {
+
   const [salesPerformance, setSalesPerformance] = useState([]);
   const [restockTrends, setRestockTrends] = useState([]);
   const [inventoryLevels, setInventoryLevels] = useState([]);
@@ -197,47 +198,29 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
   };
 
-  // Helper function to format percentage change with comparison text
-  const formatPercentageChange = (change, preset) => {
-    if (!change && change !== 0) return null;
-    
-    const isPositive = change >= 0;
-    const arrow = isPositive ? '↑' : '↓';
-    const color = isPositive ? 'text-green-600' : 'text-red-600';
-    const absChange = Math.abs(change);
-    
-    let periodText = '';
-    if (preset === 'current_day') periodText = 'vs yesterday';
-    else if (preset === 'current_week') periodText = 'vs last week';
-    else if (preset === 'current_month') periodText = 'vs last month';
-    else if (preset === 'current_year') periodText = 'vs last year';
-    
-    return (
-      <p className={`text-[11px] ${color} font-medium mt-1`}>
-        {arrow} {absChange.toFixed(1)}% {periodText}
-      </p>
-    );
-  };
-
 
   //COMPARES PREVIOUS VALUES FROM THE CURRENT
   const compareValues = (current, previous) => {
-    if (previous === 0) return "No comparison available";
+
+    if (!previous) return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(current.toFixed(2)).toLocaleString()}% Increase!</span>)
+
+    if (!current) return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(previous.toFixed(2)).toLocaleString()}% Decrease!</span>)
+
+    if (previous === current) return "No change compared to last month";
+    
+
 
     const percentageChange = ((current - previous) / previous) * 100;
 
     if (percentageChange > 0) {
 
-      return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(percentageChange.toFixed(2)).toLocaleString()} Increase!</span>)
+      return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(percentageChange.toFixed(2)).toLocaleString()}% Increase!</span>)
 
     } else if (percentageChange < 0) {
 
-      return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(percentageChange.toFixed(2)).toLocaleString()} Decrease!</span>)
+      return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(percentageChange.toFixed(2)).toLocaleString()}% Decrease!</span>)
 
-    } else {
-
-      return "No change compared to last month";
-    }
+    } 
   }
 
   
@@ -293,97 +276,134 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         </div>
 
 
-        {/*LETS USER SWITCH TO DIFFERENT CHARTS */}
-        <div 
+        {/*LETS USER SWITCH TO DIFFERENT CHARTS (ONLY APEAR IF ROLE IS NO OWNER)*/}
+        { branchId &&
+
+          <div 
           className="flex border-2 rounded-full bg-gray-50 shadow-sm overflow-hidden transition-all duration-200"
           role="tablist"
-        >
-          <button
-            className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm
-              ${currentCharts === "sale"
-                ? "bg-green-800 text-white scale-105 shadow-md"
-                : "text-green-800 hover:bg-green-100 "
-              } rounded-l-full`}
-            aria-selected={currentCharts === "sale"}
-            onClick={() => setCurrentCharts("sale")}
-            tabIndex={0}
           >
-            <FaRegMoneyBillAlt />
-            Sales
-          </button>
-          <button
-            className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
-              ${currentCharts === "delivery"
-                ? "bg-green-800 text-white scale-105 shadow-md"
-                : "text-green-800 hover:bg-green-100 "
-              } rounded-r-full`}
-            aria-selected={currentCharts === "delivery"}
-            onClick={() => setCurrentCharts("delivery")}
-            tabIndex={0}
-          >
-            <TbTruckDelivery />
-            Delivery
-          </button>
-        </div>
+            <button
+              className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm
+                ${currentCharts === "sale"
+                  ? "bg-green-800 text-white scale-105 shadow-md"
+                  : "text-green-800 hover:bg-green-100 "
+                } rounded-l-full`}
+              aria-selected={currentCharts === "sale"}
+              onClick={() => setCurrentCharts("sale")}
+              tabIndex={0}
+            >
+              <FaRegMoneyBillAlt />
+              Sales
+            </button>
+            <button
+              className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
+                ${currentCharts === "delivery"
+                  ? "bg-green-800 text-white scale-105 shadow-md"
+                  : "text-green-800 hover:bg-green-100 "
+                } rounded-r-full`}
+              aria-selected={currentCharts === "delivery"}
+              onClick={() => setCurrentCharts("delivery")}
+              tabIndex={0}
+            >
+              <TbTruckDelivery />
+              Delivery
+            </button>
+          </div>
+
+        }
+        
         
         
       </div>
 
       {/* KPI CARDS*/}
       <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+            <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+
+              <div className='mr-6 ml-2'>
+                
+                <FaShoppingCart className='text-5xl text-green-500'/>
+                
+               
+              </div>
+
+              <div>
+                <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-400" />
+
+                <h3 className="text-[13px] font-semibold text-gray-700">Total Sales</h3>
+
+                <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">
+                  {currencyFormat(kpis.total_sales)}
+
+                </p>
+
               
-              <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-400" />
-
-              <h3 className="text-[13px] font-semibold text-gray-700">Total Sales</h3>
-
-              <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">
-                {currencyFormat(kpis.total_sales)}
-
-              </p>
-
-              {kpis.showComparison && kpis.sales_change !== undefined ? 
-                formatPercentageChange(kpis.sales_change, kpis.preset) :
                 <p className="text-[11px] text-gray-400 font-medium mt-1">
-                  {compareValues(kpis.total_profit, kpis.prev_total_sales)}
+                  {compareValues(kpis.total_sales, kpis.prev_total_sales)}
                 </p>  
-              }
+              </div>
+              
+              
+              
 
             </div>
 
 
-            <div className="bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
-              <div className="absolute left-0 top-0 bottom-0 w-2 bg-yellow-400" />
-              <h3 className="text-[13px] font-semibold text-gray-700">Total Investment</h3>
-              <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{currencyFormat(kpis.total_investment)}</p>
-              {kpis.showComparison && kpis.investment_change !== undefined ? 
-                formatPercentageChange(kpis.investment_change, kpis.preset) :
+            <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+
+              <div className='mr-6 ml-2'>
+                
+                <FaPiggyBank className='text-5xl text-yellow-500'/>
+                
+               
+              </div>
+
+
+              <div>
+                <div className="absolute left-0 top-0 bottom-0 w-2 bg-yellow-400" />
+                <h3 className="text-[13px] font-semibold text-gray-700">Total Investment</h3>
+                <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{currencyFormat(kpis.total_investment)}</p>
+                
                 <p className="text-[11px] text-gray-400 font-medium mt-1">
                   {compareValues(kpis.total_investment, kpis.prev_total_investment)}
                 </p>
-              }
+              </div>
+              
+              
 
             </div>
 
 
-            <div className="bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+            <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
 
-              <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-400" />
-              <h3 className="text-[13px] font-semibold text-gray-700">Total Profit</h3>
-              <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit): currencyFormat(0)}</p>
-              {kpis.showComparison && kpis.profit_change !== undefined ? 
-                formatPercentageChange(kpis.profit_change, kpis.preset) :
+              <div className='mr-6 ml-2'>
+                
+                <FaWallet className='text-5xl text-blue-500'/>
+                
+               
+              </div>
+
+
+              <div>
+                <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-400" />
+                <h3 className="text-[13px] font-semibold text-gray-700">Total Profit</h3>
+                <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit) : currencyFormat(0)}</p>
+                
                 <p className="text-[11px] text-gray-400 font-medium mt-1">
                   {compareValues(kpis.total_profit, kpis.prev_total_profit)}
                 </p>
-              }
+              </div>
+
+              
+              
 
             </div>
 
       </div>
   
       {/*CHARTS CONTAINAER*/}
-  <div className="grid grid-cols-12 gap-5 flex-1 min-h-0 overflow-hidden">
+  <div className="grid grid-cols-12 gap-5 flex-1 min-h-0 max-h-screen overflow-hidden">
        
 
        { currentCharts === "sale" && 

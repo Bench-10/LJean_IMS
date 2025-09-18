@@ -340,6 +340,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
       amountNetVat,
       seniorPwdDisc,
       totalAmountDue,
+      transactionBy: user.full_name
       
 
     };

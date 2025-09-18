@@ -290,12 +290,12 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
 
   const total_sales = Number(salesRows[0].total_sales || 0);
   const total_investment = Number(investRows[0].total_investment || 0);
-  const total_profit = total_sales - total_investment;
+  const total_profit = (total_sales - total_investment) < 0 ? 0 : total_sales - total_investment ;
 
 
   const prev_total_sales = Number(prevSalesRows[0].total_sales || 0);
   const prev_total_investment = Number(prevInvestRows[0].total_investment || 0);
-  const prev_total_profit = prev_total_sales - prev_total_investment;
+  const prev_total_profit = (prev_total_sales - prev_total_investment) < 0 ? 0 : prev_total_sales - prev_total_investment;
 
 
   return { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit,  range: { start, end }};

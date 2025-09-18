@@ -305,42 +305,32 @@ function App() {
 
 
   //DISABLE AND ENABLE ACCOUNT
-  const disableEnableAccount = async() =>{
+  const disableEnableAccount = async(userToDisable) =>{
     
     //RE-ENABLE ACCOUNT
     if (!user.role.some(role => ['Owner'].includes(role))) return;
 
-    if (userDetailes.is_disabled){
+    if (userToDisable.is_disabled){
         
-        await axios.put(`http://localhost:3000/api/disable/${userDetailes.user_id}`, {isDisabled: false})
+        await axios.put(`http://localhost:3000/api/disable/${userToDisable.user_id}`, {isDisabled: false})
         setUsers((prev) =>
           prev.map((user) =>
-            user.user_id === userDetailes.user_id
+            user.user_id === userToDisable.user_id
               ? { ...user, is_disabled: false }
               : user
           )
         );
 
-        setUserDetailes((prev) => ({
-            ...prev,
-            is_disabled: false,
-          }));
-
     } else {
 
-        await axios.put(`http://localhost:3000/api/disable/${userDetailes.user_id}`, {isDisabled: true})
+        await axios.put(`http://localhost:3000/api/disable/${userToDisable.user_id}`, {isDisabled: true})
           setUsers((prev) =>
             prev.map((user) =>
-              user.user_id === userDetailes.user_id
+              user.user_id === userToDisable.user_id
                 ? { ...user, is_disabled: true }
                 : user
             )
           );
-
-          setUserDetailes((prev) => ({
-            ...prev,
-            is_disabled: true,
-          }));
 
     }
 
@@ -429,7 +419,6 @@ function App() {
         onClose={() => setOpenUsers(false)} 
         handleUserModalOpen={handleUserModalOpen}
         deleteUser={deleteUser}
-        disableEnableAccount={disableEnableAccount}
         
       />
 
@@ -540,6 +529,7 @@ function App() {
                     setOpenUsers={setOpenUsers}
                     setUserDetailes={setUserDetailes}
                     sanitizeInput={sanitizeInput}
+                    disableEnableAccount={disableEnableAccount}
                     users={users}
                   
                   />

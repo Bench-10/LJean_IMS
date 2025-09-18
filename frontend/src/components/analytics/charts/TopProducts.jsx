@@ -1,13 +1,36 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { currencyFormat } from '../../../utils/formatCurrency';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, AreaChart, Area, Legend, Cell } from 'recharts';
 
 function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval }) {
+  console.log('📊 TopProducts component render:', { 
+    salesPerformanceLength: salesPerformance?.length,
+    salesPerformance: salesPerformance,  // Show all data
+    sampleItem: salesPerformance?.[0],  // Show structure of first item
+    salesInterval,
+    topProductsLength: topProducts?.length,
+    topProducts: topProducts
+  });
+  
+  console.log('🎨 TopProducts component mounted and rendering charts');
+  
+  useEffect(() => {
+    console.log('📐 TopProducts useEffect - checking container dimensions');
+    const containers = document.querySelectorAll('[data-chart-container]');
+    containers.forEach((container, index) => {
+      const rect = container.getBoundingClientRect();
+      console.log(`Container ${index}:`, {
+        width: rect.width,
+        height: rect.height,
+        visible: rect.width > 0 && rect.height > 0
+      });
+    });
+  }, []);
+  
   return (
     <>
-    
         <Card title={categoryName} className="col-span-4 h-full">
-            <div className="flex-1 min-h-0 h-full">
+            <div className="flex-1 min-h-0 h-full max-h-full overflow-hidden" data-chart-container="top-products">
 
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topProducts} barSize={14} margin={{ top: 10, right: 5, left: 5, bottom: 5 }} layout="vertical">
@@ -36,7 +59,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
             </Card>
 
             <Card title="Sales Performance" className="col-span-8 h-full">
-            <div className="flex flex-col h-full gap-6">
+            <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden">
                 {/* Sales Performance Filter */}
                 <div className="flex justify-end">
                     <select value={salesInterval} onChange={e=>setSalesInterval(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white">
@@ -47,8 +70,15 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                     </select>
                 </div>
 
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="sales-performance">
 
+                    {(!salesPerformance || salesPerformance.length === 0) && (
+                        <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
+                            No sales performance data for the selected filters.
+                        </div>
+                    )}
+
+                    {salesPerformance && salesPerformance.length > 0 && (
                     <ResponsiveContainer width="100%" height="100%">
 
                         <LineChart data={salesPerformance} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
@@ -82,6 +112,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                         </LineChart>
 
                     </ResponsiveContainer>
+                    )}
 
                 </div>
 
@@ -96,7 +127,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                         <option value="yearly">Yearly</option>
                     </select>
                 </div>
-                <div className="h-52">
+                <div className="h-52 max-h-52 overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={restockTrends} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
                         <defs>

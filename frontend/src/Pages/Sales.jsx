@@ -36,7 +36,8 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput}) {
       amountNet: sailInfo.amount_net_vat, 
       vat: sailInfo.vat, 
       total: sailInfo.total_amount_due,
-      seniorPwdDiscount: sailInfo.senior_pwd_discount
+      seniorPwdDiscount: sailInfo.senior_pwd_discount,
+      transactionBy: sailInfo.transaction_by
 
     });
 

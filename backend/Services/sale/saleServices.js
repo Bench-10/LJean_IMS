@@ -5,7 +5,10 @@ import {correctDateFormat} from "../Services_Utils/convertRedableDate.js"
 
 //VIEW SALE
 export const viewSale = async (branchId) => {
-   const { rows } = await SQLquery(`SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount FROM Sales_Information WHERE branch_id = $1;`, [branchId]);
+   const { rows } = await SQLquery(`
+    SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount, transaction_by
+    FROM Sales_Information 
+    WHERE branch_id = $1;`, [branchId]);
    
    return rows;
 };
@@ -33,7 +36,7 @@ export const addSale = async (headerAndProducts) => {
 
     const {headerInformationAndTotal = {}, productRow = []} = headerAndProducts;
 
-    const {chargeTo, tin, address, date, branch_id, seniorPw,  vat, amountNetVat, seniorPwdDisc, totalAmountDue, } = headerInformationAndTotal;
+    const {chargeTo, tin, address, date, branch_id, seniorPw,  vat, amountNetVat, seniorPwdDisc, totalAmountDue, transactionBy } = headerInformationAndTotal;
 
     let discount_number;
     if (seniorPw.trim().length === 0){
@@ -74,9 +77,9 @@ export const addSale = async (headerAndProducts) => {
 
     
         await SQLquery(`
-            INSERT INTO Sales_Information ( sales_information_id, branch_id, charge_to, tin, address, date, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount ) VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+            INSERT INTO Sales_Information ( sales_information_id, branch_id, charge_to, tin, address, date, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount, transaction_by ) VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
 
-        `, [sale_id, branch_id, chargeTo, tin, address, date, vat, amountNetVat, totalAmountDue, discount_number, seniorPwdDisc]);
+        `, [sale_id, branch_id, chargeTo, tin, address, date, vat, amountNetVat, totalAmountDue, discount_number, seniorPwdDisc, transactionBy ]);
 
 
 
@@ -110,7 +113,7 @@ export const addSale = async (headerAndProducts) => {
 
 
         const {rows} = await SQLquery(`
-            SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount
+            SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount, transaction_by
             FROM Sales_Information 
             WHERE branch_id = $1 AND sales_information_id = $2;`
         , [branch_id, sale_id]);

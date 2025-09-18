@@ -1,21 +1,17 @@
 import React, { useState } from 'react'
 import { useAuth } from '../authentication/Authentication'
 import { FiEdit } from "react-icons/fi";
-import { MdDelete, MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
+import { MdDelete } from "react-icons/md";
 import { RxCross2 } from "react-icons/rx";
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
-import EnableDisableAccountDialog from './dialogs/EnableDisableAccountDialog';
 
-function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser, disableEnableAccount}) {
+function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser}) {
 
   const {user} = useAuth();
-
-  
 
 
   //FOR DIALOG
   const [openDialog, setDialog] = useState(false);
-  const [openAccountStatusDialog, setOpenAccountStatusDialog] = useState(false);
   const message = `Are you sure you wan to  delete the account for ${userDetailes.full_name} ?`;
 
 
@@ -26,24 +22,13 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
         {openDialog && 
                   
             <ConfirmationDialog
-            mode={"delete"}
-            message={message}
-            submitFunction={() => {deleteUser(userDetailes.user_id); onClose();}}
-            onClose={() => {setDialog(false);}}
+                mode={"delete"}
+                message={message}
+                submitFunction={() => {deleteUser(userDetailes.user_id)}}
+                onClose={() => {setDialog(false);}}
 
             />
         
-        }
-
-
-
-        {openAccountStatusDialog && 
-        
-            <EnableDisableAccountDialog
-                onClose={() => setOpenAccountStatusDialog(false)}
-                status={userDetailes.is_disabled}
-                action={()=> {disableEnableAccount(); onClose();}}
-            />
         }
 
 
@@ -95,7 +80,7 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                     <div className='p-5 bg-gray-100 rounded-md'>
                         <h1 className='mb-1 font-semibold text-xs'>STATUS</h1>
-                        <span className={`text-lg font-semibold py-1 px-4 rounded-full ${userDetailes.is_active ? 'bg-green-500 text-green-900': 'bg-red-500 text-red-900' } `}>{userDetailes.is_active ? 'Active':'Inactive'}</span>
+                        <span className={`text-lg font-semibold py-1 px-4 rounded-full ${userDetailes.is_active ? 'bg-green-500 text-green-900': userDetailes.is_disabled ? 'bg-red-500 text-red-900' : 'bg-gray-200 text-gray-500' } `}>{userDetailes.is_active ? 'Active': userDetailes.is_disabled ? 'Disabled' : 'Inactive'}</span>
 
                     </div>
 
@@ -168,11 +153,6 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                 <button className='py-2 px-3 bg-blue-600 w-44 rounded-md flex items-center justify-center gap-2 hover:bg-blue-500' onClick={() => handleUserModalOpen('edit')}>
                     <FiEdit />Edit
-                </button>
-
-                <button className={`py-2 px-3 ${userDetailes.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'}   w-auto rounded-md flex items-center justify-center gap-2`} onClick={() => setOpenAccountStatusDialog(true)}>
-                   {userDetailes.is_disabled ? <MdOutlineDesktopWindows /> : <MdOutlineDesktopAccessDisabled />}
-                   {userDetailes.is_disabled ? "Re-enable account" : "Disable account"}
                 </button>
 
 

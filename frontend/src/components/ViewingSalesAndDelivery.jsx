@@ -86,8 +86,11 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                             </h2>
                         </div>
                         
-                        
+                        <p className='text-xs mb-3'>
+                            Person In-charge: <span className='font-bold italic'>{headerInformation.transactionBy}</span>
+                        </p>
                         <div className={`grid ${String(headerInformation.seniorPwdNumber).toLowerCase() !== 'none' ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mb-3`}>
+                            
                             <div>
                                 <label className="text-xs font-bold text-gray-600">SALE ID</label>
                                 <div className="p-2 bg-gray-50 border rounded text-sm">
@@ -228,7 +231,8 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                             <div className="flex flex-row justify-between items-start">
                     
                                 <div className="flex-1 pr-8">
-                                    <h3 className="text-lg font-semibold text-gray-700 mb-3">Summary Details</h3>
+                                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Summary Details</h3>
+                                    
                                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                                         <p className="text-sm text-gray-600 mb-2">
                                             This transaction was completed successfully. The total amount includes VAT and all applicable taxes.

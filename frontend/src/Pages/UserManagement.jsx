@@ -1,15 +1,21 @@
 import { MdGroupAdd } from "react-icons/md";
 import NoInfoFound from "../utils/NoInfoFound";
-import { GrView } from "react-icons/gr";
 import { useState } from "react";
+import { MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
+import EnableDisableAccountDialog from "../components/dialogs/EnableDisableAccountDialog";
 
 
 
-function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetailes, sanitizeInput}) {
+function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetailes, sanitizeInput, disableEnableAccount}) {
 
 
 
   const [searchItem, setSearchItem] = useState('');
+
+
+  const [openAccountStatusDialog, setOpenAccountStatusDialog] = useState(false);
+  const [userStatus, setUserStatus] = useState(false);
+  const [userInfo, setUserInfo] = useState({});
   
 
   const handleSearch = (event) =>{
@@ -28,6 +34,17 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
 
   return (
       <div className='ml-[220px] px-8 py-2 max-h-screen'>
+
+        {openAccountStatusDialog && 
+              
+          <EnableDisableAccountDialog
+              onClose={() => setOpenAccountStatusDialog(false)}
+              status={userStatus}
+              action={()=> {disableEnableAccount(userInfo)}}
+          />
+        }
+
+
         {/*TITLE*/}
         <h1 className=' text-4xl font-bold text-green-900'>
           USER MANAGEMENT
@@ -87,6 +104,9 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-36">
                     STATUS
                   </th>
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-48">
+                    ACTION
+                  </th>
                   
                
               </tr>
@@ -104,7 +124,7 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
                 
                     <tr key={rowIndex} className={`${!row.is_disabled ? 'hover:bg-gray-200/70': ''} h-14 ${row.is_disabled ? 'bg-red-200': (rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer ${row.is_disabled ? 'text-red-900':''}` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
                       <td className="px-4 py-2"  >{row.full_name}</td>
-                      <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.branch}</td>
+                      <td className="px-4 py-2 font-medium whitespace-nowrap" >{row.branch}</td>
                       <td className="px-4 py-2 whitespace-nowrap"  >
 
                           {Array.isArray(row.role)
@@ -113,12 +133,27 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
                                   : row.role[0] || "")
                               : row || ""}
 
-                        </td>
+                      </td>
                       <td className="px-4 py-2"  >{row.cell_number}</td>
                       <td className="px-4 py-2 text-center align-middle">
                         <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${row.is_active ? 'bg-[#61E85C] text-green-700 ' : row.is_disabled ? 'bg-red-400 text-red-800' : 'bg-gray-200 text-gray-500' }`}> 
                             {row.is_active ? 'Active' : row.is_disabled ? 'Disabled' : 'Inactive'}
                         </div>
+                      </td>
+
+                      <td className="text-center align-middle">
+                        <button
+                          className={`py-2 px-4 ${row.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'} w-auto rounded-md flex items-center justify-center gap-2 mx-auto`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUserStatus(row.is_disabled);
+                            setUserInfo(row);
+                            setOpenAccountStatusDialog(true);
+                          }}
+                        >
+                          {row.is_disabled ? <MdOutlineDesktopWindows /> : <MdOutlineDesktopAccessDisabled />}
+                          {row.is_disabled ? "Enable account" : "Disable account"}
+                        </button>
                       </td>
 
                     </tr>

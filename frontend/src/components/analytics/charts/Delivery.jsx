@@ -4,8 +4,8 @@ import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Ba
 function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval}) {
   return (
     <>
-      <Card title={"Delivery Analytics"} className="col-span-full h-full">
-          <div className="flex flex-col h-full">
+      <Card title={"Delivery Analytics"} className="col-span-full h-[500px]">
+          <div className="flex flex-col h-full max-h-full overflow-hidden">
             {/* Delivery Controls */}
             <div className="flex justify-end mb-4 p-2rounded-md">
               {/* Interval selector only */}
@@ -21,7 +21,7 @@ function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval}) {
             </div>
 
             {/* Chart */}
-            <div className="flex-1">
+            <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="delivery">
               <ResponsiveContainer width="100%" height="100%">
                 
                 <BarChart
