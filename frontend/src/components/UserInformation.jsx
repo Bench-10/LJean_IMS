@@ -96,11 +96,6 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                     </div>
 
-
-
-
-
-
                 </div>
 
                 {/*RIGHT SIDE */}

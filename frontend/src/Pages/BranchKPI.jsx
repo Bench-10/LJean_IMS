@@ -37,11 +37,6 @@ export default function BranchKPI(){
         </NavLink>
 
         <h1 className="text-lg font-semibold text-gray-700">{loading ? 'Loading...' : error ? 'Branch' : branchName} Analytics</h1>
-        
-        {/* DEBUG: Test if component renders */}
-        <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded mb-2">
-          DEBUG: BranchKPI rendering with branchId = {branchId} (type: {typeof branchId})
-        </div>
 
       </div>
 

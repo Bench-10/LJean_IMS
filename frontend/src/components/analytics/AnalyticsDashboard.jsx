@@ -7,8 +7,11 @@ import {currencyFormat} from '../../utils/formatCurrency.js';
 import { NavLink } from "react-router-dom";
 import TopProducts from './charts/TopProducts.jsx';
 import Delivery from './charts/Delivery.jsx';
+import BranchPerformance from './charts/BranchPerformance.jsx';
 import { TbTruckDelivery } from "react-icons/tb";
 import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown, FaShoppingCart, FaPiggyBank, FaWallet } from "react-icons/fa";
+import { HiOutlineBuildingOffice2 } from "react-icons/hi2";
+import { useAuth } from '../../authentication/Authentication.jsx';
 
 
 
@@ -37,6 +40,10 @@ const CategorySelect = ({ categoryFilter, setCategoryFilter, onCategoryNameChang
 };
 
 export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) {
+  const { user } = useAuth();
+
+  // ROLE CHECK: ONLY OWNER SHOULD SEE BRANCH PERFORMANCE OPTION
+  const isOwner = user?.role?.some(role => ['Owner'].includes(role));
 
   const [salesPerformance, setSalesPerformance] = useState([]);
   const [restockTrends, setRestockTrends] = useState([]);
@@ -69,7 +76,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
 
-  //SWITCH TO DIFFERENT TYPE OF ANALYTICS
+  //SWITCH TO DIFFERENT TYPE OF ANALYTICS (SALES, DELIVERY, OR BRANCH)
   const [currentCharts, setCurrentCharts] = useState("sale");
 
 
@@ -202,11 +209,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   //COMPARES PREVIOUS VALUES FROM THE CURRENT
   const compareValues = (current, previous) => {
 
-    if (!previous) return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(current.toFixed(2)).toLocaleString()}% Increase!</span>)
+    if (previous === 0 && current !== 0) return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(current.toFixed(2)).toLocaleString()}% Increase!</span>)
 
-    if (!current) return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(previous.toFixed(2)).toLocaleString()}% Decrease!</span>)
+    if (previous !== 0 && current === 0) return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(previous.toFixed(2)).toLocaleString()}% Decrease!</span>)
 
-    if (previous === current) return "No change compared to last month";
+    if (previous === current) return "No change";
     
 
 
@@ -276,8 +283,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         </div>
 
 
-        {/*LETS USER SWITCH TO DIFFERENT CHARTS (ONLY APEAR IF ROLE IS NO OWNER)*/}
-        { branchId &&
+        {/*LETS USER SWITCH TO DIFFERENT CHARTS (ONLY APPEAR IF USER HAS BRANCH_ID OR IS OWNER WITH NO BRANCH_ID)*/}
+        { (branchId || (!branchId && isOwner)) &&
 
           <div 
           className="flex border-2 rounded-full bg-gray-50 shadow-sm overflow-hidden transition-all duration-200"
@@ -301,7 +308,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
                 ${currentCharts === "delivery"
                   ? "bg-green-800 text-white scale-105 shadow-md"
                   : "text-green-800 hover:bg-green-100 "
-                } rounded-r-full`}
+                } ${(!branchId && isOwner) ? '' : 'rounded-r-full'}`}
               aria-selected={currentCharts === "delivery"}
               onClick={() => setCurrentCharts("delivery")}
               tabIndex={0}
@@ -309,6 +316,22 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <TbTruckDelivery />
               Delivery
             </button>
+            {/* BRANCH PERFORMANCE BUTTON - OWNER ONLY AND NO BRANCH_ID */}
+            {!branchId && isOwner && (
+              <button
+                className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
+                  ${currentCharts === "branch"
+                    ? "bg-green-800 text-white scale-105 shadow-md"
+                    : "text-green-800 hover:bg-green-100 "
+                  } rounded-r-full`}
+                aria-selected={currentCharts === "branch"}
+                onClick={() => setCurrentCharts("branch")}
+                tabIndex={0}
+              >
+                <HiOutlineBuildingOffice2 />
+                Branch
+              </button>
+            )}
           </div>
 
         }
@@ -434,6 +457,22 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             deliveryData={deliveryData}
             deliveryInterval={deliveryInterval}
             setDeliveryInterval={setDeliveryInterval}
+          />
+        )
+       
+       }
+
+       {/* BRANCH PERFORMANCE CHARTS - OWNER ONLY AND NO BRANCH_ID */}
+       { currentCharts === "branch" && !branchId && isOwner && 
+
+        (
+          <BranchPerformance
+            Card={Card}
+            rangeMode={rangeMode}
+            preset={preset}
+            startDate={startDate}
+            endDate={endDate}
+            todayISO={todayISO}
           />
         )
        

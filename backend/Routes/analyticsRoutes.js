@@ -36,7 +36,8 @@ router.get('/analytics/kpis', analyticsControllers.getKPIs);
 //BRANCH LIST FOR OWNERS VIEWING
 router.get('/analytics/branches', analyticsControllers.getBranches);
 
-
+//BRANCH SALES SUMMARY (TOTAL AMOUNT DUE PER BRANCH)
+router.get('/analytics/branches-summary', analyticsControllers.getBranchSalesSummary);
 
 //DELIVERY INFORMATION
 router.get('/analytics/delivery', analyticsControllers.numberOfDeliveriesByDate);

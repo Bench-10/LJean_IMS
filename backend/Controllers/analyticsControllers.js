@@ -156,3 +156,17 @@ export const numberOfDeliveriesByDate = async (req, res) => {
   }
 
 };
+
+
+
+// BRANCH SALES SUMMARY (TOTAL AMOUNT DUE PER BRANCH)
+export const getBranchSalesSummary = async (req, res) => {
+  try {
+    const { start_date, end_date, range = '3m' } = req.query;
+    const rows = await analyticsServices.fetchBranchSalesSummary({ start_date, end_date, range });
+    res.json(rows);
+  } catch (err) {
+    console.error('Branch sales summary error', err);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};

@@ -310,3 +310,31 @@ export async function fetchBranches(){
   const { rows } = await SQLquery('SELECT branch_id, branch_name, address FROM Branch ORDER BY branch_name ASC');
   return rows;
 }
+
+
+
+
+export async function fetchBranchSalesSummary({ start_date, end_date, range }){
+  // USE CUSTOM DATES IF PROVIDED; OTHERWISE FALL BACK TO RANGE
+  let start, end;
+  if (start_date && end_date) {
+    start = start_date;
+    end = end_date;
+  } else {
+    ({ start, end } = buildDateRange(range));
+  }
+
+  // RETURN TOTAL AMOUNT DUE PER BRANCH, INCLUDING BRANCHES WITH ZERO SALES
+  const { rows } = await SQLquery(`
+    SELECT b.branch_id,
+           b.branch_name,
+           COALESCE(SUM(s.total_amount_due), 0) AS total_amount_due
+    FROM Branch b
+    LEFT JOIN Sales_Information s
+      ON s.branch_id = b.branch_id
+     AND s.date BETWEEN $1 AND $2
+    GROUP BY b.branch_id, b.branch_name
+    ORDER BY total_amount_due DESC, b.branch_name ASC;`, [start, end]);
+
+  return rows;
+}
