@@ -76,8 +76,15 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
 
-  //SWITCH TO DIFFERENT TYPE OF ANALYTICS (SALES, DELIVERY, OR BRANCH)
-  const [currentCharts, setCurrentCharts] = useState("sale");
+ 
+  const [currentCharts, setCurrentCharts] = useState(() => {
+    // CHECK IF USER HAS OWNER ROLE
+    if (user && !branchId && user.role && user.role.some(role => role === "Owner")) {
+      return "branch";
+    } else {
+      return "sale";
+    }
+  });
 
 
   useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval]);
@@ -290,12 +297,28 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
           className="flex border-2 rounded-full bg-gray-50 shadow-sm overflow-hidden transition-all duration-200"
           role="tablist"
           >
+            {/* BRANCH PERFORMANCE BUTTON - OWNER ONLY AND NO BRANCH_ID */}
+            {!branchId && isOwner && (
+              <button
+                className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
+                  ${currentCharts === "branch"
+                    ? "bg-green-800 text-white scale-105 shadow-md"
+                    : "text-green-800 hover:bg-green-100 "
+                  }`}
+                aria-selected={currentCharts === "branch"}
+                onClick={() => setCurrentCharts("branch")}
+                tabIndex={0}
+              >
+                <HiOutlineBuildingOffice2 />
+                Branch
+              </button>
+            )}
             <button
               className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm
                 ${currentCharts === "sale"
                   ? "bg-green-800 text-white scale-105 shadow-md"
                   : "text-green-800 hover:bg-green-100 "
-                } rounded-l-full`}
+                }`}
               aria-selected={currentCharts === "sale"}
               onClick={() => setCurrentCharts("sale")}
               tabIndex={0}
@@ -316,22 +339,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <TbTruckDelivery />
               Delivery
             </button>
-            {/* BRANCH PERFORMANCE BUTTON - OWNER ONLY AND NO BRANCH_ID */}
-            {!branchId && isOwner && (
-              <button
-                className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
-                  ${currentCharts === "branch"
-                    ? "bg-green-800 text-white scale-105 shadow-md"
-                    : "text-green-800 hover:bg-green-100 "
-                  } rounded-r-full`}
-                aria-selected={currentCharts === "branch"}
-                onClick={() => setCurrentCharts("branch")}
-                tabIndex={0}
-              >
-                <HiOutlineBuildingOffice2 />
-                Branch
-              </button>
-            )}
+            
           </div>
 
         }
