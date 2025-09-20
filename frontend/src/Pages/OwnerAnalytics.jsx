@@ -14,7 +14,7 @@ const KPIBlock = ({ color, title, value, note }) => (
 );
 
 export default function OwnerAnalytics(){
-  const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0 });
+  const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0, inventory_count: 0 });
   const [salesPerformance, setSalesPerformance] = useState([]);
   const [interval, setInterval] = useState('monthly');
   const [loading, setLoading] = useState(true);
@@ -131,7 +131,7 @@ export default function OwnerAnalytics(){
 
       {!loading && !error && (
         <>
-          <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 flex-shrink-0">
+          <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 flex-shrink-0">
             <KPIBlock color="bg-green-400" title="Total Sales" value={currencyFormat(kpis.total_sales)}  />
 
         
@@ -139,6 +139,7 @@ export default function OwnerAnalytics(){
 
 
             <KPIBlock color="bg-blue-400" title="Total Profit" value={currencyFormat(kpis.total_sales > kpis.total_investment ? kpis.total_profit : 0)}/>
+            <KPIBlock color="bg-purple-400" title="Inventory Items" value={Number(kpis.inventory_count).toLocaleString()} note="Distinct products across scope" />
           </div>
           
         </>

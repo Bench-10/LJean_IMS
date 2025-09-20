@@ -11,6 +11,7 @@ import BranchPerformance from './charts/BranchPerformance.jsx';
 import { TbTruckDelivery } from "react-icons/tb";
 import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown, FaShoppingCart, FaPiggyBank, FaWallet } from "react-icons/fa";
 import { HiOutlineBuildingOffice2 } from "react-icons/hi2";
+import { AiFillProduct } from "react-icons/ai";
 import { useAuth } from '../../authentication/Authentication.jsx';
 
 
@@ -72,7 +73,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [endDate, setEndDate] = useState(todayISO);
   const [categoryFilter, setCategoryFilter] = useState(''); 
   const [categories, setCategories] = useState([]);
-  const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0, prev_total_sales:0, prev_total_investment:0, prev_total_profit:0});
+  const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0, prev_total_sales:0, prev_total_investment:0, prev_total_profit:0, inventory_count: 0});
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
 
@@ -349,12 +350,12 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       </div>
 
       {/* KPI CARDS*/}
-      <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+  <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
 
-              <div className='mr-6 ml-2'>
+              <div className='mr-5 ml-1'>
                 
-                <FaShoppingCart className='text-5xl text-green-500'/>
+                <FaShoppingCart className='text-4xl text-green-500'/>
                 
                
               </div>
@@ -383,9 +384,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
 
-              <div className='mr-6 ml-2'>
+              <div className='mr-5 ml-1'>
                 
-                <FaPiggyBank className='text-5xl text-yellow-500'/>
+                <FaPiggyBank className='text-4xl text-yellow-500'/>
                 
                
               </div>
@@ -408,9 +409,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
 
-              <div className='mr-6 ml-2'>
+              <div className='mr-5 ml-1'>
                 
-                <FaWallet className='text-5xl text-blue-500'/>
+                <FaWallet className='text-4xl text-blue-500'/>
                 
                
               </div>
@@ -428,6 +429,27 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
               
               
+
+            </div>
+
+            {/* INVENTORY COUNT KPI */}
+            <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+
+              <div className='mr-5 ml-1'>
+               
+                <AiFillProduct  className='text-4xl text-purple-500'/>
+              </div>
+
+              <div>
+                <div className="absolute left-0 top-0 bottom-0 w-2 bg-purple-400" />
+                <h3 className="text-[13px] font-semibold text-gray-700">Inventory Items</h3>
+                <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{Number(kpis.inventory_count).toLocaleString()}</p>
+
+
+                <p className="text-[11px] text-gray-400 font-medium mt-1">Total distinct products</p>
+
+
+              </div>
 
             </div>
 

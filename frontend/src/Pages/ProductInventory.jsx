@@ -3,6 +3,7 @@ import NoInfoFound from '../utils/NoInfoFound';
 import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp.jsx';
 import { useAuth } from '../authentication/Authentication';
 import {currencyFormat} from '../utils/formatCurrency.js';
+import InventoryItemDetailsDialog from '../components/InventoryItemDetailsDialog.jsx';
 
 
 function ProductInventory({branches, handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories, openInAppNotif, mode, message}) {
@@ -13,10 +14,25 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedBranch, setSelectedBranch] = useState(() => user && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id : '' );
 
+  // NEW: DIALOG STATE
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+
   const handleSearch = (event) =>{
     setSearchItem(sanitizeInput(event.target.value));
 
   }
+
+  // OPEN DETAILS DIALOG ON ROW CLICK
+  const openDetails = (item) => {
+    setSelectedItem(item);
+    setIsDetailsOpen(true);
+  };
+
+  const closeDetails = () => {
+    setIsDetailsOpen(false);
+    setSelectedItem(null);
+  };
 
 
   //CONTAINS ALL AVAILABLE PRODUCTS WHEN LOADED
@@ -53,6 +69,17 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
             
             />
         }
+
+
+        {/* DETAILS DIALOG */}
+        <InventoryItemDetailsDialog
+          open={isDetailsOpen}
+          onClose={closeDetails}
+          user={user}
+          item={selectedItem}
+    
+        />
+        
 
         {/*TITLE*/}
         <h1 className=' text-4xl font-bold text-green-900'>
@@ -204,7 +231,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                 (
                   filteredData.map((row, rowIndex) => (
                 
-                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`}>
+                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => openDetails(row)} style={{cursor:'pointer'}}>
                       <td className="px-4 py-2 text-center"  >{row.product_id}</td>
                       <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
                       <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
@@ -226,7 +253,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                       {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
                       {user.role.some(role => ['Inventory Staff'].includes(role)) &&
 
-                        <td className="px-4 py-2 text-center">
+                        <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                           <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
                               Edit
                           </button>
@@ -251,6 +278,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
           </button>
 
         </div>
+
 
       </div>
 

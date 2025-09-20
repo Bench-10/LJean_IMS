@@ -236,6 +236,16 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
       JOIN Inventory_Product ip USING(product_id)
       ${prevInvestWhere};`, prevInvestParams);
 
+    // INVENTORY COUNT (FILTERED BY CATEGORY AND OPTIONAL BRANCH)
+    const invCntConds = ['ip.category_id = $1'];
+    const invCntParams = [category_id];
+    if (branch_id) { invCntConds.push('ip.branch_id = $2'); invCntParams.push(branch_id); }
+    const invCntWhere = 'WHERE ' + invCntConds.join(' AND ');
+    const { rows: invCountRows } = await SQLquery(`
+      SELECT COUNT(DISTINCT ip.product_id) AS inventory_count
+      FROM Inventory_Product ip
+      ${invCntWhere};`, invCntParams);
+
     const total_sales = Number(salesRows[0].total_sales || 0);
     const total_investment = Number(investRows[0].total_investment || 0);
     const total_profit = total_sales - total_investment;
@@ -247,7 +257,9 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
 
 
 
-    return { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit,  range: { start, end }};
+    const inventory_count = Number(invCountRows?.[0]?.inventory_count || 0);
+
+    return { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit, inventory_count, range: { start, end }};
 
   }
 
@@ -288,6 +300,14 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
      prevInvestParams);
 
 
+  // INVENTORY COUNT (NO CATEGORY FILTER, OPTIONAL BRANCH)
+  const invCountParams = branch_id ? [branch_id] : [];
+  const invCountWhere = branch_id ? 'WHERE ip.branch_id = $1' : '';
+  const { rows: invCountRows } = await SQLquery(`
+    SELECT COUNT(DISTINCT ip.product_id) AS inventory_count
+    FROM Inventory_Product ip
+    ${invCountWhere};`, invCountParams);
+
   const total_sales = Number(salesRows[0].total_sales || 0);
   const total_investment = Number(investRows[0].total_investment || 0);
   const total_profit = (total_sales - total_investment) < 0 ? 0 : total_sales - total_investment ;
@@ -298,7 +318,9 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
   const prev_total_profit = (prev_total_sales - prev_total_investment) < 0 ? 0 : prev_total_sales - prev_total_investment;
 
 
-  return { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit,  range: { start, end }};
+  const inventory_count = Number(invCountRows?.[0]?.inventory_count || 0);
+
+  return { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit, inventory_count, range: { start, end }};
 
 }
 
