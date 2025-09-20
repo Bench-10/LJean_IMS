@@ -58,6 +58,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   
   // Delivery specific controls
   const [deliveryInterval, setDeliveryInterval] = useState('monthly');
+  const [deliveryStatus, setDeliveryStatus] = useState('delivered');
   // Use dayjs to avoid timezone shifts
   const todayISO = dayjs().format('YYYY-MM-DD');
   const monthStartISO = dayjs().startOf('month').format('YYYY-MM-DD');
@@ -109,7 +110,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   });
 
 
-  useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval]);
+  useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryStatus]);
   const [allBranches, setAllBranches] = useState([]);
   useEffect(()=>{ if(canSelectBranch) loadBranches(); }, [canSelectBranch]);
   async function loadBranches(){
@@ -162,7 +163,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     // Delivery uses its own interval only - no date range filtering
     const paramsDelivery = { 
       ...(branchId ? { branch_id: branchId } : {}), 
-      format: deliveryInterval
+      format: deliveryInterval,
+      status: deliveryStatus
     };
 
     try {
@@ -340,7 +342,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
                 ${currentCharts === "sale"
                   ? "bg-green-800 text-white scale-105 shadow-md"
                   : "text-green-800 hover:bg-green-100 "
-                }`}
+                } ${!branchId && isOwner ? 'rounded-r-full' : ''}`}
               aria-selected={currentCharts === "sale"}
               onClick={() => setCurrentCharts("sale")}
               tabIndex={0}
@@ -348,19 +350,21 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <FaRegMoneyBillAlt />
               Sales
             </button>
-            <button
-              className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
-                ${currentCharts === "delivery"
-                  ? "bg-green-800 text-white scale-105 shadow-md"
-                  : "text-green-800 hover:bg-green-100 "
-                } ${(!branchId && isOwner) ? '' : 'rounded-r-full'}`}
-              aria-selected={currentCharts === "delivery"}
-              onClick={() => setCurrentCharts("delivery")}
-              tabIndex={0}
-            >
-              <TbTruckDelivery />
-              Delivery
-            </button>
+            {branchId && isOwner && (
+              <button
+                className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
+                  ${currentCharts === "delivery"
+                    ? "bg-green-800 text-white scale-105 shadow-md"
+                    : "text-green-800 hover:bg-green-100 "
+                  } rounded-r-full`}
+                aria-selected={currentCharts === "delivery"}
+                onClick={() => setCurrentCharts("delivery")}
+                tabIndex={0}
+              >
+                <TbTruckDelivery />
+                Delivery
+              </button>
+            )}
             
           </div>
 
@@ -508,6 +512,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             deliveryData={deliveryData}
             deliveryInterval={deliveryInterval}
             setDeliveryInterval={setDeliveryInterval}
+            deliveryStatus={deliveryStatus}
+            setDeliveryStatus={setDeliveryStatus}
           />
         )
        

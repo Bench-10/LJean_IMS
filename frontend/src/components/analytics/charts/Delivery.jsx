@@ -1,14 +1,26 @@
 import React from 'react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend, Cell } from 'recharts';
 
-function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval}) {
+function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval, deliveryStatus, setDeliveryStatus}) {
   return (
     <>
       <Card title={"Delivery Analytics"} className="col-span-full h-[500px]">
           <div className="flex flex-col h-full max-h-full overflow-hidden">
             {/* Delivery Controls */}
-            <div className="flex justify-end mb-4 p-2rounded-md">
-              {/* Interval selector only */}
+            <div className="flex items-center gap-2 justify-end mb-4 p-2rounded-md">
+              {/* Status selector */}
+              <label className="text-[11px] text-gray-600 font-semibold">Status</label>
+              <select
+                value={deliveryStatus}
+                onChange={e => setDeliveryStatus(e.target.value)}
+                className="text-xs border rounded px-2 py-1 bg-white"
+              >
+                <option value="delivered">Delivered</option>
+                <option value="undelivered">Undelivered</option>
+              </select>
+
+              {/* Interval selector */}
+              <label className="text-[11px] text-gray-600 font-semibold">Interval</label>
               <select 
                 value={deliveryInterval} 
                 onChange={e => setDeliveryInterval(e.target.value)} 

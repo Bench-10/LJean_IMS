@@ -3,12 +3,19 @@ import { SQLquery } from '../../db.js';
 
 
 
-export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_date) => {
+export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_date, status = 'delivered') => {
 
 
     let filterFormat;
     let dateFilter = '';
     let params = [branch_id];
+
+    // Determine status filter
+    // delivered: is_delivered = true AND is_pending = false
+    // undelivered: is_delivered = false AND is_pending = true
+    const statusFilter = (String(status).toLowerCase() === 'undelivered')
+        ? '(is_delivered = false AND is_pending = true)'
+        : '(is_delivered = true AND is_pending = false)';
 
     if (dateFormat === 'monthly') {
 
@@ -33,7 +40,7 @@ export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_da
 
         `SELECT ${filterFormat}, COUNT(delivered_date) AS number_of_deliveries 
          FROM Delivery
-         WHERE branch_id = $1 AND (is_delivered = true AND is_pending = false)${dateFilter}
+         WHERE branch_id = $1 AND ${statusFilter}${dateFilter}
          GROUP BY date
          ORDER BY MIN(delivered_date);`,
          params

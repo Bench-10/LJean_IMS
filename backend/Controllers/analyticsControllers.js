@@ -139,11 +139,11 @@ export const getBranches = async (_req, res) => {
 export const numberOfDeliveriesByDate = async (req, res) => {
   try {
 
-    const { branch_id, format = 'monthly', start_date, end_date } = req.query;
+    const { branch_id, format = 'monthly', start_date, end_date, status = 'delivered' } = req.query;
     
-    console.log('Delivery request params:', { branch_id, format, start_date, end_date });
+    console.log('Delivery request params:', { branch_id, format, start_date, end_date, status });
     
-    const rows = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id, start_date, end_date);
+    const rows = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id, start_date, end_date, status);
     
     console.log('Delivery response data:', rows);
     
