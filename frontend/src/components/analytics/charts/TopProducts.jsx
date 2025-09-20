@@ -29,7 +29,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
   
   return (
     <>
-        <Card title={categoryName} className="col-span-4 h-full">
+        <Card title={categoryName} className="col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
             <div className="flex-1 min-h-0 h-full max-h-full overflow-hidden" data-chart-container="top-products">
 
             <ResponsiveContainer width="100%" height="100%">
@@ -58,7 +58,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
             </Card>
 
-            <Card title="Sales Performance" className="col-span-8 h-full">
+            <Card title="Sales Performance" className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
             <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden">
                 {/* Sales Performance Filter */}
                 <div className="flex justify-end">

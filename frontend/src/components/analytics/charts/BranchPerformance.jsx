@@ -60,24 +60,11 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // HELPER TO RESOLVE DATE RANGE CONSISTENTLY
+  // DATE RANGE: RELY ON PARENT-COMPUTED DATES TO AVOID TZ DRIFT
+  // Parent already computes startDate/endDate with dayjs; use them directly for consistency with KPIs
   const resolveDateRange = () => {
-    let start_date = startDate;
-    let end_date = endDate;
-    if(rangeMode === 'preset') {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      let s = today;
-      if(preset === 'current_day') s = today;
-      else if(preset === 'current_week') {
-        const dow = today.getDay();
-        const offset = (dow === 0 ? -6 : 1 - dow);
-        s = new Date(today); s.setDate(s.getDate() + offset);
-      } else if(preset === 'current_month') s = new Date(today.getFullYear(), today.getMonth(), 1);
-      else if(preset === 'current_year') s = new Date(today.getFullYear(), 0, 1);
-      start_date = s.toISOString().slice(0,10);
-      end_date = today.toISOString().slice(0,10);
-    }
+    const start_date = startDate;
+    const end_date = endDate;
     return { start_date, end_date };
   };
 
@@ -127,7 +114,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
   return (
     <>
       {/* BRANCH PERFORMANCE COMPARISON */}
-      <Card title={"BRANCH PERFORMANCE COMPARISON"} className="col-span-8 h-[500px]">
+      <Card title={"BRANCH PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
         <div className="flex flex-col h-full max-h-full overflow-hidden">
           {loading && <div className="text-sm text-gray-500">Loading branch performance...</div>}
           {error && <div className="text-sm text-red-600">{error}</div>}
@@ -171,7 +158,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
       </Card>
 
       {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH */}
-      <Card title={"REVENUE DISTRIBUTION"} className="col-span-4 h-[500px]">
+      <Card title={"REVENUE DISTRIBUTION"} className="col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
         <div className="flex flex-col h-full max-h-full overflow-hidden">
           {loading && <div className="text-sm text-gray-500">Loading distribution...</div>}
           {error && <div className="text-sm text-red-600">{error}</div>}

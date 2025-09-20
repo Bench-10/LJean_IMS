@@ -77,6 +77,27 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
 
+  // Keep startDate/endDate in sync when using preset mode so children (e.g., BranchPerformance) get accurate ranges
+  useEffect(() => {
+    if (rangeMode !== 'preset') return;
+    const today = dayjs().startOf('day');
+    let s = today;
+    if (preset === 'current_day') {
+      s = today;
+    } else if (preset === 'current_week') {
+      s = today.isoWeekday(1).startOf('day');
+    } else if (preset === 'current_month') {
+      s = today.startOf('month');
+    } else if (preset === 'current_year') {
+      s = today.startOf('year');
+    }
+    const newStart = s.format('YYYY-MM-DD');
+    const newEnd = today.format('YYYY-MM-DD');
+    // Only update if changed to avoid unnecessary renders
+    if (newStart !== startDate) setStartDate(newStart);
+    if (newEnd !== endDate) setEndDate(newEnd);
+  }, [rangeMode, preset]);
+
  
   const [currentCharts, setCurrentCharts] = useState(() => {
     // CHECK IF USER HAS OWNER ROLE
@@ -365,7 +386,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
                 <h3 className="text-[13px] font-semibold text-gray-700">Total Sales</h3>
 
-                <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">
+                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight">
                   {currencyFormat(kpis.total_sales)}
 
                 </p>
@@ -395,7 +416,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <div>
                 <div className="absolute left-0 top-0 bottom-0 w-2 bg-yellow-400" />
                 <h3 className="text-[13px] font-semibold text-gray-700">Total Investment</h3>
-                <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{currencyFormat(kpis.total_investment)}</p>
+                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight">{currencyFormat(kpis.total_investment)}</p>
                 
                 <p className="text-[11px] text-gray-400 font-medium mt-1">
                   {compareValues(kpis.total_investment, kpis.prev_total_investment)}
@@ -420,7 +441,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <div>
                 <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-400" />
                 <h3 className="text-[13px] font-semibold text-gray-700">Total Profit</h3>
-                <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit) : currencyFormat(0)}</p>
+                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit) : currencyFormat(0)}</p>
                 
                 <p className="text-[11px] text-gray-400 font-medium mt-1">
                   {compareValues(kpis.total_profit, kpis.prev_total_profit)}
@@ -441,9 +462,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               </div>
 
               <div>
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-purple-400" />
+                <div className="absolute left-0 top-0 bottom-0 w-2 bg-purple-400" />  
                 <h3 className="text-[13px] font-semibold text-gray-700">Inventory Items</h3>
-                <p className="text-[clamp(22px,3vw,32px)] font-bold mt-1 leading-tight">{Number(kpis.inventory_count).toLocaleString()}</p>
+                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight">{Number(kpis.inventory_count).toLocaleString()}</p>
 
 
                 <p className="text-[11px] text-gray-400 font-medium mt-1">Total distinct products</p>
