@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import NoInfoFound from '../utils/NoInfoFound';
+import NoInfoFound from './common/NoInfoFound';
 import axios from 'axios';
 import { currencyFormat } from '../utils/formatCurrency';
 import { BsTelephoneFill } from "react-icons/bs";

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../authentication/Authentication';
-import NoInfoFound from '../utils/NoInfoFound';
+import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import axios from 'axios';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery.jsx';
@@ -138,7 +138,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput}) {
         <hr className="border-t-2 my-4 w-full border-gray-500"/>
 
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className="w-full divide-y divide-gray-200  text-sm">
+          <table className={`w-full ${filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
             <thead className="sticky top-0 bg-gray-100">
               <tr>
                 

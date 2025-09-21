@@ -336,7 +336,64 @@ export async function fetchBranches(){
 
 
 
-export async function fetchBranchSalesSummary({ start_date, end_date, range }){
+export async function fetchBranchTimeline({ branch_id, category_id, interval, start_date, end_date, range }) {
+  // Use custom dates if provided, otherwise use range
+  let start, end;
+  if (start_date && end_date) {
+    start = start_date;
+    end = end_date;
+  } else {
+    ({ start, end } = buildDateRange(range));
+  }
+
+  // Determine date truncation based on interval
+  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
+  
+  // Build conditions and parameters
+  const conditions = ['s.date BETWEEN $1 AND $2', 's.branch_id = $3'];
+  const params = [start, end, branch_id];
+  let idx = 4;
+  
+  if (category_id) { 
+    conditions.push(`ip.category_id = $${idx++}`); 
+    params.push(category_id); 
+  }
+  
+  const where = 'WHERE ' + conditions.join(' AND ');
+  
+  // Different date formatting based on interval for better display
+  let dateSelect;
+  if (interval === 'daily') {
+    dateSelect = `date_trunc('${dateTrunc}', s.date)::date AS period,
+                  TO_CHAR(date_trunc('${dateTrunc}', s.date), 'Mon DD') AS formatted_period`;
+  } else if (interval === 'weekly') {
+    dateSelect = `date_trunc('${dateTrunc}', s.date)::date AS period,
+                  TO_CHAR(date_trunc('${dateTrunc}', s.date), 'Mon DD') AS formatted_period`;
+  } else {
+    dateSelect = `date_trunc('${dateTrunc}', s.date)::date AS period,
+                  TO_CHAR(date_trunc('${dateTrunc}', s.date), 'Mon YYYY') AS formatted_period`;
+  }
+  
+  const { rows } = await SQLquery(`
+    SELECT ${dateSelect},
+      SUM(si.amount) AS sales_amount,
+      SUM(si.quantity) AS units_sold,
+      COUNT(DISTINCT s.sales_information_id) AS transaction_count
+    FROM Sales_Items si
+    JOIN Sales_Information s USING(sales_information_id)
+    JOIN Inventory_Product ip USING(product_id)
+    ${where}
+    GROUP BY date_trunc('${dateTrunc}', s.date)
+    ORDER BY period;`, params);
+    
+  return rows;
+}
+
+
+
+
+
+export async function fetchBranchSalesSummary({ start_date, end_date, range, category_id }){
   // USE CUSTOM DATES IF PROVIDED; OTHERWISE FALL BACK TO RANGE
   let start, end;
   if (start_date && end_date) {
@@ -346,17 +403,37 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range }){
     ({ start, end } = buildDateRange(range));
   }
 
+  // BUILD CATEGORY FILTER IF PROVIDED
+  let categoryJoin = '';
+  let categoryFilter = '';
+  const params = [start, end];
+  
+  if (category_id) {
+    categoryJoin = `
+      LEFT JOIN Sales_Items si ON si.sales_information_id = s.sales_information_id
+      LEFT JOIN Inventory_Product ip ON ip.product_id = si.product_id
+    `;
+    categoryFilter = `AND (s.sales_information_id IS NULL OR ip.category_id = $3)`;
+    params.push(category_id);
+  }
+
   // RETURN TOTAL AMOUNT DUE PER BRANCH, INCLUDING BRANCHES WITH ZERO SALES
+  // WITH OPTIONAL CATEGORY FILTERING
   const { rows } = await SQLquery(`
     SELECT b.branch_id,
            b.branch_name,
-           COALESCE(SUM(s.total_amount_due), 0) AS total_amount_due
+           ${category_id 
+             ? 'COALESCE(SUM(DISTINCT CASE WHEN ip.category_id = $3 THEN si.amount ELSE 0 END), 0) AS total_amount_due'
+             : 'COALESCE(SUM(s.total_amount_due), 0) AS total_amount_due'
+           }
     FROM Branch b
     LEFT JOIN Sales_Information s
       ON s.branch_id = b.branch_id
      AND s.date BETWEEN $1 AND $2
+    ${categoryJoin}
+    WHERE 1=1 ${categoryFilter}
     GROUP BY b.branch_id, b.branch_name
-    ORDER BY total_amount_due DESC, b.branch_name ASC;`, [start, end]);
+    ORDER BY total_amount_due DESC, b.branch_name ASC;`, params);
 
   return rows;
 }

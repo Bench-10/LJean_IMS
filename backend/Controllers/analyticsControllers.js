@@ -159,11 +159,43 @@ export const numberOfDeliveriesByDate = async (req, res) => {
 
 
 
+// BRANCH TIMELINE - DEDICATED ENDPOINT FOR BRANCH-SPECIFIC TIMELINE DATA
+export const getBranchTimeline = async (req, res) => {
+  try {
+    const { branch_id, category_id, interval = 'monthly', start_date, end_date, range = '3m' } = req.query;
+    
+    // Validate required branch_id
+    if (!branch_id) {
+      return res.status(400).json({ message: 'branch_id is required' });
+    }
+    
+    console.log('Branch timeline request params:', { branch_id, category_id, interval, start_date, end_date, range });
+    
+    const rows = await analyticsServices.fetchBranchTimeline({ 
+      branch_id, 
+      category_id, 
+      interval, 
+      start_date, 
+      end_date, 
+      range 
+    });
+    
+    console.log('Branch timeline response data:', rows);
+    
+    res.json(rows);
+  } catch (err) {
+    console.error('Branch timeline error', err);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+
+
 // BRANCH SALES SUMMARY (TOTAL AMOUNT DUE PER BRANCH)
 export const getBranchSalesSummary = async (req, res) => {
   try {
-    const { start_date, end_date, range = '3m' } = req.query;
-    const rows = await analyticsServices.fetchBranchSalesSummary({ start_date, end_date, range });
+    const { start_date, end_date, range = '3m', category_id } = req.query;
+    const rows = await analyticsServices.fetchBranchSalesSummary({ start_date, end_date, range, category_id });
     res.json(rows);
   } catch (err) {
     console.error('Branch sales summary error', err);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BsFunnelFill } from "react-icons/bs";
-import NoInfoFound from '../utils/NoInfoFound';
+import NoInfoFound from './common/NoInfoFound.jsx';
 import { useAuth } from '../authentication/Authentication';
 import {currencyFormat} from '../utils/formatCurrency.js';
  
@@ -166,7 +166,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
 
               {/*HISTORY TABLE SECTION*/}
               <div className='overflow-x-auto overflow-y-auto w-full h-[77%] mt-8 rounded-lg shadow-sm border border-gray-200  hide-scrollbar '> 
-                <table className='w-full' >
+                <table className='w-full h-full' >
                   <thead className='sticky top-0 h-10 z-40'>
                     <tr className='bg-gray-200'>
                       <th className='px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider'>Date</th>

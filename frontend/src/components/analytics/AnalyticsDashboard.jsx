@@ -8,6 +8,7 @@ import { NavLink } from "react-router-dom";
 import TopProducts from './charts/TopProducts.jsx';
 import Delivery from './charts/Delivery.jsx';
 import BranchPerformance from './charts/BranchPerformance.jsx';
+import BranchTimeline from './charts/BranchTimeline.jsx';
 import { TbTruckDelivery } from "react-icons/tb";
 import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown, FaShoppingCart, FaPiggyBank, FaWallet } from "react-icons/fa";
 import { HiOutlineBuildingOffice2 } from "react-icons/hi2";
@@ -112,7 +113,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
   useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryStatus]);
   const [allBranches, setAllBranches] = useState([]);
-  useEffect(()=>{ if(canSelectBranch) loadBranches(); }, [canSelectBranch]);
+  useEffect(()=>{ if(canSelectBranch || (!branchId && isOwner)) loadBranches(); }, [canSelectBranch, branchId, isOwner]);
   async function loadBranches(){
     try { const res = await axios.get('http://localhost:3000/api/analytics/branches'); setAllBranches(res.data); } catch(e){ console.error(e);} }
 
@@ -350,7 +351,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <FaRegMoneyBillAlt />
               Sales
             </button>
-            {branchId && isOwner && (
+            {branchId && (
               <button
                 className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
                   ${currentCharts === "delivery"
@@ -523,14 +524,23 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
        { currentCharts === "branch" && !branchId && isOwner && 
 
         (
-          <BranchPerformance
-            Card={Card}
-            rangeMode={rangeMode}
-            preset={preset}
-            startDate={startDate}
-            endDate={endDate}
-            todayISO={todayISO}
-          />
+          <>
+            <BranchPerformance
+              Card={Card}
+              rangeMode={rangeMode}
+              preset={preset}
+              startDate={startDate}
+              endDate={endDate}
+              todayISO={todayISO}
+              categoryFilter={categoryFilter}
+            />
+            
+            <BranchTimeline
+              Card={Card}
+              categoryFilter={categoryFilter}
+              allBranches={allBranches}
+            />
+          </>
         )
        
        }

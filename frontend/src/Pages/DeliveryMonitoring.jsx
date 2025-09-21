@@ -1,5 +1,5 @@
 import {React, useEffect, useState} from 'react'
-import NoInfoFound from '../utils/NoInfoFound';
+import NoInfoFound from '../components/common/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery';
 import { TbTruckDelivery } from "react-icons/tb";
@@ -148,7 +148,7 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
 
         {/*TABLE */}
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className="w-full divide-y divide-gray-200  text-sm">
+          <table className={`w-full ${!filteredData || filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
             <thead className="sticky top-0 bg-gray-100">
               <tr>
                 

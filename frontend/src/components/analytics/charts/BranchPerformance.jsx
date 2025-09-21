@@ -4,10 +4,11 @@ import { useAuth } from '../../../authentication/Authentication.jsx';
 import axios from 'axios';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import dayjs from 'dayjs';
+import ChartNoData from '../../common/ChartNoData.jsx';
 
-function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayISO }) {
+function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayISO, categoryFilter }) {
   const { user } = useAuth();
-  const [branchTotals, setBranchTotals] = useState([]); // [{ branch_id, branch_name, total_amount_due }]
+  const [branchTotals, setBranchTotals] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [screenDimensions, setScreenDimensions] = useState({
@@ -25,9 +26,9 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
   const calculateResponsiveSizes = () => {
     const { width, height } = screenDimensions;
     
-    // BASE SIZES ON SCREEN DIMENSIONS
-    const baseRadius = Math.min(width * 0.08, height * 0.12); // RESPONSIVE RADIUS
-    const outerRadius = Math.max(60, Math.min(baseRadius, 180)); // MIN 60, MAX 180
+    // BASE SIZES ON SCREEN DIMENSIONS - REDUCED FOR SMALLER PIE CHART
+    const baseRadius = Math.min(width * 0.05, height * 0.08);
+    const outerRadius = Math.max(40, Math.min(baseRadius, 120)); 
     
     // ADJUST FONT SIZES BASED ON SCREEN SIZE
     const legendFontSize = width < 768 ? 10 : width < 1024 ? 11 : 12;
@@ -60,8 +61,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // DATE RANGE: RELY ON PARENT-COMPUTED DATES TO AVOID TZ DRIFT
-  // Parent already computes startDate/endDate with dayjs; use them directly for consistency with KPIs
+  
   const resolveDateRange = () => {
     const start_date = startDate;
     const end_date = endDate;
@@ -79,9 +79,18 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
         setError(null);
         const { start_date, end_date } = resolveDateRange();
         
+        const params = { start_date, end_date };
+        
+        // ADD CATEGORY FILTER IF SELECTED
+        if (categoryFilter) {
+          params.category_id = categoryFilter;
+        }
+        
+        console.log('📊 Fetching branch performance with params:', params);
+        
         // USE EFFICIENT BACKEND ENDPOINT FOR BRANCH SUMMARY
         const branchSummaryRes = await axios.get('http://localhost:3000/api/analytics/branches-summary', { 
-          params: { start_date, end_date } 
+          params
         });
         const branchData = branchSummaryRes.data || [];
         console.log('📊 Branch performance data received:', branchData);
@@ -95,7 +104,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
     };
 
     fetchBranchData();
-  }, [isOwner, rangeMode, preset, startDate, endDate]);
+  }, [isOwner, rangeMode, preset, startDate, endDate, categoryFilter]);
 
   // IF NOT OWNER, RETURN NULL (COMPONENT WON'T RENDER)
   if (!isOwner) return null;
@@ -103,10 +112,36 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
   // FILTER OUT BRANCHES WITH ZERO SALES FOR PIE CHART
   const pieChartData = branchTotals.filter(item => item.total_amount_due > 0);
   
-  // ENSURE DATA HAS NUMERIC VALUES
-  const processedPieData = pieChartData.map(item => ({
+  // CALCULATE TOTAL REVENUE FOR PERCENTAGE CALCULATION
+  const totalRevenue = pieChartData.reduce((sum, item) => sum + Number(item.total_amount_due), 0);
+  
+  // ENSURE DATA HAS NUMERIC VALUES AND ADD PERCENTAGE
+  const processedPieData = pieChartData.map(item => {
+    const amount = Number(item.total_amount_due);
+    const percentage = totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0;
+    
+    return {
+      ...item,
+      total_amount_due: amount,
+      percentage: Number(percentage.toFixed(1))
+    };
+  });
+
+  // CHECK IF ANY BRANCH HAS A POSITIVE TOTAL FOR BAR CHART
+  const hasPositiveBarValues = branchTotals.some(item => Number(item.total_amount_due) > 0);
+
+  // TRUNCATE BRANCH NAMES FOR DISPLAY
+  const truncateBranchName = (name, maxLength = 8) => {
+    if (!name) return '';
+    if (name.length <= maxLength) return name;
+    return name.substring(0, maxLength) + '...';
+  };
+
+  // PROCESS DATA WITH TRUNCATED NAMES FOR BAR CHART
+  const processedBarData = branchTotals.map(item => ({
     ...item,
-    total_amount_due: Number(item.total_amount_due)
+    display_name: truncateBranchName(item.branch_name, 8),
+    original_name: item.branch_name
   }));
 
   // GET RESPONSIVE SIZES FOR CURRENT SCREEN
@@ -114,20 +149,20 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
   return (
     <>
       {/* BRANCH PERFORMANCE COMPARISON */}
-      <Card title={"BRANCH PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
+      <Card title={"BRANCH SALES PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]">
         <div className="flex flex-col h-full max-h-full overflow-hidden">
           {loading && <div className="text-sm text-gray-500">Loading branch performance...</div>}
-          {error && <div className="text-sm text-red-600">{error}</div>}
-          {!loading && !error && branchTotals.length > 0 && (
+          
+          {!loading && !error && branchTotals.length > 0 && hasPositiveBarValues && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="branch-performance">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={branchTotals}
+                  data={processedBarData}
                   margin={{ top: 10, right: 5, left: 5, bottom: 25 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                   <XAxis 
-                    dataKey="branch_name" 
+                    dataKey="display_name" 
                     tick={{ fontSize: 10 }} 
                     axisLine={false} 
                     tickLine={false} 
@@ -136,9 +171,24 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
                     height={60}
                     angle={-45}
                   />
-                  <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value) => [currencyFormat(value), "Total Sales"]} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {(() => {
+                    const maxAmount = processedBarData.reduce((m,p) => Math.max(m, Number(p.total_amount_due)||0), 0);
+                    
+                    if (maxAmount <= 0) return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 1]} />;
+                    
+                    const target = Math.ceil(maxAmount * 1.15); 
+                    const magnitude = Math.pow(10, Math.floor(Math.log10(target)));
+                    const padded = Math.ceil(target / magnitude) * magnitude;
+                    
+                    return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, padded]} />;
+                  })()}
+                  <Tooltip 
+                    formatter={(value) => [currencyFormat(value), "Total Sales"]}
+                    labelFormatter={(label, payload) => {
+                      const item = payload && payload[0] && payload[0].payload;
+                      return item ? `Branch: ${item.original_name}` : `Branch: ${label}`;
+                    }}
+                  />
                   <Bar 
                     name="Total Sales" 
                     dataKey="total_amount_due" 
@@ -149,19 +199,19 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
               </ResponsiveContainer>
             </div>
           )}
-          {!loading && !error && branchTotals.length === 0 && (
-            <div className="text-sm text-gray-500 flex items-center justify-center h-full">
-              No branch performance data available for the selected range.
-            </div>
+          {!loading && (!error || error) && (branchTotals.length === 0 || !hasPositiveBarValues) && (
+            <ChartNoData
+              message="No branch performance data for the selected range."
+              hint="TRY EXPANDING THE DATE RANGE."
+            />
           )}
         </div>
       </Card>
 
-      {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH */}
-      <Card title={"REVENUE DISTRIBUTION"} className="col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
+      {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
+      <Card title={"REVENUE DISTRIBUTION (%)"} className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]">
         <div className="flex flex-col h-full max-h-full overflow-hidden">
           {loading && <div className="text-sm text-gray-500">Loading distribution...</div>}
-          {error && <div className="text-sm text-red-600">{error}</div>}
           
           {!loading && !error && processedPieData.length > 0 && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="revenue-distribution">
@@ -184,7 +234,10 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value, name) => [currencyFormat(value), name]} 
+                    formatter={(value, name, props) => [
+                      `${props.payload.percentage}% (${currencyFormat(value)}) `,
+                      name
+                    ]} 
                     labelFormatter={(label) => `Branch: ${label}`}
                     contentStyle={{ 
                       fontSize: responsiveSizes.tooltipFontSize,
@@ -205,10 +258,11 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
             </div>
           )}
           
-          {!loading && !error && processedPieData.length === 0 && branchTotals.length === 0 && (
-            <div className="text-sm text-gray-500 flex items-center justify-center h-full">
-              No revenue distribution data available.
-            </div>
+          {!loading && (!error || error) && processedPieData.length === 0 && (
+            <ChartNoData
+              message="No revenue distribution data available."
+              hint="TRY A DIFFERENT DATE RANGE."
+            />
           )}
         </div>
       </Card>

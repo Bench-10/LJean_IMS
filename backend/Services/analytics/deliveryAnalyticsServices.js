@@ -10,9 +10,6 @@ export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_da
     let dateFilter = '';
     let params = [branch_id];
 
-    // Determine status filter
-    // delivered: is_delivered = true AND is_pending = false
-    // undelivered: is_delivered = false AND is_pending = true
     const statusFilter = (String(status).toLowerCase() === 'undelivered')
         ? '(is_delivered = false AND is_pending = true)'
         : '(is_delivered = true AND is_pending = false)';

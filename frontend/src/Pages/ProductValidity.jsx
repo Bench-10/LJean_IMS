@@ -1,7 +1,7 @@
 import {React, useState, useEffect } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
 import axios from 'axios';
-import NoInfoFound from '../utils/NoInfoFound';
+import NoInfoFound from '../components/common/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 
 function ProductValidity({ sanitizeInput }) {
@@ -97,7 +97,7 @@ function ProductValidity({ sanitizeInput }) {
 
 
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className="w-full divide-y divide-gray-200  text-sm">
+          <table className={`w-full ${filteredValidityData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
             <thead className="sticky top-0 bg-gray-100">
               <tr>
                 

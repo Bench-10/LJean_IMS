@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { currencyFormat } from '../../../utils/formatCurrency';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, AreaChart, Area, Legend, Cell } from 'recharts';
+import ChartNoData from '../../common/ChartNoData.jsx';
 
 function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval }) {
   console.log('📊 TopProducts component render:', { 
@@ -31,29 +32,31 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
     <>
         <Card title={categoryName} className="col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
             <div className="flex-1 min-h-0 h-full max-h-full overflow-hidden" data-chart-container="top-products">
+            {(!topProducts || topProducts.length === 0) ? (
+              <ChartNoData message="No top products for the selected filters." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topProducts} barSize={14} margin={{ top: 10, right: 5, left: 5, bottom: 5 }} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                  {(() => {
+                      const max = topProducts.reduce((m,p)=> Math.max(m, Number(p.sales_amount)||0), 0);
+                      const padded = max === 0 ? 1 : Math.ceil((max * 1.1)/100)*100; 
+                      return <XAxis type="number" domain={[0, padded]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
+                  })()}
+                  <YAxis dataKey="product_name" type="category" tick={{ fontSize: 14 }} width={110} axisLine={false} tickLine={false} />
 
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topProducts} barSize={14} margin={{ top: 10, right: 5, left: 5, bottom: 5 }} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-                {(() => {
-                    const max = topProducts.reduce((m,p)=> Math.max(m, Number(p.sales_amount)||0), 0);
-                    const padded = max === 0 ? 1 : Math.ceil((max * 1.1)/100)*100; 
-                    return <XAxis type="number" domain={[0, padded]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
-                })()}
-                <YAxis dataKey="product_name" type="category" tick={{ fontSize: 14 }} width={110} axisLine={false} tickLine={false} />
+                  
+                  <Tooltip formatter={(v)=>currencyFormat(v)} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                  <Bar dataKey="sales_amount" radius={[0,4,4,0]}>
+                      {topProducts.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={idx < 3 ? '#16a34a' : '#3bb3b3'} />
+                      ))}
+                  </Bar>
 
-                
-                <Tooltip formatter={(v)=>currencyFormat(v)} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                <Bar dataKey="sales_amount" radius={[0,4,4,0]}>
-                    {topProducts.map((entry, idx) => (
-                    <Cell key={`cell-${idx}`} fill={idx < 3 ? '#16a34a' : '#3bb3b3'} />
-                    ))}
-                </Bar>
+                  </BarChart>
 
-                </BarChart>
-
-            </ResponsiveContainer>
-
+              </ResponsiveContainer>
+            )}
             </div>
 
             </Card>
@@ -72,13 +75,12 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
                 <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="sales-performance">
 
-                    {(!salesPerformance || salesPerformance.length === 0) && (
-                        <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
-                            No sales performance data for the selected filters.
-                        </div>
-                    )}
-
-                    {salesPerformance && salesPerformance.length > 0 && (
+                    {(!salesPerformance || salesPerformance.length === 0) ? (
+                        <ChartNoData
+                          message="No sales performance data for the selected filters."
+                          hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY."
+                        />
+                    ) : (
                     <ResponsiveContainer width="100%" height="100%">
 
                         <LineChart data={salesPerformance} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
@@ -127,6 +129,13 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                         <option value="yearly">Yearly</option>
                     </select>
                 </div>
+
+                {(!restockTrends || restockTrends.length === 0) ? (
+                        <ChartNoData
+                          message="No sales performance data for the selected filters."
+                          hint="TRY ADJUSTING THE DATE RANGE."
+                        />
+                ) : (
                 <div className="h-52 max-h-52 overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={restockTrends} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
@@ -168,6 +177,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                 </ResponsiveContainer>
 
                 </div>
+                )}
 
             </div>
 

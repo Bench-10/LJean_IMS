@@ -39,6 +39,9 @@ router.get('/analytics/branches', analyticsControllers.getBranches);
 //BRANCH SALES SUMMARY (TOTAL AMOUNT DUE PER BRANCH)
 router.get('/analytics/branches-summary', analyticsControllers.getBranchSalesSummary);
 
+//BRANCH TIMELINE - DEDICATED ENDPOINT FOR BRANCH-SPECIFIC TIMELINE DATA
+router.get('/analytics/branch-timeline', analyticsControllers.getBranchTimeline);
+
 //DELIVERY INFORMATION
 router.get('/analytics/delivery', analyticsControllers.numberOfDeliveriesByDate);
 
