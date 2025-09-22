@@ -11,14 +11,14 @@ export const notifyProductShelfLife = async() =>{
                 (a.product_validity - CURRENT_DATE) <= 3 AS near_expy, 
                 a.product_validity <= CURRENT_DATE AS expy, 
                 a.product_id, 
-                a.branch_id, 
+                ip.branch_id, 
                 a.product_validity,
                 SUM(a.quantity_added) AS total_quantity
             FROM Add_Stocks a
             LEFT JOIN Inventory_product ip USING(product_id)
             LEFT JOIN Category c USING(category_id)
             WHERE a.product_validity >= CURRENT_DATE - 2
-            GROUP BY a.product_id, a.branch_id, a.product_validity, ip.product_name, c.category_name
+            GROUP BY a.product_id, ip.branch_id, a.product_validity, ip.product_name, c.category_name
             ORDER BY a.product_validity DESC
     `);
 

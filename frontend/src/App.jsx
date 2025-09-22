@@ -61,7 +61,11 @@ function App() {
 
   // WEB SOCKET CONNECTION
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      // RESET NOTIFICATION STATE WHEN USER LOGS OUT
+      setNotify([]);
+      return;
+    }
 
     const newSocket = io('http://localhost:3000');
     
@@ -242,9 +246,14 @@ function App() {
   //BEST FOR NOW
   useEffect(() => {
 
-    if (!user) return;
+    if (!user) {
+      // RESET NOTIFICATION STATE WHEN USER LOGS OUT
+      setNotify([]);
+      return;
+    }
     if (!user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) return;
     
+    // FETCH NOTIFICATIONS FOR THE CURRENT USER
     getTime();
 
     const intervalId = setInterval(() => {

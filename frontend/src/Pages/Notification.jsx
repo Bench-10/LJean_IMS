@@ -13,6 +13,17 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
   const prevLengthRef = useRef(notify.length);
+  const currentUserRef = useRef(user?.user_id);
+
+  // RESET REFERENCE WHEN USER CHANGES
+  useEffect(() => {
+    if (user?.user_id !== currentUserRef.current) {
+      // RESET REFERENCE TO CURRENT NOTIFICATION COUNT TO PREVENT FALSE POPUPS
+      prevLengthRef.current = notify.length;
+      currentUserRef.current = user?.user_id;
+      setShowPopup(false);
+    }
+  }, [user, notify.length]);
 
   // REQUEST FOR NOTIFICATION
   useEffect(() => {
