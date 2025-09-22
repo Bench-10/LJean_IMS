@@ -191,6 +191,10 @@ CREATE TABLE Sales_Information (
 );
 
 
+alter table Sales_Information -- NEW COLUMN
+add column transaction_by varchar(100);
+
+
 
 
 
