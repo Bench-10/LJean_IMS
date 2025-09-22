@@ -5,31 +5,29 @@ import { broadcastNotification } from "../../server.js";
 //FUNCTION THAT AUTOMATICALLY GENERATE NOTIFICATION FOR PRODUCT SHELF LIFE
 export const notifyProductShelfLife = async() =>{
     const { rows } =  await SQLquery(`
-            SELECT Inventory_product.product_name, Category.category_name, (product_validity - CURRENT_DATE) <= 3 AS near_expy, product_validity <= CURRENT_DATE AS expy, Add_stocks.product_id, branch_id, product_validity
-            FROM Add_Stocks
-            LEFT JOIN Inventory_product USING(product_id)
-            LEFT JOIN Category USING(category_id)
-            WHERE product_validity >= CURRENT_DATE - 2
-            ORDER BY date_added DESC, add_id DESC
+            SELECT 
+                ip.product_name, 
+                c.category_name, 
+                (a.product_validity - CURRENT_DATE) <= 3 AS near_expy, 
+                a.product_validity <= CURRENT_DATE AS expy, 
+                a.product_id, 
+                a.branch_id, 
+                a.product_validity,
+                SUM(a.quantity_added) AS total_quantity
+            FROM Add_Stocks a
+            LEFT JOIN Inventory_product ip USING(product_id)
+            LEFT JOIN Category c USING(category_id)
+            WHERE a.product_validity >= CURRENT_DATE - 2
+            GROUP BY a.product_id, a.branch_id, a.product_validity, ip.product_name, c.category_name
+            ORDER BY a.product_validity DESC
     `);
 
     //LOOP THROUGH THE ROWS 
     for (const row of rows){
         //IF THE ROW IS EXPIRED
         if (row.expy){
-
-            //THIS CHECKS THE QUANTITY IF THERE ARE SAME PRODUCT ID WITH THE SAME DATE OF EXPIRY
-            const quantityResult = await SQLquery(
-                `SELECT SUM(quantity_added) AS total_quantity 
-                FROM Add_stocks 
-                WHERE product_validity = $1 AND product_id = $2`,
-                [row.product_validity, row.product_id]
-            );
-
-
-            //NUMBER OF QUANTITY EXPIRED
-            const totalQuantity = quantityResult.rows[0].total_quantity || 0;
-
+            //NUMBER OF QUANTITY EXPIRED (already calculated in the query)
+            const totalQuantity = row.total_quantity || 0;
 
             //EXPIRED NOTIFICATTION MESSAGE
             const notificationMessage = `${totalQuantity} of ${row.product_name} has reached the end of shelf life`;
@@ -75,20 +73,8 @@ export const notifyProductShelfLife = async() =>{
         
         //IF THE ROW IS NEAR THE END OF ITS SHELF LIFE
         if (row.near_expy && !row.expy){
-
-
-            //THIS CHECKS THE QUANTITY IF THERE ARE SAME PRODUCT ID WITH THE SAME DATE OF EXPIRY
-            const quantityResult = await SQLquery(
-                `SELECT SUM(quantity_added) AS total_quantity 
-                FROM Add_stocks 
-                WHERE product_validity = $1 AND product_id = $2`,
-                [row.product_validity, row.product_id]
-            );
-
-
-            //NUMBER OF QUANTITY NEAR EXPIRY
-            const totalQuantity = quantityResult.rows[0].total_quantity || 0;
-
+            //NUMBER OF QUANTITY NEAR EXPIRY (already calculated in the query)
+            const totalQuantity = row.total_quantity || 0;
 
             //EXPIRED NOTIFICATTION MESSAGE
             const notificationMessage = `${totalQuantity} of ${row.product_name} is reaching the end of shelf life`;
