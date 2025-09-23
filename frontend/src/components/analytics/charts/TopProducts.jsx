@@ -3,14 +3,15 @@ import { currencyFormat } from '../../../utils/formatCurrency';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, AreaChart, Area, Legend, Cell } from 'recharts';
 import ChartNoData from '../../common/ChartNoData.jsx';
 
-function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval }) {
+function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter }) {
   console.log('📊 TopProducts component render:', { 
     salesPerformanceLength: salesPerformance?.length,
     salesPerformance: salesPerformance,  // Show all data
     sampleItem: salesPerformance?.[0],  // Show structure of first item
     salesInterval,
     topProductsLength: topProducts?.length,
-    topProducts: topProducts
+    topProducts: topProducts,
+    productIdFilter: productIdFilter
   });
   
   console.log('🎨 TopProducts component mounted and rendering charts');
@@ -27,14 +28,39 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
       });
     });
   }, []);
+
+  // SET FILTER BY PRODUCT ID
+  const handleClick = (data) => {
+    setProductIdFilter(data.product_id)
+  };
+
+  // CLEAR PRODUCT FILTER
+  const clearProductFilter = () => {
+    setProductIdFilter('');
+  };
+
+  // GET SELECTED PRODUCT NAME
+  const selectedProductName = productIdFilter ? 
+    topProducts?.find(p => p.product_id === parseInt(productIdFilter))?.product_name : null;
   
   return (
     <>
-        <Card title={categoryName} className="col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
-            <div className="flex-1 min-h-0 h-full max-h-full overflow-hidden" data-chart-container="top-products">
-            {(!topProducts || topProducts.length === 0) ? (
-              <ChartNoData message="No top products for the selected filters." />
-            ) : (
+        <Card title={selectedProductName ? `${categoryName} - ${selectedProductName}` : categoryName} className=" relative col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
+            <div className="flex flex-col h-full">
+              {selectedProductName && (
+                <div className="absolute top-2 right-3 mb-2">
+                  <button 
+                    onClick={clearProductFilter}
+                    className="text-xs text-red-600 hover:text-red-800 underline"
+                  >
+                    Clear Product Filter
+                  </button>
+                </div>
+              )}
+              <div className="flex-1 min-h-0 overflow-hidden" data-chart-container="top-products">
+              {(!topProducts || topProducts.length === 0) ? (
+                <ChartNoData message="No top products for the selected filters." />
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topProducts} barSize={14} margin={{ top: 10, right: 5, left: 5, bottom: 5 }} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
@@ -47,21 +73,31 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
                   
                   <Tooltip formatter={(v)=>currencyFormat(v)} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                  <Bar dataKey="sales_amount" radius={[0,4,4,0]}>
-                      {topProducts.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={idx < 3 ? '#16a34a' : '#3bb3b3'} />
-                      ))}
+                  <Bar dataKey="sales_amount" radius={[0,4,4,0]} onClick={handleClick} barSize={40} className='cursor-pointer'>
+                      {topProducts.map((entry, idx) => {
+                        const isSelected = productIdFilter && entry.product_id === parseInt(productIdFilter);
+                        let fillColor;
+                        if (isSelected) {
+                          fillColor = '#dc2626'; 
+                        } else if (idx < 3) {
+                          fillColor = '#16a34a'; 
+                        } else {
+                          fillColor = '#3bb3b3';
+                        }
+                        return <Cell key={`cell-${idx}`} fill={fillColor} />;
+                      })}
                   </Bar>
 
                   </BarChart>
 
               </ResponsiveContainer>
             )}
+              </div>
             </div>
 
             </Card>
 
-            <Card title="Sales Performance" className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
+            <Card title={selectedProductName ? `Sales Performance - ${selectedProductName}` : "Sales Performance"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
             <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden">
                 {/* Sales Performance Filter */}
                 <div className="flex justify-end">
@@ -77,13 +113,20 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
                     {(!salesPerformance || salesPerformance.length === 0) ? (
                         <ChartNoData
-                          message="No sales performance data for the selected filters."
+                          message={selectedProductName ? `No sales performance data for ${selectedProductName}.` : "No sales performance data for the selected filters."}
                           hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY."
                         />
                     ) : (
                     <ResponsiveContainer width="100%" height="100%">
 
                         <LineChart data={salesPerformance} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                            <defs>
+                                <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#0f766e" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#0f766e" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+
                             <CartesianGrid stroke="#f1f5f9" />
 
                             <XAxis dataKey="period" tick={{ fontSize: 10 }} tickFormatter={formatPeriod} />
@@ -105,6 +148,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                          
                             <Tooltip labelFormatter={formatPeriod} />
 
+                            <Area type="monotone" dataKey="sales_amount" stroke="none" fillOpacity={1} fill="url(#colorSales)" />
                             <Line type="monotone" dataKey="sales_amount" name="Sales" stroke="#0f766e" strokeWidth={2} dot={false} />
 
 
@@ -118,13 +162,15 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
             <div>
                 {/* Demand Forecasting Filter */}
                 <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase">Demand Forecasting (Units Sold)</h3>
+                    <h3 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase">
+                      {selectedProductName ? `Demand Forecasting - ${selectedProductName} (Units Sold)` : "Demand Forecasting (Units Sold)"}
+                    </h3>
                     
                 </div>
 
                 {(!salesPerformance || salesPerformance.length === 0) ? (
                         <ChartNoData
-                          message="No units sold data for the selected filters."
+                          message={selectedProductName ? `No units sold data for ${selectedProductName}.` : "No units sold data for the selected filters."}
                           hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY."
                         />
                 ) : (

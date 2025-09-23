@@ -26,8 +26,8 @@ export const getInventoryLevels = async (req, res) => {
 export const getSalesPerformance = async (req, res) => {
   try {
      
-    const { branch_id, category_id, interval = 'monthly', range = '1y' } = req.query;
-    const rows = await analyticsServices.fetchSalesPerformance({ branch_id, category_id, interval, range });
+    const { branch_id, category_id, product_id, interval = 'monthly', range = '1y' } = req.query;
+    const rows = await analyticsServices.fetchSalesPerformance({ branch_id, category_id, product_id, interval, range });
     res.json(rows);
   } catch (err) {
 
@@ -102,8 +102,8 @@ export const getCategoryDistribution = async (req, res) => {
 
 export const getKPIs = async (req, res) => {
   try {
-  const { branch_id, category_id, range = '1m', start_date, end_date } = req.query;
-  const rows = await analyticsServices.fetchKPIs({ branch_id, category_id, range, start_date, end_date });
+  const { branch_id, category_id, product_id, range = '1m', start_date, end_date } = req.query;
+  const rows = await analyticsServices.fetchKPIs({ branch_id, category_id, product_id, range, start_date, end_date });
     res.json(rows);
 
   } catch (err) {

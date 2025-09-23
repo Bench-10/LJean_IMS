@@ -74,6 +74,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [startDate, setStartDate] = useState(monthStartISO);
   const [endDate, setEndDate] = useState(todayISO);
   const [categoryFilter, setCategoryFilter] = useState(''); 
+  const [productIdFilter, setProductIdFilter] = useState('')
   const [categories, setCategories] = useState([]);
   const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0, prev_total_sales:0, prev_total_investment:0, prev_total_profit:0, inventory_count: 0});
   const [categoryName, setCategoryName] = useState('All Products');
@@ -111,7 +112,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   });
 
 
-  useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryStatus]);
+  useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryStatus, productIdFilter]);
   const [allBranches, setAllBranches] = useState([]);
   useEffect(()=>{ if(canSelectBranch || (!branchId && isOwner)) loadBranches(); }, [canSelectBranch, branchId, isOwner]);
   async function loadBranches(){
@@ -143,6 +144,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     const paramsSales = { interval: salesInterval };
     if (branchId) paramsSales.branch_id = branchId;
     if (categoryFilter) paramsSales.category_id = categoryFilter;
+    if (productIdFilter) paramsSales.product_id = productIdFilter;
 
     // Restock trends uses restockInterval  
     const paramsRestock = { interval: restockInterval };
@@ -153,9 +155,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     if (branchId) paramsLevels.branch_id = branchId;
 
     const paramsTop = { branch_id: branchId, category_id: categoryFilter || undefined, start_date, end_date, limit: 7 };
+
     const paramsKPI = { 
       branch_id: branchId, 
       category_id: categoryFilter || undefined, 
+      product_id: productIdFilter || undefined,
       start_date, 
       end_date,
       preset: rangeMode === 'preset' ? preset : 'custom'
@@ -333,7 +337,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
                     : "text-green-800 hover:bg-green-100 "
                   }`}
                 aria-selected={currentCharts === "branch"}
-                onClick={() => setCurrentCharts("branch")}
+                onClick={() => {setCurrentCharts("branch"); setProductIdFilter('');} }
                 tabIndex={0}
               >
                 <HiOutlineBuildingOffice2 />
@@ -501,6 +505,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             setSalesInterval={setSalesInterval}
             restockInterval={restockInterval}
             setRestockInterval={setRestockInterval}
+            setProductIdFilter={setProductIdFilter}
+            productIdFilter={productIdFilter}
           />
         )
 

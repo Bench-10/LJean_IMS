@@ -62,7 +62,7 @@ export async function fetchInventoryLevels({ branch_id, range }) {
 
 
 
-export async function fetchSalesPerformance({ branch_id, category_id, interval, range }) {
+export async function fetchSalesPerformance({ branch_id, category_id, product_id, interval, range }) {
   const { start, end } = buildDateRange(range);
   const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
   const conditions = ['s.date BETWEEN $1 AND $2'];
@@ -70,6 +70,7 @@ export async function fetchSalesPerformance({ branch_id, category_id, interval, 
   let idx = 3;
   if (branch_id) { conditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
   if (category_id) { conditions.push(`ip.category_id = $${idx++}`); params.push(category_id); }
+  if (product_id) { conditions.push(`si.product_id = $${idx++}`); params.push(product_id); }
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const { rows } = await SQLquery(`
     SELECT date_trunc('${dateTrunc}', s.date)::date AS period,
@@ -167,7 +168,7 @@ export async function fetchCategoryDistribution({ branch_id }) {
 
 
 
-export async function fetchKPIs({ branch_id, category_id, range, start_date, end_date }) {
+export async function fetchKPIs({ branch_id, category_id, product_id, range, start_date, end_date }) {
 
   let start, end;
   if (start_date && end_date) {
@@ -197,7 +198,9 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
     // CURRENT SALES
     const conditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];
     const params = [start, end, category_id];
-    if (branch_id) { conditions.push('s.branch_id = $4'); params.push(branch_id); }
+    let salesIdx = 4;
+    if (branch_id) { conditions.push(`s.branch_id = $${salesIdx++}`); params.push(branch_id); }
+    if (product_id) { conditions.push(`si.product_id = $${salesIdx++}`); params.push(product_id); }
     const where = 'WHERE ' + conditions.join(' AND ');
     const { rows: salesRows } = await SQLquery(`
       SELECT COALESCE(SUM(si.amount),0) AS total_sales
@@ -211,7 +214,9 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
     //PREVIOUS SALES
     const prevConditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];
     const prevParams = [prevStart, prevEnd, category_id];
-    if (branch_id) { prevConditions.push('s.branch_id = $4'); prevParams.push(branch_id); }
+    let prevSalesIdx = 4;
+    if (branch_id) { prevConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevParams.push(branch_id); }
+    if (product_id) { prevConditions.push(`si.product_id = $${prevSalesIdx++}`); prevParams.push(product_id); }
     const prevWhere = 'WHERE ' + prevConditions.join(' AND ');
     const { rows: prevSalesRows } = await SQLquery(`
       SELECT COALESCE(SUM(si.amount),0) AS total_sales
@@ -225,7 +230,9 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
     //CURRENT INVESTMENTS
     const investConditions = ['a.date_added BETWEEN $1 AND $2', 'ip.category_id = $3'];
     const investParams = [start, end, category_id];
-    if (branch_id) { investConditions.push('ip.branch_id = $4'); investParams.push(branch_id); }
+    let investIdx = 4;
+    if (branch_id) { investConditions.push(`ip.branch_id = $${investIdx++}`); investParams.push(branch_id); }
+    if (product_id) { investConditions.push(`ip.product_id = $${investIdx++}`); investParams.push(product_id); }
     const investWhere = 'WHERE ' + investConditions.join(' AND ');
     const { rows: investRows } = await SQLquery(`
       SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
@@ -235,10 +242,12 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
 
 
 
-    // PRIVIOUS INVESTMENTS
+    // PREVIOUS INVESTMENTS
     const prevInvestConditions = ['a.date_added BETWEEN $1 AND $2', 'ip.category_id = $3'];
     const prevInvestParams = [prevStart, prevEnd, category_id];
-    if (branch_id) { prevInvestConditions.push('ip.branch_id = $4'); prevInvestParams.push(branch_id); }
+    let prevInvestIdx = 4;
+    if (branch_id) { prevInvestConditions.push(`ip.branch_id = $${prevInvestIdx++}`); prevInvestParams.push(branch_id); }
+    if (product_id) { prevInvestConditions.push(`ip.product_id = $${prevInvestIdx++}`); prevInvestParams.push(product_id); }
     const prevInvestWhere = 'WHERE ' + prevInvestConditions.join(' AND ');
     const { rows: prevInvestRows } = await SQLquery(`
       SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
@@ -249,7 +258,9 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
     // INVENTORY COUNT (FILTERED BY CATEGORY AND OPTIONAL BRANCH)
     const invCntConds = ['ip.category_id = $1'];
     const invCntParams = [category_id];
-    if (branch_id) { invCntConds.push('ip.branch_id = $2'); invCntParams.push(branch_id); }
+    let invCountIdx = 2;
+    if (branch_id) { invCntConds.push(`ip.branch_id = $${invCountIdx++}`); invCntParams.push(branch_id); }
+    if (product_id) { invCntConds.push(`ip.product_id = $${invCountIdx++}`); invCntParams.push(product_id); }
     const invCntWhere = 'WHERE ' + invCntConds.join(' AND ');
     const { rows: invCountRows } = await SQLquery(`
       SELECT COUNT(DISTINCT ip.product_id) AS inventory_count
@@ -274,45 +285,71 @@ export async function fetchKPIs({ branch_id, category_id, range, start_date, end
   }
 
   // CURRENT SALE (NO CATEGORY FILTER)
-  const salesParams = branch_id ? [start, end, branch_id] : [start, end];
-  const salesBranchFilter = branch_id ? 'AND s.branch_id = $3' : '';
+  const salesConditions = ['s.date BETWEEN $1 AND $2'];
+  const salesParams = [start, end];
+  let salesIdx = 3;
+  if (branch_id) { salesConditions.push(`s.branch_id = $${salesIdx++}`); salesParams.push(branch_id); }
+  if (product_id) { salesConditions.push(`si.product_id = $${salesIdx++}`); salesParams.push(product_id); }
+  const salesWhere = 'WHERE ' + salesConditions.join(' AND ');
+  const salesJoin = product_id ? 'JOIN Sales_Items si USING(sales_information_id)' : '';
   const { rows: salesRows } = await SQLquery(`
-    SELECT COALESCE(SUM(total_amount_due),0) AS total_sales
+    SELECT COALESCE(SUM(${product_id ? 'si.amount' : 'total_amount_due'}),0) AS total_sales
     FROM Sales_Information s
-    WHERE s.date BETWEEN $1 AND $2 ${salesBranchFilter};`,
+    ${salesJoin}
+    ${salesWhere};`,
     salesParams);
 
   // PREVIOUS SALE (NO CATEGORY FILTER)
-  const prevSalesParams = branch_id ? [prevStart, prevEnd, branch_id] : [prevStart, prevEnd];
+  const prevSalesConditions = ['s.date BETWEEN $1 AND $2'];
+  const prevSalesParams = [prevStart, prevEnd];
+  let prevSalesIdx = 3;
+  if (branch_id) { prevSalesConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevSalesParams.push(branch_id); }
+  if (product_id) { prevSalesConditions.push(`si.product_id = $${prevSalesIdx++}`); prevSalesParams.push(product_id); }
+  const prevSalesWhere = 'WHERE ' + prevSalesConditions.join(' AND ');
+  const prevSalesJoin = product_id ? 'JOIN Sales_Items si USING(sales_information_id)' : '';
   const { rows: prevSalesRows } = await SQLquery(`
-    SELECT COALESCE(SUM(total_amount_due),0) AS total_sales
+    SELECT COALESCE(SUM(${product_id ? 'si.amount' : 'total_amount_due'}),0) AS total_sales
     FROM Sales_Information s
-    WHERE s.date BETWEEN $1 AND $2 ${salesBranchFilter};`, 
+    ${prevSalesJoin}
+    ${prevSalesWhere};`, 
     prevSalesParams);
 
   // CURRENT INVESTMENT
-  const investParams = branch_id ? [start, end, branch_id] : [start, end];
-  const investBranchFilter = branch_id ? 'AND ip.branch_id = $3' : '';
+  const investConditions = ['a.date_added BETWEEN $1 AND $2'];
+  const investParams = [start, end];
+  let investIdx = 3;
+  if (branch_id) { investConditions.push(`ip.branch_id = $${investIdx++}`); investParams.push(branch_id); }
+  if (product_id) { investConditions.push(`ip.product_id = $${investIdx++}`); investParams.push(product_id); }
+  const investWhere = 'WHERE ' + investConditions.join(' AND ');
   const { rows: investRows } = await SQLquery(`
     SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
     FROM Add_Stocks a
     JOIN Inventory_Product ip USING(product_id)
-    WHERE a.date_added BETWEEN $1 AND $2 ${investBranchFilter};`,
+    ${investWhere};`,
      investParams);
 
-  // PREVIOUS INVENTMENT
-  const prevInvestParams = branch_id ? [prevStart, prevEnd, branch_id] : [prevStart, prevEnd];
+  // PREVIOUS INVESTMENT
+  const prevInvestConditions = ['a.date_added BETWEEN $1 AND $2'];
+  const prevInvestParams = [prevStart, prevEnd];
+  let prevInvestIdx = 3;
+  if (branch_id) { prevInvestConditions.push(`ip.branch_id = $${prevInvestIdx++}`); prevInvestParams.push(branch_id); }
+  if (product_id) { prevInvestConditions.push(`ip.product_id = $${prevInvestIdx++}`); prevInvestParams.push(product_id); }
+  const prevInvestWhere = 'WHERE ' + prevInvestConditions.join(' AND ');
   const { rows: prevInvestRows } = await SQLquery(`
     SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
     FROM Add_Stocks a
     JOIN Inventory_Product ip USING(product_id)
-    WHERE a.date_added BETWEEN $1 AND $2 ${investBranchFilter};`,
+    ${prevInvestWhere};`,
      prevInvestParams);
 
 
   // INVENTORY COUNT (NO CATEGORY FILTER, OPTIONAL BRANCH)
-  const invCountParams = branch_id ? [branch_id] : [];
-  const invCountWhere = branch_id ? 'WHERE ip.branch_id = $1' : '';
+  const invCountConditions = [];
+  const invCountParams = [];
+  let invCountIdx = 1;
+  if (branch_id) { invCountConditions.push(`ip.branch_id = $${invCountIdx++}`); invCountParams.push(branch_id); }
+  if (product_id) { invCountConditions.push(`ip.product_id = $${invCountIdx++}`); invCountParams.push(product_id); }
+  const invCountWhere = invCountConditions.length ? 'WHERE ' + invCountConditions.join(' AND ') : '';
   const { rows: invCountRows } = await SQLquery(`
     SELECT COUNT(DISTINCT ip.product_id) AS inventory_count
     FROM Inventory_Product ip
