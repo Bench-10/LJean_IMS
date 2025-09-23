@@ -4,20 +4,10 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import ChartNoData from '../../common/ChartNoData.jsx';
 
 function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter }) {
-  console.log('📊 TopProducts component render:', { 
-    salesPerformanceLength: salesPerformance?.length,
-    salesPerformance: salesPerformance,  // Show all data
-    sampleItem: salesPerformance?.[0],  // Show structure of first item
-    salesInterval,
-    topProductsLength: topProducts?.length,
-    topProducts: topProducts,
-    productIdFilter: productIdFilter
-  });
-  
-  console.log('🎨 TopProducts component mounted and rendering charts');
+
   
   useEffect(() => {
-    console.log('📐 TopProducts useEffect - checking container dimensions');
+    
     const containers = document.querySelectorAll('[data-chart-container]');
     containers.forEach((container, index) => {
       const rect = container.getBoundingClientRect();
@@ -42,6 +32,21 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
   // GET SELECTED PRODUCT NAME
   const selectedProductName = productIdFilter ? 
     topProducts?.find(p => p.product_id === parseInt(productIdFilter))?.product_name : null;
+
+  
+  const VISIBLE_ROWS = 7;      
+
+  const BAR_SIZE = 30;        
+
+  const ROW_GAP = 44;      
+
+  const MARGIN_TOP = 10;           
+  const MARGIN_BOTTOM = 10;        
+  const itemsCount = Array.isArray(topProducts) ? topProducts.length : 0;
+  
+  const visibleHeight = (VISIBLE_ROWS * BAR_SIZE) + ((VISIBLE_ROWS - 1) * ROW_GAP) + MARGIN_TOP + MARGIN_BOTTOM; 
+
+  const totalHeight = (itemsCount * BAR_SIZE) + (Math.max(itemsCount - 1, 0) * ROW_GAP) + MARGIN_TOP + MARGIN_BOTTOM;
   
   return (
     <>
@@ -57,40 +62,56 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                   </button>
                 </div>
               )}
-              <div className="flex-1 min-h-0 overflow-hidden" data-chart-container="top-products">
+              <div
+                className="overflow-y-auto scrollbar-thin [scrollbar-color:transparent_transparent] [scrollbar-width:thin]"
+                data-chart-container="top-products"
+                style={{ height: visibleHeight, scrollbarColor: 'transparent transparent', scrollbarWidth: 'thin' }}
+              >
               {(!topProducts || topProducts.length === 0) ? (
                 <ChartNoData message="No top products for the selected filters." />
               ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topProducts} barSize={14} margin={{ top: 10, right: 5, left: 5, bottom: 5 }} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-                  {(() => {
-                      const max = topProducts.reduce((m,p)=> Math.max(m, Number(p.sales_amount)||0), 0);
-                      const padded = max === 0 ? 1 : Math.ceil((max * 1.1)/100)*100; 
-                      return <XAxis type="number" domain={[0, padded]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
-                  })()}
-                  <YAxis dataKey="product_name" type="category" tick={{ fontSize: 14 }} width={110} axisLine={false} tickLine={false} />
+                <ResponsiveContainer width="100%" height={totalHeight}>
+                    <BarChart
+                      data={topProducts}
+                      margin={{ top: MARGIN_TOP, right: 5, left: 5, bottom: MARGIN_BOTTOM }}
+                      layout="vertical"
+                      barCategoryGap={`${ROW_GAP}px`}
+                      barGap={0}
+                    >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                    {(() => {
+                        const max = topProducts.reduce((m,p)=> Math.max(m, Number(p.sales_amount)||0), 0);
+                        const padded = max === 0 ? 1 : Math.ceil((max * 1.1)/100)*100; 
+                        return <XAxis type="number" domain={[0, padded]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
+                    })()}
+                    <YAxis dataKey="product_name" type="category" tick={{ fontSize: 14 }} width={110} axisLine={false} tickLine={false} />
 
-                  
-                  <Tooltip formatter={(v)=>currencyFormat(v)} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                  <Bar dataKey="sales_amount" radius={[0,4,4,0]} onClick={handleClick} barSize={40} className='cursor-pointer'>
-                      {topProducts.map((entry, idx) => {
-                        const isSelected = productIdFilter && entry.product_id === parseInt(productIdFilter);
-                        let fillColor;
-                        if (isSelected) {
-                          fillColor = '#dc2626'; 
-                        } else if (idx < 3) {
-                          fillColor = '#16a34a'; 
-                        } else {
-                          fillColor = '#3bb3b3';
-                        }
-                        return <Cell key={`cell-${idx}`} fill={fillColor} />;
-                      })}
-                  </Bar>
+                    
+                    <Tooltip formatter={(v)=>currencyFormat(v)} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                    <Bar
+                      dataKey="sales_amount"
+                      radius={[0,4,4,0]}
+                      onClick={handleClick}
+                      className='cursor-pointer'
+                      barSize={BAR_SIZE}
+                      background={{ fill: '#F8FAFC' }}
+                    >
+                        {topProducts.map((entry, idx) => {
+                          const isSelected = productIdFilter && entry.product_id === parseInt(productIdFilter);
+                          let fillColor;
+                          if (isSelected) {
+                            fillColor = '#dc2626'; 
+                          } else if (idx < 3) {
+                            fillColor = '#16a34a'; 
+                          } else {
+                            fillColor = '#3bb3b3';
+                          }
+                          return <Cell key={`cell-${idx}`} fill={fillColor} />;
+                        })}
+                    </Bar>
 
-                  </BarChart>
-
-              </ResponsiveContainer>
+                    </BarChart>
+                </ResponsiveContainer>
             )}
               </div>
             </div>
