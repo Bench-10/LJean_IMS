@@ -185,8 +185,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       setTopProducts(top.data);
       setCategoryDist(cat.data);
       setKpis(kpi.data);
+
   // Ensure counts are numbers for the chart
-  setDeliveryData(delivery.data.map(d => ({ ...d, number_of_deliveries: Number(d.number_of_deliveries) })));
+     setDeliveryData(delivery.data.map(d => ({ ...d, number_of_deliveries: Number(d.number_of_deliveries) })));
       
       if (cat.data && cat.data.length && categories.length === 0) {
         
@@ -209,14 +210,15 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
    
     const isoMatch = p.match(/^(\d{4}-\d{2}-\d{2})(T.*)?$/);
     if(isoMatch) {
-      const d = new Date(isoMatch[1] + 'T00:00:00');
-      if(!isNaN(d)) return formatByInterval(d, salesInterval);
+      // USE DAYJS TO AVOID TIMEZONE ISSUES
+      const d = dayjs(isoMatch[1], 'YYYY-MM-DD');
+      if(d.isValid()) return formatByInterval(d.toDate(), salesInterval);
     }
    
     const ymMatch = p.match(/^(\d{4})-(\d{2})$/);
     if(ymMatch) {
-      const d = new Date(Number(ymMatch[1]), Number(ymMatch[2]) - 1, 1);
-      if(!isNaN(d)) return d.toLocaleDateString('en-US', { month:'short' });
+      const d = dayjs(`${ymMatch[1]}-${ymMatch[2]}-01`, 'YYYY-MM-DD');
+      if(d.isValid()) return d.format('MMM');
     }
     return p; 
   };

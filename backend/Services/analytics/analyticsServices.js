@@ -81,7 +81,12 @@ export async function fetchSalesPerformance({ branch_id, category_id, interval, 
     ${where}
     GROUP BY 1
     ORDER BY 1;`, params);
-  return rows;
+  
+  // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
+  return rows.map(row => ({
+    ...row,
+    period: dayjs(row.period).format('YYYY-MM-DD')
+  }));
 }
 
 
@@ -102,7 +107,12 @@ export async function fetchRestockTrends({ branch_id, interval, range }) {
     WHERE a.date_added BETWEEN $1 AND $2 ${branchFilter}
     GROUP BY 1
     ORDER BY 1;`, params);
-  return rows;
+  
+  // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
+  return rows.map(row => ({
+    ...row,
+    period: dayjs(row.period).format('YYYY-MM-DD')
+  }));
 }
 
 
@@ -386,7 +396,11 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
     GROUP BY date_trunc('${dateTrunc}', s.date)
     ORDER BY period;`, params);
     
-  return rows;
+  // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
+  return rows.map(row => ({
+    ...row,
+    period: dayjs(row.period).format('YYYY-MM-DD')
+  }));
 }
 
 

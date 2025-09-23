@@ -105,11 +105,8 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                          
                             <Tooltip labelFormatter={formatPeriod} />
 
-                            <Legend verticalAlign="top" height={24} wrapperStyle={{ fontSize: 10 }} />
-
                             <Line type="monotone" dataKey="sales_amount" name="Sales" stroke="#0f766e" strokeWidth={2} dot={false} />
 
-                            <Line type="monotone" dataKey="units_sold" name="Units" stroke="#0891b2" strokeWidth={2} dot={false} />
 
                         </LineChart>
 
@@ -119,32 +116,27 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                 </div>
 
             <div>
-                {/* Restock Trends Filter */}
+                {/* Demand Forecasting Filter */}
                 <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase">Demand Forecasting (Future Slot)</h3>
-                    <select value={restockInterval} onChange={e=>setRestockInterval(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white">
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="yearly">Yearly</option>
-                    </select>
+                    <h3 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase">Demand Forecasting (Units Sold)</h3>
+                    
                 </div>
 
-                {(!restockTrends || restockTrends.length === 0) ? (
+                {(!salesPerformance || salesPerformance.length === 0) ? (
                         <ChartNoData
-                          message="No sales performance data for the selected filters."
-                          hint="TRY ADJUSTING THE DATE RANGE."
+                          message="No units sold data for the selected filters."
+                          hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY."
                         />
                 ) : (
                 <div className="h-52 max-h-52 overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={restockTrends} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
+                    <AreaChart data={salesPerformance} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
                         <defs>
 
-                        <linearGradient id="colorAdd" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
 
-                            <stop offset="5%" stopColor="#3bb3b3" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="#3bb3b3" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#0891b2" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="#0891b2" stopOpacity={0}/>
 
 
                         </linearGradient>
@@ -157,7 +149,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                         <XAxis dataKey="period" tick={{ fontSize: 10 }} tickFormatter={formatPeriod} />
                         
                         {(() => {
-                            const max = restockTrends.reduce((m,p)=> Math.max(m, Number(p.total_added)||0), 0);
+                            const max = salesPerformance.reduce((m,p)=> Math.max(m, Number(p.units_sold)||0), 0);
                             
                             if (max <= 0) return <YAxis tick={{ fontSize: 10 }} domain={[0, 1]} />;
                             
@@ -168,9 +160,12 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                             return <YAxis tick={{ fontSize: 10 }} domain={[0, padded]} />;
                         })()}
                         
-                        <Tooltip labelFormatter={formatPeriod} />
+                        <Tooltip 
+                            labelFormatter={formatPeriod} 
+                            formatter={(value) => [`${value} units`, 'Units Sold']}
+                        />
                         
-                        <Area type="monotone" dataKey="total_added" stroke="#3bb3b3" fillOpacity={1} fill="url(#colorAdd)" />
+                        <Area type="monotone" dataKey="units_sold" stroke="#0891b2" fillOpacity={1} fill="url(#colorUnits)" />
 
                     </AreaChart>
 

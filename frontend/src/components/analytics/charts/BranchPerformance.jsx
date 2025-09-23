@@ -6,7 +6,7 @@ import { currencyFormat } from '../../../utils/formatCurrency.js';
 import dayjs from 'dayjs';
 import ChartNoData from '../../common/ChartNoData.jsx';
 
-function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayISO, categoryFilter }) {
+function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, categoryFilter }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]); 
   const [loading, setLoading] = useState(false);
@@ -93,7 +93,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, todayI
           params
         });
         const branchData = branchSummaryRes.data || [];
-        console.log('📊 Branch performance data received:', branchData);
+        
         setBranchTotals(branchData);
       } catch (e) {
         console.error('Branch performance fetch error:', e);
