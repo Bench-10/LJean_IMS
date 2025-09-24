@@ -121,7 +121,6 @@ export default function OwnerAnalytics(){
             </div>
           )}
           
-          <button onClick={()=>navigate('/branches')} className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-md">View Branch Analytics</button>
         </div>
       </div>
 

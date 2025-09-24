@@ -279,7 +279,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
         {(!branchId) &&
 
-            <NavLink to="/branches" className={`relative py-1 px-2 border-2 rounded-md border-gray-600 transition-all cursor-pointer hover:text-white hover:bg-gray-600`} >
+            <NavLink to="/branches" className={`relative py-2 px-4 border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100`} >
 
               <span className="text-sm">
                   View Branch Anlytics

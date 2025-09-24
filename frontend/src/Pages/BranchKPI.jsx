@@ -31,7 +31,7 @@ export default function BranchKPI(){
   <div className='ml-[220px] px-6 py-6 h-full overflow-hidden bg-[#eef2ee] flex flex-col min-h-0'>
       <div className="flex items-center gap-4 flex-wrap mb-4"> 
 
-        <NavLink to="/branches" className="flex gap-2 items-center border border-gray-600 px-3 py-1 rounded-md text-sm text-gray-700 hover:bg-gray-600 hover:text-white transition-colors">
+        <NavLink to="/branches" className="flex gap-2 items-center relative py-1 px-4 border-2 bg-white font-medium rounded-md text-xs text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100">
           <IoArrowBack /> Branches
 
         </NavLink>
