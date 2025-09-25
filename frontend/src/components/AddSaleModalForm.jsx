@@ -5,7 +5,7 @@ import  toTwoDecimals from '../utils/fixedDecimalPlaces.js';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 import dayjs from 'dayjs';
-import axios from 'axios';
+import api from '../utils/api.js';
 
 
 function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSaleHeader, fetchProductsData}) {
@@ -353,7 +353,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   
 
 
-    const data = await axios.post('http://localhost:3000/api/sale', saleData);
+    const data = await api.post(`/api/sale`, saleData);
     setSaleHeader((prevData) => [...prevData, data.data]);
 
     setEmptyQuantiy(false);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { RxCross2 } from "react-icons/rx";
-import axios from 'axios';
+import api from '../utils/api';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 
 function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes, setOpenUsers}) {
@@ -202,7 +202,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
 
         //CHECK IF USERNAME ALREADY EXIST
-        const response = await axios.get('http://localhost:3000/api/existing_account', { params: {username}});
+        const response = await api.get(`/api/existing_account`, { params: {username}});
 
         if (response.data.result){
 
@@ -243,7 +243,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
      if (mode === 'add'){
         try {
-        const response = await axios.post('http://localhost:3000/api/create_account', userData);
+        const response = await api.post(`/api/create_account`, userData);
         fetchUsersinfo();
         console.log('Item Added', response.data);
         
@@ -256,7 +256,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
      if (mode === 'edit'){
         try {
-        const response = await axios.put(`http://localhost:3000/api/update_account/${userDetailes.user_id}`, userData);
+        const response = await api.put(`/api/update_account/${userDetailes.user_id}`, userData);
         await fetchUsersinfo();
         await setUserDetailes(response.data);
         

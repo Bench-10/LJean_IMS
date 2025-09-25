@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./utils/api.js";
 import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 import ModalForm from "./components/ModalForm";
@@ -67,7 +67,7 @@ function App() {
       return;
     }
 
-    const newSocket = io('http://localhost:3000');
+    const newSocket = io(`${import.meta.env.VITE_API_URL}`);
     
     newSocket.on('connect', () => {
       console.log('Connected to server');
@@ -113,9 +113,9 @@ function App() {
       try {
         let response;
         if (!user.role.some(role => ['Branch Manager', 'Owner'].includes(role))){
-          response = await axios.get(`http://localhost:3000/api/items?branch_id=${user.branch_id}`);
+          response = await api.get(`/api/items?branch_id=${user.branch_id}`);
         } else {
-          response = await axios.get(`http://localhost:3000/api/items/`);
+          response = await api.get(`/api/items/`);
         }
         setProductsData(response.data);
       } catch (error) {
@@ -146,7 +146,7 @@ function App() {
   const handleSubmit = async (newItem) =>{
     if (modalMode === 'add'){
       try {
-        const response = await axios.post('http://localhost:3000/api/items/', newItem);
+        const response = await api.post(`/api/items/`, newItem);
         setProductsData((prevData) => [...prevData, response.data]);
         console.log('Item Added', response.data);
 
@@ -168,7 +168,7 @@ function App() {
     } else{
       try {
         console.log(itemData)
-        const response = await axios.put(`http://localhost:3000/api/items/${itemData.product_id}`, newItem);
+        const response = await api.put(`/api/items/${itemData.product_id}`, newItem);
         setProductsData((prevData) => 
           prevData.map((item) => (item.product_id === itemData.product_id ? response.data : item))
         );
@@ -195,7 +195,7 @@ function App() {
 
   const fetchSaleRecords = async() =>{
     try {
-      const saleHeader = await axios.get(`http://localhost:3000/api/sale?branch_id=${user.branch_id}`);
+      const saleHeader = await api.get(`/api/sale?branch_id=${user.branch_id}`);
       setSaleHeader(saleHeader.data);
     } catch (error) {
       console.log(error);
@@ -207,7 +207,7 @@ function App() {
   const getDeliveries = async () => {
     try {
 
-      const data = await axios.get(`http://localhost:3000/api/delivery?branch_id=${user.branch_id}`);
+      const data = await api.get(`/api/delivery?branch_id=${user.branch_id}`);
       setDeliveryData(data.data);
 
     } catch (error) {
@@ -232,7 +232,7 @@ function App() {
   //FOR NOTIFICATION DATA
   const getTime = async () =>{
     try {
-      const time = await axios.get(`http://localhost:3000/api/notifications?branch_id=${user.branch_id}&user_id=${user.user_id}&hire_date=${user.hire_date}`);
+      const time = await api.get(`/api/notifications?branch_id=${user.branch_id}&user_id=${user.user_id}&hire_date=${user.hire_date}`);
       setNotify(time.data);
     } catch (error) {
       console.log(error.message);
@@ -277,7 +277,7 @@ function App() {
   //FETCHING THE BRANCH GLOBALLY
   const fetchBranch = async() =>{
     try {
-        const branch = await axios.get('http://localhost:3000/api/branches');
+        const branch = await api.get(`/api/branches`);
         setBranches(branch.data);
     } catch (error) {
         console.log(error)
@@ -288,7 +288,7 @@ function App() {
   //FOR ADDING USER
   const fetchUsersinfo = async() =>{
 
-    const response = await axios.get('http://localhost:3000/api/users');
+    const response = await api.get(`/api/users`);
     setUsers(response.data)
 
   };
@@ -306,7 +306,7 @@ function App() {
 
 
   const deleteUser = async(userID) =>{
-    await axios.delete(`http://localhost:3000/api/delete_account/${userID}`);
+    await api.delete(`/api/delete_account/${userID}`);
     fetchUsersinfo();
 
   };
@@ -321,7 +321,7 @@ function App() {
 
     if (userToDisable.is_disabled){
         
-        await axios.put(`http://localhost:3000/api/disable/${userToDisable.user_id}`, {isDisabled: false})
+        await api.put(`/api/disable/${userToDisable.user_id}`, {isDisabled: false})
         setUsers((prev) =>
           prev.map((user) =>
             user.user_id === userToDisable.user_id
@@ -332,7 +332,7 @@ function App() {
 
     } else {
 
-        await axios.put(`http://localhost:3000/api/disable/${userToDisable.user_id}`, {isDisabled: true})
+        await api.put(`/api/disable/${userToDisable.user_id}`, {isDisabled: true})
           setUsers((prev) =>
             prev.map((user) =>
               user.user_id === userToDisable.user_id

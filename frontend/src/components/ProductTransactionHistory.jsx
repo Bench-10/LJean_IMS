@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api.js';
 import { BsFunnelFill } from "react-icons/bs";
 import NoInfoFound from './common/NoInfoFound.jsx';
 import { useAuth } from '../authentication/Authentication';
@@ -61,9 +61,9 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
       try {
         let response;
         if (!user.role.some(role => ['Owner'].includes(role))){
-          response = await axios.post(`http://localhost:3000/api/product_history?branch_id=${user.branch_id}`, dates);
+          response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
         } else{
-          response = await axios.post(`http://localhost:3000/api/product_history/`, dates);
+          response = await api.post(`/api/product_history/`, dates);
         }
         setProductHistory(response.data);
       } catch (error) {

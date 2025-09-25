@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { useAuth } from '../../../authentication/Authentication.jsx';
-import axios from 'axios';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
-import dayjs from 'dayjs';
+import api from '../../../utils/api.js';
 
 function BranchTimeline({ Card, categoryFilter, allBranches }) {
   const { user } = useAuth();
@@ -51,7 +50,7 @@ function BranchTimeline({ Card, categoryFilter, allBranches }) {
         
         console.log('📊 Fetching branch timeline with params:', params);
         
-        const response = await axios.get('http://localhost:3000/api/analytics/branch-timeline', { 
+        const response = await api.get(`/api/analytics/branch-timeline`, { 
           params 
         });
         

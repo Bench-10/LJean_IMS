@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
-import axios from 'axios';
+import api from '../../utils/api.js';
 import {currencyFormat} from '../../utils/formatCurrency.js';
 import { NavLink } from "react-router-dom";
 import TopProducts from './charts/TopProducts.jsx';
@@ -30,7 +30,7 @@ const CategorySelect = ({ categoryFilter, setCategoryFilter, onCategoryNameChang
   const [list, setList] = useState([]);
   useEffect(()=>{
     async function load(){
-      try { const res = await axios.get('http://localhost:3000/api/categories'); setList(res.data); } catch(e){ console.error(e);} }
+      try { const res = await api.get(`/api/categories`); setList(res.data); } catch(e){ console.error(e);} }
     load();
   },[]);
   return (
@@ -116,10 +116,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [allBranches, setAllBranches] = useState([]);
   useEffect(()=>{ if(canSelectBranch || (!branchId && isOwner)) loadBranches(); }, [canSelectBranch, branchId, isOwner]);
   async function loadBranches(){
-    try { const res = await axios.get('http://localhost:3000/api/analytics/branches'); setAllBranches(res.data); } catch(e){ console.error(e);} }
+    try { const res = await api.get(`/api/analytics/branches`); setAllBranches(res.data); } catch(e){ console.error(e);} }
 
   async function fetchAll(){
-    const base = 'http://localhost:3000/api/analytics';
+    const base = `/api/analytics`;
     
     let start_date = startDate;
     let end_date = endDate;
@@ -174,13 +174,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
     try {
       const [sales, restock, levels, top, cat, kpi, delivery] = await Promise.all([
-        axios.get(`${base}/sales-performance`, { params: paramsSales }),
-        axios.get(`${base}/restock-trends`, { params: paramsRestock }),
-        axios.get(`${base}/inventory-levels`, { params: paramsLevels }),
-        axios.get(`${base}/top-products`, { params: paramsTop }),
-        axios.get(`${base}/category-distribution`, { params: { branch_id: branchId } }),
-        axios.get(`${base}/kpis`, { params: paramsKPI }),
-        axios.get(`${base}/delivery`, { params: paramsDelivery })
+        api.get(`${base}/sales-performance`, { params: paramsSales }),
+        api.get(`${base}/restock-trends`, { params: paramsRestock }),
+        api.get(`${base}/inventory-levels`, { params: paramsLevels }),
+        api.get(`${base}/top-products`, { params: paramsTop }),
+        api.get(`${base}/category-distribution`, { params: { branch_id: branchId } }),
+        api.get(`${base}/kpis`, { params: paramsKPI }),
+        api.get(`${base}/delivery`, { params: paramsDelivery })
       ]);
 
       setSalesPerformance(sales.data);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api.js';
 import { currencyFormat } from '../utils/formatCurrency.js';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -57,8 +57,8 @@ export default function OwnerAnalytics(){
 
       const range = '6m';
       const [kpiRes, salesRes] = await Promise.all([
-        axios.get('http://localhost:3000/api/analytics/kpis', { params: { start_date, end_date } }),
-        axios.get('http://localhost:3000/api/analytics/sales-performance', { params: { interval, range } })
+        api.get(`/api/analytics/kpis`, { params: { start_date, end_date } }),
+        api.get(`/api/analytics/sales-performance`, { params: { interval, range } })
       ]);
 
       setKpis(kpiRes.data);

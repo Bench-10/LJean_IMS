@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 
 const AuthContext = createContext();
@@ -14,7 +14,7 @@ function Authentication ({ children }) {
 
   const loginAuthentication = async (username, password) => {
     try {
-      const response = await axios.post('http://localhost:3000/api/authentication', { username, password });
+      const response = await api.post(`/api/authentication`, { username, password });
       const userData = response.data[0];
       setUser(userData);
       localStorage.setItem('userInfo', JSON.stringify(userData));
@@ -34,7 +34,7 @@ function Authentication ({ children }) {
   const logout = async () => {
 
     if (!user.role.some(role => ['Owner'].includes(role))){
-      await axios.put(`http://localhost:3000/api/authentication/${user.user_id}`, { activity: false });
+      await api.put(`/api/authentication/${user.user_id}`, { activity: false });
     }
 
     setUser(null);

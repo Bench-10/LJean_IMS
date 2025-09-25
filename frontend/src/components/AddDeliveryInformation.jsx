@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../utils/api.js';
 import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 
@@ -54,12 +54,12 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
         };
 
         if (mode === 'add'){
-            const response = await axios.post('http://localhost:3000/api/delivery/', payload);
+            const response = await api.post(`/api/delivery/`, payload);
             getDeliveries()
             console.log('New Delivery Added', response.data);
         } else {
 
-            const delivery = await axios.put(`http://localhost:3000/api/delivery/${deliveryEditData.sales_information_id}`, payload);
+            const delivery = await api.put(`/api/delivery/${deliveryEditData.sales_information_id}`, payload);
         
             getDeliveries((prevData) => 
                 prevData.map((item) => (item.sales_information_id === Number(id) ? {...item, is_delivered: delivery.data} : item))

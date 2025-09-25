@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
-import axios from 'axios';
+import api from '../utils/api';
 
 function BranchAnalyticsCards() {
     const [branches, setBranches] = useState([]);
@@ -13,7 +13,7 @@ function BranchAnalyticsCards() {
     async function loadBranches(){
         try {
             setLoading(true); setError(null);
-            const res = await axios.get('http://localhost:3000/api/analytics/branches');
+            const res = await api.get(`/api/analytics/branches`);
             setBranches(res.data);
         } catch(e){ setError('Failed to load branches'); }
         finally { setLoading(false); }

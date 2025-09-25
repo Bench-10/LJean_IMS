@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../utils/api';
 import { useEffect, useState, React, useRef} from 'react';
 import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
@@ -123,7 +123,7 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
     ));
 
     //UPDATES THE BACKEND
-    await axios.post(`http://localhost:3000/api/notifications`,{ alert_id: alert_id, user_id: user.user_id});
+    await api.post(`/api/notifications`,{ alert_id: alert_id, user_id: user.user_id});
 
   };
 

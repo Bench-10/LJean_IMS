@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../../../authentication/Authentication.jsx';
-import axios from 'axios';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
-import dayjs from 'dayjs';
 import ChartNoData from '../../common/ChartNoData.jsx';
+import api from '../../../utils/api.js';
 
 function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, categoryFilter }) {
   const { user } = useAuth();
@@ -89,7 +88,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
         console.log('📊 Fetching branch performance with params:', params);
         
         // USE EFFICIENT BACKEND ENDPOINT FOR BRANCH SUMMARY
-        const branchSummaryRes = await axios.get('http://localhost:3000/api/analytics/branches-summary', { 
+        const branchSummaryRes = await api.get(`/api/analytics/branches-summary`, { 
           params
         });
         const branchData = branchSummaryRes.data || [];

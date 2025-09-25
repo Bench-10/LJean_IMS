@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import axios from 'axios';
+import api from '../utils/api';
 
 function Category({isCategoryOpen, onClose, setListCategories, listCategories, fetchProductsData, sanitizeInput}) {
 
@@ -18,7 +18,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
 
   const generateCategories =  async() => {
       try {
-        const response = await axios.get('http://localhost:3000/api/categories/');
+        const response = await api.get(`/api/categories/`);
         setListCategories(response.data);
       } catch (error) {
         setError(error.message);
@@ -38,7 +38,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
       return;
 
       try {
-        const response = await axios.post('http://localhost:3000/api/categories/', {category_name});
+        const response = await api.post(`/api/categories/`, {category_name});
         setListCategories((prevData) => [...prevData, response.data]);
         console.log('Category Added', response.data);
         
@@ -52,7 +52,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
           return
 
         const category_name = editCategory_name;
-        const response = await axios.put(`http://localhost:3000/api/categories/${selectEditCategory.category_id}`, { category_name }  );
+        const response = await api.put(`/api/categories/${selectEditCategory.category_id}`, { category_name }  );
         setListCategories((prevData) => 
           prevData.map((cat) => (cat.category_id === selectEditCategory.category_id ? response.data : cat))
         );

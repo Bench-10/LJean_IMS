@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import NoInfoFound from './common/NoInfoFound';
-import axios from 'axios';
+import api from '../utils/api';
 import { currencyFormat } from '../utils/formatCurrency';
 import { BsTelephoneFill } from "react-icons/bs";
 import { RiCellphoneFill } from "react-icons/ri";
@@ -16,7 +16,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
     },[openModal])
 
     const items = async () =>{
-        const soldItems = await axios.get(`http://localhost:3000/api/sale_items?sale_id=${sale_id}`);
+        const soldItems = await api.get(`/api/sale_items?sale_id=${sale_id}`);
 
         setSoldItems(soldItems.data);
     }

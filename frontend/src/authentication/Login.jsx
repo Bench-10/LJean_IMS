@@ -5,7 +5,7 @@ import { FaUser, FaLock, FaEye, FaExclamationCircle } from 'react-icons/fa';
 import './login.css';
 import { useAuth } from './Authentication'; 
 import TooMuchAttempts from '../components/dialogs/TooMuchAttempts';
-import axios from 'axios';
+import api from '../utils/api';
 
 
 function Login() {
@@ -135,7 +135,7 @@ function Login() {
         if (usernameWithInvalidPass === username){
           if(trials.current > 10){
             
-            await axios.put(`http://localhost:3000/api/disable_on_attempt/${username}`, {isDisabled: true})
+            await api.put(`/api/disable_on_attempt/${username}`, {isDisabled: true})
             setShowTooManyAttempts(true);
             return;
           } 

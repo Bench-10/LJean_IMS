@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api.js';
 import { useParams, NavLink } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
 import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard.jsx';
@@ -16,7 +16,7 @@ export default function BranchKPI(){
     try {
 
       setLoading(true); setError(null);
-      const res = await axios.get('http://localhost:3000/api/analytics/branches');
+      const res = await api.get(`/api/analytics/branches`);
       const found = res.data.find(b=> String(b.branch_id) === String(branchId));
       setBranchName(found ? found.branch_name : `Branch ${branchId}`);
     } catch(e){ 

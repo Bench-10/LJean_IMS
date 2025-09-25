@@ -17,14 +17,18 @@ const app  = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "*", //CHANGE THIS WHEN ITS TIME FOR HOSTING
     methods: ["GET", "POST"]
   }
 });
 
 dotenv.config();
 
-app.use(cors());
+app.use(cors({
+  origin: "*", 
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  credentials: true
+}));
 
 app.use(express.json());
 
@@ -109,7 +113,7 @@ export const broadcastToUser = (userId, notification) => {
 
 
 
-server.listen(PORT, async ()=>{
+server.listen(PORT, '0.0.0.0', async ()=>{
     console.log('Port '+ PORT + ' is currently running....' )
 });
 
