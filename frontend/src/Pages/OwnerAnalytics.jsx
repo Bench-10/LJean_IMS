@@ -15,7 +15,7 @@ const KPIBlock = ({ color, title, value, note }) => (
 
 export default function OwnerAnalytics(){
   const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0, inventory_count: 0 });
-  const [salesPerformance, setSalesPerformance] = useState([]);
+  const [salesPerformance, setSalesPerformance] = useState({ history: [], forecast: [], series: [] });
   const [interval, setInterval] = useState('monthly');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,11 +58,22 @@ export default function OwnerAnalytics(){
       const range = '6m';
       const [kpiRes, salesRes] = await Promise.all([
         api.get(`/api/analytics/kpis`, { params: { start_date, end_date } }),
-        api.get(`/api/analytics/sales-performance`, { params: { interval, range } })
+        api.get(`/api/analytics/sales-performance`, { params: { interval, range, start_date, end_date } })
       ]);
 
       setKpis(kpiRes.data);
-      setSalesPerformance(salesRes.data && salesRes.data.length ? salesRes.data : []);
+      const normalizedSales = Array.isArray(salesRes.data)
+        ? {
+            history: salesRes.data,
+            forecast: [],
+            series: salesRes.data
+          }
+        : {
+            history: salesRes.data?.history ?? [],
+            forecast: salesRes.data?.forecast ?? [],
+            series: salesRes.data?.series ?? salesRes.data?.history ?? []
+          };
+      setSalesPerformance(normalizedSales);
     } catch(e){
 
       setError('Failed to load KPIs');

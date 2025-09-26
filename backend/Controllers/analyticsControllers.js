@@ -25,9 +25,24 @@ export const getInventoryLevels = async (req, res) => {
 
 export const getSalesPerformance = async (req, res) => {
   try {
-     
-    const { branch_id, category_id, product_id, interval = 'monthly', range = '1y' } = req.query;
-    const rows = await analyticsServices.fetchSalesPerformance({ branch_id, category_id, product_id, interval, range });
+    const {
+      branch_id,
+      category_id,
+      product_id,
+      interval = 'monthly',
+      range = '1y',
+      start_date,
+      end_date
+    } = req.query;
+    const rows = await analyticsServices.fetchSalesPerformance({
+      branch_id,
+      category_id,
+      product_id,
+      interval,
+      range,
+      start_date,
+      end_date
+    });
     res.json(rows);
   } catch (err) {
 

@@ -1,6 +1,7 @@
 import { SQLquery } from '../../db.js';
 import { correctDateFormat } from '../Services_Utils/convertRedableDate.js';
 import dayjs from 'dayjs';
+import { runDemandForecast } from '../forecasting/forecastService.js';
 
 
 function buildDateRange(range){
@@ -62,8 +63,16 @@ export async function fetchInventoryLevels({ branch_id, range }) {
 
 
 
-export async function fetchSalesPerformance({ branch_id, category_id, product_id, interval, range }) {
-  const { start, end } = buildDateRange(range);
+export async function fetchSalesPerformance({ branch_id, category_id, product_id, interval, range, start_date, end_date }) {
+  let start;
+  let end;
+
+  if (start_date && end_date) {
+    start = start_date;
+    end = end_date;
+  } else {
+    ({ start, end } = buildDateRange(range));
+  }
   const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
   const conditions = ['s.date BETWEEN $1 AND $2'];
   const params = [start, end];
@@ -84,10 +93,43 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     ORDER BY 1;`, params);
   
   // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
-  return rows.map(row => ({
-    ...row,
-    period: dayjs(row.period).format('YYYY-MM-DD')
+  const history = rows.map(row => ({
+    period: dayjs(row.period).format('YYYY-MM-DD'),
+    sales_amount: Number(row.sales_amount || 0),
+    units_sold: Number(row.units_sold || 0)
   }));
+
+  let forecast = [];
+  try {
+    const forecastInput = history.map(item => ({
+      period: item.period,
+      value: item.units_sold
+    }));
+    forecast = await runDemandForecast({ history: forecastInput, interval });
+  } catch (err) {
+    console.error('Sales forecast error', err);
+    forecast = [];
+  }
+
+
+  const forecastSeries = forecast.map(point => ({
+    period: point.period,
+    units_sold: Number(point.forecast || 0),
+    forecast_lower: point.forecast_lower != null ? Number(point.forecast_lower) : null,
+    forecast_upper: point.forecast_upper != null ? Number(point.forecast_upper) : null,
+    is_forecast: true
+  }));
+
+  const combinedSeries = [
+    ...history.map(item => ({ ...item, is_forecast: false })),
+    ...forecastSeries
+  ];
+
+  return {
+    history,
+    forecast: forecastSeries,
+    series: combinedSeries
+  };
 }
 
 

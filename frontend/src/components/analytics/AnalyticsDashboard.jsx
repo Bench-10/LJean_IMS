@@ -47,7 +47,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   // ROLE CHECK: ONLY OWNER SHOULD SEE BRANCH PERFORMANCE OPTION
   const isOwner = user?.role?.some(role => ['Owner'].includes(role));
 
-  const [salesPerformance, setSalesPerformance] = useState([]);
+  const [salesPerformance, setSalesPerformance] = useState({ history: [], forecast: [], series: [] });
   const [restockTrends, setRestockTrends] = useState([]);
   const [inventoryLevels, setInventoryLevels] = useState([]);
   const [categoryDist, setCategoryDist] = useState([]);
@@ -112,7 +112,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   });
 
 
-  useEffect(()=>{ fetchAll(); }, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryStatus, productIdFilter]);
+  useEffect(()=>{ fetchAll();  console.log(salesPerformance);}, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryStatus, productIdFilter]);
   const [allBranches, setAllBranches] = useState([]);
   useEffect(()=>{ if(canSelectBranch || (!branchId && isOwner)) loadBranches(); }, [canSelectBranch, branchId, isOwner]);
   async function loadBranches(){
@@ -141,7 +141,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     }
 
     // Sales performance uses salesInterval
-    const paramsSales = { interval: salesInterval };
+  const paramsSales = { interval: salesInterval };
     if (branchId) paramsSales.branch_id = branchId;
     if (categoryFilter) paramsSales.category_id = categoryFilter;
     if (productIdFilter) paramsSales.product_id = productIdFilter;
@@ -183,7 +183,19 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         api.get(`${base}/delivery`, { params: paramsDelivery })
       ]);
 
-      setSalesPerformance(sales.data);
+      const normalizedSales = Array.isArray(sales.data)
+        ? {
+            history: sales.data,
+            forecast: [],
+            series: sales.data
+          }
+        : {
+            history: sales.data?.history ?? [],
+            forecast: sales.data?.forecast ?? [],
+            series: sales.data?.series ?? sales.data?.history ?? []
+          };
+
+      setSalesPerformance(normalizedSales);
       setRestockTrends(restock.data);
       setInventoryLevels(levels.data);
       setTopProducts(top.data);
