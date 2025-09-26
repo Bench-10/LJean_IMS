@@ -13,7 +13,7 @@ function getDb() {
             database: process.env.PG_DATABASE,
             password: process.env.PG_PASSWORD,
             port: process.env.PG_PORT,
-            max: 15
+            max: 20
         });
         
         dbInstance.on('error', (err) => {

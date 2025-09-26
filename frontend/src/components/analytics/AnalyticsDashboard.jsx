@@ -14,6 +14,7 @@ import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown, FaShoppingCart
 import { HiOutlineBuildingOffice2 } from "react-icons/hi2";
 import { AiFillProduct } from "react-icons/ai";
 import { useAuth } from '../../authentication/Authentication.jsx';
+import ChartLoading from '../common/ChartLoading.jsx';
 
 
 
@@ -52,6 +53,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [inventoryLevels, setInventoryLevels] = useState([]);
   const [categoryDist, setCategoryDist] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
+  
+  // Loading states for each chart
+  const [loadingSalesPerformance, setLoadingSalesPerformance] = useState(false);
+  const [loadingTopProducts, setLoadingTopProducts] = useState(false);
+  const [loadingDelivery, setLoadingDelivery] = useState(false);
+  const [loadingKPIs, setLoadingKPIs] = useState(false);
+  const [loadingBranchPerformance, setLoadingBranchPerformance] = useState(false);
   
   // Graph intervals (separate from KPI/Top Products)
   const [salesInterval, setSalesInterval] = useState('monthly');
@@ -120,6 +128,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
   async function fetchAll(){
     const base = `/api/analytics`;
+    
+    // Set loading states
+    setLoadingSalesPerformance(true);
+    setLoadingTopProducts(true);
+    setLoadingDelivery(true);
+    setLoadingKPIs(true);
+    if (!branchId && isOwner) setLoadingBranchPerformance(true);
     
     let start_date = startDate;
     let end_date = endDate;
@@ -202,14 +217,21 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       setCategoryDist(cat.data);
       setKpis(kpi.data);
 
-  // Ensure counts are numbers for the chart
-     setDeliveryData(delivery.data.map(d => ({ ...d, number_of_deliveries: Number(d.number_of_deliveries) })));
+      // Ensure counts are numbers for the chart
+      setDeliveryData(delivery.data.map(d => ({ ...d, number_of_deliveries: Number(d.number_of_deliveries) })));
       
       if (cat.data && cat.data.length && categories.length === 0) {
         
       }
     } catch(e){
       console.error('Analytics fetch error', e);
+    } finally {
+      // Clear loading states
+      setLoadingSalesPerformance(false);
+      setLoadingTopProducts(false);
+      setLoadingDelivery(false);
+      setLoadingKPIs(false);
+      setLoadingBranchPerformance(false);
     }
   }
 
@@ -394,11 +416,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       </div>
 
       {/* KPI CARDS*/}
-  <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+  <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 relative">
+            
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
-
+              {loadingKPIs && <ChartLoading message='Loading total sales' type='kpi' /> }
               <div className='mr-5 ml-1'>
                 
+
                 <FaShoppingCart className='text-4xl text-green-500'/>
                 
                
@@ -428,6 +452,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
 
+              {loadingKPIs && <ChartLoading message='Loading total investments' type='kpi' /> }
+
               <div className='mr-5 ml-1'>
                 
                 <FaPiggyBank className='text-4xl text-yellow-500'/>
@@ -452,6 +478,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
 
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+
+              {loadingKPIs && <ChartLoading message='Loading total profit' type='kpi' /> }
 
               <div className='mr-5 ml-1'>
                 
@@ -478,6 +506,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
             {/* INVENTORY COUNT KPI */}
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+
+              {loadingKPIs && <ChartLoading message='Loading produc count' type='kpi' /> }
 
               <div className='mr-5 ml-1'>
                
@@ -519,6 +549,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             setRestockInterval={setRestockInterval}
             setProductIdFilter={setProductIdFilter}
             productIdFilter={productIdFilter}
+            loadingSalesPerformance={loadingSalesPerformance}
+            loadingTopProducts={loadingTopProducts}
           />
         )
 
@@ -535,6 +567,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             setDeliveryInterval={setDeliveryInterval}
             deliveryStatus={deliveryStatus}
             setDeliveryStatus={setDeliveryStatus}
+            loadingDelivery={loadingDelivery}
           />
         )
        
@@ -553,12 +586,14 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               endDate={endDate}
               todayISO={todayISO}
               categoryFilter={categoryFilter}
+              loadingBranchPerformance={loadingBranchPerformance}
             />
             
             <BranchTimeline
               Card={Card}
               categoryFilter={categoryFilter}
               allBranches={allBranches}
+              loadingBranchTimeline={loadingBranchPerformance}
             />
           </>
         )

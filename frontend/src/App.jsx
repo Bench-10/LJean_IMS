@@ -22,6 +22,7 @@ import { useAuth } from "./authentication/Authentication";
 import BranchAnalyticsCards from "./Pages/BranchAnalyticsCards";
 import BranchKPI from "./Pages/BranchKPI.jsx";
 import AddDeliveryInformation from "./components/AddDeliveryInformation.jsx";
+import FormLoading from "./components/common/FormLoading";
 
 
 
@@ -46,6 +47,7 @@ function App() {
   const [inAppNotifMessage, setInAppNotifMessage] = useState('');
   const [deliveryData, setDeliveryData] = useState([]);
   const [deliveryEditData, setDeliveryEdit] = useState([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Socket connection
   const [socket, setSocket] = useState(null);
@@ -55,7 +57,7 @@ function App() {
 
   //PREVENTS SCRIPTS ATTACKS ON INPUT FIELDS
   function sanitizeInput(input) {
-    return input.replace(/[<>\/"']/g, '');
+    return input.replace(/[<>="']/g, '');
   }
 
 
@@ -305,10 +307,16 @@ function App() {
 
 
 
-  const deleteUser = async(userID) =>{
-    await api.delete(`/api/delete_account/${userID}`);
-    fetchUsersinfo();
-
+  const deleteUser = async(userID) => {
+    try {
+      setDeleteLoading(true);
+      await api.delete(`/api/delete_account/${userID}`);
+      fetchUsersinfo();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
 
@@ -363,6 +371,10 @@ function App() {
   return (
 
     <>
+
+      {deleteLoading && (
+        <FormLoading message="Deleting user account..." />
+      )}
 
       {/*COMPONENTS*/}
       <AddSaleModalForm
@@ -428,6 +440,7 @@ function App() {
         onClose={() => setOpenUsers(false)} 
         handleUserModalOpen={handleUserModalOpen}
         deleteUser={deleteUser}
+        deleteLoading={deleteLoading}
         
       />
 

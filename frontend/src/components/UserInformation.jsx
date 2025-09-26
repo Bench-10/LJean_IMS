@@ -4,8 +4,9 @@ import { FiEdit } from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
 import { RxCross2 } from "react-icons/rx";
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
+import FormLoading from './common/FormLoading';
 
-function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser}) {
+function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser, deleteLoading}) {
 
   const {user} = useAuth();
 
@@ -18,6 +19,9 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
   return (
     <div>
 
+      {deleteLoading && (
+        <FormLoading message="Deleting user account..." />
+      )}
 
         {openDialog && 
                   

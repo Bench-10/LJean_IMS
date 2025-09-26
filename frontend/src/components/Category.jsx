@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import api from '../utils/api';
+import FormLoading from './common/FormLoading';
 
 function Category({isCategoryOpen, onClose, setListCategories, listCategories, fetchProductsData, sanitizeInput}) {
 
@@ -7,6 +8,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
   const [editCategory_name, setEditcategoryName] = useState ('')
   const [openEdit, setOpenEdit] = useState(false);
   const [selectEditCategory, setSelectEditCategory] = useState({});
+  const [loading, setLoading] = useState(false);
 
 
   useEffect(()=>{
@@ -32,22 +34,19 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
 
 
   const submitCategory = async (type) =>{
+    
+    try {
+      setLoading(true);
 
-    if (type === 'add'){
-      if (category_name.length === 0)
-      return;
+      if (type === 'add'){
+        if (category_name.length === 0)
+        return;
 
-      try {
         const response = await api.post(`/api/categories/`, {category_name});
         setListCategories((prevData) => [...prevData, response.data]);
         console.log('Category Added', response.data);
         
-      } catch (error) {
-        console.error('Error adding Item', error);
-      }
-
-    } else if (type === 'edit') {
-      try {
+      } else if (type === 'edit') {
         if (editCategory_name.length === 0)
           return
 
@@ -57,24 +56,26 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
           prevData.map((cat) => (cat.category_id === selectEditCategory.category_id ? response.data : cat))
         );
         
-
         console.log('Item Updated', response.data);
-        
-      } catch (error) {
-        console.error('Error adding Item', error);
+        setOpenEdit(false);
       }
-
-      setOpenEdit(false);
+      
+      setCategoryName('');
+      
+    } catch (error) {
+      console.error('Error with category operation:', error);
+    } finally {
+      setLoading(false);
     }
-    
-    setCategoryName('');
-  }
+  };
 
   
   return (
     <div >
 
-     
+      {loading && (
+        <FormLoading message={openEdit ? 'Updating category...' : 'Adding category...'} />
+      )}
 
         {isCategoryOpen && (
         <div

@@ -4,7 +4,7 @@ import api from '../utils/api';
 import { currencyFormat } from '../utils/formatCurrency';
 import { BsTelephoneFill } from "react-icons/bs";
 import { RiCellphoneFill } from "react-icons/ri";
-import { MdEmail } from "react-icons/md";
+import { MdEmail, MdOutlineCorporateFare } from "react-icons/md";
 
 function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInformation, sale_id}) {
 
@@ -78,6 +78,11 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                     <div className='flex items-center gap-x-2'>
                                         <MdEmail />
                                         {user.branch_email}
+                                    </div>
+
+                                    <div className='flex items-center gap-x-2'>
+                                        <MdOutlineCorporateFare />
+                                        VAT Reg. TIN 186-705-637-000
                                     </div>
                                 </div>
                             </div>

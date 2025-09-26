@@ -2,8 +2,9 @@ import React, { useEffect } from 'react';
 import { currencyFormat } from '../../../utils/formatCurrency';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Area, Legend, Cell, ReferenceLine, ComposedChart } from 'recharts';
 import ChartNoData from '../../common/ChartNoData.jsx';
+import ChartLoading from '../../common/ChartLoading.jsx';
 
-function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter }) {
+function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts }) {
 
   
   useEffect(() => {
@@ -115,6 +116,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
     <>
         <Card title={selectedProductName ? `${categoryName} - ${selectedProductName}` : categoryName} className=" relative col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
             <div className="flex flex-col h-full">
+              {loadingTopProducts && <ChartLoading message="Loading top products..." />}
               {selectedProductName && (
                 <div className="absolute top-2 right-3 mb-2">
                   <button 
@@ -182,7 +184,8 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
             </Card>
 
             <Card title={selectedProductName ? `Sales Performance - ${selectedProductName}` : "Sales Performance"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
-            <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden">
+            <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
+                {loadingSalesPerformance && <ChartLoading message="Loading sales performance..." />}
                 {/* Sales Performance Filter */}
                 <div className="flex justify-end">
                     <select value={salesInterval} onChange={e=>setSalesInterval(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white">

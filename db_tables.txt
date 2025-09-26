@@ -136,6 +136,11 @@ CREATE TABLE Add_Stocks(
 	FOREIGN KEY (product_id) REFERENCES Inventory_Product(product_id)
 );
 
+alter table add_stocks
+add column quantity_left int
+
+update add_stocks set quantity_left = quantity_added
+
 
 
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api.js';
 import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
+import FormLoading from './common/FormLoading';
 
 
 function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, deliveryData, getDeliveries, mode, deliveryEditData}) {
@@ -11,6 +12,7 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
     //FOR DIALOG
     const [openDialog, setDialog] = useState(false);
     const message = mode ==='edit' ? 'Are you sure you want to edit this ': 'Are you sure you want to add this ?';
+    const [loading, setLoading] = useState(false);
 
 
     const [courierName, setCourierName] = useState('');
@@ -43,32 +45,39 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
 
 
     async function handleSubmit(mode) {
-
-        const payload = { 
-            courierName, 
-            salesId: Number(salesId), 
-            address, 
-            currentBranch: user.branch_id,
-            deliveredDate, 
-            status 
-        };
-
-        if (mode === 'add'){
-            const response = await api.post(`/api/delivery/`, payload);
-            getDeliveries()
-            console.log('New Delivery Added', response.data);
-        } else {
-
-            const delivery = await api.put(`/api/delivery/${deliveryEditData.sales_information_id}`, payload);
         
-            getDeliveries((prevData) => 
-                prevData.map((item) => (item.sales_information_id === Number(id) ? {...item, is_delivered: delivery.data} : item))
-            );
+        try {
+            setLoading(true);
+
+            const payload = { 
+                courierName, 
+                salesId: Number(salesId), 
+                address, 
+                currentBranch: user.branch_id,
+                deliveredDate, 
+                status 
+            };
+
+            if (mode === 'add'){
+                const response = await api.post(`/api/delivery/`, payload);
+                getDeliveries()
+                console.log('New Delivery Added', response.data);
+            } else {
+
+                const delivery = await api.put(`/api/delivery/${deliveryEditData.sales_information_id}`, payload);
             
-        };
-        
-
-        onClose();
+                getDeliveries((prevData) => 
+                    prevData.map((item) => (item.sales_information_id === Number(id) ? {...item, is_delivered: delivery.data} : item))
+                );
+                
+            };
+            
+            onClose();
+        } catch (error) {
+            console.error('Error submitting delivery:', error);
+        } finally {
+            setLoading(false);
+        }
     }
 
 
@@ -77,6 +86,9 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
 
+            {loading && (
+                <FormLoading message={mode === 'edit' ? 'Updating delivery...' : 'Adding delivery...'} />
+            )}
 
             {openDialog && 
             
@@ -194,28 +206,26 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
                         <div className="flex items-start gap-5 w-full">
                             <span className="text-sm font-medium pt-2 whitespace-nowrap">Status :</span>
                             <div className="flex flex-col w-full border border-gray-800 rounded-md overflow-hidden divide-y divide-gray-200 ">
-                                <button
-                                    type="button"
-                                    onClick={()=>setStatus({is_delivered: false, pending: true})}
-                                    className={`h-14 text-sm font-semibold tracking-wide flex items-center justify-center transition-colors ${status.pending ? ' text-amber-500 bg-amber-50' : 'bg-gray-50 text-gray-500 hover:bg-white'}`}
-                                >
-                                    OUT FOR DELIVERY
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={()=>setStatus({is_delivered: true, pending: false})}
-                                    className={`h-14 text-sm font-semibold tracking-wide flex items-center justify-center transition-colors ${status.is_delivered && !status.pending ? 'bg-green-100 text-green-600' : 'bg-gray-50 text-gray-500 hover:bg-white'}`}
-                                >
-                                    DELIVERED
-                                </button>
+                                
+                                <select 
+                                 name="" 
+                                 id=""
+                                  className="h-11 border border-gray-400 w-full rounded px-4 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-300"
+                                 value={status.pending ? "out" : (status.is_delivered ? "delivered" : "undelivered")}
+                                 onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'out') setStatus({is_delivered: false, pending: true})
+                                    if (val === 'delivered') setStatus({is_delivered: true, pending: false})
+                                    if (val === 'undelivered') setStatus({is_delivered: false, pending: false})
+                                 }}
+                                 
+                                 >
+                                    <option value="out" style={{ color: 'orange', backgroundColor: '#FFF7E0' }}>OUT FOR DELIVERY</option>
+                                    <option value="delivered" style={{ color: 'green', backgroundColor: '#E6FFED' }}>DELIVERED</option>
+                                    <option value="undelivered" style={{ color: 'red', backgroundColor: '#FFE6E6' }}>UNDELIVERED</option>
 
-                                 <button
-                                    type="button"
-                                    onClick={()=>setStatus({is_delivered: false, pending: false})}
-                                    className={`h-14 text-sm font-semibold tracking-wide flex items-center justify-center transition-colors ${!status.is_delivered && !status.pending ? 'bg-red-100 text-red-600' : 'bg-gray-50 text-gray-500 hover:bg-white'}`}
-                                >
-                                    UNDELIVERED
-                                </button>
+
+                                </select>
                             </div>
                         </div>
                     </div>

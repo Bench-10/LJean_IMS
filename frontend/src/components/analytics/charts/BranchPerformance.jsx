@@ -3,9 +3,10 @@ import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Ba
 import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
+import ChartLoading from '../../common/ChartLoading.jsx';
 import api from '../../../utils/api.js';
 
-function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, categoryFilter }) {
+function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, categoryFilter, loadingBranchPerformance }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]); 
   const [loading, setLoading] = useState(false);
@@ -149,10 +150,10 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
     <>
       {/* BRANCH PERFORMANCE COMPARISON */}
       <Card title={"BRANCH SALES PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]">
-        <div className="flex flex-col h-full max-h-full overflow-hidden">
-          {loading && <div className="text-sm text-gray-500">Loading branch performance...</div>}
+        <div className="flex flex-col h-full max-h-full overflow-hidden relative">
+          {(loading || loadingBranchPerformance) && <ChartLoading message="Loading branch performance..." />}
           
-          {!loading && !error && branchTotals.length > 0 && hasPositiveBarValues && (
+          {!loading && !loadingBranchPerformance && !error && branchTotals.length > 0 && hasPositiveBarValues && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="branch-performance">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -209,10 +210,10 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
 
       {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
       <Card title={"REVENUE DISTRIBUTION (%)"} className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]">
-        <div className="flex flex-col h-full max-h-full overflow-hidden">
-          {loading && <div className="text-sm text-gray-500">Loading distribution...</div>}
+        <div className="flex flex-col h-full max-h-full overflow-hidden relative">
+          {(loading || loadingBranchPerformance) && <ChartLoading message="Loading distribution..." />}
           
-          {!loading && !error && processedPieData.length > 0 && (
+          {!loading && !loadingBranchPerformance && !error && processedPieData.length > 0 && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="revenue-distribution">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>

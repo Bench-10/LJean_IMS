@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
+import FormLoading from './common/FormLoading';
 
 
 function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput}) {
@@ -28,6 +29,9 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const [notANumber, setNotANumber] = useState({});
   const [invalidNumber, setInvalidNumber] = useState({});
   const [isExpiredEarly, setIsExpiredEarly] = useState(false);
+
+  // LOADING STATE
+  const [loading, setLoading] = useState(false);
 
 
   //FOR DIALOG
@@ -158,28 +162,33 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
   //HANDLES THE SUBMIT
   const handleSubmit = async () => {
-  
+    try {
+      setLoading(true);
+      
+      //RUNS IF THERE ARE NO INVALID INPUTS
+      const itemData = {
+        product_name,
+        category_id: Number(category_id),
+        branch_id: Number(branch_id),
+        unit,
+        unit_price: Number(unit_price),
+        unit_cost: Number(unit_cost),
+        quantity_added: Number(quantity_added),
+        threshold: Number(threshold),
+        date_added,
+        product_validity,
+        userID: user.user_id,
+        fullName: user.full_name
+      };
 
-    //RUNS IF THERE ARE NO INVALID INPUTS
-    const itemData = {
-      product_name,
-      category_id: Number(category_id),
-      branch_id: Number(branch_id),
-      unit,
-      unit_price: Number(unit_price),
-      unit_cost: Number(unit_cost),
-      quantity_added: Number(quantity_added),
-      threshold: Number(threshold),
-      date_added,
-      product_validity,
-      userID: user.user_id,
-      fullName: user.full_name
-    };
-
-
-    //SENDS THE DATA TO App.jsx TO BE SENT TO DATABASE
-    await OnSubmit(itemData);
-    onClose();
+      //SENDS THE DATA TO App.jsx TO BE SENT TO DATABASE
+      await OnSubmit(itemData);
+      onClose();
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
 
@@ -212,6 +221,12 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
   return (
     <div>
+      {/* Loading overlay */}
+      {loading && (
+        <FormLoading 
+          message={mode === 'add' ? "Adding product..." : "Updating product..."}
+        />
+      )}
 
       {openDialog && 
                   

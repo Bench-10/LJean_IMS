@@ -3,6 +3,7 @@ import { useAuth } from '../authentication/Authentication';
 import { RxCross2 } from "react-icons/rx";
 import api from '../utils/api';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
+import FormLoading from './common/FormLoading';
 
 function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes, setOpenUsers}) {
 
@@ -28,6 +29,9 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
   const [usernameExisting, setUsernameExisting] = useState(false);
   const [passwordCheck, setPasswordCheck] = useState('');
   const [cellCheck, setCellCheck] = useState(false);
+
+  // LOADING STATE
+  const [loading, setLoading] = useState(false);
 
  
   //USER ROLES
@@ -227,6 +231,8 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
 
   const submitUserConfirmation = async () => {
+    try {
+      setLoading(true);
 
      const userData = {
         first_name,
@@ -269,6 +275,11 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
      onClose(); 
      setCellCheck(false);
+    } catch (error) {
+      console.error('Error submitting user:', error);
+    } finally {
+      setLoading(false);
+    }
 
   };
 
@@ -294,6 +305,12 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
   return (
     <div>
+        {/* Loading overlay */}
+        {loading && (
+          <FormLoading 
+            message={mode === 'add' ? "Creating user..." : "Updating user..."}
+          />
+        )}
 
         {openDialog && 
             

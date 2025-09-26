@@ -4,6 +4,7 @@ import { IoMdAdd } from "react-icons/io";
 import  toTwoDecimals from '../utils/fixedDecimalPlaces.js';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
+import FormLoading from './common/FormLoading';
 import dayjs from 'dayjs';
 import api from '../utils/api.js';
 
@@ -41,6 +42,9 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   //FOR DIALOG
   const [openDialog, setDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState('');
+
+  // LOADING STATE
+  const [loading, setLoading] = useState(false);
 
 
   useEffect(() =>{
@@ -327,42 +331,44 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   
   //SUBMIT THE DATA
   const submitSale = async () =>{
-  
+    try {
+      setLoading(true);
 
-    const headerInformationAndTotal = {
-      chargeTo,
-      tin,
-      address,
-      date,
-      branch_id: user.branch_id,
-      seniorPw,
-      vat,
-      amountNetVat,
-      seniorPwdDisc,
-      totalAmountDue,
-      transactionBy: user.full_name
-      
+      const headerInformationAndTotal = {
+        chargeTo,
+        tin,
+        address,
+        date,
+        branch_id: user.branch_id,
+        seniorPw,
+        vat,
+        amountNetVat,
+        seniorPwdDisc,
+        totalAmountDue,
+        transactionBy: user.full_name
+        
 
-    };
+      };
 
-    const saleData = {
-      headerInformationAndTotal,
-      productRow: rows
-    };
+      const saleData = {
+        headerInformationAndTotal,
+        productRow: rows
+      };
 
-  
+      const data = await api.post(`/api/sale`, saleData);
+      setSaleHeader((prevData) => [...prevData, data.data]);
 
+      setEmptyQuantiy(false);
+      setSomeEmpty(false);
+      closeModal();
 
-    const data = await api.post(`/api/sale`, saleData);
-    setSaleHeader((prevData) => [...prevData, data.data]);
-
-    setEmptyQuantiy(false);
-    setSomeEmpty(false);
-    closeModal();
-
-    //RE-FETCH WITH THE LATEST PRODUCT DATA(FRONTEND)
-    fetchProductsData();
-
+      //RE-FETCH WITH THE LATEST PRODUCT DATA(FRONTEND)
+      fetchProductsData();
+    } catch (error) {
+      console.error('Error submitting sale:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
 
@@ -373,6 +379,11 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
 
   return (
      <div>
+        {/* Loading overlay */}
+        {loading && (
+          <FormLoading message="Processing sale..." />
+        )}
+
         {openDialog && 
 
           <ConfirmationDialog
