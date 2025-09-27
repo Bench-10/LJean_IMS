@@ -6,10 +6,31 @@ import { broadcastNotification } from "../../server.js";
 //INVENTORY SERVICES
 const getUpdatedInventoryList =  async (productId, branchId) => {
    const { rows } = await SQLquery(
-        `SELECT product_id, branch_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
-         FROM inventory_product
-         LEFT JOIN Category USING(category_id)
-         WHERE product_id = $1 AND branch_id = $2`,
+        `SELECT 
+            inventory_product.product_id, 
+            branch_id, 
+            Category.category_id, 
+            Category.category_name, 
+            product_name, 
+            unit, 
+            unit_price, 
+            unit_cost, 
+            SUM(Add_Stocks.quantity_left) AS quantity, 
+            threshold 
+        FROM inventory_product
+        LEFT JOIN Category USING(category_id)
+        LEFT JOIN Add_Stocks USING(product_id)
+        WHERE product_id = $1 AND branch_id = $2 AND product_validity > CURRENT_DATE
+        GROUP BY 
+            inventory_product.product_id, 
+            branch_id, 
+            Category.category_id, 
+            Category.category_name, 
+            product_name, 
+            unit, 
+            unit_price, 
+            unit_cost, 
+            threshold`,
         [productId, branchId],
     );
 
@@ -22,9 +43,31 @@ export const getProductItems = async(branchId) => {
 
     if (!branchId){
         const {rows} = await SQLquery(`
-            SELECT product_id, branch_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
-            FROM inventory_product
+            SELECT 
+                inventory_product.product_id, 
+                branch_id, 
+                Category.category_id, 
+                Category.category_name, 
+                product_name, 
+                unit, 
+                unit_price, 
+                unit_cost, 
+                SUM(Add_Stocks.quantity_left) AS quantity, 
+                threshold 
+            FROM inventory_product  
             LEFT JOIN Category USING(category_id)
+            LEFT JOIN Add_Stocks USING(product_id)
+            WHERE product_validity > CURRENT_DATE
+            GROUP BY 
+                inventory_product.product_id, 
+                branch_id, 
+                Category.category_id, 
+                Category.category_name, 
+                product_name, 
+                unit, 
+                unit_price, 
+                unit_cost, 
+                threshold
             ORDER BY inventory_product.product_id ASC
         `);
 
@@ -34,10 +77,31 @@ export const getProductItems = async(branchId) => {
 
 
     const {rows} = await SQLquery(`
-        SELECT product_id, branch_id, Category.category_id, Category.category_name, product_name, unit, unit_price, unit_cost, quantity, threshold 
-        FROM inventory_product
+        SELECT 
+            inventory_product.product_id, 
+            branch_id, 
+            Category.category_id, 
+            Category.category_name, 
+            product_name, 
+            unit, 
+            unit_price, 
+            unit_cost, 
+            SUM(Add_Stocks.quantity_left) AS quantity, 
+            threshold 
+        FROM inventory_product  
         LEFT JOIN Category USING(category_id)
-        WHERE branch_id = $1
+        LEFT JOIN Add_Stocks USING(product_id)
+        WHERE branch_id = $1 AND product_validity > CURRENT_DATE
+        GROUP BY 
+            inventory_product.product_id, 
+            branch_id, 
+            Category.category_id, 
+            Category.category_name, 
+            product_name, 
+            unit, 
+            unit_price, 
+            unit_cost, 
+            threshold
         ORDER BY inventory_product.product_id ASC
     `,[branchId]);
 
@@ -54,30 +118,52 @@ export const addProductItem = async (productData) => {
     const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
     const color = 'green';
 
-    //CREATES A UNIQUE PRODUCT ID
+    //CREATES A UNIQUE PRODUCT ID WITH RETRY LOGIC
     let product_id;
     let isUnique = false;
-    while (!isUnique) {
+    let retryCount = 0;
+    const maxRetries = 10;
+    
+    while (!isUnique && retryCount < maxRetries) {
         product_id = Math.floor(100000 + Math.random() * 900000); 
-        const check = await SQLquery('SELECT 1 FROM Inventory_Product WHERE product_id = $1', [product_id]);
-        if (check.rowCount === 0) isUnique = true;
+        
+        try {
+            const check = await SQLquery('SELECT 1 FROM Inventory_Product WHERE product_id = $1 FOR UPDATE', [product_id]);
+            if (check.rowCount === 0) {
+                isUnique = true;
+            } else {
+                retryCount++;
+                // Add small delay to reduce contention
+                
+                await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
+            }
+        } catch (error) {
+            retryCount++;
+            if (retryCount >= maxRetries) {
+                throw new Error('Unable to generate unique product ID after multiple attempts');
+            }
+        }
+    }
+
+    if (!isUnique) {
+        throw new Error('Unable to generate unique product ID');
     }
 
     await SQLquery('BEGIN');
 
     await SQLquery(
         `INSERT INTO Inventory_Product 
-        (product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, quantity, threshold)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-        [product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, quantity_added, threshold]
+        (product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, threshold)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, threshold]
     );   
 
     await SQLquery(
         `INSERT INTO Add_Stocks 
-        (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
-        [product_id, unit_price, unit_cost, quantity_added, date_added, product_validity]
+        [product_id, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added]
     );
 
     const alertResult = await SQLquery(
@@ -120,21 +206,26 @@ export const updateProductItem = async (productData, itemId) => {
 
         return await SQLquery(
             `INSERT INTO Add_Stocks 
-            (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [itemId, unit_price, unit_cost, quantity_added, date_added, product_validity]
+            [itemId, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added]
         );
 
     }
 
-
-    const previousData = await SQLquery('SELECT branch_id, quantity, unit_price, unit_cost FROM Inventory_Product WHERE product_id =   $1', [itemId]
+    // LOCK THE PRODUCT ROW TO PREVENT CONCURRENT MODIFICATIONS
+    const previousData = await SQLquery(
+        'SELECT branch_id, unit_price, unit_cost FROM Inventory_Product WHERE product_id = $1 FOR UPDATE', 
+        [itemId]
     );
+
+    if (previousData.rowCount === 0) {
+        throw new Error(`Product with ID ${itemId} not found`);
+    }
 
 
     const returnPreviousPrice = Number(previousData.rows[0].unit_price);
-    const returnPreviousCost = Number(previousData.rows[0].unit_cost);
     const returnBranchId = Number(previousData.rows[0].branch_id);
 
 
@@ -151,16 +242,6 @@ export const updateProductItem = async (productData, itemId) => {
 
 
     await SQLquery('BEGIN');
-
-
-    await SQLquery(
-        `UPDATE Inventory_Product SET 
-        category_id = $1, product_name = $2, unit = $3, unit_price = $4, unit_cost = $5, quantity = quantity + $6, threshold = $7 
-        WHERE product_id = $8
-        RETURNING *`,
-        [category_id, product_name, unit, unit_price, unit_cost, quantity_added, threshold, itemId]
-
-    );
 
 
     if (quantity_added !== 0){
@@ -221,7 +302,6 @@ export const updateProductItem = async (productData, itemId) => {
 
     }
 
-   
    
     await SQLquery('COMMIT');
 

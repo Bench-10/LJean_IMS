@@ -242,7 +242,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                         <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_cost)}</td>
                       }
                       
-                      <td className="px-4 py-2 text-right"  >{row.quantity.toLocaleString()}</td>
+                      <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
                       <td className="px-4 py-2 text-center"  >{row.threshold.toLocaleString()}</td>
                       <td className="px-4 py-2 text-center w-36"  >
                         <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>

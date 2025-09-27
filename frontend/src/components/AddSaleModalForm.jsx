@@ -118,9 +118,9 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
     
     const product = productsToSell.find(p => p.product_id === currentId);
 
-    const availableQuantity = product ? product.quantity : 0;
+    const availableQuantity = product ? Number(product.quantity) : 0;
 
-    const currentQuantity = rows[index].quantity;
+    const currentQuantity = Number(rows[index].quantity) || 0;
 
 
     if (currentId && currentQuantity > availableQuantity){

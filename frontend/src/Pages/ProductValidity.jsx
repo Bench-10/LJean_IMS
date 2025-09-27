@@ -113,6 +113,9 @@ function ProductValidity({ sanitizeInput }) {
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
                     CATEGORY
                   </th>
+                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
+                    CATEGORY
+                  </th>
                   
                
               </tr>
@@ -166,6 +169,7 @@ function ProductValidity({ sanitizeInput }) {
                       <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
                       <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
                       <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
+                      <td className="px-4 py-2 text-center "  >{validity.quantity_left}</td>
                       
                     </tr>
                     

@@ -120,6 +120,8 @@ ALTER COLUMN product_id DROP DEFAULT,
 ALTER COLUMN product_id TYPE INT;
 DROP SEQUENCE IF EXISTS inventory_product_product_id_seq;
 
+ALTER TABLE inventory_product ALTER COLUMN quantity DROP NOT NULL;
+
 
 
 
