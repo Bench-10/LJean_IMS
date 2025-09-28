@@ -1,5 +1,6 @@
 import { SQLquery } from "../../db.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
+import { confirmDeliveryAndDeductStock } from "../sale/saleServices.js";
 
 
 
@@ -33,26 +34,40 @@ export const addDeliveryData = async(data) =>{
         if (check.rowCount === 0) isUnique = true;
     }
 
+    try {
+        await SQLquery('BEGIN');
 
-    const {rows: newData} = await SQLquery(
-        `INSERT INTO Delivery(
-            delivery_id, 
-            sales_information_id, 
-            branch_id, 
-            destination_address, 
-            delivered_date,
-            courier_name,
-            is_delivered,
-            is_pending)
+        const {rows: newData} = await SQLquery(
+            `INSERT INTO Delivery(
+                delivery_id, 
+                sales_information_id, 
+                branch_id, 
+                destination_address, 
+                delivered_date,
+                courier_name,
+                is_delivered,
+                is_pending)
+                VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
+            `, [delivery_id, salesId, currentBranch, address, deliveredDate, courierName, status.is_delivered, status.pending]
+        );
 
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
-        `, [delivery_id, salesId, currentBranch, address, deliveredDate, courierName, status.is_delivered, status.pending]
-    );
+        // If delivery is marked as delivered when first created, deduct stock immediately
+        if (status.is_delivered) {
+            console.log(`Delivery marked as delivered immediately for sale ID: ${salesId}, deducting stock`);
+            await confirmDeliveryAndDeductStock(salesId);
+            console.log(`Stock deducted for sale ID: ${salesId} upon delivery confirmation`);
+        }
 
+        await SQLquery('COMMIT');
+        return newData;
+        
+    } catch (error) {
+        console.error(`Error in addDeliveryData for sale ID ${salesId}:`, error.message);
+        await SQLquery('ROLLBACK');
+        throw error; // Important: re-throw the error so it's not silent
+    }
 
     
-
-    return newData;
 
 };
 
@@ -63,14 +78,29 @@ export const setToDelivered  = async(saleID, update) =>{
 
     const {courierName, deliveredDate, status } = update;
 
-    const {rows: updateDelivery} = await SQLquery(`
-        UPDATE Delivery 
-        SET courier_name = $1, delivered_date = $2, is_delivered = $3, is_pending = $4
-        WHERE sales_information_id = $5 RETURNING *`,
-        [courierName, deliveredDate, status.is_delivered, status.pending, saleID]
-    );
+    try {
+        await SQLquery('BEGIN');
 
+        // Update delivery status
+        const {rows: updateDelivery} = await SQLquery(`
+            UPDATE Delivery 
+            SET courier_name = $1, delivered_date = $2, is_delivered = $3, is_pending = $4
+            WHERE sales_information_id = $5 RETURNING *`,
+            [courierName, deliveredDate, status.is_delivered, status.pending, saleID]
+        );
 
-    return updateDelivery[0]; 
+        // If delivery is confirmed (is_delivered = true), deduct stock from inventory
+        if (status.is_delivered) {
+            await confirmDeliveryAndDeductStock(saleID);
+            console.log(`Stock deducted for sale ID: ${saleID} upon delivery confirmation`);
+        }
+
+        await SQLquery('COMMIT');
+        return updateDelivery[0];
+
+    } catch (error) {
+        await SQLquery('ROLLBACK');
+        throw error;
+    }
 
 };

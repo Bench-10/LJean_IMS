@@ -77,6 +77,13 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
   const conditions = ['s.date BETWEEN $1 AND $2'];
   const params = [start, end];
   let idx = 3;
+  
+  // Only include sales that are either normal sales or delivered delivery sales
+  conditions.push(`(
+    (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
+    (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+  )`);
+  
   if (branch_id) { conditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
   if (category_id) { conditions.push(`ip.category_id = $${idx++}`); params.push(category_id); }
   if (product_id) { conditions.push(`si.product_id = $${idx++}`); params.push(product_id); }
@@ -174,6 +181,13 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
   const conditions = ['s.date BETWEEN $1 AND $2'];
   const params = [start, end];
   let idx = 3;
+  
+  // Only include sales that are either normal sales or delivered delivery sales
+  conditions.push(`(
+    (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
+    (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+  )`);
+  
   if (branch_id) { conditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
   if (category_id) { conditions.push(`ip.category_id = $${idx++}`); params.push(category_id); }
   const where = 'WHERE ' + conditions.join(' AND ');
@@ -235,10 +249,19 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   const prevStart = prevStartDate.format('YYYY-MM-DD');
   const prevEnd = prevEndDate.format('YYYY-MM-DD');  
   
+  // Helper function to add delivery filter conditions
+  const addDeliveryFilter = (conditions) => {
+    // Only include sales that are either normal sales or delivered delivery sales
+    conditions.push(`(
+      (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
+      (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+    )`);
+  };
   
   if (category_id) {
     // CURRENT SALES
     const conditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];
+    addDeliveryFilter(conditions);
     const params = [start, end, category_id];
     let salesIdx = 4;
     if (branch_id) { conditions.push(`s.branch_id = $${salesIdx++}`); params.push(branch_id); }
@@ -255,6 +278,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
 
     //PREVIOUS SALES
     const prevConditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];
+    addDeliveryFilter(prevConditions);
     const prevParams = [prevStart, prevEnd, category_id];
     let prevSalesIdx = 4;
     if (branch_id) { prevConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevParams.push(branch_id); }
@@ -328,6 +352,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
 
   // CURRENT SALE (NO CATEGORY FILTER)
   const salesConditions = ['s.date BETWEEN $1 AND $2'];
+  addDeliveryFilter(salesConditions);
   const salesParams = [start, end];
   let salesIdx = 3;
   if (branch_id) { salesConditions.push(`s.branch_id = $${salesIdx++}`); salesParams.push(branch_id); }
@@ -343,6 +368,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
 
   // PREVIOUS SALE (NO CATEGORY FILTER)
   const prevSalesConditions = ['s.date BETWEEN $1 AND $2'];
+  addDeliveryFilter(prevSalesConditions);
   const prevSalesParams = [prevStart, prevEnd];
   let prevSalesIdx = 3;
   if (branch_id) { prevSalesConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevSalesParams.push(branch_id); }
@@ -443,6 +469,12 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
   const params = [start, end, branch_id];
   let idx = 4;
   
+  // Only include sales that are either normal sales or delivered delivery sales
+  conditions.push(`(
+    (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
+    (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+  )`);
+  
   if (category_id) { 
     conditions.push(`ip.category_id = $${idx++}`); 
     params.push(category_id); 
@@ -509,9 +541,15 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
     categoryFilter = `AND (s.sales_information_id IS NULL OR ip.category_id = $3)`;
     params.push(category_id);
   }
+  
+  // Only include sales that are either normal sales or delivered delivery sales
+  const deliveryFilter = `AND (
+    (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
+    (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+  )`;
 
   // RETURN TOTAL AMOUNT DUE PER BRANCH, INCLUDING BRANCHES WITH ZERO SALES
-  // WITH OPTIONAL CATEGORY FILTERING
+  // WITH OPTIONAL CATEGORY FILTERING AND DELIVERY STATUS FILTERING
   const { rows } = await SQLquery(`
     SELECT b.branch_id,
            b.branch_name,
@@ -523,6 +561,7 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
     LEFT JOIN Sales_Information s
       ON s.branch_id = b.branch_id
      AND s.date BETWEEN $1 AND $2
+     ${deliveryFilter}
     ${categoryJoin}
     WHERE 1=1 ${categoryFilter}
     GROUP BY b.branch_id, b.branch_name

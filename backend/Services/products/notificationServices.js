@@ -39,7 +39,15 @@ function formatTime(timestamp) {
 export const returnNotification = async (branchId, userId, hireDate) =>{
 
     const {rows} = await SQLquery(`
-        SELECT Inventory_Alerts.alert_id, alert_type, message, alert_date, banner_color, COALESCE(user_notification.is_read, false) AS is_read, user_full_name, Inventory_Alerts.user_id
+        SELECT 
+        Inventory_Alerts.alert_id, 
+          alert_type,
+          message, 
+          alert_date, 
+          banner_color, 
+          COALESCE(user_notification.is_read, false) AS is_read, 
+          user_full_name, 
+          Inventory_Alerts.user_id
         FROM Inventory_Alerts
         LEFT JOIN user_notification
         ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1

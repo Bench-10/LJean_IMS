@@ -33,10 +33,12 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   const [tin, setTin] = useState('');
   const [address, setAddress] = useState('');
   const [date, setDate] = useState(dateToday);
+  
+  // NEW: Delivery indicator
+  const [isForDelivery, setIsForDelivery] = useState(false);
+  
 
-  //IF PWD OR SENIOR CITIZEN
-  const [seniorApplied, setSeniorApplied] = useState(false);
-  const [seniorPw, setSeniorPw] = useState('');
+
 
 
   //FOR DIALOG
@@ -63,7 +65,8 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
 
 
   //CALCULATING AMOUNT AND VAT
-  const [seniorPwdDisc, setSeniorPwdDisc] = useState(0);
+  const [additionalDiscount, setAdditionalDiscount] = useState(0);
+  const [deliveryFee, setDeliveryFee] = useState(0);
   const [vat, setVat] = useState(0);
   const [amountNetVat, setAmount] = useState(0);
   const [totalAmountDue, setTotalAmountDue] = useState(0);
@@ -103,9 +106,9 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
     setEmptyQuantiy(false);
     setSomeEmpty(false);
     setExceedQuanity([]);
-    setSeniorApplied(false);
-    setSeniorPw('');
-    setSeniorPwdDisc(0);
+    setAdditionalDiscount(0);
+    setDeliveryFee(0);
+    setIsForDelivery(false);
 
 
   };
@@ -183,40 +186,31 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   };
 
 
-  //CALCULATES THE VAT(MIGHT CHANGE IN THE FUTURE)
+  //CALCULATES THE VAT AND TOTAL AMOUNT
   const vatAmount =(amount) =>{
-    const vat = amount * 0.12;
-    setVat(vat);
-
-  
-
-    //APPLY DISCOUNT
-    discount(amount + vat, seniorApplied)
+    const vatCalculated = amount * 0.12;
+    setVat(vatCalculated);
     
+    
+    calculateTotalAmount(amount, vatCalculated, additionalDiscount, deliveryFee);
   };
 
+  //CENTRALIZED TOTAL CALCULATION
+  const calculateTotalAmount = (netAmount, vatAmount, discount, delivery) => {
+    const total = (netAmount + vatAmount + delivery) - discount;
+    setTotalAmountDue(Math.max(0, total)); 
+  };
 
-  //WITH PWD SENIOR DISCOUNT
-  const discount = (total_amount, isSenior) =>{
+  //HANDLE DISCOUNT CHANGE
+  const handleDiscountChange = (discountAmount) => {
+    setAdditionalDiscount(discountAmount);
+    calculateTotalAmount(amountNetVat, vat, discountAmount, deliveryFee);
+  };
 
-    if (!total_amount) return;
-
-    if (!isSenior){
-      //SETS THE TOTAL AMOUNT + VAT
-       setSeniorPwdDisc(0);
-       setTotalAmountDue(total_amount);
-       return;
-    };
-
-    const seniorPwdDiscount = total_amount * 0.20;
-
-    setSeniorPwdDisc(seniorPwdDiscount);
-
-    const withDiscount = total_amount - seniorPwdDiscount
-
-    //SETS THE TOTAL AMOUNT + VAT WITTH PWD DISCOUNT
-    setTotalAmountDue(withDiscount);
-    
+  //HANDLE DELIVERY FEE CHANGE
+  const handleDeliveryFeeChange = (feeAmount) => {
+    setDeliveryFee(feeAmount);
+    calculateTotalAmount(amountNetVat, vat, additionalDiscount, feeAmount);
   };
 
 
@@ -340,12 +334,13 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
         address,
         date,
         branch_id: user.branch_id,
-        seniorPw,
         vat,
         amountNetVat,
-        seniorPwdDisc,
         totalAmountDue,
-        transactionBy: user.full_name
+        transactionBy: user.full_name,
+        additionalDiscount,
+        deliveryFee,
+        isForDelivery
         
 
       };
@@ -434,35 +429,6 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                         {/*CUSTOMER INFORMATION*/}
 
                         <div className='flex flex-col'>
-                          <div className='flex justify-end gap-x-4'>
-                              {seniorApplied && (
-                                <input
-                                    placeholder="Enter PWD/Senior ID"
-                                    value={seniorPw}
-                                    onChange={(e) => {setSeniorPw(e.target.value);}}
-                                    className="h-8 border border-gray-300 rounded px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                                />
-                            )}
-                              <label className="inline-flex items-center gap-2 text-sm">
-                                  <input
-                                      type="checkbox"
-                                      checked={seniorApplied}
-                                      onChange={(e) => {
-                                        const checked = e.target.checked;
-                                        setSeniorApplied(checked);
-
-                                        if (checked){
-                                          discount(amountNetVat+vat, true)
-                                        } else {
-                                          setSeniorPwdDisc(0);
-                                          setTotalAmountDue(amountNetVat + vat);
-                                        }
-                                      }}
-                                      className="form-checkbox h-4 w-4 text-amber-500"
-                                  />
-                                  <span className="font-medium">PWD/Senior citizen</span>
-                              </label>
-                          </div>
                             
                             <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-6 p-4 bg-gray-50 rounded-lg border border-gray-200'>
                             
@@ -675,6 +641,57 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                               </table>
                             </div>
 
+                          {/* NEW: Additional Discount and Delivery Fee Fields */}
+                          <div className='grid grid-cols-1 md:grid-cols-3 gap-3 my-2 p-3 rounded border'>
+                            
+                            {/* Delivery Checkbox */}
+                            <div className='w-full flex items-center'>
+                                <input 
+                                  type="checkbox"
+                                  id="isForDelivery"
+                                  className='mr-2'
+                                  checked={isForDelivery}
+                                  onChange={(e) => setIsForDelivery(e.target.checked)}
+                                />
+                                <label htmlFor="isForDelivery" className='text-xs font-medium text-gray-700 uppercase tracking-wide cursor-pointer'>
+                                  For Delivery
+                                </label>
+                            </div>
+                            
+                            <div className='w-full'>
+                                <label className='block text-xs font-medium mb-1 text-gray-700 uppercase tracking-wide'>Delivery Fee</label>
+                                <input 
+                                  type="text"
+                                  className='w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all' 
+                                  value={deliveryFee}
+                                  onKeyDown={(e) => {
+                                    if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
+                                      e.preventDefault();
+                                    }
+                                  }}
+                                  onChange={e => handleDeliveryFeeChange(Number(e.target.value) || 0)}
+                                  placeholder="Enter delivery fee"
+                                />
+                            </div>
+
+                            <div className='w-full'>
+                                <label className='block text-xs font-medium mb-1 text-gray-700 uppercase tracking-wide'>Additional Discount</label>
+                                <input 
+                                  type="text"
+                                  className='w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all' 
+                                  value={additionalDiscount}
+                                  onKeyDown={(e) => {
+                                    if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
+                                      e.preventDefault();
+                                    }
+                                  }}
+                                  onChange={e => handleDiscountChange(Number(e.target.value) || 0)}
+
+                                  placeholder="Enter additional discount"
+                                />
+                            </div>
+
+                          </div>
                         </div>
 
                         {/*TOTAL AND SUBMIT BUTTON*/}
@@ -691,12 +708,21 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                             <span className='text-xs font-bold text-gray-600'>AMOUNT NET VAT:</span>
                                             <span className='ml-2 font-medium'>{currencyFormat(toTwoDecimals(amountNetVat))}</span>
                                         </div>
-                                        {seniorApplied && 
+                                        
+                                        {/* NEW: Additional Discount and Delivery Fee Summary */}
+                                        {deliveryFee > 0 && (
                                           <div className='text-sm'>
-                                              <span className='text-xs font-bold text-gray-600'>SENIOR/PWD DISCOUNT</span>
-                                              <span className='ml-2 font-medium text-red-500'> -{currencyFormat(toTwoDecimals(seniorPwdDisc))}</span>
+                                            <span className='text-xs font-bold text-blue-600'>Delivery Fee:</span>
+                                            <span className='ml-2 font-medium text-blue-600'>{currencyFormat(toTwoDecimals(deliveryFee))}</span>
                                           </div>
-                                        }
+                                        )}
+                                        {additionalDiscount > 0 && (
+                                          <div className='text-sm'>
+                                            <span className='text-xs font-bold text-red-600'>Additional Discount:</span>
+                                            <span className='ml-2 font-medium text-red-600'>-{currencyFormat(toTwoDecimals(additionalDiscount))}</span>
+                                          </div>
+                                        )}
+                                        
                                     </div>
                                 </div>
                                 <div className='border-t border-gray-300 pt-3'>
@@ -710,13 +736,13 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                             {/*SUBMIT BUTTON*/}
                             <div className='text-center'>
                                 <button 
-                                  disabled={(seniorApplied && !seniorPw) ||!totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0}
+                                  disabled={!amountNetVat || !totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0}
                                   type='submit' 
                                   className={`py-3 px-8 font-medium rounded-sm transition-all  disabled:bg-green-200 disabled:text-green-600 disabled:cursor-not-allowed disabled:border disabled:border-green-200  bg-green-600 hover:bg-green-700 text-white border border-green-600 shadow-sm hover:shadow-md`}>
                                     Confirm Sale
                                 </button>
 
-                                {((seniorApplied && !seniorPw) || !totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0) &&
+                                {(!amountNetVat || !totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0) &&
                                   <p className='font-thin italic text-xs text-red-500 mt-3'>*Please complete the required fields</p>
                                 }
                             </div>

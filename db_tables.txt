@@ -133,11 +133,13 @@ CREATE TABLE Add_Stocks(
 	h_unit_price DECIMAL(10,2) not null,
 	h_unit_cost DECIMAL(10,2) not null,
 	quantity_added INT not null,
+    quantity_left INT not null,
 	date_added DATE not null,
 	product_validity DATE not null,
 	FOREIGN KEY (product_id) REFERENCES Inventory_Product(product_id)
 );
 
+--NEW UPDATES
 alter table add_stocks
 add column quantity_left int
 
@@ -192,8 +194,7 @@ CREATE TABLE Sales_Information (
     vat DECIMAL(10, 2),
     amount_net_vat DECIMAL(10, 2),
     total_amount_due DECIMAL(10, 2),
-    dicount_pwd_senior_number VARCHAR(225),
-    senior_pwd_discount DECIMAL(10,2),
+    discount DECIMAL(10,2),
     transaction_by VARCHAR(100)
 	FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
 );
@@ -201,6 +202,21 @@ CREATE TABLE Sales_Information (
 
 alter table Sales_Information -- NEW COLUMN
 add column transaction_by varchar(100);
+
+-NEW UPDATES
+ALTER TABLE sales_information
+RENAME COLUMN senior_pwd_discount TO discount;
+
+ALTER TABLE sales_information
+DROP COLUMN dicount_pwd_senior_number;
+
+ALTER TABLE sales_information
+ADD COLUMN delivery_fee INT;
+
+UPDATE sales_information SET delivery_fee = 100
+
+ALTER TABLE Sales_Information ADD COLUMN is_for_delivery BOOLEAN DEFAULT FALSE;
+
 
 
 

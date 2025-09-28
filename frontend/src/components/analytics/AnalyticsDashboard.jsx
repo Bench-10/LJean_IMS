@@ -324,6 +324,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
         <div className={`flex flex-wrap gap-3 items-center ${!branchId ? 'justify-between' : ''}`}>
           <CategorySelect categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} onCategoryNameChange={setCategoryName} />
+          
           {/* KPI & Top Products Range Controls */}
           <div className="flex items-center gap-2 bg-white border rounded-md px-2 py-1">
             <label className="text-[11px] text-gray-600 font-semibold">Mode</label>

@@ -20,7 +20,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput}) {
 
 
   //HEADER AND TOTAL INFORMATION
-  const [saleData, setSaleData ] = useState({sale_id: '', chargeTo: '', tin: '', address: '', date: '', seniorPwdNumber: '', amountNet: '', vat: '', total: '', seniorPwdDiscount: ''})
+  const [saleData, setSaleData ] = useState({sale_id: '', chargeTo: '', tin: '', address: '', date: '', amountNet: '', vat: '', total: '', discount: 0, transactionBy: '', deliveryFee: 0})
 
 
   //VIEW THE PRUDUCTS UNDER SALE ID
@@ -31,13 +31,13 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput}) {
       chargeTo: sailInfo.charge_to, 
       tin: sailInfo.tin, 
       address: sailInfo.address, 
-      date: sailInfo.formated_date, 
-      seniorPwdNumber: sailInfo.dicount_pwd_senior_number,
+      date: sailInfo.formated_date,
       amountNet: sailInfo.amount_net_vat, 
       vat: sailInfo.vat, 
       total: sailInfo.total_amount_due,
-      seniorPwdDiscount: sailInfo.senior_pwd_discount,
-      transactionBy: sailInfo.transaction_by
+      discount: sailInfo.discount,
+      transactionBy: sailInfo.transaction_by,
+      deliveryFee: sailInfo.delivery_fee
 
     });
 
@@ -54,12 +54,13 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput}) {
       chargeTo: '', 
       tin: '', 
       address: '', 
-      date: '', 
-      seniorPwdNumber: '',
+      date: '',
       amountNet: '', 
       vat: '', 
       total: '',
-      seniorPwdDiscount: ''
+      discount: 0,
+      transactionBy: '',
+      deliveryFee: 0
     });
 
 

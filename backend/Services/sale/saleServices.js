@@ -6,7 +6,7 @@ import {correctDateFormat} from "../Services_Utils/convertRedableDate.js"
 //VIEW SALE
 export const viewSale = async (branchId) => {
    const { rows } = await SQLquery(`
-    SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount, transaction_by
+    SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, discount, transaction_by, delivery_fee, is_for_delivery
     FROM Sales_Information 
     WHERE branch_id = $1;`, [branchId]);
    
@@ -36,15 +36,10 @@ export const addSale = async (headerAndProducts) => {
 
     const {headerInformationAndTotal = {}, productRow = []} = headerAndProducts;
 
-    const {chargeTo, tin, address, date, branch_id, seniorPw,  vat, amountNetVat, seniorPwdDisc, totalAmountDue, transactionBy } = headerInformationAndTotal;
+    const {chargeTo, tin, address, date, branch_id, seniorPw,  vat, amountNetVat, additionalDiscount,
+        deliveryFee, totalAmountDue, transactionBy, isForDelivery } = headerInformationAndTotal;
 
-    let discount_number;
-    if (seniorPw.trim().length === 0){
-        discount_number  = 'none';
-    } else {
-        discount_number = seniorPw;
-    }
-
+   
     let sale_id;
     let isUnique = false;
     while (!isUnique) {
@@ -78,9 +73,9 @@ export const addSale = async (headerAndProducts) => {
 
     
         await SQLquery(`
-            INSERT INTO Sales_Information ( sales_information_id, branch_id, charge_to, tin, address, date, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount, transaction_by ) VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+            INSERT INTO Sales_Information ( sales_information_id, branch_id, charge_to, tin, address, date, vat, amount_net_vat, total_amount_due, discount, transaction_by, delivery_fee, is_for_delivery ) VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
 
-        `, [sale_id, branch_id, chargeTo, tin, address, date, vat, amountNetVat, totalAmountDue, discount_number, seniorPwdDisc, transactionBy ]);
+        `, [sale_id, branch_id, chargeTo, tin, address, date, vat, amountNetVat, totalAmountDue, additionalDiscount, transactionBy, deliveryFee, isForDelivery]);
 
 
 
@@ -101,65 +96,71 @@ export const addSale = async (headerAndProducts) => {
             await SQLquery(query, values);
 
             // FIFO STOCK DEDUCTION WITH DEADLOCK PREVENTION
-            for (const product of productRow) {
-                let remainingToDeduct = Number(product.quantity);
-                
-                // Use SKIP LOCKED to prevent deadlocks in high-concurrency scenarios
-                const batches = await SQLquery(
-                    `SELECT add_id, quantity_left 
-                     FROM Add_Stocks 
-                     WHERE product_id = $1 AND quantity_left > 0
-                     ORDER BY date_added ASC, product_validity ASC
-                     FOR UPDATE SKIP LOCKED`,
-                    [product.product_id]
-                );
-
-                // If no unlocked batches available, wait and retry
-                if (batches.rowCount === 0) {
-                    // Fallback: try regular FOR UPDATE (will wait for locks)
-                    const lockedBatches = await SQLquery(
+            // Only deduct stock if NOT for delivery (immediate sale)
+            if (!isForDelivery) {
+                for (const product of productRow) {
+                    let remainingToDeduct = Number(product.quantity);
+                    
+                    // Use SKIP LOCKED to prevent deadlocks in high-concurrency scenarios
+                    const batches = await SQLquery(
                         `SELECT add_id, quantity_left 
                          FROM Add_Stocks 
-                         WHERE product_id = $1 AND quantity_left > 0
+                         WHERE product_id = $1 AND quantity_left > 0 AND product_validity > CURRENT_DATE
                          ORDER BY date_added ASC, product_validity ASC
-                         FOR UPDATE`,
+                         FOR UPDATE SKIP LOCKED`,
                         [product.product_id]
                     );
-                    
-                    if (lockedBatches.rowCount === 0) {
-                        throw new Error(`No available stock for product ID ${product.product_id}`);
-                    }
-                    
-                    // Use locked batches if skip locked returned nothing
-                    batches.rows = lockedBatches.rows;
-                }
 
-                for (const batch of batches.rows) {
-                    if (remainingToDeduct <= 0) break;
-
-                    const batchQuantity = Number(batch.quantity_left);
-                    const deductFromThisBatch = Math.min(remainingToDeduct, batchQuantity);
-                    const newQuantityLeft = batchQuantity - deductFromThisBatch;
-
-                    //ATOMIC UPDATE WITH VERSION CHECK
-                    const updateResult = await SQLquery(
-                        'UPDATE Add_Stocks SET quantity_left = $1 WHERE add_id = $2 AND quantity_left = $3',
-                        [newQuantityLeft, batch.add_id, batchQuantity]
-                    );
-
-                    // If update failed (quantity changed by another transaction)
-                    if (updateResult.rowCount === 0) {
-                        throw new Error(`Concurrent modification detected for batch ${batch.add_id}. Please retry the transaction.`);
+                    // If no unlocked batches available, wait and retry
+                    if (batches.rowCount === 0) {
+                        // Fallback: try regular FOR UPDATE (will wait for locks)
+                        const lockedBatches = await SQLquery(
+                            `SELECT add_id, quantity_left 
+                             FROM Add_Stocks 
+                             WHERE product_id = $1 AND quantity_left > 0 AND product_validity > CURRENT_DATE
+                             ORDER BY date_added ASC, product_validity ASC
+                             FOR UPDATE`,
+                            [product.product_id]
+                        );
+                        
+                        if (lockedBatches.rowCount === 0) {
+                            throw new Error(`No available stock for product ID ${product.product_id}`);
+                        }
+                        
+                        // Use locked batches if skip locked returned nothing
+                        batches.rows = lockedBatches.rows;
                     }
 
-                    remainingToDeduct -= deductFromThisBatch;
-                }
+                    for (const batch of batches.rows) {
+                        if (remainingToDeduct <= 0) break;
 
-                // CHECK IF ALL QUANTITY OF PRODUCTS IS 0
-                if (remainingToDeduct > 0) {
-                    throw new Error(`Unable to deduct full quantity for product ID ${product.product_id}. Remaining: ${remainingToDeduct}`);
+                        const batchQuantity = Number(batch.quantity_left);
+                        const deductFromThisBatch = Math.min(remainingToDeduct, batchQuantity);
+                        const newQuantityLeft = batchQuantity - deductFromThisBatch;
+
+                        //ATOMIC UPDATE WITH VERSION CHECK
+                        const updateResult = await SQLquery(
+                            'UPDATE Add_Stocks SET quantity_left = $1 WHERE add_id = $2 AND quantity_left = $3',
+                            [newQuantityLeft, batch.add_id, batchQuantity]
+                        );
+
+                        // If update failed (quantity changed by another transaction)
+                        if (updateResult.rowCount === 0) {
+                            throw new Error(`Concurrent modification detected for batch ${batch.add_id}. Please retry the transaction.`);
+                        }
+
+                        remainingToDeduct -= deductFromThisBatch;
+                    }
+
+                    // CHECK IF ALL QUANTITY OF PRODUCTS IS 0
+                    if (remainingToDeduct > 0) {
+                        throw new Error(`Unable to deduct full quantity for product ID ${product.product_id}. Remaining: ${remainingToDeduct}`);
+                    }
                 }
-            };
+            } else {
+                // For delivery sales, we just verify stock availability but don't deduct yet
+                console.log('Sale is for delivery - stock will be deducted when delivery is confirmed');
+            }
         };
 
 
@@ -167,7 +168,7 @@ export const addSale = async (headerAndProducts) => {
 
 
         const {rows} = await SQLquery(`
-            SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, dicount_pwd_senior_number, senior_pwd_discount, transaction_by
+            SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, discount, transaction_by, delivery_fee, is_for_delivery
             FROM Sales_Information 
             WHERE branch_id = $1 AND sales_information_id = $2;`
         , [branch_id, sale_id]);
@@ -180,4 +181,90 @@ export const addSale = async (headerAndProducts) => {
         throw error;
     }
 
+};
+
+
+// DEDUCT STOCK WHEN DELIVERY IS CONFIRMED
+export const confirmDeliveryAndDeductStock = async (salesInformationId) => {
+    try {
+        await SQLquery('BEGIN');
+        
+        // Get the sale items for this sale
+        const { rows: saleItems } = await SQLquery(`
+            SELECT product_id, quantity 
+            FROM Sales_Items 
+            WHERE sales_information_id = $1`,
+            [salesInformationId]
+        );
+        
+        if (saleItems.length === 0) {
+            throw new Error(`No sale items found for sale ID ${salesInformationId}`);
+        }
+        
+        // FIFO STOCK DEDUCTION FOR EACH PRODUCT
+        for (const product of saleItems) {
+            let remainingToDeduct = Number(product.quantity);
+            
+            // Use SKIP LOCKED to prevent deadlocks
+            const batches = await SQLquery(
+                `SELECT add_id, quantity_left 
+                 FROM Add_Stocks 
+                 WHERE product_id = $1 AND quantity_left > 0 AND product_validity > CURRENT_DATE
+                 ORDER BY date_added ASC, product_validity ASC
+                 FOR UPDATE SKIP LOCKED`,
+                [product.product_id]
+            );
+
+            // If no unlocked batches available, try regular FOR UPDATE
+            if (batches.rowCount === 0) {
+                const lockedBatches = await SQLquery(
+                    `SELECT add_id, quantity_left 
+                     FROM Add_Stocks 
+                     WHERE product_id = $1 AND quantity_left > 0 AND product_validity > CURRENT_DATE
+                     ORDER BY date_added ASC, product_validity ASC
+                     FOR UPDATE`,
+                    [product.product_id]
+                );
+                
+                if (lockedBatches.rowCount === 0) {
+                    throw new Error(`No available stock for product ID ${product.product_id}`);
+                }
+                
+                batches.rows = lockedBatches.rows;
+            }
+
+            // Deduct from each batch using FIFO
+            for (const batch of batches.rows) {
+                if (remainingToDeduct <= 0) break;
+
+                const batchQuantity = Number(batch.quantity_left);
+                const deductFromThisBatch = Math.min(remainingToDeduct, batchQuantity);
+                const newQuantityLeft = batchQuantity - deductFromThisBatch;
+
+                // Atomic update with version check
+                const updateResult = await SQLquery(
+                    'UPDATE Add_Stocks SET quantity_left = $1 WHERE add_id = $2 AND quantity_left = $3',
+                    [newQuantityLeft, batch.add_id, batchQuantity]
+                );
+
+                if (updateResult.rowCount === 0) {
+                    throw new Error(`Concurrent modification detected for batch ${batch.add_id}. Please retry.`);
+                }
+
+                remainingToDeduct -= deductFromThisBatch;
+            }
+
+            // Check if all quantity was deducted
+            if (remainingToDeduct > 0) {
+                throw new Error(`Unable to deduct full quantity for product ID ${product.product_id}. Remaining: ${remainingToDeduct}`);
+            }
+        }
+        
+        await SQLquery('COMMIT');
+        return { success: true, message: 'Stock deducted successfully' };
+        
+    } catch (error) {
+        await SQLquery('ROLLBACK');
+        throw error;
+    }
 };

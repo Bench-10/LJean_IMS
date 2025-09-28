@@ -12,6 +12,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
 
     useEffect(() =>{
         if (!sale_id) return;
+        
         items();
     },[openModal])
 
@@ -94,7 +95,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                         <p className='text-xs mb-3'>
                             Person In-charge: <span className='font-bold italic'>{headerInformation.transactionBy}</span>
                         </p>
-                        <div className={`grid ${String(headerInformation.seniorPwdNumber).toLowerCase() !== 'none' ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mb-3`}>
+                        <div className={`grid grid-cols-2 gap-3 mb-3`}>
                             
                             <div>
                                 <label className="text-xs font-bold text-gray-600">SALE ID</label>
@@ -108,15 +109,6 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                     {headerInformation.date}
                                 </div>
                             </div>
-
-                            {(String(headerInformation.seniorPwdNumber).toLowerCase() !== 'none' && type === "sales") &&
-                                <div>
-                                    <label className="text-xs font-bold text-gray-600">Senior/Pwd Number</label>
-                                    <div className="p-2 bg-gray-50 border rounded text-sm">
-                                        {headerInformation.seniorPwdNumber}
-                                    </div>
-                                </div>
-                            }
                              
                         </div>
 
@@ -167,7 +159,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                         {type && type === "sales" && 
     
                                             <th className="px-3 py-2 text-center text-xs font-medium text-gray-700 bg-gray-50">
-                                                AMOUNT
+                                                UNIT PRICE
                                             </th>
                                       
                                         }
@@ -176,7 +168,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                         {type && type === "sales" && 
     
                                             <th className="px-3 py-2 text-center text-xs font-medium text-gray-700 bg-gray-50">
-                                                 UNIT PRICE
+                                                 AMOUNT
                                             </th>
                                       
                                         }
@@ -213,10 +205,11 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                             }
 
                                         </tr>
+                                        
                                       ))
                                       
-
                                      )
+
                                   }
                                     
                                 </tbody>
@@ -258,12 +251,20 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                             <span className="font-medium text-gray-600">VAT (10%):</span>
                                             <span className="font-semibold">{currencyFormat(headerInformation.vat)}</span>
                                         </div>
-                                        {(String(headerInformation.seniorPwdNumber).toLowerCase() !== 'none' && type === "sales") && (
+                                        {(headerInformation.discount !== undefined && headerInformation.discount > 0 && type === "sales") && (
                                             <div className="flex justify-between py-2 border-b border-gray-200 text-base">
-                                                <span className="font-medium text-amber-600">Senior Discount (20%):</span>
-                                                <span className="font-semibold text-amber-600">-{currencyFormat(headerInformation.seniorPwdDiscount)}</span>
+                                                <span className="font-medium text-amber-600">Discount:</span>
+                                                <span className="font-semibold text-amber-600">-{currencyFormat(Number(headerInformation.discount))}</span>
                                             </div>
                                         )}
+                                       
+                                        {headerInformation.deliveryFee !== undefined && headerInformation.deliveryFee > 0 && type === "sales" && (
+                                            <div className="flex justify-between py-2 border-b border-gray-200 text-base">
+                                                <span className="font-medium text-blue-600">Delivery Fee:</span>
+                                                <span className="font-semibold text-blue-600">{currencyFormat(Number(headerInformation.deliveryFee))}</span>
+                                            </div>
+                                        )}
+                                        
                                         <div className="flex justify-between py-3 text-xl font-bold border-t-2 border-gray-400 mt-2">
                                             <span>TOTAL AMOUNT DUE:</span>
                                             <span className="text-green-700">{currencyFormat(headerInformation.total)}</span>

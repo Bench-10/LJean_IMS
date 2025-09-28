@@ -158,10 +158,10 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
 
                                     <option value="">Select sale id</option>
 
-                                    {saleHeader.filter(row => !deliveryData.some(
-                                        delivery => String(delivery.sales_information_id) === String(row.sales_information_id)
-                                        )).map((row, index) => (
-
+                                    {saleHeader.filter(row => 
+                                        row.is_for_delivery && 
+                                        !deliveryData.some(delivery => String(delivery.sales_information_id) === String(row.sales_information_id))
+                                    ).map((row, index) => (
 
                                         <option key={index} value={row.sales_information_id}>{row.sales_information_id}</option>
                                     ))}

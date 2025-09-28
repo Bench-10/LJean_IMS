@@ -192,7 +192,7 @@ export const getBranchTimeline = async (req, res) => {
       interval, 
       start_date, 
       end_date, 
-      range 
+      range
     });
     
     console.log('Branch timeline response data:', rows);
