@@ -78,10 +78,13 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
   const params = [start, end];
   let idx = 3;
   
-  // Only include sales that are either normal sales or delivered delivery sales
-  conditions.push(`(
-    (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
-    (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+  // Since stock is now always deducted when sale is placed, we include all sales
+  // The delivery status is just for tracking - stock impact is immediate
+  // Only exclude sales where stock has been restored due to cancellation/undelivered
+  conditions.push(`NOT EXISTS (
+    SELECT 1 FROM Sales_Stock_Usage ssu 
+    WHERE ssu.sales_information_id = s.sales_information_id 
+    AND ssu.is_restored = true
   )`);
   
   if (branch_id) { conditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
@@ -182,10 +185,11 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
   const params = [start, end];
   let idx = 3;
   
-  // Only include sales that are either normal sales or delivered delivery sales
-  conditions.push(`(
-    (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
-    (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+  // Include all sales except those where stock has been restored (canceled/undelivered)
+  conditions.push(`NOT EXISTS (
+    SELECT 1 FROM Sales_Stock_Usage ssu 
+    WHERE ssu.sales_information_id = s.sales_information_id 
+    AND ssu.is_restored = true
   )`);
   
   if (branch_id) { conditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
@@ -251,10 +255,11 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   
   // Helper function to add delivery filter conditions
   const addDeliveryFilter = (conditions) => {
-    // Only include sales that are either normal sales or delivered delivery sales
-    conditions.push(`(
-      (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
-      (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+    // Include all sales except those where stock has been restored (canceled/undelivered)
+    conditions.push(`NOT EXISTS (
+      SELECT 1 FROM Sales_Stock_Usage ssu 
+      WHERE ssu.sales_information_id = s.sales_information_id 
+      AND ssu.is_restored = true
     )`);
   };
   
@@ -469,10 +474,11 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
   const params = [start, end, branch_id];
   let idx = 4;
   
-  // Only include sales that are either normal sales or delivered delivery sales
-  conditions.push(`(
-    (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
-    (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+  // Include all sales except those where stock has been restored (canceled/undelivered)
+  conditions.push(`NOT EXISTS (
+    SELECT 1 FROM Sales_Stock_Usage ssu 
+    WHERE ssu.sales_information_id = s.sales_information_id 
+    AND ssu.is_restored = true
   )`);
   
   if (category_id) { 
@@ -542,10 +548,11 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
     params.push(category_id);
   }
   
-  // Only include sales that are either normal sales or delivered delivery sales
-  const deliveryFilter = `AND (
-    (s.is_for_delivery = false OR s.is_for_delivery IS NULL) OR 
-    (s.is_for_delivery = true AND EXISTS (SELECT 1 FROM Delivery d WHERE d.sales_information_id = s.sales_information_id AND d.is_delivered = true))
+  // Only include sales except those where stock has been restored (canceled/undelivered)
+  const deliveryFilter = `AND NOT EXISTS (
+    SELECT 1 FROM Sales_Stock_Usage ssu 
+    WHERE ssu.sales_information_id = s.sales_information_id 
+    AND ssu.is_restored = true
   )`;
 
   // RETURN TOTAL AMOUNT DUE PER BRANCH, INCLUDING BRANCHES WITH ZERO SALES

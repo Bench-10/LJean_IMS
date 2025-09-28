@@ -248,3 +248,30 @@ CREATE TABLE Delivery (
     is_delivered BOOL
     is_pending BOOL
 );
+
+
+
+
+
+-- Add table to track which stock batches were used for each sale item
+CREATE TABLE Sales_Stock_Usage (
+    usage_id SERIAL PRIMARY KEY,
+    sales_information_id INT NOT NULL,
+    product_id INT NOT NULL,
+    add_stock_id INT NOT NULL,  -- References Add_Stocks.add_id
+    quantity_used INT NOT NULL,
+    date_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_restored BOOLEAN DEFAULT FALSE,  -- Track if stock was restored
+    restored_date TIMESTAMP,
+    FOREIGN KEY (sales_information_id) REFERENCES Sales_Information(sales_information_id),
+    FOREIGN KEY (product_id) REFERENCES Inventory_Product(product_id),
+    FOREIGN KEY (add_stock_id) REFERENCES Add_Stocks(add_id)
+);
+
+-- Create index for better performance
+CREATE INDEX idx_sales_stock_usage_sale_id ON Sales_Stock_Usage(sales_information_id);
+CREATE INDEX idx_sales_stock_usage_stock_id ON Sales_Stock_Usage(add_stock_id);
+
+-- Optional: Add comments for clarity
+COMMENT ON TABLE Sales_Stock_Usage IS 'Tracks which stock batches were used for each sale item, enabling precise stock restoration';
+COMMENT ON COLUMN Sales_Stock_Usage.is_restored IS 'TRUE when stock has been restored due to order cancellation/undelivered status';
