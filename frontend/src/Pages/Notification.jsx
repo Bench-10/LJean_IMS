@@ -3,8 +3,9 @@ import { useEffect, useState, React, useRef} from 'react';
 import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
 import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp';
+import ChartLoading from '../components/common/ChartLoading'; // Make sure this is imported
 
-function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
+function Notification({openNotif, notify, setNotify, unreadCount, onClose, notificaionLoading}) {
 
 
   const {user} = useAuth();
@@ -162,91 +163,38 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
               <p className='text-xs text-gray-700'>You have <span className='font-bold'>{unreadCount}</span> unread massages.</p>
             </div>
 
-            {/*SCROLLABEL CONTENT*/}
-            <div className='px-8 py-6 overflow-y-auto max-h-[calc(80vh-120px)] modal-scroll-container'>
-              {/*NOTIFICATION CONTAINER*/} 
-              <div className='flex flex-col gap-y-6'>
-
-                {/*TODAY NOTIFICATION*/}
-                <div className=''>
-
-                  <div className='flex items-center mb-4'>
-                    <h2 className='font-semibold text-gray-700 mr-3'>
-                      Today
-                    </h2>
-                    <hr className='flex-1 border-gray-300'/>
-                  </div>
-                  
-
-                  {/*TODAYS NOTIFICATION BLOCK CONTAINER*/}
-                  <div className='flex flex-col gap-y-3'>
-
-                    {/*NOTIFICATION BLOCK */}
-                    {todayNotification.length === 0 ? 
-                      (
-                        <div className="text-gray-500 italic text-center py-4">No notifications for today.</div>
-                      ) :
-
-                      (
-                        todayNotification.map((notification, index) => (
-                            <div key={index} className={`${!notification.is_read ? 'bg-blue-50 border-blue-200' : 'bg-white'} relative flex flex-col px-6 py-4 border border-gray-200 border-l-4 ${borderColorMap[notification.banner_color] || ''} rounded-lg shadow-sm hover:shadow-md transition-shadow`} onClick={() => markedAsRead(notification.alert_id)}>
-
-                              <div className='mb-2 flex items-center justify-between'>
-                                <h3 className='text-lg font-semibold text-gray-800'>{notification.alert_type}</h3>
-                                {!notification.is_read && (
-                                  <div className='flex items-center gap-2'>
-                                    <span className='text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full'>Unread</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className='mb-4'>
-                                <p className='text-gray-600 text-sm leading-relaxed'>
-                                  <span>
-                                    <strong>{notification.user_full_name}: </strong>{notification.message || ''}
-                                  </span>
-                                 
-                                </p>
-                              </div>
-
-                              <div className='absolute right-6 bottom-3'>
-                                <span className='text-xs text-gray-400'>
-                                  {notification.alert_date_formatted}
-                                </span>
-                              </div>
-
-                          </div>
-
-                        ))
-
-                      )
-                    
-                    }
-
-                  </div>
-
+            {/*SCROLLABLE CONTENT*/}
+            <div className='relative px-8 py-6 overflow-y-auto max-h-[calc(80vh-120px)] modal-scroll-container'>
+              {notificaionLoading ? (
+                <div className='flex items-center justify-center h-52'>
+                  <ChartLoading message="Loading notifications..." />
                 </div>
+                
+              ) : (
+                <div className='flex flex-col gap-y-6'>
 
-                {/*PREVIOUS NOTIFICATION*/}
-                <div className=''>
-                  <div className='flex items-center mb-4'>
-                    <h2 className='font-semibold text-gray-700 mr-3'>
-                      Previous
-                    </h2>
-                    <hr className='flex-1 border-gray-300'/>
-                  </div>
+                  {/*TODAY NOTIFICATION*/}
+                  <div className=''>
 
-                  {/*PREVIOUS NOTIFICATION BLOCK CONTAINER */}
-                  <div className='flex flex-col gap-y-3'>
+                    <div className='flex items-center mb-4'>
+                      <h2 className='font-semibold text-gray-700 mr-3'>
+                        Today
+                      </h2>
+                      <hr className='flex-1 border-gray-300'/>
+                    </div>
+                    
 
-                    {/*NOTIFICATION BLOCK */}
-                    {notTodayNotification.length === 0 ? 
+                    {/*TODAYS NOTIFICATION BLOCK CONTAINER*/}
+                    <div className='flex flex-col gap-y-3'>
+
+                      {/*NOTIFICATION BLOCK */}
+                      {todayNotification.length === 0 ? 
                         (
-                          <div className="text-gray-500 italic text-center py-4">No previous notifications.</div>
+                          <div className="text-gray-500 italic text-center py-4">No notifications for today.</div>
                         ) :
 
                         (
-                          notTodayNotification.slice(0, visibleCount).map((notification, index) => (
+                          todayNotification.map((notification, index) => (
                               <div key={index} className={`${!notification.is_read ? 'bg-blue-50 border-blue-200' : 'bg-white'} relative flex flex-col px-6 py-4 border border-gray-200 border-l-4 ${borderColorMap[notification.banner_color] || ''} rounded-lg shadow-sm hover:shadow-md transition-shadow`} onClick={() => markedAsRead(notification.alert_id)}>
 
                                 <div className='mb-2 flex items-center justify-between'>
@@ -260,9 +208,10 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
 
                                 <div className='mb-4'>
                                   <p className='text-gray-600 text-sm leading-relaxed'>
-                                       <span>
-                                        <strong>{notification.user_full_name}: </strong>{notification.message || ''}
-                                       </span>
+                                    <span>
+                                      <strong>{notification.user_full_name}: </strong>{notification.message || ''}
+                                    </span>
+                                   
                                   </p>
                                 </div>
 
@@ -275,16 +224,73 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
                             </div>
 
                           ))
+
                         )
                       
                       }
 
+                    </div>
+
+                  </div>
+
+                  {/*PREVIOUS NOTIFICATION*/}
+                  <div className=''>
+                    <div className='flex items-center mb-4'>
+                      <h2 className='font-semibold text-gray-700 mr-3'>
+                        Previous
+                      </h2>
+                      <hr className='flex-1 border-gray-300'/>
+                    </div>
+
+                    {/*PREVIOUS NOTIFICATION BLOCK CONTAINER */}
+                    <div className='flex flex-col gap-y-3'>
+
+                      {/*NOTIFICATION BLOCK */}
+                      {notTodayNotification.length === 0 ? 
+                          (
+                            <div className="text-gray-500 italic text-center py-4">No previous notifications.</div>
+                          ) :
+
+                          (
+                            notTodayNotification.slice(0, visibleCount).map((notification, index) => (
+                                <div key={index} className={`${!notification.is_read ? 'bg-blue-50 border-blue-200' : 'bg-white'} relative flex flex-col px-6 py-4 border border-gray-200 border-l-4 ${borderColorMap[notification.banner_color] || ''} rounded-lg shadow-sm hover:shadow-md transition-shadow`} onClick={() => markedAsRead(notification.alert_id)}>
+
+                                  <div className='mb-2 flex items-center justify-between'>
+                                    <h3 className='text-lg font-semibold text-gray-800'>{notification.alert_type}</h3>
+                                    {!notification.is_read && (
+                                      <div className='flex items-center gap-2'>
+                                        <span className='text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full'>Unread</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className='mb-4'>
+                                    <p className='text-gray-600 text-sm leading-relaxed'>
+                                         <span>
+                                          <strong>{notification.user_full_name}: </strong>{notification.message || ''}
+                                         </span>
+                                    </p>
+                                  </div>
+
+                                  <div className='absolute right-6 bottom-3'>
+                                    <span className='text-xs text-gray-400'>
+                                      {notification.alert_date_formatted}
+                                    </span>
+                                  </div>
+
+                              </div>
+
+                            ))
+                          )
+                        
+                        }
+
+                    </div>
+
                   </div>
 
                 </div>
-
-              </div>
-
+              )}
             </div>
             
           </div>

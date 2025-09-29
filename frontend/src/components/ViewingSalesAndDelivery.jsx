@@ -5,10 +5,12 @@ import { currencyFormat } from '../utils/formatCurrency';
 import { BsTelephoneFill } from "react-icons/bs";
 import { RiCellphoneFill } from "react-icons/ri";
 import { MdEmail, MdOutlineCorporateFare } from "react-icons/md";
+import ChartLoading from './common/ChartLoading';
 
 function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInformation, sale_id}) {
 
     const [soldItems, setSoldItems] = useState([]);
+    const [loading, setLoading] = useState(false)
 
     useEffect(() =>{
         if (!sale_id) return;
@@ -17,9 +19,19 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
     },[openModal])
 
     const items = async () =>{
-        const soldItems = await api.get(`/api/sale_items?sale_id=${sale_id}`);
+        try {
+            setLoading(true);
 
-        setSoldItems(soldItems.data);
+            const soldItems = await api.get(`/api/sale_items?sale_id=${sale_id}`);
+            setSoldItems(soldItems.data);
+            
+        } catch (error) {
+            console.log(error);
+        } finally {
+            setLoading(false);
+
+        }
+        
     }
     
   if (!user) return;
@@ -178,39 +190,45 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
 
-                                  {(!soldItems || soldItems.length === 0) ?
-                                     (
-                                        <NoInfoFound col={5}/>
-                                     ) : 
+                                    { loading ? (
+                                           
+                                            <ChartLoading message="Loading sales information..." />
+                                               
+                                        ) : 
 
-                                     (
+                                        (!soldItems || soldItems.length === 0) ?
+                                            (
+                                                <NoInfoFound col={5}/>
+                                            ) : 
+
+                                            (
 
 
-                                      soldItems.map((items, itemIndex) => (
-                                        <tr key={itemIndex} className="hover:bg-gray-50 text-sm">
-                                            <td className="px-3 py-2 text-left">{items.product_name}</td>
-                                            <td className="px-3 py-2 text-center">{items.quantity.toLocaleString()}</td>
-                                            <td className="px-3 py-2 text-center">{items.unit}</td>
+                                            soldItems.map((items, itemIndex) => (
+                                                <tr key={itemIndex} className="hover:bg-gray-50 text-sm">
+                                                    <td className="px-3 py-2 text-left">{items.product_name}</td>
+                                                    <td className="px-3 py-2 text-center">{items.quantity.toLocaleString()}</td>
+                                                    <td className="px-3 py-2 text-center">{items.unit}</td>
 
-                                            {type && type === "sales" && 
-                                                <td className="px-3 py-2 text-right">
-                                                    {currencyFormat(items.unit_price)}
-                                                </td>
-                                            }
+                                                    {type && type === "sales" && 
+                                                        <td className="px-3 py-2 text-right">
+                                                            {currencyFormat(items.unit_price)}
+                                                        </td>
+                                                    }
 
-                                            {type && type === "sales" && 
-                                                <td className="px-3 py-2 text-right">
-                                                    {currencyFormat(items.amount)}
-                                                </td>
-                                            }
+                                                    {type && type === "sales" && 
+                                                        <td className="px-3 py-2 text-right">
+                                                            {currencyFormat(items.amount)}
+                                                        </td>
+                                                    }
 
-                                        </tr>
+                                                </tr>
+                                                
+                                            ))
                                         
-                                      ))
-                                      
-                                     )
+                                        )
 
-                                  }
+                                    }
                                     
                                 </tbody>
 

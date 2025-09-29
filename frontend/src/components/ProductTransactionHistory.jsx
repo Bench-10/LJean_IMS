@@ -4,6 +4,7 @@ import { BsFunnelFill } from "react-icons/bs";
 import NoInfoFound from './common/NoInfoFound.jsx';
 import { useAuth } from '../authentication/Authentication';
 import {currencyFormat} from '../utils/formatCurrency.js';
+import ChartLoading from './common/ChartLoading.jsx';
  
 function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInput }) {
 
@@ -13,6 +14,8 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   const [productHistory, setProductHistory] = useState([]);
   const [search, setSearch] = useState('');
 
+  const [loading, setLoading] = useState(false)
+  
   const {user} = useAuth();
 
 
@@ -59,6 +62,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
       const dates = {startDate, endDate}
 
       try {
+        setLoading(true);
         let response;
         if (!user.role.some(role => ['Owner'].includes(role))){
           response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
@@ -69,6 +73,8 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
       } catch (error) {
         setError(error.message);
         
+      } finally {
+        setLoading(false);
       }
   };
 
@@ -177,23 +183,31 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
                       <th className='px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider'>Value</th>
                     </tr>
                   </thead>
-                  <tbody className='bg-white '>
-                    {currentProductHistory.length === 0 ?
-                      (
-                        <NoInfoFound col={6}/>
-                      ) :
+                  <tbody className='bg-white relative'>
+                    { loading ? (
+                        <tr>
+                          <td colSpan={6}>
+                            <ChartLoading message="Loading product history..." />
+                          </td>
+                        </tr>
+                      ) : 
+                      (currentProductHistory.length === 0 ?
+                        (
+                          <NoInfoFound col={6}/>
+                        ) :
 
-                      (
-                        currentProductHistory.map((history, histoindx) => (
-                          <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'> {currencyFormat(history.h_unit_cost)}</td>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{history.quantity_added.toLocaleString()}</td>
-                            <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{currencyFormat(history.value)}</td>
-                          </tr>
-                        ))
+                        (
+                          currentProductHistory.map((history, histoindx) => (
+                            <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
+                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
+                              <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
+                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
+                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'> {currencyFormat(history.h_unit_cost)}</td>
+                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{history.quantity_added.toLocaleString()}</td>
+                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{currencyFormat(history.value)}</td>
+                            </tr>
+                          ))
+                        )
                       )
                     }
                    

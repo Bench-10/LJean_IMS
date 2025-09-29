@@ -3,10 +3,11 @@ import NoInfoFound from "../components/common/NoInfoFound";
 import { useState } from "react";
 import { MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
 import EnableDisableAccountDialog from "../components/dialogs/EnableDisableAccountDialog";
+import ChartLoading from "../components/common/ChartLoading";
 
 
 
-function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetailes, sanitizeInput, disableEnableAccount}) {
+function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUserDetailes, sanitizeInput, disableEnableAccount, usersLoading}) {
 
 
 
@@ -59,7 +60,7 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
             
             <input
               type="text"
-              placeholder="Search Employee Name or Branch or Role"
+              placeholder="Search Employee Name or Role"
               className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
               onChange={handleSearch}
               
@@ -91,9 +92,15 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
                   <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white">
                     NAME
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-52 ">
-                    BRANCH
-                  </th>
+
+                  {user && user.role.some(role => ['Owner'].includes(role)) && 
+
+                    <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-52 ">
+                      BRANCH
+                    </th>
+            
+                  }
+                  
                   <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-52">
                     ROLE
                   </th>
@@ -111,53 +118,66 @@ function UserManagement({handleUserModalOpen, users, setOpenUsers, setUserDetail
               </tr>
             </thead>
 
-            <tbody className="bg-white">
+            <tbody className="bg-white relative">
 
-              {filteredUserData.length === 0 ? 
+              {usersLoading ? 
                 (
-                  <NoInfoFound col={10}/>
-                ) : 
-
-                (
-                  filteredUserData.map((row, rowIndex) => (
+                  <tr>
+                    <td colSpan={10}>
+                        <ChartLoading message="Loading users..."/>
+                    </td>
+                  </tr>
+                )
+                :
                 
-                    <tr key={rowIndex} className={`${!row.is_disabled ? 'hover:bg-gray-200/70': ''} h-14 ${row.is_disabled ? 'bg-red-200': (rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer ${row.is_disabled ? 'text-red-900':''}` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
-                      <td className="px-4 py-2"  >{row.full_name}</td>
-                      <td className="px-4 py-2 font-medium whitespace-nowrap" >{row.branch}</td>
-                      <td className="px-4 py-2 whitespace-nowrap"  >
+                (filteredUserData.length === 0 ? 
+                  (
+                    <NoInfoFound col={10}/>
+                  ) : 
 
-                          {Array.isArray(row.role)
-                              ? (row.role.length > 1
-                                  ? row.role.join(", ")
-                                  : row.role[0] || "")
-                              : row || ""}
+                  (
+                    filteredUserData.map((row, rowIndex) => (
+                  
+                      <tr key={rowIndex} className={`${!row.is_disabled ? 'hover:bg-gray-200/70': ''} h-14 ${row.is_disabled ? 'bg-red-200': (rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer ${row.is_disabled ? 'text-red-900':''}` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
+                        <td className="px-4 py-2"  >{row.full_name}</td>
+                        {user && user.role.some(role => ['Owner'].includes(role)) && 
+                          <td className="px-4 py-2 font-medium whitespace-nowrap" >{row.branch}</td>
+                        }
+                        <td className="px-4 py-2 whitespace-nowrap"  >
 
-                      </td>
-                      <td className="px-4 py-2"  >{row.cell_number}</td>
-                      <td className="px-4 py-2 text-center align-middle">
-                        <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${row.is_active ? 'bg-[#61E85C] text-green-700 ' : row.is_disabled ? 'bg-red-400 text-red-800' : 'bg-gray-200 text-gray-500' }`}> 
-                            {row.is_active ? 'Active' : row.is_disabled ? 'Disabled' : 'Inactive'}
-                        </div>
-                      </td>
+                            {Array.isArray(row.role)
+                                ? (row.role.length > 1
+                                    ? row.role.join(", ")
+                                    : row.role[0] || "")
+                                : row || ""}
 
-                      <td className="text-center align-middle">
-                        <button
-                          className={`py-2 px-4 ${row.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'} w-auto rounded-md flex items-center justify-center gap-2 mx-auto`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setUserStatus(row.is_disabled);
-                            setUserInfo(row);
-                            setOpenAccountStatusDialog(true);
-                          }}
-                        >
-                          {row.is_disabled ? <MdOutlineDesktopWindows /> : <MdOutlineDesktopAccessDisabled />}
-                          {row.is_disabled ? "Enable account" : "Disable account"}
-                        </button>
-                      </td>
+                        </td>
+                        <td className="px-4 py-2"  >{row.cell_number}</td>
+                        <td className="px-4 py-2 text-center align-middle">
+                          <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${row.is_active ? 'bg-[#61E85C] text-green-700 ' : row.is_disabled ? 'bg-red-400 text-red-800' : 'bg-gray-200 text-gray-500' }`}> 
+                              {row.is_active ? 'Active' : row.is_disabled ? 'Disabled' : 'Inactive'}
+                          </div>
+                        </td>
 
-                    </tr>
-                  ))
-                ) 
+                        <td className="text-center align-middle">
+                          <button
+                            className={`py-2 px-4 ${row.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'} w-auto rounded-md flex items-center justify-center gap-2 mx-auto`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUserStatus(row.is_disabled);
+                              setUserInfo(row);
+                              setOpenAccountStatusDialog(true);
+                            }}
+                          >
+                            {row.is_disabled ? <MdOutlineDesktopWindows /> : <MdOutlineDesktopAccessDisabled />}
+                            {row.is_disabled ? "Enable account" : "Disable account"}
+                          </button>
+                        </td>
+
+                      </tr>
+                    ))
+                  )
+                )
               }
               
             </tbody>

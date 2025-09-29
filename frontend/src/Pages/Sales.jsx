@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
-import axios from 'axios';
+import ChartLoading from '../components/common/ChartLoading.jsx';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery.jsx';
 import { FaCashRegister } from "react-icons/fa6";
 
 
-function Sales({setOpenSaleModal, saleHeader, sanitizeInput}) {
+function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
   const {user} = useAuth();
 
@@ -172,29 +172,39 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput}) {
             </thead>
 
             
-            <tbody className="bg-white">
-
-              {filteredData.length === 0 ? 
+            <tbody className="bg-white relative">
+              {salesLoading ? 
                 (
-                  <NoInfoFound col={9}/>
-                ) : 
-
-                (
-                  filteredData.map((row, rowIndex) => (
+                 <tr>
+                  <td colSpan={5}>
+                    <ChartLoading message='Loading sales records...' />
+                  </td>
+                 </tr>
                 
-                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => {openSoldItems(row); setModalType("sales")}}>
-                      <td className="px-4 py-2 text-center"  >{row.sales_information_id}</td>
-                      <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.charge_to}</td>
-                      <td className="px-4 py-2 whitespace-nowrap"  >{row.tin}</td>
-                      <td className="px-4 py-2"  >{row.address}</td>
-                      <td className="px-4 py-2 text-right"  >{row.formated_date}</td>
-                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.amount_net_vat)}</td>
-                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.vat)}</td>
-                      <td className="px-5 py-2 text-right"  >{currencyFormat(row.total_amount_due)}</td>
+                )
+               :
+              
+                filteredData.length === 0 ? 
+                  (
+                    <NoInfoFound col={9}/>
+                  ) : 
 
-                    </tr>
-                  ))
-                ) 
+                  (
+                    filteredData.map((row, rowIndex) => (
+                  
+                      <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => {openSoldItems(row); setModalType("sales")}}>
+                        <td className="px-4 py-2 text-center"  >{row.sales_information_id}</td>
+                        <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.charge_to}</td>
+                        <td className="px-4 py-2 whitespace-nowrap"  >{row.tin}</td>
+                        <td className="px-4 py-2"  >{row.address}</td>
+                        <td className="px-4 py-2 text-right"  >{row.formated_date}</td>
+                        <td className="px-4 py-2 text-right"  >{currencyFormat(row.amount_net_vat)}</td>
+                        <td className="px-4 py-2 text-right"  >{currencyFormat(row.vat)}</td>
+                        <td className="px-5 py-2 text-right"  >{currencyFormat(row.total_amount_due)}</td>
+
+                      </tr>
+                    ))
+                  ) 
               }
               
             </tbody>

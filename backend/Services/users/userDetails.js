@@ -4,7 +4,26 @@ import * as passwordEncryption from '../Services_Utils/passwordEncryption.js';
 
 
 
-export const getAllUsers = async () =>{
+export const getAllUsers = async (branchId, userId) =>{
+
+    const where = [" NOT ('Owner' = ANY(role))"];
+    const conditions = [];
+
+    if (branchId){
+        where.push('Branch.branch_id = $1'); 
+        conditions.push(branchId)
+    };
+
+    if (userId){
+        where.push('Users.user_id != $2'); 
+        conditions.push(userId)
+    };
+
+
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+
     const { rows } = await SQLquery(`
             SELECT 
                 Users.user_id, 
@@ -27,9 +46,9 @@ export const getAllUsers = async () =>{
             FROM Users
             JOIN Branch ON Branch.branch_id = Users.branch_id
             JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
-            WHERE NOT ('Owner' = ANY(role))
+            ${whereClause}
             ORDER BY hire_date;
-        `);
+        `, conditions);
 
     const usersWithDecryptedPasswords = await Promise.all(
         rows.map(async (user) => ({

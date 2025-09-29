@@ -47,7 +47,16 @@ function App() {
   const [inAppNotifMessage, setInAppNotifMessage] = useState('');
   const [deliveryData, setDeliveryData] = useState([]);
   const [deliveryEditData, setDeliveryEdit] = useState([]);
+
+
+  //LOADING STATES
+  const [invetoryLoading, setInventoryLoading] = useState(false);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [notificaionLoading, setNotificationLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
 
   // Socket connection
   const [socket, setSocket] = useState(null);
@@ -113,6 +122,7 @@ function App() {
   //DISPLAY THE INVENTORY TABLE
   const fetchProductsData = async () =>{
       try {
+        setInventoryLoading(true);
         let response;
         if (!user.role.some(role => ['Branch Manager', 'Owner'].includes(role))){
           response = await api.get(`/api/items?branch_id=${user.branch_id}`);
@@ -123,6 +133,8 @@ function App() {
       } catch (error) {
         console.log(error.message);
         
+      } finally {
+        setInventoryLoading(false)
       }
   };
 
@@ -197,10 +209,13 @@ function App() {
 
   const fetchSaleRecords = async() =>{
     try {
+      setSalesLoading(true);
       const saleHeader = await api.get(`/api/sale?branch_id=${user.branch_id}`);
       setSaleHeader(saleHeader.data);
     } catch (error) {
       console.log(error);
+    } finally{
+      setSalesLoading(false);
     }
   };
 
@@ -208,12 +223,14 @@ function App() {
 
   const getDeliveries = async () => {
     try {
-
+      setDeliveryLoading(true);
       const data = await api.get(`/api/delivery?branch_id=${user.branch_id}`);
       setDeliveryData(data.data);
 
     } catch (error) {
       console.log(error);
+    } finally {
+      setDeliveryLoading(false);
     }
     
 
@@ -234,11 +251,14 @@ function App() {
   //FOR NOTIFICATION DATA
   const getTime = async () =>{
     try {
+      setNotificationLoading(true);
       const time = await api.get(`/api/notifications?branch_id=${user.branch_id}&user_id=${user.user_id}&hire_date=${user.hire_date}`);
       setNotify(time.data);
     } catch (error) {
       console.log(error.message);
       
+    } finally {
+      setNotificationLoading(false)
     }
 
   };
@@ -290,8 +310,24 @@ function App() {
   //FOR ADDING USER
   const fetchUsersinfo = async() =>{
 
-    const response = await api.get(`/api/users`);
-    setUsers(response.data)
+    try {
+       setUsersLoading(true);
+       let response;
+
+       if (user.branch_id && user.role.some(role => ['Branch Manager'].includes(role))){
+          response = await api.get(`/api/users?branch_id=${user.branch_id}&user_id=${user.user_id}`);
+       } else {
+          response = await api.get(`/api/users`);
+       }
+
+       setUsers(response.data)
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setUsersLoading(false);
+    }
+
+   
 
   };
 
@@ -325,7 +361,7 @@ function App() {
   const disableEnableAccount = async(userToDisable) =>{
     
     //RE-ENABLE ACCOUNT
-    if (!user.role.some(role => ['Owner'].includes(role))) return;
+    if (!user.role.some(role => ['Owner', 'Branch Manager'].includes(role))) return;
 
     if (userToDisable.is_disabled){
         
@@ -457,6 +493,7 @@ function App() {
         openNotif={openNotif}
         notify={notify}
         unreadCount={unreadCount}
+        notificaionLoading={notificaionLoading}
         setNotify={setNotify}
         onClose={() => setOpenNotif(false)}
         
@@ -490,6 +527,7 @@ function App() {
                     mode={modalMode}
                     openInAppNotif={openInAppNotif}
                     message={inAppNotifMessage}
+                    invetoryLoading={invetoryLoading}
 
                   />
 
@@ -544,7 +582,7 @@ function App() {
 
           {/*USER MANAGEMENT PAGE*/}
           <Route path="/user_management" exact element={ 
-              <RouteProtection allowedRoles={['Owner']}>
+              <RouteProtection allowedRoles={['Owner', 'Branch Manager']}>
 
                   <UserManagement
                     handleUserModalOpen={handleUserModalOpen}
@@ -553,6 +591,8 @@ function App() {
                     sanitizeInput={sanitizeInput}
                     disableEnableAccount={disableEnableAccount}
                     users={users}
+                    user={user}
+                    usersLoading={usersLoading}
                   
                   />
 
@@ -569,6 +609,7 @@ function App() {
                     saleHeader={saleHeader}
                     setOpenSaleModal={setOpenSaleModal}
                     sanitizeInput={sanitizeInput}
+                    salesLoading={salesLoading}
                   
                   />
 
@@ -583,6 +624,7 @@ function App() {
 
                   <DeliveryMonitoring
                     deliveryData={deliveryData}
+                    deliveryLoading={deliveryLoading}
                     getDeliveries={getDeliveries}
                     setAddDelivery={setAddDelivery}
                     sanitizeInput={sanitizeInput}

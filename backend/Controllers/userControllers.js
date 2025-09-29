@@ -18,7 +18,9 @@ export const getBranches = async (req, res) =>{
 
 export const getUsers = async (req, res) =>{
     try {
-        const user = await userDetails.getAllUsers();
+        const branchId = req.query.branch_id;
+        const userId = req.query.user_id;
+        const user = await userDetails.getAllUsers(branchId, userId);
         res.status(200).json(user);
     } catch (error) {
         console.error('Error fetching users: ', error);

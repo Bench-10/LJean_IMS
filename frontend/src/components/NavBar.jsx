@@ -93,7 +93,7 @@ function NavBar() {
 
 
               {/*USER MANAGEMENT NAVIGATION*/}
-              {user && (user.role.some(role => ['Owner'].includes(role))) &&
+              {user && (user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
 
                   <NavLink
                     to="/user_management"

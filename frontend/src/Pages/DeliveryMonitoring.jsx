@@ -3,11 +3,12 @@ import NoInfoFound from '../components/common/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery';
 import { TbTruckDelivery } from "react-icons/tb";
+import ChartLoading from '../components/common/ChartLoading';
 
 
 
 
-function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, deliveryEdit }) {
+function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, deliveryEdit, deliveryLoading}) {
 
   const [search, setSearchDelivery] = useState('');
 
@@ -182,37 +183,48 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
             </thead>
 
             
-            <tbody className="bg-white">
-
-              {!filteredData || filteredData.length === 0 ? 
+            <tbody className="bg-white relative">
+              {deliveryLoading ? 
                 (
-                  <NoInfoFound col={6}/>
-                ) : 
+                  <tr>
+                    <td colSpan={6}>
+                      <ChartLoading message='Loading delivery data...'/>
+                    </td>
+                  </tr>
+                )
 
-                (
-                  filteredData.map((row, idx) => (
-                    <tr key={idx} className={`hover:bg-gray-200/70 h-14 ${(idx + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}` } onClick={() => {openDetailes(row); setModalType("other")}}>
-                      <td className="px-4 py-2 text-left">{row.delivery_id}</td>
-                      <td className="px-4 py-2 font-medium whitespace-nowrap text-left"  >{row.courier_name}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-left">{row.sales_information_id}</td>
-                      <td className="px-4 py-2 text-left">{row.destination_address}</td>
-                      <td className="px-4 py-2 text-left">{row.formated_delivered_date}</td>
-                      <td className="px-4 py-2 text-center">
-                        <button 
-                        className={`${row.is_pending ? 'bg-amber-400 text-white' : row.is_delivered ?  'border-2 border-green-700/70 text-green-700/70 font-semibold'  : 'border-2 border-red-700/70 text-red-700/70 font-semibold'} rounded-md px-4 py-2`}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            deliveryEdit('edit', row);
-                        }}
+               :
+
+                (!filteredData || filteredData.length === 0 ? 
+                  (
+                    <NoInfoFound col={6}/>
+                  ) : 
+
+                  (
+                    filteredData.map((row, idx) => (
+                      <tr key={idx} className={`hover:bg-gray-200/70 h-14 ${(idx + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}` } onClick={() => {openDetailes(row); setModalType("other")}}>
+                        <td className="px-4 py-2 text-left">{row.delivery_id}</td>
+                        <td className="px-4 py-2 font-medium whitespace-nowrap text-left"  >{row.courier_name}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-left">{row.sales_information_id}</td>
+                        <td className="px-4 py-2 text-left">{row.destination_address}</td>
+                        <td className="px-4 py-2 text-left">{row.formated_delivered_date}</td>
+                        <td className="px-4 py-2 text-center">
+                          <button 
+                          className={`${row.is_pending ? 'bg-amber-400 text-white' : row.is_delivered ?  'border-2 border-green-700/70 text-green-700/70 font-semibold'  : 'border-2 border-red-700/70 text-red-700/70 font-semibold'} rounded-md px-4 py-2`}
+                          onClick={(e) => {
+                              e.stopPropagation();
+                              deliveryEdit('edit', row);
+                          }}
+                          
+                          >
+                              {row.is_pending ? 'Delivering...' : row.is_delivered ? 'Delivered' : 'Undelivered'}
+                          </button>
+                        </td>
                         
-                        >
-                            {row.is_pending ? 'Delivering...' : row.is_delivered ? 'Delivered' : 'Undelivered'}
-                        </button>
-                      </td>
-                      
-                    </tr>
-                  ))
-                  
+                      </tr>
+                    ))
+                    
+                  )
                 )
               
               }

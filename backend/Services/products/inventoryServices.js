@@ -15,12 +15,12 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
             unit, 
             unit_price, 
             unit_cost, 
-            SUM(Add_Stocks.quantity_left) AS quantity, 
+            COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
             threshold 
         FROM inventory_product
         LEFT JOIN Category USING(category_id)
         LEFT JOIN Add_Stocks USING(product_id)
-        WHERE product_id = $1 AND branch_id = $2 AND product_validity > CURRENT_DATE
+        WHERE product_id = $1 AND branch_id = $2
         GROUP BY 
             inventory_product.product_id, 
             branch_id, 
@@ -44,31 +44,30 @@ export const getProductItems = async(branchId) => {
     if (!branchId){
         const {rows} = await SQLquery(`
             SELECT 
-                inventory_product.product_id, 
-                branch_id, 
-                Category.category_id, 
-                Category.category_name, 
-                product_name, 
-                unit, 
-                unit_price, 
-                unit_cost, 
-                SUM(Add_Stocks.quantity_left) AS quantity, 
-                threshold 
-            FROM inventory_product  
-            LEFT JOIN Category USING(category_id)
-            LEFT JOIN Add_Stocks USING(product_id)
-            WHERE product_validity > CURRENT_DATE
+                ip.product_id, 
+                ip.branch_id, 
+                c.category_id, 
+                c.category_name, 
+                ip.product_name, 
+                ip.unit, 
+                ip.unit_price, 
+                ip.unit_cost, 
+                COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
+                ip.threshold
+            FROM inventory_product ip
+            LEFT JOIN category c USING(category_id)
+            LEFT JOIN add_stocks ast USING(product_id)
             GROUP BY 
-                inventory_product.product_id, 
-                branch_id, 
-                Category.category_id, 
-                Category.category_name, 
-                product_name, 
-                unit, 
-                unit_price, 
-                unit_cost, 
-                threshold
-            ORDER BY inventory_product.product_id ASC
+                ip.product_id, 
+                ip.branch_id, 
+                c.category_id, 
+                c.category_name, 
+                ip.product_name, 
+                ip.unit, 
+                ip.unit_price, 
+                ip.unit_cost, 
+                ip.threshold
+            ORDER BY ip.product_id ASC;
         `);
 
         return rows;
@@ -86,12 +85,12 @@ export const getProductItems = async(branchId) => {
             unit, 
             unit_price, 
             unit_cost, 
-            SUM(Add_Stocks.quantity_left) AS quantity, 
+            COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
             threshold 
         FROM inventory_product  
         LEFT JOIN Category USING(category_id)
         LEFT JOIN Add_Stocks USING(product_id)
-        WHERE branch_id = $1 AND product_validity > CURRENT_DATE
+        WHERE branch_id = $1
         GROUP BY 
             inventory_product.product_id, 
             branch_id, 

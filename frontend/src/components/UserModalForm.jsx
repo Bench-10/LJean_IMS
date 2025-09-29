@@ -15,7 +15,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
   //USERINFO FIELDS
   const [first_name, setFirstName] = useState('');
   const [last_name, setLastname] = useState('');
-  const [branch, setBranch] = useState('');
+  const [branch, setBranch] = useState(user && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id: '');
   const [role, setRole] = useState({isManager: false, isInventoryStaff: false, isSalesAssociate: false});
   const [cell_number, setCellNumber] = useState('');    
   const [address, setAddress] = useState('');
@@ -54,10 +54,10 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
     setEmptyField({});
 
 
-    if (isModalOpen && mode === 'add' && user.role.some(role => ['Owner'].includes(role))){
+    if (isModalOpen && mode === 'add' && user.role.some(role => ['Owner', 'Branch Manager'].includes(role))){
         setFirstName('');
         setLastname('');
-        setBranch('');
+        setBranch(user && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id: '');
         setRole({isManager: false, isInventoryStaff: false, isSalesAssociate: false});
         setCellNumber('');
         setAddress('');
@@ -72,7 +72,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
 
 
-    if (isModalOpen && mode === 'edit' && user.role.some(role => ['Owner'].includes(role)) && userDetailes){
+    if (isModalOpen && mode === 'edit' && user.role.some(role => ['Owner', 'Branch Manager'].includes(role)) && userDetailes){
 
 
         let setDbUserRoles = {isManager: false, isInventoryStaff: false, isSalesAssociate: false};
@@ -325,14 +325,14 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
         }
 
 
-        {isModalOpen && user.role.some(role => ['Owner'].includes(role)) &&(
+        {isModalOpen && user.role.some(role => ['Owner', 'Branch Manager'].includes(role)) &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]"
             style={{ pointerEvents: 'auto' }}  onClick={onClose}
             />
         )}
 
-        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user.role.some(role => ['Owner'].includes(role))}>
+        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user.role.some(role => ['Owner', 'Branch Manager'].includes(role))}>
             <div className='bg-white text-black w-[700px] rounded-md' >
                 {/*HEADER TITLE */}
                 <div className='bg-green-800 p-4 rounded-t-md flex justify-between items-center '>
@@ -378,21 +378,36 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
                                     <h2 className='font-semibold text-green-900 text-lg'>Branch</h2>
 
-                                    <select 
-                                        name="" 
-                                        id="branch_select" 
-                                        className={inputDesign('branch')}
-                                        value={branch}
-                                        onChange={(e) => setBranch(e.target.value)}
+                                    {user && user.role.some(role => ['Branch Manager'].includes(role)) ? 
 
-                                    >
+                                        <input 
+                                            type='text' 
+                                            id="branch_select" 
+                                            className={inputDesign('branch')}
+                                            value={branches.find(b => b.branch_id === branch)?.branch_name || ''}
+                                            readOnly
 
-                                        <option value="">--Select a branch--</option>
-                                        {branches.map((option) => (
-                                            <option key={option.branch_id} value={option.branch_id}>{option.branch_name}</option>
-                                        ))}
+                                        />
+                                        :
 
-                                    </select>
+                                        <select 
+                                            name="" 
+                                            id="branch_select" 
+                                            className={inputDesign('branch')}
+                                            value={branch}
+                                            onChange={(e) => setBranch(e.target.value)}
+
+                                        >
+
+                                            <option value="">--Select a branch--</option>
+                                            {branches.map((option) => (
+                                                <option key={option.branch_id} value={option.branch_id}>{option.branch_name}</option>
+                                            ))}
+
+                                        </select>
+                                    
+                                    }
+
 
                                     {errorflag('branch', 'Branch')}
 
@@ -466,26 +481,28 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
                                     <h2 className='font-semibold text-green-900 text-lg'>User Role</h2>
 
-                                    <div className='flex items-center gap-x-2 '>
-                                        Branch Manager
-                                        <input
-                                            type="checkbox"
-                                            checked={role.isManager}
-                                            onChange={(e) => {
+                                     {user && user.role.some(role => ['Owner'].includes(role)) && 
+                                        <div className='flex items-center gap-x-2 '>
+                                            Branch Manager
+                                            <input
+                                                type="checkbox"
+                                                checked={role.isManager}
+                                                onChange={(e) => {
 
-                                                setRole(prev => ({
-                                                    ...prev,
-                                                    isManager: e.target.checked
-                                                }));
-                                                
-                                            }}
-                                            className="form-checkbox h-4 w-4 text-amber-500"
-                                        />
-                                    </div>
+                                                    setRole(prev => ({
+                                                        ...prev,
+                                                        isManager: e.target.checked
+                                                    }));
+                                                    
+                                                }}
+                                                className="form-checkbox h-4 w-4 text-amber-500"
+                                            />
+                                        </div>
+                                     }
 
                                     
                            
-                                    <div className='flex items-center gap-x-2 '>
+                                     <div className='flex items-center gap-x-2 '>
                                         Inventory Staff
                                         <input
                                             type="checkbox"
@@ -502,10 +519,10 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
                                             }}
                                             className="form-checkbox h-4 w-4 text-amber-500"
                                         />
-                                    </div>
+                                     </div>
 
 
-                                    <div className='flex items-center gap-x-2 '>
+                                     <div className='flex items-center gap-x-2 '>
                                         Sales Associate
                                         <input
                                             type="checkbox"
@@ -520,10 +537,10 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
                                             }}
                                             className="form-checkbox h-4 w-4 text-amber-500"
                                         />
-                                    </div>
+                                     </div>
 
 
-                                    {errorflag('role', 'User Role')}
+                                     {errorflag('role', 'User Role')}
 
 
                                 </div>

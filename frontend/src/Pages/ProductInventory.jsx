@@ -4,9 +4,10 @@ import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp
 import { useAuth } from '../authentication/Authentication';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import InventoryItemDetailsDialog from '../components/InventoryItemDetailsDialog.jsx';
+import ChartLoading from '../components/common/ChartLoading.jsx';
 
 
-function ProductInventory({branches, handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories, openInAppNotif, mode, message}) {
+function ProductInventory({branches, handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories, openInAppNotif, mode, message, invetoryLoading}) {
   
   const {user} = useAuth();
   const [error, setError] = useState();
@@ -221,49 +222,57 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
             </thead>
 
             
-            <tbody className="bg-white">
+            <tbody className="bg-white relative">
+              {invetoryLoading ? 
+                <tr>
+                  <th colSpan={10}>
+                    <ChartLoading message='Loading inventory products...' />
+                  </th>
+                </tr>
+              
+              :
 
-              {filteredData.length === 0 ? 
-                (
-                  <NoInfoFound col={10}/>
-                ) : 
+                filteredData.length === 0 ? 
+                  (
+                    <NoInfoFound col={10}/>
+                  ) : 
 
-                (
-                  filteredData.map((row, rowIndex) => (
-                
-                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => openDetails(row)} style={{cursor:'pointer'}}>
-                      <td className="px-4 py-2 text-center"  >{row.product_id}</td>
-                      <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
-                      <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
-                      <td className="px-4 py-2"  >{row.unit}</td>
-                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_price)}</td>
+                  (
+                    filteredData.map((row, rowIndex) => (
+                  
+                      <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => openDetails(row)} style={{cursor:'pointer'}}>
+                        <td className="px-4 py-2 text-center"  >{row.product_id}</td>
+                        <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
+                        <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
+                        <td className="px-4 py-2"  >{row.unit}</td>
+                        <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_price)}</td>
 
-                      {user.role.some(role => ['Branch Manager'].includes(role)) &&
-                        <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_cost)}</td>
-                      }
-                      
-                      <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
-                      <td className="px-4 py-2 text-center"  >{row.threshold.toLocaleString()}</td>
-                      <td className="px-4 py-2 text-center w-36"  >
-                        <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
-                          {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}
-                        </div>
-                      </td>
-
-                      {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-                      {user.role.some(role => ['Inventory Staff'].includes(role)) &&
-
-                        <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                          <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
-                              Edit
-                          </button>
+                        {user.role.some(role => ['Branch Manager'].includes(role)) &&
+                          <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_cost)}</td>
+                        }
+                        
+                        <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
+                        <td className="px-4 py-2 text-center"  >{row.threshold.toLocaleString()}</td>
+                        <td className="px-4 py-2 text-center w-36"  >
+                          <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
+                            {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}
+                          </div>
                         </td>
 
-                      }
-                      
-                    </tr>
-                  ))
-                ) 
+                        {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
+                        {user.role.some(role => ['Inventory Staff'].includes(role)) &&
+
+                          <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
+                                Edit
+                            </button>
+                          </td>
+
+                        }
+                        
+                      </tr>
+                    ))
+                  ) 
               }
               
             </tbody>
