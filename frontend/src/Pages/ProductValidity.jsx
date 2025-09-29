@@ -1,9 +1,11 @@
 import {React, useState, useEffect } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
+import { TbFileExport } from "react-icons/tb";
 import api from '../utils/api';
 import NoInfoFound from '../components/common/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 import ChartLoading from '../components/common/ChartLoading';
+import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 
 function ProductValidity({ sanitizeInput }) {
   const [productValidityList, setValidity] = useState([]);
@@ -48,6 +50,25 @@ function ProductValidity({ sanitizeInput }) {
     
   );
 
+  // Export functionality
+  const handleExportValidity = (format) => {
+    const exportData = formatForExport(filteredValidityData, []);
+    const filename = `product_validity_export_${new Date().toISOString().split('T')[0]}`;
+    
+    const customHeaders = ['Product Name', 'Category', 'Date Added', 'Product Validity Date', 'Quantity Left'];
+    const dataKeys = ['product_name', 'category_name', 'formated_date_added', 'formated_product_validity', 'quantity_left'];
+    
+    if (format === 'csv') {
+      exportToCSV(exportData, filename, customHeaders, dataKeys);
+    } else if (format === 'pdf') {
+      exportToPDF(exportData, filename, {
+        title: 'Product Validity Report',
+        customHeaders: customHeaders,
+        dataKeys: dataKeys
+      });
+    }
+  };
+
 
 
   
@@ -75,22 +96,45 @@ function ProductValidity({ sanitizeInput }) {
 
           </div>
 
-          {/*EXPIRY LABEL*/}
-          <div  className="ml-auto flex gap-4 mr-14">
+          <div  className="ml-auto flex gap-4 items-center">
             
-            {/*NEAR EXPIRY DIV*/}
-            <div className='flex gap-4 align-middle'>
-              <span className="relative pl-6 content-center before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-4 before:h-4 before:rounded before:bg-[#FFF3C1]">
-                Near Expiry
-              </span>
+    
+            {/*EXPIRY LABELS*/}
+            <div className="flex gap-4">
+              {/*NEAR EXPIRY DIV*/}
+              <div className='flex gap-4 align-middle'>
+                <span className="relative pl-6 content-center before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-4 before:h-4 before:rounded before:bg-[#FFF3C1]">
+                  Near Expiry
+                </span>
+              </div>
+
+              {/*EXPIRED DIV*/}
+              <div className='flex gap-4'>
+                <span className="relative pl-6 content-center before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-4 before:h-4 before:rounded before:bg-[#FF3131]">
+                  Expired
+                </span>
+              </div>
             </div>
 
-
-            {/*EXPIRED DIV*/}
-           <div className='flex gap-4'>
-              <span className="relative pl-6 content-center before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-4 before:h-4 before:rounded before:bg-[#FF3131]">
-                Expired
-              </span>
+            {/*EXPORT DROPDOWN*/}
+            <div className="relative group">
+              <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
+                <TbFileExport />EXPORT
+              </button>
+              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                <button 
+                  onClick={() => handleExportValidity('csv')}
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                >
+                  Export as CSV
+                </button>
+                <button 
+                  onClick={() => handleExportValidity('pdf')}
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                >
+                  Export as PDF
+                </button>
+              </div>
             </div>
 
           </div>
@@ -103,7 +147,7 @@ function ProductValidity({ sanitizeInput }) {
 
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
           <table className={`w-full ${filteredValidityData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
-            <thead className="sticky top-0 bg-gray-100">
+            <thead className="sticky top-0 bg-gray-100 z-10">
               <tr>
                 
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
@@ -119,7 +163,7 @@ function ProductValidity({ sanitizeInput }) {
                     CATEGORY
                   </th>
                    <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
-                    CATEGORY
+                    QUANTITY
                   </th>
                   
                

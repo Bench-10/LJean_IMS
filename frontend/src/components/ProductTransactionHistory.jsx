@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import api from '../utils/api.js';
 import { BsFunnelFill } from "react-icons/bs";
+import { TbFileExport } from "react-icons/tb";
 import NoInfoFound from './common/NoInfoFound.jsx';
 import { useAuth } from '../authentication/Authentication';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import ChartLoading from './common/ChartLoading.jsx';
+import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
  
 function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInput }) {
 
@@ -97,6 +99,25 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   currentProductHistory = currentProductHistory.filter(product =>
     product.product_name.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Export functionality
+  const handleExportHistory = (format) => {
+    const exportData = formatForExport(currentProductHistory, []);
+    const filename = `product_history_export_${new Date().toISOString().split('T')[0]}`;
+    
+    const customHeaders = ['Date Added', 'Product Name', 'Category', 'Cost', 'Quantity'];
+    const dataKeys = ['formated_date_added', 'product_name', 'category_name', 'h_unit_cost', 'quantity_added'];
+    
+    if (format === 'csv') {
+      exportToCSV(exportData, filename, customHeaders, dataKeys);
+    } else if (format === 'pdf') {
+      exportToPDF(exportData, filename, {
+        title: 'Product Transaction History Report',
+        customHeaders: customHeaders,
+        dataKeys: dataKeys
+      });
+    }
+  };
 
 
 
@@ -216,8 +237,26 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
               </div>
     
               {/*EXPORT BUTTON*/}
-              <div>
-
+              <div className='flex justify-end mt-4'>
+                <div className="relative group">
+                  <button className='bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
+                    <TbFileExport />Export History
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                    <button 
+                      onClick={() => handleExportHistory('csv')}
+                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                    >
+                      Export as CSV
+                    </button>
+                    <button 
+                      onClick={() => handleExportHistory('pdf')}
+                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                    >
+                      Export as PDF
+                    </button>
+                  </div>
+                </div>
               </div>
 
 

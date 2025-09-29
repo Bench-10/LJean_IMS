@@ -10,7 +10,7 @@ import ChartLoading from './common/ChartLoading';
 function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInformation, sale_id}) {
 
     const [soldItems, setSoldItems] = useState([]);
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(false);
 
     useEffect(() =>{
         if (!sale_id) return;

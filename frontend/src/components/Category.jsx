@@ -23,7 +23,7 @@ function Category({isCategoryOpen, onClose, setListCategories, listCategories, f
         const response = await api.get(`/api/categories/`);
         setListCategories(response.data);
       } catch (error) {
-        setError(error.message);
+        console.log(error.message);
       }
   };
 

@@ -6,9 +6,25 @@ import {correctDateFormat} from "../Services_Utils/convertRedableDate.js"
 // VIEW SALE
 export const viewSale = async (branchId) => {
    const { rows } = await SQLquery(`
-    SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, discount, transaction_by, delivery_fee, is_for_delivery
+    SELECT 
+        Sales_Information.sales_information_id, 
+        Sales_Information.branch_id, 
+        charge_to, 
+        tin, address, 
+        ${correctDateFormat('date')}, 
+        vat, 
+        amount_net_vat, 
+        total_amount_due, 
+        discount, 
+        transaction_by, 
+        delivery_fee, 
+        is_for_delivery,
+        COALESCE(is_delivered, false) AS is_delivered,
+        COALESCE(is_pending, false) AS is_pending
     FROM Sales_Information 
-    WHERE branch_id = $1;`, [branchId]);
+    LEFT JOIN Delivery 
+    USING(sales_information_id)
+    WHERE Sales_Information.branch_id = $1;`, [branchId]);
    
    return rows;
 };
@@ -108,9 +124,26 @@ export const addSale = async (headerAndProducts) => {
 
 
         const {rows} = await SQLquery(`
-            SELECT sales_information_id, branch_id, charge_to, tin, address, ${correctDateFormat('date')}, vat, amount_net_vat, total_amount_due, discount, transaction_by, delivery_fee, is_for_delivery
+            SELECT 
+                Sales_Information.sales_information_id, 
+                Sales_Information.branch_id,  
+                charge_to, 
+                tin, 
+                address, 
+                ${correctDateFormat('date')}, 
+                vat, 
+                amount_net_vat, 
+                total_amount_due, 
+                discount, 
+                transaction_by, 
+                delivery_fee, 
+                is_for_delivery,
+                COALESCE(is_delivered, false) AS is_delivered,
+                COALESCE(is_pending, true) AS is_pending
             FROM Sales_Information 
-            WHERE branch_id = $1 AND sales_information_id = $2;`
+            LEFT JOIN Delivery 
+            USING(sales_information_id)
+            WHERE Sales_Information.branch_id = $1 AND sales_information_id = $2;`
         , [branch_id, sale_id]);
 
         return rows[0];

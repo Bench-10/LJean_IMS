@@ -6,7 +6,6 @@ import EnableDisableAccountDialog from "../components/dialogs/EnableDisableAccou
 import ChartLoading from "../components/common/ChartLoading";
 
 
-
 function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUserDetailes, sanitizeInput, disableEnableAccount, usersLoading}) {
 
 
@@ -67,11 +66,11 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
             />
 
           </div>
-
-          <div  className="ml-auto flex">
+          
+          <div  className="ml-auto flex gap-3">
 
               {/*ADD NEW USER BTN*/}
-              <button className='inline-flex items-center border bg-[#29a419] text-white px-5 rounded-md transition-all' onClick={() => handleUserModalOpen('add')}><MdGroupAdd className="mr-2"/>ADD NEW USER</button>
+              <button className='inline-flex items-center border bg-[#29a419] text-white px-5 py-2 rounded-md transition-all' onClick={() => handleUserModalOpen('add')}><MdGroupAdd className="mr-2"/>ADD NEW USER</button>
 
           </div>
 
@@ -86,7 +85,7 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
         {/*TABLE */}
         <div className="overflow-x-auto  overflow-y-auto h-[600px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
           <table className={`w-full ${filteredUserData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
-            <thead className="sticky top-0 bg-gray-100">
+            <thead className="sticky top-0 bg-gray-100 z-10">
               <tr>
                 
                   <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white">

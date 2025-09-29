@@ -1,6 +1,8 @@
 import React, { useState }from 'react';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp.jsx';
+import { TbFileExport } from "react-icons/tb";
+import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 import { useAuth } from '../authentication/Authentication';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import InventoryItemDetailsDialog from '../components/InventoryItemDetailsDialog.jsx';
@@ -56,6 +58,25 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
     product.product_name.toLowerCase().includes(searchItem.toLowerCase())
     
   );
+
+  // Export functionality
+  const handleExportInventory = (format) => {
+    const exportData = formatForExport(filteredData, ['product_id']);
+    const filename = `inventory_export_${new Date().toISOString().split('T')[0]}`;
+    
+    const customHeaders = ['Product Name', 'Category', 'Unit', 'Stock Quantity', 'Price', 'Threshold'];
+    const dataKeys = ['product_name', 'category_name', 'unit', 'quantity', 'unit_price', 'threshold'];
+    
+    if (format === 'csv') {
+      exportToCSV(exportData, filename, customHeaders, dataKeys);
+    } else if (format === 'pdf') {
+      exportToPDF(exportData, filename, {
+        title: 'Product Inventory Report',
+        customHeaders: customHeaders,
+        dataKeys: dataKeys
+      });
+    }
+  };
 
 
   return (
@@ -146,22 +167,42 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
           </div>
           
 
-          {/*CATEGORIES AND ADD ITEM */}
-          {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-          {user.role.some(role => ['Inventory Staff'].includes(role)) &&
-          
-            <div  className="ml-auto flex gap-4">
-              
-              {/*CATEGORIES BTN*/}
-              <button className='bg-[#007278] text-white font-medium hover:bg-[#009097] px-5 rounded-md transition-all' onClick={() => setIsCategory(true)}>CATEGORIES</button>
-
-
-              {/*ADD ITEM BTN*/}
-              <button className='bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all' onClick={() => handleOpen('add')}>ADD ITEMS</button>
-
+          {/*EXPORT AND CATEGORIES AND ADD ITEM */}
+          <div  className="ml-auto flex gap-4">
+            
+            {/*EXPORT DROPDOWN*/}
+            <div className="relative group">
+              <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
+                <TbFileExport />EXPORT
+              </button>
+              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                <button 
+                  onClick={() => handleExportInventory('csv')}
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                >
+                  Export as CSV
+                </button>
+                <button 
+                  onClick={() => handleExportInventory('pdf')}
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                >
+                  Export as PDF
+                </button>
+              </div>
             </div>
 
-          }
+            {/*CATEGORIES AND ADD ITEM - APPEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
+            {user.role.some(role => ['Inventory Staff'].includes(role)) && (
+              <>
+                {/*CATEGORIES BTN*/}
+                <button className='bg-[#007278] text-white font-medium hover:bg-[#009097] px-5 rounded-md transition-all' onClick={() => setIsCategory(true)}>CATEGORIES</button>
+
+                {/*ADD ITEM BTN*/}
+                <button className='bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all' onClick={() => handleOpen('add')}>ADD ITEMS</button>
+              </>
+            )}
+
+          </div>
           
 
         </div>
@@ -172,7 +213,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
         {/*TABLE */}
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
           <table className={`w-full ${filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
-            <thead className="sticky top-0 bg-gray-100 ">
+            <thead className="sticky top-0 bg-gray-100 z-10 ">
               <tr>
                 
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-24">

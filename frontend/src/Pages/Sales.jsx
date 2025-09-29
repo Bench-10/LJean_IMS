@@ -17,6 +17,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
 
   const [searchSale, setSearchSale] = useState('');
+  const [saleFilter, setSaleFilter] = useState('all');
 
 
   //HEADER AND TOTAL INFORMATION
@@ -71,13 +72,30 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
     setSearchSale(sanitizeInput(event.target.value))
   };
 
+  //FILTER DROPDOWN SELECTION
   let filteredSale = saleHeader;
+  if (saleFilter === 'normal') {
+    filteredSale = filteredSale.filter(sale => !sale.is_for_delivery);
 
+  } else if (saleFilter === 'for_delivery') {
+    filteredSale = filteredSale.filter(sale => sale.is_for_delivery);
+
+  } else if (saleFilter === 'delivered') {
+    filteredSale = filteredSale.filter(sale => sale.is_for_delivery && sale.is_delivered && !sale.is_pending);
+
+  } else if (saleFilter === 'undelivered') {
+    filteredSale = filteredSale.filter(sale => sale.is_for_delivery && !sale.is_delivered && !sale.is_pending);
+
+  } else if (saleFilter === 'out_for_delivery') {
+    filteredSale = filteredSale.filter(sale => sale.is_for_delivery && !sale.is_delivered && sale.is_pending);
+
+  }
+
+  // Filter by search
   const filteredData = filteredSale.filter(sale => 
-    sale.charge_to.toLowerCase().includes(searchSale.toLowerCase()) ||
-    sale.tin.toLowerCase().includes(searchSale.toLowerCase()) ||
-    sale.address.toLowerCase().includes(searchSale.toLowerCase()) 
-    
+    sale.charge_to?.toLowerCase().includes(searchSale.toLowerCase()) ||
+    sale.tin?.toLowerCase().includes(searchSale.toLowerCase()) ||
+    sale.address?.toLowerCase().includes(searchSale.toLowerCase()) 
   );
 
   return (
@@ -104,43 +122,49 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
 
         {/*SEARCH AND ADD*/}
-        <div className='flex w-full'>
+        <div className='flex w-full items-center'>
           {/*SEARCH */}
           <div className='w-[400px]'>
-            
             <input
               type="text"
               placeholder="Search"
               className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
               onChange={handleSaleSearch}
             />
-
           </div>
 
+          {/* DROPDOWN FILTER */}
+          <div className='ml-4'>
+            <select
+              value={saleFilter}
+              onChange={e => setSaleFilter(e.target.value)}
+              className="border outline outline-1 outline-gray-400 focus:outline-green-700 px-3 py-2 rounded h-9"
+            >
+              <option value="all">All Sales</option>
+              <option value="normal">Normal Sales</option>
+              <option value="for_delivery">For Delivery Sales</option>
+              <option value="delivered">Delivered Sales</option>
+              <option value="undelivered">Undelivered Sales</option>
+              <option value="out_for_delivery">Out for Delivery Sales</option>
+            </select>
+          </div>
 
-          {/*APEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
+          {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
           {user.role.some(role => ['Sales Associate'].includes(role)) &&
-          
-            <div  className="ml-auto flex gap-4">
-
-
+            <div className="ml-auto flex gap-4 h-9">
               {/*ADD SALE BTN*/}
               <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all'  onClick={() => setOpenSaleModal(true)}> 
                 <FaCashRegister /> ADD SALE
               </button>
-
             </div>
-
           }
-          
-
         </div>
 
         <hr className="border-t-2 my-4 w-full border-gray-500"/>
 
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
           <table className={`w-full ${filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
-            <thead className="sticky top-0 bg-gray-100">
+            <thead className="sticky top-0 bg-gray-100 z-10">
               <tr>
                 
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-24">

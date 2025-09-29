@@ -2,7 +2,7 @@ import {React, useEffect, useState} from 'react'
 import NoInfoFound from '../components/common/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery';
-import { TbTruckDelivery } from "react-icons/tb";
+import { TbTruckDelivery, TbFileExport } from "react-icons/tb";
 import ChartLoading from '../components/common/ChartLoading';
 
 
@@ -126,20 +126,16 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
           
 
           
-          {/*APEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
-          {user.role.some(role => ['Sales Associate'].includes(role)) &&
-          
-            <div  className="ml-auto flex gap-4">
-              
-              {/*ADD ITEM BTN*/}
+          <div  className="ml-auto flex gap-4">
+            {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
+            {user.role.some(role => ['Sales Associate'].includes(role)) && (
               <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all' onClick={() => setAddDelivery(true)} >
                 <TbTruckDelivery />
                 ADD DELIVERY
               </button>
+            )}
 
-            </div>
-
-          }
+          </div>
           
 
         </div>
@@ -150,7 +146,7 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
         {/*TABLE */}
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
           <table className={`w-full ${!filteredData || filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
-            <thead className="sticky top-0 bg-gray-100">
+            <thead className="sticky top-0 bg-gray-100 z-10">
               <tr>
                 
                   <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white ">
