@@ -508,7 +508,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             {/* INVENTORY COUNT KPI */}
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
 
-              {loadingKPIs && <ChartLoading message='Loading produc count' type='kpi' /> }
+              {loadingKPIs && <ChartLoading message='Loading product count' type='kpi' /> }
 
               <div className='mr-5 ml-1'>
                

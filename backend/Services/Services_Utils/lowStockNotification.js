@@ -1,18 +1,14 @@
 import { SQLquery } from "../../db.js";
 import { broadcastNotification } from "../../server.js";
 
-/**
- * Checks the current quantity of a product against its threshold and handles low-stock notifications.
- * The notification is only sent once while the product remains below the threshold. Once the quantity
- * rises above the threshold, the notification flag is reset to allow future alerts.
- *
- * @param {number} productId - The inventory product ID to validate.
- * @param {{ triggeredByUserId?: number|null, triggerUserName?: string|null }} options
- */
+
+
+
+
 export const checkAndHandleLowStock = async (productId, options = {}) => {
   if (!productId) return;
 
-  const { triggeredByUserId = null, triggerUserName = null } = options;
+  const { triggeredByUserId = null, triggerUserName = 'System' } = options;
 
   const { rows } = await SQLquery(
     `SELECT 
@@ -40,22 +36,22 @@ export const checkAndHandleLowStock = async (productId, options = {}) => {
     branch_id: branchId,
     quantity
   } = rows[0];
-
-  // Normalize numeric values
+  
+  // NORMALIZE NUMERIC VALUES
   const currentQuantity = Number(quantity ?? 0);
   const thresholdValue = Number(threshold ?? 0);
   const alreadyNotified = Boolean(lowStockNotified);
 
   if (Number.isNaN(thresholdValue)) {
-    return; // No threshold defined; nothing to do
+    return; // NO THRESHOLD DEFINED; NOTHING TO DO
   }
 
-  // When quantity drops to/below threshold, send notification once
+  // WHEN QUANTITY DROPS TO/BELOW THRESHOLD, SEND NOTIFICATION ONCE
   if (currentQuantity <= thresholdValue) {
     if (!alreadyNotified) {
       await SQLquery('UPDATE Inventory_Product SET low_stock_notified = TRUE WHERE product_id = $1', [productId]);
 
-      const message = `${productName} is low on stock (${currentQuantity} remaining). Threshold is ${thresholdValue}.`;
+      const message = `${productName} is low on stock (${currentQuantity} remaining).`;
 
       const alertResult = await SQLquery(
         `INSERT INTO Inventory_Alerts 
@@ -79,10 +75,17 @@ export const checkAndHandleLowStock = async (productId, options = {}) => {
           target_roles: ['Branch Manager', 'Inventory Staff'],
           creator_id: triggeredByUserId
         });
+
       }
+
     }
+
+
   } else if (alreadyNotified) {
-    // Quantity recovered above threshold; reset flag so future drops notify again
+
+    // QUANTITY RECOVERED ABOVE THRESHOLD; RESET FLAG SO FUTURE DROPS NOTIFY AGAIN
     await SQLquery('UPDATE Inventory_Product SET low_stock_notified = FALSE WHERE product_id = $1', [productId]);
+
   }
+
 };

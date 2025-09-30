@@ -1,11 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { currencyFormat } from '../../../utils/formatCurrency';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Area, Legend, Cell, ReferenceLine, ComposedChart } from 'recharts';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
+import RestockSuggestionsDialog from '../../dialogs/RestockSuggestionsDialog.jsx';
+import { FaLightbulb, FaBoxOpen } from 'react-icons/fa';
 
 function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts }) {
 
+  const [showRestockDialog, setShowRestockDialog] = useState(false);
   
   useEffect(() => {
     console.log(salesPerformance);
@@ -380,9 +383,34 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
             </div>
 
+            {/* Restocking Suggestions Button */}
+            {(hasActualData || hasForecastData) && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={() => setShowRestockDialog(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
+                >
+                  <FaLightbulb />
+                  Get Restocking Suggestions
+                </button>
+              </div>
+            )}
+
             </div>
     
         </Card>
+
+        {/* Restock Suggestions Dialog */}
+        <RestockSuggestionsDialog
+          isOpen={showRestockDialog}
+          onClose={() => setShowRestockDialog(false)}
+          forecastData={forecastChartData}
+          actualData={actualSeries}
+          topProducts={topProducts}
+          salesInterval={salesInterval}
+          categoryName={categoryName}
+          selectedProductName={selectedProductName}
+        />
     
     </>
   )
