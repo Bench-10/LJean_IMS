@@ -1,5 +1,6 @@
 import { SQLquery } from "../../db.js";
-import {correctDateFormat} from "../Services_Utils/convertRedableDate.js"
+import {correctDateFormat} from "../Services_Utils/convertRedableDate.js";
+import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification } from "../../server.js";
 
 
 
@@ -146,7 +147,86 @@ export const addSale = async (headerAndProducts) => {
             WHERE Sales_Information.branch_id = $1 AND sales_information_id = $2;`
         , [branch_id, sale_id]);
 
-        return rows[0];
+        const newSaleRecord = rows[0];
+
+        // BROADCAST SALE UPDATE TO ALL USERS IN THE BRANCH
+        broadcastSaleUpdate(branch_id, {
+            action: 'add',
+            sale: newSaleRecord,
+            user_id: headerInformationAndTotal.userID || null
+        });
+
+        // BROADCAST INVENTORY UPDATES FOR ALL PRODUCTS THAT HAD STOCK DEDUCTED
+        if (productRow && productRow.length > 0) {
+            for (const product of productRow) {
+                // GET UPDATED INVENTORY DATA FOR EACH AFFECTED PRODUCT
+                const { rows: updatedProduct } = await SQLquery(`
+                    SELECT 
+                        inventory_product.product_id, 
+                        branch_id, 
+                        Category.category_id, 
+                        Category.category_name, 
+                        product_name, 
+                        unit, 
+                        unit_price, 
+                        unit_cost, 
+                        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
+                        threshold 
+                    FROM inventory_product
+                    LEFT JOIN Category USING(category_id)
+                    LEFT JOIN Add_Stocks ast USING(product_id)
+                    WHERE inventory_product.product_id = $1 AND inventory_product.branch_id = $2
+                    GROUP BY 
+                        inventory_product.product_id, 
+                        branch_id, 
+                        Category.category_id, 
+                        Category.category_name, 
+                        product_name, 
+                        unit, 
+                        unit_price, 
+                        unit_cost, 
+                        threshold`,
+                    [product.product_id, branch_id]
+                );
+
+                if (updatedProduct[0]) {
+                    broadcastInventoryUpdate(branch_id, {
+                        action: 'sale_deduction',
+                        product: updatedProduct[0],
+                        sale_id: sale_id,
+                        quantity_sold: product.quantity,
+                        user_id: headerInformationAndTotal.userID || null
+                    });
+                }
+            }
+        }
+
+        // BROADCAST NOTIFICATION FOR NEW SALE
+        const saleNotificationMessage = `New sale created by ${transactionBy} for ${chargeTo} - Total: ₱${totalAmountDue}`;
+        
+        const alertResult = await SQLquery(
+            `INSERT INTO Inventory_Alerts 
+            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *`,
+            [null, branch_id, 'New Sale', saleNotificationMessage, 'green', headerInformationAndTotal.userID || null, transactionBy]
+        );
+
+        if (alertResult.rows[0]) {
+            broadcastNotification(branch_id, {
+                alert_id: alertResult.rows[0].alert_id,
+                alert_type: 'New Sale',
+                message: saleNotificationMessage,
+                banner_color: 'green',
+                user_id: alertResult.rows[0].user_id,
+                user_full_name: transactionBy,
+                alert_date: alertResult.rows[0].alert_date,
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            });
+        }
+
+        return newSaleRecord;
 
     } catch (error) {
 

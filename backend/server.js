@@ -118,6 +118,11 @@ export const broadcastHistoryUpdate = (branchId, historyData) => {
   io.to(`branch-${branchId}`).emit('history-update', historyData);
 };
 
+// BROADCAST SALES UPDATE TO ALL USERS IN BRANCH
+export const broadcastSaleUpdate = (branchId, saleData) => {
+  io.to(`branch-${branchId}`).emit('sale-update', saleData);
+};
+
 
 
 // SENDS NOTIFICATION TO SPECIFIC USER

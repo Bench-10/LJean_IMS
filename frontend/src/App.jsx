@@ -124,6 +124,15 @@ function App() {
                 : item
             )
           );
+        } else if (inventoryData.action === 'sale_deduction' || inventoryData.action === 'delivery_stock_change') {
+          // HANDLE INVENTORY CHANGES FROM SALES OR DELIVERY STATUS CHANGES
+          setProductsData(prevData => 
+            prevData.map(item => 
+              item.product_id === inventoryData.product.product_id 
+                ? inventoryData.product 
+                : item
+            )
+          );
         }
         
         // NOTE: No in-app notification here for other devices
@@ -156,6 +165,51 @@ function App() {
         window.dispatchEvent(new CustomEvent('history-update', { 
           detail: historyData 
         }));
+      }
+    });
+
+    // LISTEN FOR SALES UPDATES
+    newSocket.on('sale-update', (saleData) => {
+      console.log('Sale update received:', saleData);
+      
+      // ONLY UPDATE IF THE UPDATE WASN'T MADE BY THE CURRENT USER
+      if (user.user_id !== saleData.user_id) {
+        if (saleData.action === 'add') {
+          // NEW SALE ADDED - UPDATE SALES LIST
+          setSaleHeader(prevSales => [saleData.sale, ...prevSales]);
+          
+          // SHOW IN-APP NOTIFICATION FOR NEW SALE
+          const message = `New sale created by ${saleData.sale.transaction_by} for ${saleData.sale.charge_to} - Total: ₱${saleData.sale.total_amount_due}`;
+          setOpenInAppNotif(true);
+          setInAppNotifMessage(message);
+          setTimeout(() => {
+            setOpenInAppNotif(false);
+            setInAppNotifMessage('');
+          }, 5000);
+          
+        } else if (saleData.action === 'delivery_status_change') {
+          // DELIVERY STATUS CHANGED - UPDATE SALES LIST
+          setSaleHeader(prevSales => 
+            prevSales.map(sale => 
+              sale.sales_information_id === saleData.sale.sales_information_id 
+                ? saleData.sale 
+                : sale
+            )
+          );
+          
+          // UPDATE DELIVERY DATA IF AVAILABLE
+          setDeliveryData(prevDelivery => 
+            prevDelivery.map(delivery => 
+              delivery.sales_information_id === saleData.sale.sales_information_id
+                ? { 
+                    ...delivery, 
+                    is_delivered: saleData.new_status.is_delivered,
+                    is_pending: saleData.new_status.is_pending 
+                  }
+                : delivery
+            )
+          );
+        }
       }
     });
 

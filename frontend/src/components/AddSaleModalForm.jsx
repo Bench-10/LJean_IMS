@@ -334,6 +334,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
         address,
         date,
         branch_id: user.branch_id,
+        userID: user.user_id,
         vat,
         amountNetVat,
         totalAmountDue,

@@ -1,6 +1,7 @@
 import { SQLquery } from "../../db.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 import { restoreStockFromSale, deductStockAndTrackUsage } from "../sale/saleServices.js";
+import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification } from "../../server.js";
 
 
 
@@ -184,6 +185,128 @@ export const setToDelivered = async(saleID, update) => {
 
             console.log(`Delivery status updated for sale ID: ${saleID} (no stock changes needed)`);
 
+        }
+
+        // BROADCAST DELIVERY STATUS UPDATE
+        const {rows: saleData} = await SQLquery(`
+            SELECT 
+                Sales_Information.sales_information_id, 
+                Sales_Information.branch_id,  
+                charge_to, 
+                tin, 
+                address, 
+                date, 
+                vat, 
+                amount_net_vat, 
+                total_amount_due, 
+                discount, 
+                transaction_by, 
+                delivery_fee, 
+                is_for_delivery,
+                COALESCE(is_delivered, false) AS is_delivered,
+                COALESCE(is_pending, false) AS is_pending
+            FROM Sales_Information 
+            LEFT JOIN Delivery 
+            USING(sales_information_id)
+            WHERE Sales_Information.sales_information_id = $1`,
+            [saleID]
+        );
+
+        if (saleData[0]) {
+            // BROADCAST SALE/DELIVERY UPDATE
+            broadcastSaleUpdate(saleData[0].branch_id, {
+                action: 'delivery_status_change',
+                sale: saleData[0],
+                previous_status: {
+                    was_delivered: wasDelivered,
+                    was_pending: wasPending
+                },
+                new_status: {
+                    is_delivered: status.is_delivered,
+                    is_pending: status.pending
+                }
+            });
+
+            // BROADCAST INVENTORY UPDATES IF STOCK WAS AFFECTED
+            if ((wasDelivered && !status.is_delivered && !status.pending) || 
+                (!wasDelivered && !wasPending && status.pending) ||
+                (!wasDelivered && status.is_delivered) ||
+                (wasPending && !status.is_delivered && !status.pending)) {
+                
+                // GET AFFECTED PRODUCTS AND BROADCAST INVENTORY UPDATES
+                const {rows: affectedProducts} = await SQLquery(`
+                    SELECT 
+                        si.product_id,
+                        si.quantity,
+                        ip.branch_id,
+                        ip.category_id,
+                        c.category_name,
+                        ip.product_name,
+                        ip.unit,
+                        ip.unit_price,
+                        ip.unit_cost,
+                        ip.threshold,
+                        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity
+                    FROM Sales_Items si
+                    JOIN inventory_product ip USING(product_id)
+                    LEFT JOIN Category c USING(category_id)
+                    LEFT JOIN Add_Stocks ast USING(product_id)
+                    WHERE si.sales_information_id = $1
+                    GROUP BY 
+                        si.product_id, si.quantity, ip.branch_id, ip.category_id, 
+                        c.category_name, ip.product_name, ip.unit, ip.unit_price, 
+                        ip.unit_cost, ip.threshold`,
+                    [saleID]
+                );
+
+                for (const product of affectedProducts) {
+                    broadcastInventoryUpdate(saleData[0].branch_id, {
+                        action: 'delivery_stock_change',
+                        product: {
+                            product_id: product.product_id,
+                            branch_id: product.branch_id,
+                            category_id: product.category_id,
+                            category_name: product.category_name,
+                            product_name: product.product_name,
+                            unit: product.unit,
+                            unit_price: product.unit_price,
+                            unit_cost: product.unit_cost,
+                            quantity: product.quantity,
+                            threshold: product.threshold
+                        },
+                        sale_id: saleID,
+                        delivery_change: {
+                            from: { delivered: wasDelivered, pending: wasPending },
+                            to: { delivered: status.is_delivered, pending: status.pending }
+                        }
+                    });
+                }
+
+                // BROADCAST NOTIFICATION FOR DELIVERY STATUS CHANGE
+                const notificationMessage = `Delivery status changed for sale ${saleID} - ${status.is_delivered ? 'Delivered' : status.pending ? 'Out for Delivery' : 'Undelivered'}`;
+                
+                const alertResult = await SQLquery(
+                    `INSERT INTO Inventory_Alerts 
+                    (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    RETURNING *`,
+                    [null, saleData[0].branch_id, 'Delivery Update', notificationMessage, 'blue', null, courierName || 'System']
+                );
+
+                if (alertResult.rows[0]) {
+                    broadcastNotification(saleData[0].branch_id, {
+                        alert_id: alertResult.rows[0].alert_id,
+                        alert_type: 'Delivery Update',
+                        message: notificationMessage,
+                        banner_color: 'blue',
+                        user_id: alertResult.rows[0].user_id,
+                        user_full_name: courierName || 'System',
+                        alert_date: alertResult.rows[0].alert_date,
+                        isDateToday: true,
+                        alert_date_formatted: 'Just now'
+                    });
+                }
+            }
         }
 
         await SQLquery('COMMIT');
