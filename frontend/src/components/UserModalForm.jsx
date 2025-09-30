@@ -7,15 +7,8 @@ import FormLoading from './common/FormLoading';
 
 function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes, setOpenUsers}) {
 
-
   //FOR USER ROLE AUTHENTICATION
   const {user} = useAuth();
-
-  // Early return if user data is not loaded
-  if (!user || !user.role) {
-    return null;
-  }
-
 
   //USERINFO FIELDS
   const [first_name, setFirstName] = useState('');
@@ -50,7 +43,6 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
   //FOR DIALOG
   const [openDialog, setDialog] = useState(false);
   const message =  mode === 'add' ? "Are you sure you want to add this ?": "Are you sure you want to add this ?";
-
 
   //FETCH THE DATA ONCE
   useEffect(() =>{
@@ -113,6 +105,10 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
     
   }, [openUserModal, user]);
 
+  // Early return if user data is not loaded - AFTER all hooks are declared
+  if (!user || !user.role) {
+    return null;
+  }
 
   const passwordStrength = (value) => {
     if (!value || value.length < 8){

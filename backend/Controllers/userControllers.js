@@ -162,3 +162,22 @@ export const disableStatusOnAttempt = async (req, res) =>{
         res.status(500).json({message: 'Internal Server Error'})
     }
 }
+
+
+
+//CHECK USER STATUS
+export const checkUserStatus = async (req, res) =>{
+    try {
+        const userId = req.params.id;
+        const result = await SQLquery('SELECT user_id, is_disabled FROM Users WHERE user_id = $1', [userId]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({message: 'User not found'});
+        }
+        
+        res.status(200).json(result.rows[0]);
+    } catch (error) {
+        console.error('Error checking user status: ', error);
+        res.status(500).json({message: 'Internal Server Error'})
+    }
+}

@@ -54,6 +54,7 @@ function App() {
   // ACCOUNT STATUS STATES
   const [showAccountDisabledPopup, setShowAccountDisabledPopup] = useState(false);
   const [accountStatusType, setAccountStatusType] = useState(''); // 'disabled' or 'deleted'
+  const [hasLoggedOutDueToStatus, setHasLoggedOutDueToStatus] = useState(false);
 
   //LOADING STATES
   const [invetoryLoading, setInventoryLoading] = useState(false);
@@ -75,21 +76,79 @@ function App() {
     return input.replace(/[<>="']/g, '');
   }
 
+  // CHECK IF CURRENT USER IS DISABLED ON PAGE LOAD/REFRESH
+  const checkUserStatus = async () => {
+    if (!user || !user.user_id || showAccountDisabledPopup || hasLoggedOutDueToStatus) return;
+
+    try {
+      const response = await api.get(`/api/user_status/${user.user_id}`);
+      const userData = response.data;
+      
+      if (userData.is_disabled && !showAccountDisabledPopup) {
+        console.log('User is disabled on page load, showing popup');
+        setAccountStatusType('disabled');
+        setShowAccountDisabledPopup(true);
+      }
+    } catch (error) {
+      // IF USER NOT FOUND (DELETED), SHOW DELETED POPUP
+      if (error.response && error.response.status === 404 && !showAccountDisabledPopup) {
+        console.log('User not found (deleted), showing popup');
+        setAccountStatusType('deleted');
+        setShowAccountDisabledPopup(true);
+      } else {
+        console.error('Error checking user status:', error);
+      }
+    }
+  };
+
   // HANDLE ACCOUNT DISABLED/DELETED ACTION
   const handleAccountStatusAction = async () => {
     if (accountStatusType === 'deleted') {
       // FOR DELETED ACCOUNTS - REDIRECT TO LOGIN WITHOUT LOGOUT API CALL
+      setHasLoggedOutDueToStatus(true);
       setShowAccountDisabledPopup(false);
       await logout(true); // SKIP API CALL FOR DELETED USERS
       navigate('/');
     } else if (accountStatusType === 'disabled') {
       // FOR DISABLED ACCOUNTS - LOGOUT NORMALLY
+      setHasLoggedOutDueToStatus(true);
       setShowAccountDisabledPopup(false);
       await logout(false); // SEND LOGOUT API CALL FOR DISABLED USERS
       navigate('/');
     }
   };
 
+  // HANDLE CLOSING THE POPUP (FOR WHEN NO USER IS PRESENT)
+  const handleClosePopup = () => {
+    setShowAccountDisabledPopup(false);
+    setHasLoggedOutDueToStatus(true); // PREVENT RE-SHOWING
+  };
+
+
+  // RESET LOGOUT FLAG WHEN USER CHANGES
+  useEffect(() => {
+    if (user) {
+      // RESET THE FLAG WHEN A NEW USER LOGS IN
+      setHasLoggedOutDueToStatus(false);
+    }
+  }, [user]);
+
+  // CHECK USER STATUS ON INITIAL LOAD OR USER CHANGE
+  useEffect(() => {
+    if (user && user.user_id && user.role && !user.role.some(role => ['Owner'].includes(role))) {
+      // ONLY CHECK STATUS FOR NON-OWNER USERS
+      checkUserStatus();
+
+      // SET UP PERIODIC STATUS CHECK EVERY 2 MINUTES
+      const statusCheckInterval = setInterval(() => {
+        if (!showAccountDisabledPopup && !hasLoggedOutDueToStatus) { // ONLY CHECK IF POPUP IS NOT ALREADY SHOWING AND HAVEN'T LOGGED OUT DUE TO STATUS
+          checkUserStatus();
+        }
+      }, 120000); // 2 minutes
+
+      return () => clearInterval(statusCheckInterval);
+    }
+  }, [user, showAccountDisabledPopup, hasLoggedOutDueToStatus]);
 
   // WEB SOCKET CONNECTION
   useEffect(() => {
@@ -109,6 +168,11 @@ function App() {
         branchId: user.branch_id,
         role: user.role
       });
+
+      // CHECK USER STATUS WHEN WEBSOCKET RECONNECTS
+      if (user.user_id && user.role && !user.role.some(role => ['Owner'].includes(role)) && !hasLoggedOutDueToStatus) {
+        checkUserStatus();
+      }
     });
 
     // LISTEN FOR NEW NOTIFICATION
@@ -269,7 +333,7 @@ function App() {
         setUsers(prevUsers => [userData.user, ...prevUsers]);
       } else if (userData.action === 'update') {
         // USER UPDATED - CHECK IF CURRENT USER WAS DISABLED
-        if (user && userData.user.user_id === user.user_id && userData.user.is_disabled) {
+        if (user && userData.user.user_id === user.user_id && userData.user.is_disabled && !showAccountDisabledPopup) {
           console.log('Current user was disabled, showing popup');
           setAccountStatusType('disabled');
           setShowAccountDisabledPopup(true);
@@ -285,7 +349,7 @@ function App() {
         );
       } else if (userData.action === 'delete') {
         // CHECK IF CURRENT USER WAS DELETED
-        if (user && userData.user_id === user.user_id) {
+        if (user && userData.user_id === user.user_id && !showAccountDisabledPopup) {
           console.log('Current user was deleted, showing popup');
           setAccountStatusType('deleted');
           setShowAccountDisabledPopup(true);
@@ -610,9 +674,11 @@ function App() {
 
       {/*ACCOUNT DISABLED/DELETED POPUP*/}
       <AccountDisabledPopUp
+        user={user}
         open={showAccountDisabledPopup}
         type={accountStatusType}
         onAction={handleAccountStatusAction}
+        onClose={handleClosePopup}
       />
 
       {/*COMPONENTS*/}

@@ -44,4 +44,8 @@ router.put("/disable/:id", userControllers.disableStatus);
 router.put("/disable_on_attempt/:username", userControllers.disableStatusOnAttempt);
 
 
+//CHECK USER STATUS
+router.get("/user_status/:id", userControllers.checkUserStatus);
+
+
 export default router;
