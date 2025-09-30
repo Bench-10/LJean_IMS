@@ -3,9 +3,8 @@ import { useEffect, useState, React, useRef} from 'react';
 import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
 import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp';
-import ChartLoading from '../components/common/ChartLoading'; // Make sure this is imported
 
-function Notification({openNotif, notify, setNotify, unreadCount, onClose, notificaionLoading}) {
+function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
 
 
   const {user} = useAuth();
@@ -165,12 +164,7 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose, notif
 
             {/*SCROLLABLE CONTENT*/}
             <div className='relative px-8 py-6 overflow-y-auto max-h-[calc(80vh-120px)] modal-scroll-container'>
-              {notificaionLoading ? (
-                <div className='flex items-center justify-center h-52'>
-                  <ChartLoading message="Loading notifications..." />
-                </div>
-                
-              ) : (
+            
                 <div className='flex flex-col gap-y-6'>
 
                   {/*TODAY NOTIFICATION*/}
@@ -290,7 +284,7 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose, notif
                   </div>
 
                 </div>
-              )}
+              
             </div>
             
           </div>

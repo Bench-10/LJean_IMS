@@ -56,7 +56,6 @@ function App() {
   const [salesLoading, setSalesLoading] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
-  const [notificaionLoading, setNotificationLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
 
@@ -386,15 +385,13 @@ function App() {
   //FOR NOTIFICATION DATA
   const getTime = async () =>{
     try {
-      setNotificationLoading(true);
+
       const time = await api.get(`/api/notifications?branch_id=${user.branch_id}&user_id=${user.user_id}&hire_date=${user.hire_date}`);
       setNotify(time.data);
     } catch (error) {
       console.log(error.message);
       
-    } finally {
-      setNotificationLoading(false)
-    }
+    } 
 
   };
 
@@ -628,7 +625,6 @@ function App() {
         openNotif={openNotif}
         notify={notify}
         unreadCount={unreadCount}
-        notificaionLoading={notificaionLoading}
         setNotify={setNotify}
         onClose={() => setOpenNotif(false)}
         

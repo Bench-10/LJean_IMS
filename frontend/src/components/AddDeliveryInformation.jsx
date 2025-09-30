@@ -62,12 +62,14 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
 
             if (mode === 'add'){
                 const response = await api.post(`/api/delivery/`, payload);
-                // DON'T MANUALLY REFRESH - LET WEBSOCKET HANDLE UPDATES
+                getDeliveries((prevData) => [...prevData, response.data])
                 console.log('New Delivery Added', response.data);
             } else {
 
                 const delivery = await api.put(`/api/delivery/${deliveryEditData.sales_information_id}`, payload);
-                // DON'T MANUALLY REFRESH - LET WEBSOCKET HANDLE UPDATES
+                getDeliveries((prevData) => 
+                    prevData.map((item) => (item.sales_information_id === Number(id) ? {...item, is_delivered: delivery.data} : item))
+                );
                 console.log('Delivery Updated', delivery.data);
                 
             };
