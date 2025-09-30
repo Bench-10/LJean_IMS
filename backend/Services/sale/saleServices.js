@@ -1,5 +1,6 @@
 import { SQLquery } from "../../db.js";
 import {correctDateFormat} from "../Services_Utils/convertRedableDate.js";
+import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
 import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, broadcastValidityUpdate } from "../../server.js";
 
 
@@ -354,6 +355,10 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
             user_id: userID || null
         });
     }
+
+    await checkAndHandleLowStock(productId, {
+        triggeredByUserId: userID
+    });
 };
 
 
@@ -400,6 +405,14 @@ export const restoreStockFromSale = async (salesInformationId, reason = 'Order c
         }
         
         await SQLquery('COMMIT');
+
+        const restoredProductIds = [...new Set(stockUsage.map((usage) => usage.product_id))];
+
+        for (const productId of restoredProductIds) {
+            await checkAndHandleLowStock(productId, {
+                triggeredByUserId: userID,
+            });
+        }
 
         // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH (IF BRANCH ID PROVIDED)
         if (branchId && stockUsage.length > 0) {

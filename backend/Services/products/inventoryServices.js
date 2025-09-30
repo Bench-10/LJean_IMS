@@ -1,5 +1,6 @@
 import { SQLquery } from "../../db.js";
 import { broadcastNotification, broadcastInventoryUpdate, broadcastValidityUpdate, broadcastHistoryUpdate } from "../../server.js";
+import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
 
 //HELPER FUNCTION TO GET CATEGORY NAME
 const getCategoryName = async (categoryId) => {
@@ -198,6 +199,11 @@ export const addProductItem = async (productData) => {
     await SQLquery('COMMIT');
 
     const newProductRow = await getUpdatedInventoryList(product_id, branch_id);
+
+    await checkAndHandleLowStock(product_id, {
+        triggeredByUserId: userID,
+        triggerUserName: fullName
+    });
 
     // BROADCAST INVENTORY UPDATE TO ALL USERS IN THE BRANCH
     broadcastInventoryUpdate(branch_id, {
@@ -423,6 +429,11 @@ export const updateProductItem = async (productData, itemId) => {
     await SQLquery('COMMIT');
 
     const updatedProductRow = await getUpdatedInventoryList(itemId, branch_id);
+
+    await checkAndHandleLowStock(itemId, {
+        triggeredByUserId: userID,
+        triggerUserName: fullName
+    });
 
     // BROADCAST INVENTORY UPDATE TO ALL USERS IN THE BRANCH
     broadcastInventoryUpdate(branch_id, {

@@ -1,0 +1,88 @@
+import { SQLquery } from "../../db.js";
+import { broadcastNotification } from "../../server.js";
+
+/**
+ * Checks the current quantity of a product against its threshold and handles low-stock notifications.
+ * The notification is only sent once while the product remains below the threshold. Once the quantity
+ * rises above the threshold, the notification flag is reset to allow future alerts.
+ *
+ * @param {number} productId - The inventory product ID to validate.
+ * @param {{ triggeredByUserId?: number|null, triggerUserName?: string|null }} options
+ */
+export const checkAndHandleLowStock = async (productId, options = {}) => {
+  if (!productId) return;
+
+  const { triggeredByUserId = null, triggerUserName = null } = options;
+
+  const { rows } = await SQLquery(
+    `SELECT 
+        ip.product_id,
+        ip.product_name,
+        ip.threshold,
+        ip.low_stock_notified,
+        ip.branch_id,
+        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity
+      FROM Inventory_Product ip
+      LEFT JOIN Add_Stocks ast ON ast.product_id = ip.product_id
+      WHERE ip.product_id = $1
+      GROUP BY ip.product_id, ip.product_name, ip.threshold, ip.low_stock_notified, ip.branch_id`,
+    [productId]
+  );
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  const {
+    product_name: productName,
+    threshold,
+    low_stock_notified: lowStockNotified,
+    branch_id: branchId,
+    quantity
+  } = rows[0];
+
+  // Normalize numeric values
+  const currentQuantity = Number(quantity ?? 0);
+  const thresholdValue = Number(threshold ?? 0);
+  const alreadyNotified = Boolean(lowStockNotified);
+
+  if (Number.isNaN(thresholdValue)) {
+    return; // No threshold defined; nothing to do
+  }
+
+  // When quantity drops to/below threshold, send notification once
+  if (currentQuantity <= thresholdValue) {
+    if (!alreadyNotified) {
+      await SQLquery('UPDATE Inventory_Product SET low_stock_notified = TRUE WHERE product_id = $1', [productId]);
+
+      const message = `${productName} is low on stock (${currentQuantity} remaining). Threshold is ${thresholdValue}.`;
+
+      const alertResult = await SQLquery(
+        `INSERT INTO Inventory_Alerts 
+            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING *`,
+        [productId, branchId, 'Low Stock Alert', message, 'red', triggeredByUserId, triggerUserName]
+      );
+
+      if (alertResult.rows[0]) {
+        broadcastNotification(branchId, {
+          alert_id: alertResult.rows[0].alert_id,
+          alert_type: 'Low Stock Alert',
+          message,
+          banner_color: 'red',
+          user_id: alertResult.rows[0].user_id,
+          user_full_name: triggerUserName,
+          alert_date: alertResult.rows[0].alert_date,
+          isDateToday: true,
+          alert_date_formatted: 'Just now',
+          target_roles: ['Branch Manager', 'Inventory Staff'],
+          creator_id: triggeredByUserId
+        });
+      }
+    }
+  } else if (alreadyNotified) {
+    // Quantity recovered above threshold; reset flag so future drops notify again
+    await SQLquery('UPDATE Inventory_Product SET low_stock_notified = FALSE WHERE product_id = $1', [productId]);
+  }
+};
