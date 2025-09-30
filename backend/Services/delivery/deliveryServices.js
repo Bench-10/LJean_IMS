@@ -95,15 +95,25 @@ export const addDeliveryData = async(data) =>{
                 });
             }
 
-            // BROADCAST DELIVERY ADDITION WITH USER ID FOR SELF-EXCLUSION
-            broadcastSaleUpdate(currentBranch, {
-                action: 'add_delivery', 
-                delivery: {
-                    ...newData[0],
-                    delivered_date: deliveredDate // Include formatted date
-                },
-                user_id: userID || null
-            });
+            // GET PROPERLY FORMATTED DELIVERY DATA FOR BROADCAST
+            const {rows: formattedDeliveryData} = await SQLquery(`
+                SELECT delivery_id, sales_information_id, branch_id, destination_address, 
+                       ${correctDateFormat("delivered_date")}, 
+                       courier_name, TO_CHAR(delivered_date, 'YYYY-MM-DD') AS delivered_date, 
+                       is_delivered, is_pending
+                FROM Delivery 
+                WHERE delivery_id = $1`,   
+                [delivery_id]
+            );
+
+            // BROADCAST DELIVERY ADDITION WITH PROPERLY FORMATTED DATE
+            if (formattedDeliveryData[0]) {
+                broadcastSaleUpdate(currentBranch, {
+                    action: 'add_delivery', 
+                    delivery: formattedDeliveryData[0],
+                    user_id: userID || null
+                });
+            }
 
             // BROADCAST NOTIFICATION FOR NEW DELIVERY (WITH ROLE FILTERING)
             const deliveryNotificationMessage = `New delivery assigned to ${courierName} for sale ${salesId} - Destination: ${address}`;
