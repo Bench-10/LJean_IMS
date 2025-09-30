@@ -70,6 +70,13 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
         if (setPropValidityList) {
           setPropValidityList(updateFunction);
         }
+      } else if (validityData.action === 'inventory_changed_by_sale' || 
+                 validityData.action === 'inventory_changed_by_delivery' ||
+                 validityData.action === 'stock_deducted' ||
+                 validityData.action === 'stock_restored') {
+        // REFRESH DATA WHEN INVENTORY CHANGES AFFECT VALIDITY DISPLAY
+        console.log('Refreshing validity data due to inventory changes:', validityData.action);
+        getProductInfo();
       }
     };
 

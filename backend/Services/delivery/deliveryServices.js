@@ -1,7 +1,7 @@
 import { SQLquery } from "../../db.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 import { restoreStockFromSale, deductStockAndTrackUsage } from "../sale/saleServices.js";
-import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification } from "../../server.js";
+import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, broadcastValidityUpdate } from "../../server.js";
 
 
 
@@ -23,7 +23,7 @@ export const getDeliveryData = async(branchId) =>{
 // ADD DELIVERY DATA
 export const addDeliveryData = async(data) =>{
 
-    const {courierName, salesId, address, deliveredDate, currentBranch, status } = data;
+    const {courierName, salesId, address, deliveredDate, currentBranch, status, userID, userFullName } = data;
 
 
     // CREATES A UNIQUE USER ID
@@ -57,6 +57,82 @@ export const addDeliveryData = async(data) =>{
         console.log(`Delivery record created for sale ID: ${salesId} with status: ${status.is_delivered ? 'delivered' : 'pending'}`);
 
         await SQLquery('COMMIT');
+
+        // BROADCAST NEW DELIVERY UPDATE TO ALL USERS IN THE BRANCH
+        if (newData[0]) {
+            // GET UPDATED SALE DATA WITH DELIVERY INFO
+            const {rows: saleWithDelivery} = await SQLquery(`
+                SELECT 
+                    Sales_Information.sales_information_id, 
+                    Sales_Information.branch_id,  
+                    charge_to, 
+                    tin, 
+                    address, 
+                    ${correctDateFormat('date')}, 
+                    vat, 
+                    amount_net_vat, 
+                    total_amount_due, 
+                    discount, 
+                    transaction_by, 
+                    delivery_fee, 
+                    is_for_delivery,
+                    COALESCE(is_delivered, false) AS is_delivered,
+                    COALESCE(is_pending, false) AS is_pending
+                FROM Sales_Information 
+                LEFT JOIN Delivery 
+                USING(sales_information_id)
+                WHERE Sales_Information.sales_information_id = $1`,
+                [salesId]
+            );
+
+            // BROADCAST SALE UPDATE (since delivery affects sales display)
+            if (saleWithDelivery[0]) {
+                broadcastSaleUpdate(currentBranch, {
+                    action: 'delivery_added',
+                    sale: saleWithDelivery[0],
+                    delivery: newData[0],
+                    user_id: userID || null
+                });
+            }
+
+            // BROADCAST DELIVERY ADDITION WITH USER ID FOR SELF-EXCLUSION
+            broadcastSaleUpdate(currentBranch, {
+                action: 'add_delivery', 
+                delivery: {
+                    ...newData[0],
+                    delivered_date: deliveredDate // Include formatted date
+                },
+                user_id: userID || null
+            });
+
+            // BROADCAST NOTIFICATION FOR NEW DELIVERY (WITH ROLE FILTERING)
+            const deliveryNotificationMessage = `New delivery assigned to ${courierName} for sale ${salesId} - Destination: ${address}`;
+            
+            const alertResult = await SQLquery(
+                `INSERT INTO Inventory_Alerts 
+                (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING *`,
+                [null, currentBranch, 'New Delivery', deliveryNotificationMessage, 'purple', userID || null, userFullName || courierName]
+            );
+
+            if (alertResult.rows[0]) {
+                broadcastNotification(currentBranch, {
+                    alert_id: alertResult.rows[0].alert_id,
+                    alert_type: 'New Delivery',
+                    message: deliveryNotificationMessage,
+                    banner_color: 'purple',
+                    user_id: alertResult.rows[0].user_id,
+                    user_full_name: userFullName || courierName,
+                    alert_date: alertResult.rows[0].alert_date,
+                    isDateToday: true,
+                    alert_date_formatted: 'Just now',
+                    target_roles: ['Sales Associate', 'Branch Manager', 'Delivery Personnel'], // Delivery roles get delivery notifications
+                    creator_id: userID // Exclude creator from notification
+                });
+            }
+        }
+
         return newData;
         
     } catch (error) {
@@ -74,7 +150,7 @@ export const addDeliveryData = async(data) =>{
 // SET DELIVERIES TO DELIVERED/UNDELIVERED
 export const setToDelivered = async(saleID, update) => {
 
-    const {courierName, deliveredDate, status } = update;
+    const {courierName, deliveredDate, status, userID, userFullName } = update;
 
     try {
         await SQLquery('BEGIN');
@@ -104,7 +180,9 @@ export const setToDelivered = async(saleID, update) => {
         if (wasDelivered && !status.is_delivered && !status.pending) {
 
             // DELIVERED → UNDELIVERED (TRULY CANCELED) - RESTORE STOCK
-            await restoreStockFromSale(saleID, 'Delivery marked as undelivered');
+            const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
+            const branchId = branchInfo[0]?.branch_id;
+            await restoreStockFromSale(saleID, 'Delivery marked as undelivered', branchId, userID);
             console.log(`Stock restored for sale ID: ${saleID} due to undelivered status`);
 
         }
@@ -116,9 +194,23 @@ export const setToDelivered = async(saleID, update) => {
         }
         else if (!wasDelivered && !wasPending && status.pending) {
 
-            // UNDELIVERED → OUT FOR DELIVERY - RESTORE STOCK (REACTIVATING CANCELED ORDER)
-            await restoreStockFromSale(saleID, 'Order reactivated for delivery');
-            console.log(`Stock restored for sale ID: ${saleID} due to reactivating delivery`);
+            // UNDELIVERED → OUT FOR DELIVERY - RE-DEDUCT STOCK (REACTIVATING CANCELED ORDER)
+            const {rows: itemsToRededuct} = await SQLquery(`
+                SELECT 
+                    product_id,
+                    quantity
+                FROM Sales_Items
+                WHERE sales_information_id = $1`,
+                [saleID]
+            );
+
+            const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
+            const branchId = branchInfo[0]?.branch_id;
+
+            for (const product of itemsToRededuct) {
+                await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID);
+            }
+            console.log(`Stock re-deducted for sale ID: ${saleID} due to reactivating delivery from undelivered to out for delivery`);
 
         }
         else if (!wasDelivered && !wasPending && !status.is_delivered && !status.pending) {
@@ -134,7 +226,9 @@ export const setToDelivered = async(saleID, update) => {
 
             // IF STOCK HASN'T BEEN RESTORED YET, RESTORE IT (FIRST TIME MARKING AS UNDELIVERED)
             if (stockUsage.length > 0 && stockUsage[0].is_restored === false) {
-                await restoreStockFromSale(saleID, 'Delivery set as undelivered');
+                const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
+                const branchId = branchInfo[0]?.branch_id;
+                await restoreStockFromSale(saleID, 'Delivery set as undelivered', branchId, userID);
                 console.log(`Stock restored for sale ID: ${saleID} - first time marked as undelivered`);
             } else {
                 console.log(`Sale ID: ${saleID} remains undelivered (stock already restored)`);
@@ -164,8 +258,11 @@ export const setToDelivered = async(saleID, update) => {
                     [saleID]
                 );
 
+                const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
+                const branchId = branchInfo[0]?.branch_id;
+
                 for (const product of itemsToDeduct) {
-                    await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity));
+                    await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID);
                 }
                 console.log(`Stock re-deducted for sale ID: ${saleID} (was previously restored)`);
             } else {
@@ -177,7 +274,9 @@ export const setToDelivered = async(saleID, update) => {
         else if (wasPending && !status.is_delivered && !status.pending) {
 
             // OUT FOR DELIVERY > UNDELIVERED - RESTORE STOCK
-            await restoreStockFromSale(saleID, 'Delivery canceled from pending status');
+            const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
+            const branchId = branchInfo[0]?.branch_id;
+            await restoreStockFromSale(saleID, 'Delivery canceled from pending status', branchId, userID);
             console.log(`Stock restored for sale ID: ${saleID} due to canceling pending delivery`);
 
         }
@@ -224,7 +323,8 @@ export const setToDelivered = async(saleID, update) => {
                 new_status: {
                     is_delivered: status.is_delivered,
                     is_pending: status.pending
-                }
+                },
+                user_id: userID || null
             });
 
             // BROADCAST INVENTORY UPDATES IF STOCK WAS AFFECTED
@@ -278,9 +378,22 @@ export const setToDelivered = async(saleID, update) => {
                         delivery_change: {
                             from: { delivered: wasDelivered, pending: wasPending },
                             to: { delivered: status.is_delivered, pending: status.pending }
-                        }
+                        },
+                        user_id: userID || null
                     });
                 }
+
+                // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH
+                broadcastValidityUpdate(saleData[0].branch_id, {
+                    action: 'inventory_changed_by_delivery',
+                    sale_id: saleID,
+                    delivery_status: {
+                        from: { delivered: wasDelivered, pending: wasPending },
+                        to: { delivered: status.is_delivered, pending: status.pending }
+                    },
+                    affected_products: affectedProducts.map(p => p.product_id),
+                    user_id: userID || null
+                });
 
                 // BROADCAST NOTIFICATION FOR DELIVERY STATUS CHANGE
                 const notificationMessage = `Delivery status changed for sale ${saleID} - ${status.is_delivered ? 'Delivered' : status.pending ? 'Out for Delivery' : 'Undelivered'}`;
@@ -303,7 +416,9 @@ export const setToDelivered = async(saleID, update) => {
                         user_full_name: courierName || 'System',
                         alert_date: alertResult.rows[0].alert_date,
                         isDateToday: true,
-                        alert_date_formatted: 'Just now'
+                        alert_date_formatted: 'Just now',
+                        target_roles: ['Sales Associate', 'Branch Manager', 'Delivery Personnel'], // Delivery roles get delivery notifications
+                        creator_id: userID // Exclude creator from notification
                     });
                 }
             }

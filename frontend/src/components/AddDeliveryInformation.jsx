@@ -55,20 +55,20 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
                 address, 
                 currentBranch: user.branch_id,
                 deliveredDate, 
-                status 
+                status,
+                userID: user.user_id,
+                userFullName: user.full_name
             };
 
             if (mode === 'add'){
                 const response = await api.post(`/api/delivery/`, payload);
-                getDeliveries()
+                // DON'T MANUALLY REFRESH - LET WEBSOCKET HANDLE UPDATES
                 console.log('New Delivery Added', response.data);
             } else {
 
                 const delivery = await api.put(`/api/delivery/${deliveryEditData.sales_information_id}`, payload);
-            
-                getDeliveries((prevData) => 
-                    prevData.map((item) => (item.sales_information_id === Number(id) ? {...item, is_delivered: delivery.data} : item))
-                );
+                // DON'T MANUALLY REFRESH - LET WEBSOCKET HANDLE UPDATES
+                console.log('Delivery Updated', delivery.data);
                 
             };
             

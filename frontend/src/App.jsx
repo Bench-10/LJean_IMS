@@ -96,12 +96,28 @@ function App() {
     newSocket.on('new-notification', (notification) => {
       console.log('New notification received:', notification);
       
+      // CHECK ROLE-BASED FILTERING AND CREATOR EXCLUSION
+      const shouldReceiveNotification = () => {
+        // Exclude the creator from receiving their own notification
+        if (notification.creator_id && user.user_id === notification.creator_id) {
+          return false;
+        }
+        
+        // Check if user has required roles for this notification
+        if (notification.target_roles && notification.target_roles.length > 0) {
+          if (!user.role || !user.role.some(role => notification.target_roles.includes(role))) {
+            return false;
+          }
+        }
+        
+        return true;
+      };
    
       setNotify(prevNotify => {
         // CHECK IF NOTIFICATION ALREADY EXIST
         const exists = prevNotify.some(notif => notif.alert_id === notification.alert_id);
         
-        if (!exists && user.user_id !== notification.user_id) {
+        if (!exists && user.user_id !== notification.user_id && shouldReceiveNotification()) {
           return [notification, ...prevNotify];
         }
         return prevNotify;
@@ -207,6 +223,18 @@ function App() {
                     is_pending: saleData.new_status.is_pending 
                   }
                 : delivery
+            )
+          );
+        } else if (saleData.action === 'add_delivery') {
+          // NEW DELIVERY ADDED - UPDATE DELIVERY LIST
+          setDeliveryData(prevDelivery => [saleData.delivery, ...prevDelivery]);
+        } else if (saleData.action === 'delivery_added') {
+          // DELIVERY ADDED TO EXISTING SALE - UPDATE SALES LIST
+          setSaleHeader(prevSales => 
+            prevSales.map(sale => 
+              sale.sales_information_id === saleData.sale.sales_information_id 
+                ? saleData.sale 
+                : sale
             )
           );
         }

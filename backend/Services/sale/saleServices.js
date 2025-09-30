@@ -1,6 +1,6 @@
 import { SQLquery } from "../../db.js";
 import {correctDateFormat} from "../Services_Utils/convertRedableDate.js";
-import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification } from "../../server.js";
+import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, broadcastValidityUpdate } from "../../server.js";
 
 
 
@@ -116,7 +116,7 @@ export const addSale = async (headerAndProducts) => {
         // ALWAYS DEDUCT STOCK IMMEDIATELY WHEN SALE IS PLACED (REGARDLESS OF DELIVERY STATUS)
         // THIS PREVENTS PHANTOM INVENTORY WHERE PENDING ORDERS DON'T REFLECT IN AVAILABLE STOCK
             for (const product of productRow) {
-                await deductStockAndTrackUsage(sale_id, product.product_id, Number(product.quantity));
+                await deductStockAndTrackUsage(sale_id, product.product_id, Number(product.quantity), branch_id, headerInformationAndTotal.userID);
             }
         };
 
@@ -199,9 +199,17 @@ export const addSale = async (headerAndProducts) => {
                     });
                 }
             }
+
+            // BROADCAST GENERAL VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH
+            broadcastValidityUpdate(branch_id, {
+                action: 'inventory_changed_by_sale',
+                sale_id: sale_id,
+                affected_products: productRow.map(p => p.product_id),
+                user_id: headerInformationAndTotal.userID || null
+            });
         }
 
-        // BROADCAST NOTIFICATION FOR NEW SALE
+        // BROADCAST NOTIFICATION FOR NEW SALE (WITH ROLE FILTERING)
         const saleNotificationMessage = `New sale created by ${transactionBy} for ${chargeTo} - Total: ₱${totalAmountDue}`;
         
         const alertResult = await SQLquery(
@@ -222,7 +230,9 @@ export const addSale = async (headerAndProducts) => {
                 user_full_name: transactionBy,
                 alert_date: alertResult.rows[0].alert_date,
                 isDateToday: true,
-                alert_date_formatted: 'Just now'
+                alert_date_formatted: 'Just now',
+                target_roles: ['Sales Associate', 'Branch Manager'], // Only these roles get sale notifications
+                creator_id: headerInformationAndTotal.userID // Exclude creator from notification
             });
         }
 
@@ -239,7 +249,7 @@ export const addSale = async (headerAndProducts) => {
 
 // DEDUCT STOCK AND TRACK WHICH BATCHES WERE USED
 // THIS ALLOWS US TO RESTORE STOCK TO EXACT SAME BATCHES IF ORDER IS CANCELED
-export const deductStockAndTrackUsage = async (salesInformationId, productId, quantityToDeduct) => {
+export const deductStockAndTrackUsage = async (salesInformationId, productId, quantityToDeduct, branchId = null, userID = null) => {
     let remainingToDeduct = quantityToDeduct;
 
     // CHECK IF THERE ARE EXISTING RESTORED RECORDS FOR THIS SALE
@@ -333,11 +343,22 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
     if (remainingToDeduct > 0) {
         throw new Error(`Unable to deduct full quantity for product ID ${productId}. Remaining: ${remainingToDeduct}`);
     }
+
+    // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH (IF BRANCH ID PROVIDED)
+    if (branchId) {
+        broadcastValidityUpdate(branchId, {
+            action: 'stock_deducted',
+            product_id: productId,
+            sale_id: salesInformationId,
+            quantity_deducted: quantityToDeduct,
+            user_id: userID || null
+        });
+    }
 };
 
 
 // RESTORE STOCK TO ORIGINAL BATCHES WHEN ORDER IS CANCELED/UNDELIVERED
-export const restoreStockFromSale = async (salesInformationId, reason = 'Order canceled') => {
+export const restoreStockFromSale = async (salesInformationId, reason = 'Order canceled', branchId = null, userID = null) => {
     try {
         await SQLquery('BEGIN');
         
@@ -379,6 +400,21 @@ export const restoreStockFromSale = async (salesInformationId, reason = 'Order c
         }
         
         await SQLquery('COMMIT');
+
+        // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH (IF BRANCH ID PROVIDED)
+        if (branchId && stockUsage.length > 0) {
+            broadcastValidityUpdate(branchId, {
+                action: 'stock_restored',
+                sale_id: salesInformationId,
+                restored_products: stockUsage.map(usage => ({
+                    product_id: usage.product_id,
+                    quantity_restored: usage.quantity_used
+                })),
+                reason: reason,
+                user_id: userID || null
+            });
+        }
+
         return { success: true, message: `Stock restored for sale ${salesInformationId}` };
         
     } catch (error) {
