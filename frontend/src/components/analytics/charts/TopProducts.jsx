@@ -48,7 +48,10 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
   
   const visibleHeight = (VISIBLE_ROWS * BAR_SIZE) + ((VISIBLE_ROWS - 1) * ROW_GAP) + MARGIN_TOP + MARGIN_BOTTOM; 
 
-  const totalHeight = (itemsCount * BAR_SIZE) + (Math.max(itemsCount - 1, 0) * ROW_GAP) + MARGIN_TOP + MARGIN_BOTTOM;
+  const totalHeight = Math.max(
+    (itemsCount * BAR_SIZE) + (Math.max(itemsCount - 1, 0) * ROW_GAP) + MARGIN_TOP + MARGIN_BOTTOM,
+    100  // Minimum height to ensure proper visibility
+  );
 
   const normalizedPerformance = Array.isArray(salesPerformance)
     ? {
@@ -138,9 +141,9 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                 <ResponsiveContainer width="100%" height={totalHeight}>
                     <BarChart
                       data={topProducts}
-                      margin={{ top: MARGIN_TOP, right: 5, left: 5, bottom: MARGIN_BOTTOM }}
+                      margin={{ top: MARGIN_TOP, right: 15, left: 15, bottom: MARGIN_BOTTOM }}
                       layout="vertical"
-                      barCategoryGap={`${ROW_GAP}px`}
+                      barCategoryGap={itemsCount === 1 ? 20 : ROW_GAP}
                       barGap={0}
                     >
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
@@ -149,16 +152,34 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                         const padded = max === 0 ? 1 : Math.ceil((max * 1.1)/100)*100; 
                         return <XAxis type="number" domain={[0, padded]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
                     })()}
-                    <YAxis dataKey="product_name" type="category" tick={{ fontSize: 14 }} width={110} axisLine={false} tickLine={false} />
+                    <YAxis 
+                        dataKey="product_name" 
+                        type="category" 
+                        tick={{ fontSize: 14 }} 
+                        width={110} 
+                        axisLine={false} 
+                        tickLine={false}
+                        interval={0}
+                        tickMargin={5}
+                    />
 
                     
-                    <Tooltip formatter={(v)=>currencyFormat(v)} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+                    <Tooltip 
+                        formatter={(value, name, props) => [currencyFormat(value), 'Sales Amount']}
+                        labelFormatter={(label, payload) => {
+                            if (payload && payload.length > 0) {
+                                return payload[0]?.payload?.product_name || label;
+                            }
+                            return label;
+                        }}
+                        cursor={{ fill: 'rgba(0,0,0,0.04)' }} 
+                    />
                     <Bar
                       dataKey="sales_amount"
                       radius={[0,4,4,0]}
                       onClick={handleClick}
                       className='cursor-pointer'
-                      barSize={BAR_SIZE}
+                      barSize={itemsCount === 1 ? Math.min(BAR_SIZE, 40) : BAR_SIZE}
                       background={{ fill: '#F8FAFC' }}
                     >
                         {topProducts.map((entry, idx) => {
