@@ -31,10 +31,10 @@ function Authentication ({ children }) {
   };
 
 
-  const logout = async () => {
+  const logout = async (skipApiCall = false) => {
 
-    // SEND LOGOUT API CALL FOR ALL USER TYPES TO UPDATE STATUS
-    if (user && user.user_id) {
+    // SEND LOGOUT API CALL FOR ALL USER TYPES TO UPDATE STATUS (UNLESS SKIPPED FOR DELETED USERS)
+    if (!skipApiCall && user && user.user_id) {
       try {
         await api.put(`/api/authentication/${user.user_id}`, { activity: false });
       } catch (error) {

@@ -7,7 +7,7 @@ import Notification from "./Pages/Notification";
 import ProductValidity from "./Pages/ProductValidity";
 import Category from "./components/Category";
 import ProductTransactionHistory from "./components/ProductTransactionHistory";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import Login from "./authentication/Login";
 import PageLayout from "./components/PageLayout";
 import Dashboard from "./Pages/Dashboard";
@@ -23,6 +23,7 @@ import BranchAnalyticsCards from "./Pages/BranchAnalyticsCards";
 import BranchKPI from "./Pages/BranchKPI.jsx";
 import AddDeliveryInformation from "./components/AddDeliveryInformation.jsx";
 import FormLoading from "./components/common/FormLoading";
+import AccountDisabledPopUp from "./components/dialogs/AccountDisabledPopUp";
 
 
 
@@ -50,6 +51,9 @@ function App() {
   const [deliveryEditData, setDeliveryEdit] = useState([]);
   const [productValidityList, setProductValidityList] = useState([]);
 
+  // ACCOUNT STATUS STATES
+  const [showAccountDisabledPopup, setShowAccountDisabledPopup] = useState(false);
+  const [accountStatusType, setAccountStatusType] = useState(''); // 'disabled' or 'deleted'
 
   //LOADING STATES
   const [invetoryLoading, setInventoryLoading] = useState(false);
@@ -62,13 +66,29 @@ function App() {
   // Socket connection
   const [socket, setSocket] = useState(null);
 
-  const {user} = useAuth();
+  const {user, logout} = useAuth();
+  const navigate = useNavigate();
   
 
   //PREVENTS SCRIPTS ATTACKS ON INPUT FIELDS
   function sanitizeInput(input) {
     return input.replace(/[<>="']/g, '');
   }
+
+  // HANDLE ACCOUNT DISABLED/DELETED ACTION
+  const handleAccountStatusAction = async () => {
+    if (accountStatusType === 'deleted') {
+      // FOR DELETED ACCOUNTS - REDIRECT TO LOGIN WITHOUT LOGOUT API CALL
+      setShowAccountDisabledPopup(false);
+      await logout(true); // SKIP API CALL FOR DELETED USERS
+      navigate('/');
+    } else if (accountStatusType === 'disabled') {
+      // FOR DISABLED ACCOUNTS - LOGOUT NORMALLY
+      setShowAccountDisabledPopup(false);
+      await logout(false); // SEND LOGOUT API CALL FOR DISABLED USERS
+      navigate('/');
+    }
+  };
 
 
   // WEB SOCKET CONNECTION
@@ -248,7 +268,14 @@ function App() {
         // NEW USER ADDED - UPDATE USERS LIST
         setUsers(prevUsers => [userData.user, ...prevUsers]);
       } else if (userData.action === 'update') {
-        // USER UPDATED - UPDATE USERS LIST
+        // USER UPDATED - CHECK IF CURRENT USER WAS DISABLED
+        if (user && userData.user.user_id === user.user_id && userData.user.is_disabled) {
+          console.log('Current user was disabled, showing popup');
+          setAccountStatusType('disabled');
+          setShowAccountDisabledPopup(true);
+        }
+        
+        // UPDATE USERS LIST
         setUsers(prevUsers => 
           prevUsers.map(user => 
             user.user_id === userData.user.user_id 
@@ -257,6 +284,13 @@ function App() {
           )
         );
       } else if (userData.action === 'delete') {
+        // CHECK IF CURRENT USER WAS DELETED
+        if (user && userData.user_id === user.user_id) {
+          console.log('Current user was deleted, showing popup');
+          setAccountStatusType('deleted');
+          setShowAccountDisabledPopup(true);
+        }
+        
         // USER DELETED - REMOVE FROM USERS LIST
         setUsers(prevUsers => 
           prevUsers.filter(user => user.user_id !== userData.user_id)
@@ -573,6 +607,13 @@ function App() {
       {deleteLoading && (
         <FormLoading message="Deleting user account..." />
       )}
+
+      {/*ACCOUNT DISABLED/DELETED POPUP*/}
+      <AccountDisabledPopUp
+        open={showAccountDisabledPopup}
+        type={accountStatusType}
+        onAction={handleAccountStatusAction}
+      />
 
       {/*COMPONENTS*/}
       <AddSaleModalForm
