@@ -16,7 +16,7 @@ function RouteProtection({allowedRoles = [], children}) {
     allowedRoles.length > 0 &&
     (
       Array.isArray(user.role)
-        ? !user.role.some(role => allowedRoles.includes(role))
+        ? !user.role || !user.role.some(role => allowedRoles.includes(role))
         : !allowedRoles.includes(user.role)
     )
   ) 

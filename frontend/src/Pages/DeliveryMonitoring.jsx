@@ -128,7 +128,7 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
           
           <div  className="ml-auto flex gap-4">
             {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
-            {user.role.some(role => ['Sales Associate'].includes(role)) && (
+            {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) && (
               <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all' onClick={() => setAddDelivery(true)} >
                 <TbTruckDelivery />
                 ADD DELIVERY

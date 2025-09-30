@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Real-time Updates Test</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            background-color: #f0f8ff;
+            border-left: 4px solid #007bff;
+        }
+        .notification {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        .inventory-update {
+            background-color: #d1edff;
+            border-left: 4px solid #17a2b8;
+        }
+        .validity-update {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        .connection-info {
+            padding: 10px;
+            background-color: #e2e3e5;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .connected { background-color: #28a745; }
+        .disconnected { background-color: #dc3545; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔴 LIVE: WebSocket Real-time Updates Test</h1>
+    
+    <div class="connection-info">
+        <span id="connectionStatus" class="status disconnected"></span>
+        <span id="connectionText">Disconnected</span>
+        <br><br>
+        <label for="branchId">Branch ID:</label>
+        <input type="number" id="branchId" value="1" min="1">
+        <button onclick="connectSocket()">Connect</button>
+        <button onclick="disconnectSocket()">Disconnect</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h3>📦 Inventory Updates</h3>
+            <div id="inventoryUpdates"></div>
+        </div>
+        
+        <div class="panel">
+            <h3>📅 Product Validity Updates</h3>
+            <div id="validityUpdates"></div>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 20px;">
+        <h3>📋 Product History Updates</h3>
+        <div id="historyUpdates"></div>
+    </div>
+
+    <div class="panel" style="margin-top: 20px;">
+        <h3>🔔 Notifications</h3>
+        <div id="notifications"></div>
+    </div>
+
+    <script>
+        let socket = null;
+        let branchId = 1;
+
+        function connectSocket() {
+            if (socket) {
+                socket.disconnect();
+            }
+
+            branchId = document.getElementById('branchId').value;
+            
+            // Replace with your backend URL
+            socket = io('http://localhost:3000'); // Backend runs on port 3000
+            
+            socket.on('connect', () => {
+                updateConnectionStatus(true);
+                
+                // Join branch room
+                socket.emit('join-branch', {
+                    userId: 999, // Test user ID
+                    branchId: parseInt(branchId),
+                    role: ['Test User']
+                });
+                
+                addMessage('notifications', `Connected to server and joined branch ${branchId}`, 'notification');
+            });
+
+            socket.on('disconnect', () => {
+                updateConnectionStatus(false);
+                addMessage('notifications', 'Disconnected from server', 'notification');
+            });
+
+            // Listen for inventory updates
+            socket.on('inventory-update', (data) => {
+                console.log('Inventory update received:', data);
+                const updateType = data.action === 'add' ? '➕ ADDED' : '📝 UPDATED';
+                const message = `
+                    <strong>${updateType}:</strong> ${data.product.product_name}<br>
+                    <strong>Quantity:</strong> ${data.product.quantity || 'N/A'}<br>
+                    <strong>Price:</strong> ₱${data.product.unit_price || 'N/A'}<br>
+                    <strong>Cost:</strong> ₱${data.product.unit_cost || 'N/A'}<br>
+                    <strong>Category:</strong> ${data.product.category_name || 'N/A'}<br>
+                    <strong>User ID:</strong> ${data.user_id}<br>
+                    <small>📡 ${new Date().toLocaleTimeString()}</small>
+                `;
+                addMessage('inventoryUpdates', message, 'inventory-update');
+            });
+
+            // Listen for validity updates
+            socket.on('validity-update', (data) => {
+                console.log('Validity update received:', data);
+                const message = `
+                    <strong>Action:</strong> ${data.action}<br>
+                    <strong>Product:</strong> ${data.product.product_name}<br>
+                    <strong>Category:</strong> ${data.product.category_name}<br>
+                    <strong>Added:</strong> ${data.product.formated_date_added}<br>
+                    <strong>Expires:</strong> ${data.product.formated_product_validity}<br>
+                    <strong>Status:</strong> ${data.product.expy ? '🔴 Expired' : data.product.near_expy ? '🟡 Near Expiry' : '🟢 Good'}<br>
+                    <strong>User ID:</strong> ${data.user_id}<br>
+                    <small>${new Date().toLocaleTimeString()}</small>
+                `;
+                addMessage('validityUpdates', message, 'validity-update');
+            });
+
+            // Listen for history updates
+            socket.on('history-update', (data) => {
+                console.log('History update received:', data);
+                const message = `
+                    <strong>Action:</strong> ${data.action}<br>
+                    <strong>Product:</strong> ${data.historyEntry.product_name}<br>
+                    <strong>Category:</strong> ${data.historyEntry.category_name}<br>
+                    <strong>Date Added:</strong> ${data.historyEntry.formated_date_added}<br>
+                    <strong>Quantity:</strong> ${data.historyEntry.quantity_added.toLocaleString()}<br>
+                    <strong>Unit Cost:</strong> ₱${data.historyEntry.h_unit_cost}<br>
+                    <strong>Total Value:</strong> ₱${data.historyEntry.value.toLocaleString()}<br>
+                    <strong>User ID:</strong> ${data.user_id}<br>
+                    <small>${new Date().toLocaleTimeString()}</small>
+                `;
+                addMessage('historyUpdates', message, 'validity-update');
+            });
+
+            // Listen for notifications
+            socket.on('new-notification', (data) => {
+                console.log('Notification received:', data);
+                const message = `
+                    <strong>${data.alert_type}:</strong> ${data.message}<br>
+                    <strong>From:</strong> ${data.user_full_name}<br>
+                    <small>${new Date().toLocaleTimeString()}</small>
+                `;
+                addMessage('notifications', message, 'notification');
+            });
+        }
+
+        function disconnectSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const textElement = document.getElementById('connectionText');
+            
+            if (connected) {
+                statusElement.className = 'status connected';
+                textElement.textContent = `Connected to Branch ${branchId}`;
+            } else {
+                statusElement.className = 'status disconnected';
+                textElement.textContent = 'Disconnected';
+            }
+        }
+
+        function addMessage(containerId, message, className) {
+            const container = document.getElementById(containerId);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${className}`;
+            messageDiv.innerHTML = message;
+            
+            // Add to top of container
+            container.insertBefore(messageDiv, container.firstChild);
+            
+            // Limit to 50 messages
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('inventoryUpdates').innerHTML = '';
+            document.getElementById('validityUpdates').innerHTML = '';
+            document.getElementById('historyUpdates').innerHTML = '';
+            document.getElementById('notifications').innerHTML = '';
+        }
+
+        // Auto-connect on page load
+        window.onload = function() {
+            connectSocket();
+        };
+    </script>
+</body>
+</html>

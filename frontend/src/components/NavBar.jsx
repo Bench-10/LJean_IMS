@@ -41,7 +41,7 @@ function NavBar() {
 
 
               {/*INVENTORY NAVIGATION*/}
-              {user && (user.role.some(role => ['Branch Manager', 'Owner','Inventory Staff'].includes(role))) &&
+              {user && user.role && (user.role.some(role => ['Branch Manager', 'Owner','Inventory Staff'].includes(role))) &&
 
                   <NavLink
                     to="/inventory"
@@ -59,7 +59,7 @@ function NavBar() {
 
 
               {/*PRODUCT VALIDITY NAVIGATION*/}
-              {user && (user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) &&
+              {user && user.role && (user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) &&
 
                   <NavLink
                     to="/product_validity"
@@ -76,7 +76,7 @@ function NavBar() {
 
 
               {/*DASHBOARD NAVIGATION*/}
-              {user && (user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
+              {user && user.role && (user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
 
                   <NavLink
                     to="/dashboard"
@@ -93,7 +93,7 @@ function NavBar() {
 
 
               {/*USER MANAGEMENT NAVIGATION*/}
-              {user && (user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
+              {user && user.role && (user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
 
                   <NavLink
                     to="/user_management"
@@ -110,7 +110,7 @@ function NavBar() {
 
 
               {/*SALES NAVIGATION*/}
-              {user && (user.role.some(role => ['Sales Associate'].includes(role))) &&
+              {user && user.role && (user.role.some(role => ['Sales Associate'].includes(role))) &&
 
                   <NavLink
                     to="/sales"
@@ -127,7 +127,7 @@ function NavBar() {
 
 
               {/*DELIVERY MONITORING NAVIGATION*/}
-              {user && (user.role.some(role => ['Sales Associate'].includes(role))) &&
+              {user && user.role && (user.role.some(role => ['Sales Associate'].includes(role))) &&
 
                   <NavLink
                     to="/delivery"

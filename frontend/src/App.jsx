@@ -28,6 +28,7 @@ import FormLoading from "./components/common/FormLoading";
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openUserModal, setOpenUserModal] = useState(false);
   const [openSaleModal, setOpenSaleModal] = useState(false);
   const [openUsers, setOpenUsers] = useState(false);
   const [userDetailes, setUserDetailes] = useState([]);
@@ -47,6 +48,7 @@ function App() {
   const [inAppNotifMessage, setInAppNotifMessage] = useState('');
   const [deliveryData, setDeliveryData] = useState([]);
   const [deliveryEditData, setDeliveryEdit] = useState([]);
+  const [productValidityList, setProductValidityList] = useState([]);
 
 
   //LOADING STATES
@@ -106,6 +108,57 @@ function App() {
       });
     });
 
+    // LISTEN FOR INVENTORY UPDATES
+    newSocket.on('inventory-update', (inventoryData) => {
+      console.log('Inventory update received:', inventoryData);
+      
+      // ONLY UPDATE IF THE UPDATE WASN'T MADE BY THE CURRENT USER
+      if (user.user_id !== inventoryData.user_id) {
+        if (inventoryData.action === 'add') {
+          setProductsData(prevData => [...prevData, inventoryData.product]);
+        } else if (inventoryData.action === 'update') {
+          setProductsData(prevData => 
+            prevData.map(item => 
+              item.product_id === inventoryData.product.product_id 
+                ? inventoryData.product 
+                : item
+            )
+          );
+        }
+        
+        // NOTE: No in-app notification here for other devices
+        // The notification will come through the 'new-notification' event
+        // which will show in the notification panel (old style)
+      }
+    });
+
+    // LISTEN FOR PRODUCT VALIDITY UPDATES
+    newSocket.on('validity-update', (validityData) => {
+      console.log('Product validity update received:', validityData);
+      
+      // ONLY UPDATE IF THE UPDATE WASN'T MADE BY THE CURRENT USER
+      if (user.user_id !== validityData.user_id) {
+        // TRIGGER REFRESH FOR PRODUCT VALIDITY PAGE
+        // This will be handled by individual components that need validity data
+        window.dispatchEvent(new CustomEvent('validity-update', { 
+          detail: validityData 
+        }));
+      }
+    });
+
+    // LISTEN FOR PRODUCT HISTORY UPDATES
+    newSocket.on('history-update', (historyData) => {
+      console.log('Product history update received:', historyData);
+      
+      // ONLY UPDATE IF THE UPDATE WASN'T MADE BY THE CURRENT USER
+      if (user.user_id !== historyData.user_id) {
+        // TRIGGER REFRESH FOR PRODUCT HISTORY COMPONENT
+        window.dispatchEvent(new CustomEvent('history-update', { 
+          detail: historyData 
+        }));
+      }
+    });
+
     newSocket.on('disconnect', () => {
       console.log('Disconnected from server');
     });
@@ -124,7 +177,7 @@ function App() {
       try {
         setInventoryLoading(true);
         let response;
-        if (!user.role.some(role => ['Branch Manager', 'Owner'].includes(role))){
+        if (!user || !user.role || !user.role.some(role => ['Branch Manager', 'Owner'].includes(role))){
           response = await api.get(`/api/items?branch_id=${user.branch_id}`);
         } else {
           response = await api.get(`/api/items/`);
@@ -240,7 +293,7 @@ function App() {
   useEffect(() =>{
 
     if (!user) return;
-    if (!user.role.some(role => ['Sales Associate'].includes(role))) return;
+    if (!user || !user.role || !user.role.some(role => ['Sales Associate'].includes(role))) return;
 
     fetchSaleRecords();
     getDeliveries();
@@ -273,7 +326,7 @@ function App() {
       setNotify([]);
       return;
     }
-    if (!user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) return;
+    if (!user || !user.role || !user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) return;
     
     // FETCH NOTIFICATIONS FOR THE CURRENT USER
     getTime();
@@ -290,7 +343,7 @@ function App() {
 
   //USER CREATION MODAL LOGIC
   const handleUserModalOpen = (mode) =>{
-    setIsModalOpen(true);
+    setOpenUserModal(true);
     setModalMode(mode);
   }
 
@@ -314,7 +367,7 @@ function App() {
        setUsersLoading(true);
        let response;
 
-       if (user.branch_id && user.role.some(role => ['Branch Manager'].includes(role))){
+       if (user && user.branch_id && user.role && user.role.some(role => ['Branch Manager'].includes(role))){
           response = await api.get(`/api/users?branch_id=${user.branch_id}&user_id=${user.user_id}`);
        } else {
           response = await api.get(`/api/users`);
@@ -361,7 +414,7 @@ function App() {
   const disableEnableAccount = async(userToDisable) =>{
     
     //RE-ENABLE ACCOUNT
-    if (!user.role.some(role => ['Owner', 'Branch Manager'].includes(role))) return;
+    if (!user || !user.role || !user.role.some(role => ['Owner', 'Branch Manager'].includes(role))) return;
 
     if (userToDisable.is_disabled){
         
@@ -447,11 +500,11 @@ function App() {
 
 
       <UserModalForm 
-        isModalOpen={isModalOpen}
+        openUserModal={openUserModal}
         userDetailes={userDetailes}
         mode={modalMode}
         branches={branches}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => setOpenUserModal(false)}
         fetchUsersinfo ={fetchUsersinfo}
         setUserDetailes={setUserDetailes}
         setOpenUsers={setOpenUsers}
@@ -542,6 +595,8 @@ function App() {
 
               <ProductValidity 
                 sanitizeInput={sanitizeInput}
+                productValidityList={productValidityList}
+                setProductValidityList={setProductValidityList}
               
               />
 

@@ -150,7 +150,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
           </div>
 
           {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
-          {user.role.some(role => ['Sales Associate'].includes(role)) &&
+          {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) &&
             <div className="ml-auto flex gap-4 h-9">
               {/*ADD SALE BTN*/}
               <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all'  onClick={() => setOpenSaleModal(true)}> 

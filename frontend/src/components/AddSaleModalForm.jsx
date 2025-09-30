@@ -17,7 +17,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   let productsToSell = productsData;
 
   //THIS PREVENTS USER WITH COMBINE ROLES OF MANAGER AND SALES ASSOCIATE TO SELL PRODUCTS FROM ALL BRANCHES
-  if (user && user.role.some(role => ['Branch Manager'].includes(role))){
+  if (user && user.role && user.role.some(role => ['Branch Manager'].includes(role))){
     
     productsToSell = productsData.filter(product => product.branch_id === user.branch_id);
 
@@ -391,14 +391,14 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
         
         }
 
-        {openSaleModal && user.role.some(role => ['Sales Associate'].includes(role)) &&(
+        {openSaleModal && user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]"
             style={{ pointerEvents: 'auto' }}  onClick={closeModal}
             />
         )}
 
-        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={openSaleModal && user && user.role.some(role => ['Sales Associate'].includes(role)) }>
+        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={openSaleModal && user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) }>
             <div className="relative flex flex-col border border-gray-600/40 bg-white  w-[1000px] rounded-md py-7  px-3 animate-popup" >
             
 

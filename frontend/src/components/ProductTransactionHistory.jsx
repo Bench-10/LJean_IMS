@@ -66,7 +66,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
       try {
         setLoading(true);
         let response;
-        if (!user.role.some(role => ['Owner'].includes(role))){
+        if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))){
           response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
         } else{
           response = await api.post(`/api/product_history/`, dates);
@@ -85,6 +85,31 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
     if(isProductTransactOpen)
       fetchProductHistory();
   }, [isProductTransactOpen]);
+
+  // LISTEN FOR REAL-TIME HISTORY UPDATES
+  useEffect(() => {
+    const handleHistoryUpdate = (event) => {
+      const historyData = event.detail;
+      console.log('History update received in component:', historyData);
+      
+      if (historyData.action === 'add' || historyData.action === 'update') {
+        // ADD NEW HISTORY ENTRY AT THE TOP
+        setProductHistory(prevHistory => [historyData.historyEntry, ...prevHistory]);
+        
+        // SHOW A BRIEF VISUAL INDICATOR (if modal is open)
+        if (isProductTransactOpen) {
+          // You could add a toast notification here or temporary visual feedback
+          console.log(`📋 New history entry: ${historyData.historyEntry.product_name} (${historyData.historyEntry.quantity_added} units)`);
+        }
+      }
+    };
+
+    window.addEventListener('history-update', handleHistoryUpdate);
+
+    return () => {
+      window.removeEventListener('history-update', handleHistoryUpdate);
+    };
+  }, []);
 
 
   const handleSearch = (event) =>{

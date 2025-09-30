@@ -7,8 +7,8 @@ import { useAuth } from '../authentication/Authentication';
 import ChartLoading from '../components/common/ChartLoading';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 
-function ProductValidity({ sanitizeInput }) {
-  const [productValidityList, setValidity] = useState([]);
+function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList }) {
+  const [productValidityList, setValidity] = useState(propValidityList || []);
   const [searchValidity, setSearchValidity] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,6 +20,9 @@ function ProductValidity({ sanitizeInput }) {
       setLoading(true);
       const data = await api.get(`/api/product_validity?branch_id=${user.branch_id}`);
       setValidity(data.data);
+      if (setPropValidityList) {
+        setPropValidityList(data.data);
+      }
     } catch (error) {
       console.log(error.message);
       
@@ -30,6 +33,51 @@ function ProductValidity({ sanitizeInput }) {
 
   useEffect(() =>{
       getProductInfo();
+  }, []);
+
+  // LISTEN FOR REAL-TIME VALIDITY UPDATES
+  useEffect(() => {
+    const handleValidityUpdate = (event) => {
+      const validityData = event.detail;
+      console.log('Validity update received in component:', validityData);
+      
+      if (validityData.action === 'add') {
+        // ADD NEW VALIDITY ENTRY
+        const updateFunction = (prevValidity) => [validityData.product, ...prevValidity];
+        setValidity(updateFunction);
+        if (setPropValidityList) {
+          setPropValidityList(updateFunction);
+        }
+      } else if (validityData.action === 'update') {
+        // UPDATE EXISTING VALIDITY ENTRY OR ADD NEW ONE
+        const updateFunction = (prevValidity) => {
+          const existingIndex = prevValidity.findIndex(
+            item => item.product_id === validityData.product.product_id && 
+                   item.date_added === validityData.product.date_added
+          );
+          
+          if (existingIndex >= 0) {
+            // UPDATE EXISTING
+            const updated = [...prevValidity];
+            updated[existingIndex] = { ...updated[existingIndex], ...validityData.product };
+            return updated;
+          } else {
+            // ADD NEW
+            return [validityData.product, ...prevValidity];
+          }
+        };
+        setValidity(updateFunction);
+        if (setPropValidityList) {
+          setPropValidityList(updateFunction);
+        }
+      }
+    };
+
+    window.addEventListener('validity-update', handleValidityUpdate);
+
+    return () => {
+      window.removeEventListener('validity-update', handleValidityUpdate);
+    };
   }, []);
 
 

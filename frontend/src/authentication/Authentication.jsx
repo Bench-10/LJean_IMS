@@ -33,7 +33,7 @@ function Authentication ({ children }) {
 
   const logout = async () => {
 
-    if (!user.role.some(role => ['Owner'].includes(role))){
+    if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))){
       await api.put(`/api/authentication/${user.user_id}`, { activity: false });
     }
 

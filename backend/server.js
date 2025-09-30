@@ -99,6 +99,27 @@ export const broadcastNotification = (branchId, notification) => {
 
 
 
+// BROADCAST INVENTORY UPDATE TO ALL USERS IN BRANCH
+export const broadcastInventoryUpdate = (branchId, inventoryData) => {
+  io.to(`branch-${branchId}`).emit('inventory-update', inventoryData);
+};
+
+
+
+// BROADCAST PRODUCT VALIDITY UPDATE TO ALL USERS IN BRANCH
+export const broadcastValidityUpdate = (branchId, validityData) => {
+  io.to(`branch-${branchId}`).emit('validity-update', validityData);
+};
+
+
+
+// BROADCAST PRODUCT HISTORY UPDATE TO ALL USERS IN BRANCH
+export const broadcastHistoryUpdate = (branchId, historyData) => {
+  io.to(`branch-${branchId}`).emit('history-update', historyData);
+};
+
+
+
 // SENDS NOTIFICATION TO SPECIFIC USER
 export const broadcastToUser = (userId, notification) => {
   for (const [socketId, userData] of connectedUsers) {

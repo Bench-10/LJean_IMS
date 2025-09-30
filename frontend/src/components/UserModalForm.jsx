@@ -5,17 +5,22 @@ import api from '../utils/api';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
 
-function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes, setOpenUsers}) {
+function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes, setOpenUsers}) {
 
 
   //FOR USER ROLE AUTHENTICATION
   const {user} = useAuth();
 
+  // Early return if user data is not loaded
+  if (!user || !user.role) {
+    return null;
+  }
+
 
   //USERINFO FIELDS
   const [first_name, setFirstName] = useState('');
   const [last_name, setLastname] = useState('');
-  const [branch, setBranch] = useState(user && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id: '');
+  const [branch, setBranch] = useState(user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id: '');
   const [role, setRole] = useState({isManager: false, isInventoryStaff: false, isSalesAssociate: false});
   const [cell_number, setCellNumber] = useState('');    
   const [address, setAddress] = useState('');
@@ -49,15 +54,15 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
   //FETCH THE DATA ONCE
   useEffect(() =>{
-    if (!user) return;
+    if (!user || !user.role) return;
 
     setEmptyField({});
 
 
-    if (isModalOpen && mode === 'add' && user.role.some(role => ['Owner', 'Branch Manager'].includes(role))){
+    if (openUserModal && mode === 'add' && user && user.role && user.role.some(role => ['Owner', 'Branch Manager'].includes(role))){
         setFirstName('');
         setLastname('');
-        setBranch(user && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id: '');
+        setBranch(user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id: '');
         setRole({isManager: false, isInventoryStaff: false, isSalesAssociate: false});
         setCellNumber('');
         setAddress('');
@@ -72,21 +77,21 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
 
 
-    if (isModalOpen && mode === 'edit' && user.role.some(role => ['Owner', 'Branch Manager'].includes(role)) && userDetailes){
+    if (openUserModal && mode === 'edit' && user && user.role && user.role.some(role => ['Owner', 'Branch Manager'].includes(role)) && userDetailes){
 
 
         let setDbUserRoles = {isManager: false, isInventoryStaff: false, isSalesAssociate: false};
 
     
-        if(userDetailes.role.some(role => ['Branch Manager'].includes(role))){
+        if(userDetailes.role && userDetailes.role.some(role => ['Branch Manager'].includes(role))){
             setDbUserRoles.isManager = true;
         }
 
-        if(userDetailes.role.some(role => ['Inventory Staff'].includes(role))){
+        if(userDetailes.role && userDetailes.role.some(role => ['Inventory Staff'].includes(role))){
             setDbUserRoles.isInventoryStaff = true;
         }
 
-        if(userDetailes.role.some(role => ['Sales Associate'].includes(role))){
+        if(userDetailes.role && userDetailes.role.some(role => ['Sales Associate'].includes(role))){
             setDbUserRoles.isSalesAssociate = true;
         }
 
@@ -106,11 +111,11 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
         return;
     }
     
-  }, [isModalOpen, user]);
+  }, [openUserModal, user]);
 
 
   const passwordStrength = (value) => {
-    if (value.length < 8){
+    if (!value || value.length < 8){
 
         if (passwordCheck === 'Password must be at least 8 characters!'){
             return;
@@ -325,14 +330,14 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
         }
 
 
-        {isModalOpen && user.role.some(role => ['Owner', 'Branch Manager'].includes(role)) &&(
+        {openUserModal && user && user.role && user.role.some(role => ['Owner', 'Branch Manager'].includes(role)) &&(
             <div
             className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-[1px]"
             style={{ pointerEvents: 'auto' }}  onClick={onClose}
             />
         )}
 
-        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={isModalOpen && user.role.some(role => ['Owner', 'Branch Manager'].includes(role))}>
+        <dialog className='bg-transparent fixed top-0 bottom-0  z-200 rounded-md animate-popup' open={openUserModal && user && user.role && user.role.some(role => ['Owner', 'Branch Manager'].includes(role))}>
             <div className='bg-white text-black w-[700px] rounded-md' >
                 {/*HEADER TITLE */}
                 <div className='bg-green-800 p-4 rounded-t-md flex justify-between items-center '>
@@ -378,7 +383,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
                                     <h2 className='font-semibold text-green-900 text-lg'>Branch</h2>
 
-                                    {user && user.role.some(role => ['Branch Manager'].includes(role)) ? 
+                                    {user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) ? 
 
                                         <input 
                                             type='text' 
@@ -481,7 +486,7 @@ function UserModalForm({branches, isModalOpen, onClose, mode, fetchUsersinfo, us
 
                                     <h2 className='font-semibold text-green-900 text-lg'>User Role</h2>
 
-                                     {user && user.role.some(role => ['Owner'].includes(role)) && 
+                                     {user && user.role && user.role.some(role => ['Owner'].includes(role)) && 
                                         <div className='flex items-center gap-x-2 '>
                                             Branch Manager
                                             <input

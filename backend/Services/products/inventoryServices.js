@@ -1,5 +1,11 @@
 import { SQLquery } from "../../db.js";
-import { broadcastNotification } from "../../server.js";
+import { broadcastNotification, broadcastInventoryUpdate, broadcastValidityUpdate, broadcastHistoryUpdate } from "../../server.js";
+
+//HELPER FUNCTION TO GET CATEGORY NAME
+const getCategoryName = async (categoryId) => {
+    const { rows } = await SQLquery('SELECT category_name FROM Category WHERE category_id = $1', [categoryId]);
+    return rows[0]?.category_name || '';
+};
 
 
 
@@ -19,7 +25,7 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
             threshold 
         FROM inventory_product
         LEFT JOIN Category USING(category_id)
-        LEFT JOIN Add_Stocks USING(product_id)
+        LEFT JOIN Add_Stocks ast USING(product_id)
         WHERE product_id = $1 AND branch_id = $2
         GROUP BY 
             inventory_product.product_id, 
@@ -89,7 +95,7 @@ export const getProductItems = async(branchId) => {
             threshold 
         FROM inventory_product  
         LEFT JOIN Category USING(category_id)
-        LEFT JOIN Add_Stocks USING(product_id)
+        LEFT JOIN Add_Stocks ast USING(product_id)
         WHERE branch_id = $1
         GROUP BY 
             inventory_product.product_id, 
@@ -193,6 +199,73 @@ export const addProductItem = async (productData) => {
 
     const newProductRow = await getUpdatedInventoryList(product_id, branch_id);
 
+    // BROADCAST INVENTORY UPDATE TO ALL USERS IN THE BRANCH
+    broadcastInventoryUpdate(branch_id, {
+        action: 'add',
+        product: newProductRow,
+        user_id: userID
+    });
+
+    // GET CATEGORY NAME ONCE FOR BOTH VALIDITY AND HISTORY UPDATES
+    const categoryName = await getCategoryName(category_id);
+    const addedDateObj = new Date(date_added);
+
+    // BROADCAST VALIDITY UPDATE IF PRODUCT HAS EXPIRY DATE
+    if (product_validity) {
+        const validityDateObj = new Date(product_validity);
+        const currentDate = new Date();
+        
+        // Calculate if near expiry or expired
+        const daysUntilExpiry = Math.ceil((validityDateObj - currentDate) / (1000 * 60 * 60 * 24));
+        const near_expy = daysUntilExpiry <= 3 && daysUntilExpiry >= 0;
+        const expy = validityDateObj <= currentDate;
+
+        broadcastValidityUpdate(branch_id, {
+            action: 'add',
+            product: {
+                product_id: product_id,
+                product_name: product_name,
+                category_name: categoryName,
+                quantity_added: quantity_added,
+                quantity_left: quantity_added,
+                formated_date_added: addedDateObj.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                }),
+                formated_product_validity: validityDateObj.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                }),
+                date_added: date_added,
+                product_validity: product_validity,
+                near_expy: near_expy,
+                expy: expy
+            },
+            user_id: userID
+        });
+    }
+
+    // BROADCAST HISTORY UPDATE FOR NEW PRODUCT (always has quantity when adding)
+    broadcastHistoryUpdate(branch_id, {
+        action: 'add',
+        historyEntry: {
+            product_name: product_name,
+            category_name: categoryName,
+            h_unit_cost: unit_cost,
+            quantity_added: quantity_added,
+            value: unit_cost * quantity_added,
+            formated_date_added: addedDateObj.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }),
+            date_added: date_added
+        },
+        user_id: userID
+    });
+
     return newProductRow;
 };
 
@@ -215,7 +288,7 @@ export const updateProductItem = async (productData, itemId) => {
 
     // LOCK THE PRODUCT ROW TO PREVENT CONCURRENT MODIFICATIONS
     const previousData = await SQLquery(
-        'SELECT branch_id, unit_price, unit_cost FROM Inventory_Product WHERE product_id = $1 FOR UPDATE', 
+        'SELECT branch_id, unit_price, unit_cost, product_name, unit, threshold, category_id FROM Inventory_Product WHERE product_id = $1 FOR UPDATE', 
         [itemId]
     );
 
@@ -223,9 +296,17 @@ export const updateProductItem = async (productData, itemId) => {
         throw new Error(`Product with ID ${itemId} not found`);
     }
 
-
-    const returnPreviousPrice = Number(previousData.rows[0].unit_price);
-    const returnBranchId = Number(previousData.rows[0].branch_id);
+    const prev = previousData.rows[0];
+    const returnPreviousPrice = Number(prev.unit_price);
+    const returnBranchId = Number(prev.branch_id);
+    
+    // Check if any product information changed (excluding quantity additions)
+    const productInfoChanged = 
+        prev.product_name !== product_name ||
+        prev.unit !== unit ||
+        Number(prev.threshold) !== Number(threshold) ||
+        Number(prev.category_id) !== Number(category_id) ||
+        Number(prev.unit_cost) !== Number(unit_cost);
 
 
 
@@ -239,57 +320,60 @@ export const updateProductItem = async (productData, itemId) => {
     // BANNER COLOR
     const color = 'blue';
 
-
     await SQLquery('BEGIN');
 
 
+    // Handle quantity addition and/or price change
+    let alertResult = null;
+    let finalMessage = '';
+
+    // Handle quantity addition (add new stock entry)
     if (quantity_added !== 0){
-
         await addStocksQuery();
+    }
 
-        const alertResult = await SQLquery(
-            `INSERT INTO Inventory_Alerts 
-            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *`,
-            [itemId, returnBranchId, productAddedNotifheader, addqQunatityNotifMessage, color, userID, fullName]
+    // Handle price change (update product table)
+    if (returnPreviousPrice !== unit_price){
+        // UPDATE THE INVENTORY_PRODUCT TABLE WITH NEW PRICE
+        await SQLquery(
+            `UPDATE Inventory_Product 
+            SET unit_price = $1 
+            WHERE product_id = $2`,
+            [unit_price, itemId]
         );
+    }
 
-        // SENDS DATA TO ALL USERS IN THE BRANCH
-        if (alertResult.rows[0]) {
-            broadcastNotification(returnBranchId, {
-                alert_id: alertResult.rows[0].alert_id,
-                alert_type: productAddedNotifheader,
-                message: addqQunatityNotifMessage,
-                banner_color: color,
-                user_id: alertResult.rows[0].user_id,
-                user_full_name: fullName,
-                alert_date: alertResult.rows[0].alert_date,
-                isDateToday: true,
-                alert_date_formatted: 'Just now'
-            });
-        }
+    // Determine the message based on what changed and create single notification
+    if (quantity_added !== 0 && returnPreviousPrice !== unit_price) {
+        // Both quantity and price changed - create combined message
+        finalMessage = `${addqQunatityNotifMessage} and ${changePriceNotifMessage}`;
+
+    } else if (quantity_added !== 0 && returnPreviousPrice === unit_price) {
+        // Only quantity changed
+        finalMessage = addqQunatityNotifMessage;
+
+    } else if (quantity_added === 0 && returnPreviousPrice !== unit_price) {
+        // Only price changed
+        finalMessage = changePriceNotifMessage;
 
     }
 
-    if (returnPreviousPrice !== unit_price){
-
-        await addStocksQuery();
-
-        const alertResult = await SQLquery(
+    // Create single notification entry if there were changes
+    if (finalMessage) {
+        alertResult = await SQLquery(
             `INSERT INTO Inventory_Alerts 
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [itemId, returnBranchId, productAddedNotifheader, changePriceNotifMessage, color, userID, fullName]
+            [itemId, returnBranchId, productAddedNotifheader, finalMessage, color, userID, fullName]
         );
 
-        // Broadcast the notification to all users in the branch
-        if (alertResult.rows[0]) {
+        // Broadcast the single notification
+        if (alertResult?.rows[0]) {
             broadcastNotification(returnBranchId, {
                 alert_id: alertResult.rows[0].alert_id,
                 alert_type: productAddedNotifheader,
-                message: changePriceNotifMessage,
+                message: finalMessage,
                 banner_color: color,
                 user_id: alertResult.rows[0].user_id,
                 user_full_name: fullName,
@@ -298,13 +382,116 @@ export const updateProductItem = async (productData, itemId) => {
                 alert_date_formatted: 'Just now'
             });
         }
+    }
 
+    // Handle other product information updates (name, unit, threshold, category, cost)
+    if (productInfoChanged) {
+        
+        await SQLquery(
+            `UPDATE Inventory_Product 
+            SET product_name = $1, unit = $2, threshold = $3, category_id = $4, unit_cost = $5
+            WHERE product_id = $6`,
+            [product_name, unit, threshold, category_id, unit_cost, itemId]
+        );
+
+        // Create notification for product info update
+        const updateMessage = `Product information for ${product_name} has been updated.`;
+        const alertResult = await SQLquery(
+            `INSERT INTO Inventory_Alerts 
+            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *`,
+            [itemId, returnBranchId, productAddedNotifheader, updateMessage, color, userID, fullName]
+        );
+
+        if (alertResult.rows[0]) {
+            broadcastNotification(returnBranchId, {
+                alert_id: alertResult.rows[0].alert_id,
+                alert_type: productAddedNotifheader,
+                message: updateMessage,
+                banner_color: color,
+                user_id: alertResult.rows[0].user_id,
+                user_full_name: fullName,
+                alert_date: alertResult.rows[0].alert_date,
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            });
+        }
     }
 
    
     await SQLquery('COMMIT');
 
     const updatedProductRow = await getUpdatedInventoryList(itemId, branch_id);
+
+    // BROADCAST INVENTORY UPDATE TO ALL USERS IN THE BRANCH
+    broadcastInventoryUpdate(branch_id, {
+        action: 'update',
+        product: updatedProductRow,
+        user_id: userID
+    });
+
+    // BROADCAST UPDATES ONLY IF QUANTITY WAS ADDED (new stock entry created)
+    if (quantity_added > 0) {
+        const categoryName = await getCategoryName(category_id);
+        const addedDateObj = new Date(date_added);
+
+        // BROADCAST VALIDITY UPDATE IF EXPIRY DATE PROVIDED
+        if (product_validity) {
+            const validityDateObj = new Date(product_validity);
+            const currentDate = new Date();
+            
+            // Calculate if near expiry or expired
+            const daysUntilExpiry = Math.ceil((validityDateObj - currentDate) / (1000 * 60 * 60 * 24));
+            const near_expy = daysUntilExpiry <= 3 && daysUntilExpiry >= 0;
+            const expy = validityDateObj <= currentDate;
+
+            broadcastValidityUpdate(branch_id, {
+                action: 'update',
+                product: {
+                    product_id: itemId,
+                    product_name: product_name,
+                    category_name: categoryName,
+                    quantity_added: quantity_added,
+                    quantity_left: quantity_added,
+                    formated_date_added: addedDateObj.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    }),
+                    formated_product_validity: validityDateObj.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    }),
+                    date_added: date_added,
+                    product_validity: product_validity,
+                    near_expy: near_expy,
+                    expy: expy
+                },
+                user_id: userID
+            });
+        }
+
+        // BROADCAST HISTORY UPDATE (always for quantity additions)
+        broadcastHistoryUpdate(branch_id, {
+            action: 'update',
+            historyEntry: {
+                product_name: product_name,
+                category_name: categoryName,
+                h_unit_cost: unit_cost,
+                quantity_added: quantity_added,
+                value: unit_cost * quantity_added,
+                formated_date_added: addedDateObj.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                }),
+                date_added: date_added
+            },
+            user_id: userID
+        });
+    }
 
     return  updatedProductRow;
 };
