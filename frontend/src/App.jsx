@@ -562,6 +562,7 @@ function App() {
         deliveryData={deliveryData}
         deliveryEditData={deliveryEditData}
         getDeliveries={getDeliveries}
+        fetchProductsData={fetchProductsData}
         onClose={() => {setAddDelivery(false); setModalMode('add')}}  
 
       />

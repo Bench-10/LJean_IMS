@@ -5,7 +5,7 @@ import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 import FormLoading from './common/FormLoading';
 
 
-function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, deliveryData, getDeliveries, mode, deliveryEditData}) {
+function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, deliveryData, getDeliveries, fetchProductsData, mode, deliveryEditData}) {
 
     const { user } = useAuth();
 
@@ -65,11 +65,18 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
                 getDeliveries((prevData) => [...prevData, response.data])
                 console.log('New Delivery Added', response.data);
             } else {
-
+                // DELIVERY STATUS UPDATE - MAY AFFECT INVENTORY
                 const delivery = await api.put(`/api/delivery/${deliveryEditData.sales_information_id}`, payload);
+                
                 getDeliveries((prevData) => 
                     prevData.map((item) => (item.sales_information_id === Number(id) ? {...item, is_delivered: delivery.data} : item))
                 );
+
+                // REFRESH INVENTORY DATA FOR THE USER WHO MADE THE CHANGE
+                if (fetchProductsData) {
+                    await fetchProductsData();
+                }
+                
                 console.log('Delivery Updated', delivery.data);
                 
             };
