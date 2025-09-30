@@ -33,8 +33,13 @@ function Authentication ({ children }) {
 
   const logout = async () => {
 
-    if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))){
-      await api.put(`/api/authentication/${user.user_id}`, { activity: false });
+    // SEND LOGOUT API CALL FOR ALL USER TYPES TO UPDATE STATUS
+    if (user && user.user_id) {
+      try {
+        await api.put(`/api/authentication/${user.user_id}`, { activity: false });
+      } catch (error) {
+        console.error('Error updating logout status:', error);
+      }
     }
 
     setUser(null);

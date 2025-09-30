@@ -240,6 +240,48 @@ function App() {
       }
     });
 
+    // LISTEN FOR USER MANAGEMENT UPDATES
+    newSocket.on('user-update', (userData) => {
+      console.log('User management update received:', userData);
+      
+      if (userData.action === 'add') {
+        // NEW USER ADDED - UPDATE USERS LIST
+        setUsers(prevUsers => [userData.user, ...prevUsers]);
+      } else if (userData.action === 'update') {
+        // USER UPDATED - UPDATE USERS LIST
+        setUsers(prevUsers => 
+          prevUsers.map(user => 
+            user.user_id === userData.user.user_id 
+              ? userData.user 
+              : user
+          )
+        );
+      } else if (userData.action === 'delete') {
+        // USER DELETED - REMOVE FROM USERS LIST
+        setUsers(prevUsers => 
+          prevUsers.filter(user => user.user_id !== userData.user_id)
+        );
+      }
+    });
+
+    // LISTEN FOR USER STATUS UPDATES (LOGIN/LOGOUT)
+    newSocket.on('user-status-update', (statusData) => {
+      console.log('User status update received:', statusData);
+      
+      // UPDATE USER STATUS IN THE USERS LIST
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.user_id === statusData.user_id 
+            ? { 
+                ...user, 
+                is_active: statusData.is_active,
+                last_login: statusData.last_login || user.last_login
+              } 
+            : user
+        )
+      );
+    });
+
     newSocket.on('disconnect', () => {
       console.log('Disconnected from server');
     });
@@ -479,7 +521,7 @@ function App() {
     try {
       setDeleteLoading(true);
       await api.delete(`/api/delete_account/${userID}`);
-      fetchUsersinfo();
+      // DON'T MANUALLY REFRESH - LET WEBSOCKET HANDLE REAL-TIME UPDATES
     } catch (error) {
       console.error('Error deleting user:', error);
     } finally {
@@ -498,24 +540,12 @@ function App() {
     if (userToDisable.is_disabled){
         
         await api.put(`/api/disable/${userToDisable.user_id}`, {isDisabled: false})
-        setUsers((prev) =>
-          prev.map((user) =>
-            user.user_id === userToDisable.user_id
-              ? { ...user, is_disabled: false }
-              : user
-          )
-        );
+        // DON'T MANUALLY UPDATE - LET WEBSOCKET HANDLE REAL-TIME UPDATES
 
     } else {
 
         await api.put(`/api/disable/${userToDisable.user_id}`, {isDisabled: true})
-          setUsers((prev) =>
-            prev.map((user) =>
-              user.user_id === userToDisable.user_id
-                ? { ...user, is_disabled: true }
-                : user
-            )
-          );
+        // DON'T MANUALLY UPDATE - LET WEBSOCKET HANDLE REAL-TIME UPDATES
 
     }
 

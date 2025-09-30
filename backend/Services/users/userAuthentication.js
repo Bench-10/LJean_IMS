@@ -1,6 +1,7 @@
 import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 import {decodeHashedPassword} from '../Services_Utils/passwordHashing.js';
+import { broadcastUserStatusUpdate } from "../../server.js";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
@@ -70,6 +71,17 @@ export const userAuth = async(loginInformation) =>{
             [existingUser.rows[0].user_id]
         );
 
+        // BROADCAST USER LOGIN STATUS TO ALL USERS IN THE BRANCH
+        if (userData.rows[0]) {
+            broadcastUserStatusUpdate(userData.rows[0].branch_id, {
+                action: 'login',
+                user_id: existingUser.rows[0].user_id,
+                full_name: userData.rows[0].full_name,
+                last_login: formatted,
+                is_active: true
+            });
+        }
+
         return userData.rows;
     
     };
@@ -108,6 +120,30 @@ export const userLastLogout = async(userId, active) =>{
 
     const {activity} = active;
 
-    await SQLquery("UPDATE Users SET is_active = $1 WHERE user_id = $2", [activity, userId]);
+    // ENSURE userId IS AN INTEGER
+    const userIdInt = parseInt(userId, 10);
+    
+    console.log(`Processing logout for user ${userIdInt}, activity: ${activity}`);
+
+    // CHECK IF IT'S A REGULAR USER OR ADMINISTRATOR
+    const userCheck = await SQLquery("SELECT user_id, branch_id, first_name || ' ' || last_name AS full_name FROM Users WHERE user_id = $1", [userIdInt]);
+
+    if (userCheck.rows.length > 0) {
+        // REGULAR USER - UPDATE STATUS AND BROADCAST
+        await SQLquery("UPDATE Users SET is_active = $1 WHERE user_id = $2", [activity, userIdInt]);
+
+        console.log(`Broadcasting logout status for user ${userIdInt} in branch ${userCheck.rows[0].branch_id}`);
+
+        // BROADCAST USER LOGOUT STATUS TO ALL USERS IN THE BRANCH
+        broadcastUserStatusUpdate(userCheck.rows[0].branch_id, {
+            action: 'logout',
+            user_id: userIdInt,
+            full_name: userCheck.rows[0].full_name,
+            is_active: activity
+        });
+    } else {
+        // ADMINISTRATOR USER - NO BROADCAST NEEDED (NOT IN BRANCH USERS LIST)
+        console.log(`Administrator user ${userIdInt} logged out - no status broadcast needed`);
+    }
 
 };

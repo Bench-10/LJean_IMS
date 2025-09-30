@@ -1,6 +1,7 @@
 import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
+import { broadcastUserUpdate } from "../../server.js";
 
 
 
@@ -91,6 +92,29 @@ export const createUserAccount = async (UserData) => {
     );
 
     await SQLquery('COMMIT');
+
+    // GET THE NEWLY CREATED USER DATA FOR BROADCASTING
+    const { rows } = await SQLquery(`
+        SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password
+        FROM Users
+        JOIN Branch ON Branch.branch_id = Users.branch_id
+        JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
+        WHERE Users.user_id = $1
+        ORDER BY hire_date;
+    `, [user_id]);
+
+    if (rows[0]) {
+        const userWithDecryptedPassword = {
+            ...rows[0],
+            password: await passwordEncryption.decryptPassword(rows[0].password)
+        };
+
+        // BROADCAST NEW USER CREATION TO ALL USERS IN THE BRANCH
+        broadcastUserUpdate(branch, {
+            action: 'add',
+            user: userWithDecryptedPassword
+        });
+    }
 };
 
 
@@ -173,6 +197,13 @@ export const updateUserAccount = async (UserID, UserData) =>{
 
     await SQLquery('COMMIT');
 
+    // BROADCAST USER UPDATE TO ALL USERS IN THE BRANCH
+    if (usersWithDecryptedPasswords[0]) {
+        broadcastUserUpdate(branch, {
+            action: 'update',
+            user: usersWithDecryptedPasswords[0]
+        });
+    }
     
     return usersWithDecryptedPasswords[0];
 
@@ -180,9 +211,22 @@ export const updateUserAccount = async (UserID, UserData) =>{
 
 
 
-export const deleteUser = async (userID) =>{
+export const deleteUser = async (userID, branchId) =>{
 
-    await SQLquery('DELETE FROM Users WHERE user_id = $1', [userID]);
+    // ENSURE userID IS AN INTEGER
+    const userIdInt = parseInt(userID, 10);
+    
+    console.log(`Deleting user ${userIdInt} from branch ${branchId}`);
+
+    await SQLquery('DELETE FROM Users WHERE user_id = $1', [userIdInt]);
+
+    console.log(`Broadcasting user deletion for user ${userIdInt} in branch ${branchId}`);
+
+    // BROADCAST USER DELETION TO ALL USERS IN THE BRANCH
+    broadcastUserUpdate(branchId, {
+        action: 'delete',
+        user_id: userIdInt
+    });
 
 };
 

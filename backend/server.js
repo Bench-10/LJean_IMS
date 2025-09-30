@@ -125,6 +125,22 @@ export const broadcastSaleUpdate = (branchId, saleData) => {
 
 
 
+// BROADCAST USER MANAGEMENT UPDATE TO ALL USERS IN BRANCH
+export const broadcastUserUpdate = (branchId, userData) => {
+  console.log(`Broadcasting user update to branch-${branchId}:`, userData);
+  io.to(`branch-${branchId}`).emit('user-update', userData);
+};
+
+
+
+// BROADCAST USER STATUS UPDATE (LOGIN/LOGOUT) TO ALL USERS IN BRANCH
+export const broadcastUserStatusUpdate = (branchId, statusData) => {
+  console.log(`Broadcasting user status update to branch-${branchId}:`, statusData);
+  io.to(`branch-${branchId}`).emit('user-status-update', statusData);
+};
+
+
+
 // SENDS NOTIFICATION TO SPECIFIC USER
 export const broadcastToUser = (userId, notification) => {
   for (const [socketId, userData] of connectedUsers) {

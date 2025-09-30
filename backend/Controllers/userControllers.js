@@ -2,6 +2,7 @@ import * as userDetails from '../Services/users/userDetails.js';
 import * as userAuthentication from '../Services/users/userAuthentication.js';
 import * as userCreation from '../Services/users/userCreation.js';
 import * as disableEnableAccount from '../Services/users/disableEnableAccount.js';
+import { SQLquery } from '../db.js';
 
 
 export const getBranches = async (req, res) =>{
@@ -119,7 +120,12 @@ export const userUpdateAccount = async (req, res) =>{
 export const userDeletionAccount = async (req, res) =>{
     try {
         const userID = req.params.id;
-        const user = await userCreation.deleteUser(userID);
+        
+        // GET USER'S BRANCH ID BEFORE DELETION FOR WEBSOCKET BROADCAST
+        const { rows } = await SQLquery('SELECT branch_id FROM Users WHERE user_id = $1', [userID]);
+        const branchId = rows[0]?.branch_id;
+        
+        const user = await userCreation.deleteUser(userID, branchId);
         res.status(200).json(user);
     } catch (error) {
         console.error('Error to delete a user: ', error);

@@ -255,11 +255,11 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
      if (mode === 'add'){
         try {
         const response = await api.post(`/api/create_account`, userData);
-        fetchUsersinfo();
-        console.log('Item Added', response.data);
+        // DON'T MANUALLY REFRESH - LET WEBSOCKET HANDLE REAL-TIME UPDATES
+        console.log('User Added', response.data);
         
         } catch (error) {
-            console.error('Error adding Item', error);
+            console.error('Error adding User', error);
         }
 
      };
@@ -268,12 +268,11 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
      if (mode === 'edit'){
         try {
         const response = await api.put(`/api/update_account/${userDetailes.user_id}`, userData);
-        await fetchUsersinfo();
+        // DON'T MANUALLY REFRESH - LET WEBSOCKET HANDLE REAL-TIME UPDATES
         await setUserDetailes(response.data);
         
-        
         } catch (error) {
-            console.error('Error adding Item', error);
+            console.error('Error updating User', error);
         }
 
      };
