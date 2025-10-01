@@ -230,8 +230,15 @@ function AddDeliveryInformation({ openAddDelivery, onClose, saleHeader, delivery
                                  
                                  >
                                     <option value="out" style={{ color: 'orange', backgroundColor: '#FFF7E0' }}>OUT FOR DELIVERY</option>
-                                    <option value="delivered" style={{ color: 'green', backgroundColor: '#E6FFED' }}>DELIVERED</option>
-                                    <option value="undelivered" style={{ color: 'red', backgroundColor: '#FFE6E6' }}>UNDELIVERED</option>
+
+                                    {mode === 'edit' &&
+                                        <option value="delivered" style={{ color: 'green', backgroundColor: '#E6FFED' }}>DELIVERED</option>
+                                    }
+                                    
+                                    {mode === 'edit' &&
+
+                                        <option value="undelivered" style={{ color: 'red', backgroundColor: '#FFE6E6' }}>UNDELIVERED</option>
+                                    }
 
 
                                 </select>
