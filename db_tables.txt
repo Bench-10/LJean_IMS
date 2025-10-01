@@ -253,7 +253,7 @@ CREATE TABLE Delivery (
 
 
 
--- Add table to track which stock batches were used for each sale item
+-- NEW TABLE
 CREATE TABLE Sales_Stock_Usage (
     usage_id SERIAL PRIMARY KEY,
     sales_information_id INT NOT NULL,
@@ -281,7 +281,7 @@ COMMENT ON COLUMN Sales_Stock_Usage.is_restored IS 'TRUE when stock has been res
 
 
 
--- PASSWORD RECOVERY
+-- NEW TABLE / PASSWORD RECOVERY
 CREATE TABLE password_reset_tokens (
     id SERIAL PRIMARY KEY,
     user_id INT NULL,                    
