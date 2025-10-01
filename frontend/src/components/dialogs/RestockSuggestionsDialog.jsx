@@ -55,53 +55,24 @@ const RestockSuggestionsDialog = ({
   const analyzeProductDemand = (product, forecastPeriods, actualPeriods) => {
     const suggestions = [];
     
-  // CALCULATE AVERAGE FORECAST DEMAND
+  // USE FORECAST DATA AS PRIMARY BASIS FOR RECOMMENDATIONS
     const avgForecastDemand = forecastPeriods.length > 0 
       ? forecastPeriods.reduce((sum, item) => sum + (item.forecast_units || 0), 0) / forecastPeriods.length 
       : 0;
 
-  // CALCULATE RECENT ACTUAL DEMAND TREND
-  const recentActual = actualPeriods.slice(-3); // LAST 3 PERIODS
-    const avgRecentDemand = recentActual.length > 0
-      ? recentActual.reduce((sum, item) => sum + (item.units_sold || 0), 0) / recentActual.length
-      : 0;
-
-  // CALCULATE TREND DIRECTION AND STRENGTH
-    const isIncreasingTrend = forecastPeriods.length >= 2 && 
-      forecastPeriods[forecastPeriods.length - 1]?.forecast_units > forecastPeriods[0]?.forecast_units;
-    
-    const trendStrength = forecastPeriods.length >= 2 
-      ? Math.abs(((forecastPeriods[forecastPeriods.length - 1]?.forecast_units || 0) / Math.max(forecastPeriods[0]?.forecast_units || 1, 1) - 1) * 100)
-      : 0;
-
-  // GENERATE SUGGESTIONS BASED ON INTERVAL
+  // SIMPLE RESTOCK: MULTIPLY FORECAST AVERAGE BY INTERVAL COVERAGE
     const intervalMultiplier = getIntervalMultiplier(salesInterval);
-    const baseQuantity = Math.max(avgForecastDemand, avgRecentDemand);
-  const bufferPercentage = trendStrength > 20 ? 1.5 : 1.2; // HIGHER BUFFER FOR STRONG TRENDS
-    const suggestedQuantity = Math.ceil(baseQuantity * intervalMultiplier * bufferPercentage);
+    const suggestedQuantity = Math.ceil(avgForecastDemand * intervalMultiplier);
 
-    if (baseQuantity > 0) {
+    if (avgForecastDemand > 0) {
       suggestions.push({
-        type: isIncreasingTrend && trendStrength > 15 ? 'high_priority' : 'normal',
-        icon: isIncreasingTrend ? FaArrowUp : FaBoxOpen,
-        title: `${product.product_name} - ${isIncreasingTrend && trendStrength > 15 ? 'High Growth Expected' : 'Standard Replenishment'}`,
-        message: `Based on ${salesInterval} analysis: ${Math.ceil(baseQuantity)} units per ${salesInterval.slice(0, -2)} average`,
-        recommendation: `Restock ${suggestedQuantity.toLocaleString()} units (${Math.ceil(intervalMultiplier)}-${salesInterval.slice(0, -2)} supply)`,
-        urgency: isIncreasingTrend && trendStrength > 20 ? 'high' : trendStrength > 10 ? 'medium' : 'low',
+        type: 'normal',
+        icon: FaBoxOpen,
+        title: `${product.product_name} - Replenishment`,
+        message: `Based on forecasting data: ${Math.ceil(avgForecastDemand)} units per ${salesInterval.slice(0, -2)} predicted`,
+        recommendation: `Restock ${suggestedQuantity.toLocaleString()} units (${Math.ceil(avgForecastDemand).toLocaleString()} units/${salesInterval.slice(0, -2)} • ${Math.ceil(intervalMultiplier)}-${salesInterval.slice(0, -2)} supply)`,
+        urgency: 'medium',
         confidence: calculateConfidence(forecastPeriods, actualPeriods)
-      });
-    }
-
-  // CHECK FOR SEASONAL PATTERNS OR LOW STOCK WARNINGS
-    if (avgRecentDemand > avgForecastDemand * 1.5) {
-      suggestions.push({
-        type: 'warning',
-        icon: FaExclamationTriangle,
-        title: `${product.product_name} - Recent Surge Detected`,
-        message: `Recent demand (${Math.ceil(avgRecentDemand)} units) exceeds forecast predictions`,
-        recommendation: `Consider emergency restock of ${Math.ceil(avgRecentDemand * intervalMultiplier * 1.5)} units`,
-        urgency: 'high',
-        confidence: 'medium'
       });
     }
 
@@ -121,21 +92,26 @@ const RestockSuggestionsDialog = ({
     const totalCategorySales = products.reduce((sum, p) => sum + (p.sales_amount || 0), 0);
 
     topPerformers.forEach((product, index) => {
-      const estimatedDemand = estimateProductDemand(product, forecastPeriods, actualPeriods);
-      const marketShare = totalCategorySales > 0 ? ((product.sales_amount || 0) / totalCategorySales) * 100 : 0;
-      const suggestedQuantity = Math.ceil(estimatedDemand * intervalMultiplier * (1.1 + (marketShare / 100))); // Higher buffer for high-share products
+      // USE EXACT SAME CALCULATION AS SINGLE PRODUCT ANALYSIS
+      const avgForecastDemand = forecastPeriods.length > 0 
+        ? forecastPeriods.reduce((sum, item) => sum + (item.forecast_units || 0), 0) / forecastPeriods.length 
+        : 0;
 
-      if (estimatedDemand > 0) {
+      const suggestedQuantity = Math.ceil(avgForecastDemand * intervalMultiplier);
+      
+      // MARKET SHARE IS ONLY USED FOR PRIORITY RANKING AND CONFIDENCE
+      const marketShare = totalCategorySales > 0 ? ((product.sales_amount || 0) / totalCategorySales) * 100 : 0;
+
+      if (avgForecastDemand > 0) {
         const priorityLevel = index === 0 ? 'high_priority' : index < 3 ? 'normal' : 'low_priority';
         
         suggestions.push({
           type: priorityLevel,
           icon: index === 0 ? FaArrowUp : FaBoxOpen,
           title: `${product.product_name} - ${index === 0 ? 'Top Revenue Generator' : `#${index + 1} Performer`}`,
-          message: `${marketShare.toFixed(1)}% of category sales • ~${Math.ceil(estimatedDemand)} units per ${salesInterval.slice(0, -2)}`,
-          recommendation: `${index === 0 ? 'Priority' : 'Standard'} restock: ${suggestedQuantity.toLocaleString()} units`,
-          urgency: index === 0 ? 'high' : index < 3 ? 'medium' : 'low',
-          confidence: marketShare > 10 ? 'high' : marketShare > 5 ? 'medium' : 'low'
+          message: `${index === 0 ? 'Top performing product in category' : `Ranked #${index + 1} in category performance`}`,
+          urgency: index === 0 ? 'high' : index < 3 ? 'medium' : 'low'
+          // NO RECOMMENDATION AND CONFIDENCE IN CATEGORY VIEW
         });
       }
     });
@@ -158,22 +134,32 @@ const RestockSuggestionsDialog = ({
       });
     }
 
-  // CATEGORY-WIDE BUDGET PLANNING
-    if (forecastPeriods.length > 0) {
-      const avgUnitCost = 75; // Estimated average unit cost
-      const estimatedTotalUnits = products.reduce((sum, product) => 
-        sum + estimateProductDemand(product, forecastPeriods, actualPeriods), 0
-      );
-      const budgetEstimate = estimatedTotalUnits * intervalMultiplier * avgUnitCost;
+  // CATEGORY-WIDE BUDGET PLANNING BASED ON HISTORICAL SALES PERFORMANCE
+    if (actualPeriods.length > 0) {
+      // CALCULATE AVERAGE SALES PERFORMANCE FROM HISTORICAL DATA
+      const avgHistoricalUnits = actualPeriods.reduce((sum, item) => sum + (item.units_sold || item.value || 0), 0) / actualPeriods.length;
+      const avgHistoricalRevenue = actualPeriods.reduce((sum, item) => sum + (item.sales_amount || (item.units_sold * 75) || 0), 0) / actualPeriods.length;
+      
+      // PROJECT FUTURE NEEDS BASED ON HISTORICAL PERFORMANCE
+      const projectedUnits = Math.ceil(avgHistoricalUnits * intervalMultiplier);
+      const projectedBudget = Math.ceil(avgHistoricalRevenue * intervalMultiplier);
+      
+      // CALCULATE AVERAGE UNIT PRICE FROM HISTORICAL DATA
+      const avgUnitPrice = avgHistoricalUnits > 0 ? (avgHistoricalRevenue / avgHistoricalUnits) : 75;
+      
+      // DETERMINE PERIOD DESCRIPTION
+      const periodDescription = actualPeriods.length > 1 ? 
+        `${actualPeriods.length} previous ${salesInterval}` : 
+        `previous ${salesInterval.slice(0, -2)}`;
 
       suggestions.push({
         type: 'info',
         icon: FaChartLine,
         title: `${categoryName} - Budget Planning`,
-        message: `Estimated ${Math.ceil(estimatedTotalUnits * intervalMultiplier).toLocaleString()} total units needed for ${intervalMultiplier}-${salesInterval.slice(0, -2)} coverage`,
-        recommendation: `Allocate approximately ${currencyFormat(budgetEstimate)} for category restocking`,
+        message: `Based on ${periodDescription} performance: ${Math.ceil(avgHistoricalUnits).toLocaleString()} units per ${salesInterval.slice(0, -2)} average`,
+        recommendation: `Projected need: ${projectedUnits.toLocaleString()} units • Budget: ${currencyFormat(projectedBudget)} (${intervalMultiplier}-${salesInterval.slice(0, -2)} supply)`,
         urgency: 'low',
-        confidence: 'medium'
+        confidence: actualPeriods.length >= 3 ? 'high' : actualPeriods.length >= 2 ? 'medium' : 'low'
       });
     }
 
@@ -194,23 +180,27 @@ const RestockSuggestionsDialog = ({
   };
 
   const estimateProductDemand = (product, forecastPeriods, actualPeriods) => {
-    // USE UNITS_SOLD IF AVAILABLE FROM TOPPRODUCTS DATA
+    // CALCULATE PRODUCT'S INDIVIDUAL DEMAND BASED ON ITS HISTORICAL PERFORMANCE
     const actualUnits = product.units_sold || 0;
     
-    // CALCULATE DEMAND FROM SALES AMOUNT (FALLBACK METHOD)
-    const avgUnitPrice = Math.max((product.sales_amount || 0) / Math.max(actualUnits, 1), 50); // Min ₱50 per unit
-    const estimatedUnitsFromSales = actualUnits > 0 ? actualUnits : (product.sales_amount || 0) / avgUnitPrice;
+    // IF WE HAVE FORECAST DATA, USE IT AS BASE AND SCALE BY PRODUCT'S RELATIVE PERFORMANCE
+    if (forecastPeriods.length > 0 && actualUnits > 0) {
+      // Get total forecast average
+      const avgTotalForecast = forecastPeriods.reduce((sum, item) => sum + (item.forecast_units || 0), 0) / forecastPeriods.length;
+      
+      // Use the product's actual units as its individual demand estimate
+      // This represents the product's individual contribution to total demand
+      return actualUnits;
+    }
     
-    // IF WE HAVE FORECAST DATA, BLEND IT WITH HISTORICAL DATA
-    if (forecastPeriods.length > 0) {
-      const avgForecast = forecastPeriods.reduce((sum, item) => sum + (item.forecast_units || 0), 0) / forecastPeriods.length;
-  // WEIGHT FORECAST 70%, HISTORICAL 30% FOR BALANCED PREDICTION
-      return (avgForecast * 0.7) + (estimatedUnitsFromSales * 0.3);
+    // FALLBACK: USE ACTUAL UNITS FROM TOPPRODUCTS DATA
+    if (actualUnits > 0) {
+      return actualUnits;
     }
 
-    // FALLBACK TO SALES-BASED ESTIMATION WITH TREND ADJUSTMENT
-    const intervalAdjustment = salesInterval === 'daily' ? 0.8 : salesInterval === 'weekly' ? 0.9 : 1.0;
-    return estimatedUnitsFromSales * intervalAdjustment;
+    // LAST RESORT: ESTIMATE FROM SALES AMOUNT
+    const avgUnitPrice = 50; // Default unit price
+    return (product.sales_amount || 0) / avgUnitPrice;
   };
 
   const getIntervalMultiplier = (interval) => {
@@ -336,28 +326,31 @@ const RestockSuggestionsDialog = ({
                       </div>
                       <p className="text-gray-700 mb-3">{suggestion.message}</p>
                       
-                      <div className="mb-3 text-sm">
-                        <div className="bg-white bg-opacity-60 rounded p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FaThumbsUp className="text-blue-600" />
-                            <div>
-                              <span className="font-medium text-gray-800 block">Recommendation:</span>
-                              <div className="text-gray-700 font-medium">{suggestion.recommendation}</div>
+                      {/* ONLY SHOW RECOMMENDATION AND CONFIDENCE FOR SELECTED PRODUCTS */}
+                      {suggestion.recommendation && suggestion.confidence && (
+                        <div className="mb-3 text-sm">
+                          <div className="bg-white bg-opacity-60 rounded p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FaThumbsUp className="text-blue-600" />
+                              <div>
+                                <span className="font-medium text-gray-800 block">Recommendation:</span>
+                                <div className="text-gray-700 font-medium">{suggestion.recommendation}</div>
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="text-right">
-                            <span className="text-gray-600 block">Confidence:</span>
-                            <div className={`font-medium ${
-                              suggestion.confidence === 'high' ? 'text-green-600' :
-                              suggestion.confidence === 'medium' ? 'text-orange-600' :
-                              'text-gray-600'
-                            }`}>
-                              {suggestion.confidence.toUpperCase()}
+                            <div className="text-right">
+                              <span className="text-gray-600 block">Confidence:</span>
+                              <div className={`font-medium ${
+                                suggestion.confidence === 'high' ? 'text-green-600' :
+                                suggestion.confidence === 'medium' ? 'text-orange-600' :
+                                'text-gray-600'
+                              }`}>
+                                {suggestion.confidence.toUpperCase()}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      )}
 
                     </div>
 

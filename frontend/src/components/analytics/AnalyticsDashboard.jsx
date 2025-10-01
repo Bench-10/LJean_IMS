@@ -310,7 +310,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   <div className="flex flex-col gap-5 flex-1 min-h-0">
 
       <div className="flex flex-wrap items-center justify-between" >
-
+      {console.log(salesPerformance)}
         {(!branchId) &&
 
             <NavLink to="/branches" className={`relative py-2 px-4 border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100`} >
