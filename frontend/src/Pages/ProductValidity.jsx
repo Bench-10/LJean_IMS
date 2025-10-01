@@ -170,31 +170,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 </span>
               </div>
             </div>
-
-            {/*EXPORT DROPDOWN*/}
-            <div className="relative group">
-              <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
-                <TbFileExport />EXPORT
-              </button>
-              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-                <button 
-                  onClick={() => handleExportValidity('csv')}
-                  className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-                >
-                  Export as CSV
-                </button>
-                <button 
-                  onClick={() => handleExportValidity('pdf')}
-                  className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-                >
-                  Export as PDF
-                </button>
-              </div>
-            </div>
-
           </div>
-          
-
         </div>
 
         <hr className="border-t-2 my-4 w-full border-gray-500"/>
@@ -293,18 +269,32 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
               }
 
             </tbody>
-
           </table>
-
-
-        
-
-   
       </div>
 
+      <div className='flex mt-5 relative justify-end'> 
+        {/*EXPORT DROPDOWN*/}
+        <div className="relative group">
+          <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
+            <TbFileExport />EXPORT
+          </button>
+          <div className="absolute right-0 bottom-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+            <button 
+              onClick={() => handleExportValidity('csv')}
+              className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+            >
+              Export as CSV
+            </button>
+            <button 
+              onClick={() => handleExportValidity('pdf')}
+              className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+            >
+              Export as PDF
+            </button>
+          </div>
+        </div>
       </div>
-    
-
+      </div>
   )
 }
 

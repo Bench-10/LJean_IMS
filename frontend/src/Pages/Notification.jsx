@@ -127,6 +127,22 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
 
   };
 
+  //FUNCTION THAT MARKS ALL NOTIFICATIONS AS READ
+  const markAllAsRead = async () => {
+    try {
+      
+      await api.post(`/api/notifications/mark-all-read`, {user_id: user.user_id, branch_id: user.branch_id, hire_date: user.hire_date
+      });
+
+      //UPDATES THE UI
+      setNotify(notify => notify.map(n => ({ ...n, is_read: true })));
+
+
+    } catch (error) {
+      console.error('Error:', error);
+      
+    }
+  };
 
 
   return (
@@ -156,10 +172,23 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
 
             {/*HEADER*/}
             <div className='px-8 py-6 border-b border-gray-200'>
-              <h1 className='text-3xl font-bold text-gray-800'>
-                Notifications
-              </h1>
-              <p className='text-xs text-gray-700'>You have <span className='font-bold'>{unreadCount}</span> unread massages.</p>
+              <div className='flex items-center justify-between'>
+                <div>
+                  <h1 className='text-3xl font-bold text-gray-800'>
+                    Notifications
+                  </h1>
+                  <p className='text-xs text-gray-700'>You have <span className='font-bold'>{unreadCount}</span> unread massages.</p>
+                </div>
+                
+                {unreadCount > 0 && (
+                  <button 
+                    onClick={markAllAsRead}
+                    className='px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors mr-5'
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+              </div>
             </div>
 
             {/*SCROLLABLE CONTENT*/}

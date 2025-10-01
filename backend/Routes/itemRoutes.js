@@ -33,6 +33,7 @@ router.get("/product_validity", itemControllers.getAllProductValidity);
 //SHOW NOTIFICATIONSs
 router.get("/notifications", itemControllers.getNotification);
 router.post("/notifications", itemControllers.markRead);
+router.post("/notifications/mark-all-read", itemControllers.markAllRead);
 
 
 

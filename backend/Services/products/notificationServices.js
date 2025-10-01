@@ -78,3 +78,31 @@ export const markAsRead = async (userAndAlertID) =>{
   await SQLquery(`INSERT INTO user_notification(user_id, alert_id) VALUES($1, $2)`,[user_id, alert_id]);
 
 };
+
+//MARKS ALL NOTIFICATIONS AS READ FOR A USER
+export const markAllAsRead = async (userId, branchId, hireDate) => {
+
+  
+  //GETS ALL THE UNREAD DATA NOTIFICATION OF THE USER
+  const {rows: unreadAlerts} = await SQLquery(`
+      SELECT Inventory_Alerts.alert_id
+      FROM Inventory_Alerts
+      LEFT JOIN user_notification
+      ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1
+      WHERE Inventory_Alerts.branch_id = $2 AND Inventory_Alerts.alert_date >= $3 
+      AND user_notification.is_read IS NULL 
+      AND Inventory_Alerts.user_id != $1
+  `, [userId, branchId, hireDate]);
+
+
+  // BATCH INSERT TO THE USER NOTIF
+  if (unreadAlerts.length > 0) {
+    const values = unreadAlerts.map(alert => `(${userId}, ${alert.alert_id})`).join(', ');
+
+    await SQLquery(`INSERT INTO user_notification(user_id, alert_id) VALUES ${values}`);
+
+  }
+
+  return unreadAlerts.length;
+
+};

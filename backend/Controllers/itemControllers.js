@@ -173,3 +173,30 @@ export const markRead = async (req, res) =>{
         res.status(500).jason({message: 'Internal Server Error'})
     }
 };
+
+
+
+
+export const markAllRead = async (req, res) => {
+    try {
+        const { user_id, branch_id, hire_date } = req.body;
+        
+        if (!user_id || !branch_id || !hire_date) {
+            return res.status(400).json({ message: 'user_id, branch_id, and hire_date are required' });
+        }
+        
+        const markedCount = await notificationServices.markAllAsRead(user_id, branch_id, hire_date);
+
+        res.status(200).json({ 
+            message: `${markedCount} notifications marked as read`,
+            markedCount: markedCount 
+        });
+
+    } catch (error) {
+
+        console.error('Error marking all notifications as read: ', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+
+    }
+
+};
