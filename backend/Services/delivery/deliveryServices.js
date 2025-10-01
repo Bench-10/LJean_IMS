@@ -2,6 +2,7 @@ import { SQLquery } from "../../db.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 import { restoreStockFromSale, deductStockAndTrackUsage } from "../sale/saleServices.js";
 import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, broadcastValidityUpdate } from "../../server.js";
+import { createNewDeliveryNotification, createDeliveryStatusNotification, createDeliveryStockNotification } from "./deliveryNotificationService.js";
 
 
 
@@ -115,31 +116,12 @@ export const addDeliveryData = async(data) =>{
                 });
             }
 
-            // BROADCAST NOTIFICATION FOR NEW DELIVERY (WITH ROLE FILTERING)
-            const deliveryNotificationMessage = `New delivery assigned to ${courierName} for sale ${salesId} - Destination: ${address}`;
-            
-            const alertResult = await SQLquery(
-                `INSERT INTO Inventory_Alerts 
-                (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING *`,
-                [null, currentBranch, 'New Delivery', deliveryNotificationMessage, 'purple', userID || null, userFullName || courierName]
-            );
-
-            if (alertResult.rows[0]) {
-                broadcastNotification(currentBranch, {
-                    alert_id: alertResult.rows[0].alert_id,
-                    alert_type: 'New Delivery',
-                    message: deliveryNotificationMessage,
-                    banner_color: 'purple',
-                    user_id: alertResult.rows[0].user_id,
-                    user_full_name: userFullName || courierName,
-                    alert_date: alertResult.rows[0].alert_date,
-                    isDateToday: true,
-                    alert_date_formatted: 'Just now',
-                    target_roles: ['Sales Associate', 'Branch Manager', 'Delivery Personnel'], // Delivery roles get delivery notifications
-                    creator_id: userID // Exclude creator from notification
-                });
+            // CREATE NEW DELIVERY NOTIFICATION
+            try {
+                await createNewDeliveryNotification(salesId, courierName, address, currentBranch, userID, userFullName);
+            } catch (alertError) {
+                console.error(`❌ Failed to create new delivery notification:`, alertError);
+                // Continue with operation even if notification fails
             }
         }
 
@@ -194,6 +176,13 @@ export const setToDelivered = async(saleID, update) => {
             const branchId = branchInfo[0]?.branch_id;
             await restoreStockFromSale(saleID, 'Delivery marked as undelivered', branchId, userID);
             console.log(`Stock restored for sale ID: ${saleID} due to undelivered status`);
+            
+            // CREATE STOCK RESTORATION NOTIFICATION
+            try {
+                await createDeliveryStockNotification(saleID, 'stock_restored', branchId, userID, userFullName);
+            } catch (error) {
+                console.error(`Failed to create stock restoration notification:`, error);
+            }
 
         }
         else if (wasDelivered && !status.is_delivered && status.pending) {
@@ -405,31 +394,12 @@ export const setToDelivered = async(saleID, update) => {
                     user_id: userID || null
                 });
 
-                // BROADCAST NOTIFICATION FOR DELIVERY STATUS CHANGE
-                const notificationMessage = `Delivery status changed for sale ${saleID} - ${status.is_delivered ? 'Delivered' : status.pending ? 'Out for Delivery' : 'Undelivered'}`;
-                
-                const alertResult = await SQLquery(
-                    `INSERT INTO Inventory_Alerts 
-                    (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    RETURNING *`,
-                    [null, saleData[0].branch_id, 'Delivery Update', notificationMessage, 'blue', null, courierName || 'System']
-                );
-
-                if (alertResult.rows[0]) {
-                    broadcastNotification(saleData[0].branch_id, {
-                        alert_id: alertResult.rows[0].alert_id,
-                        alert_type: 'Delivery Update',
-                        message: notificationMessage,
-                        banner_color: 'blue',
-                        user_id: alertResult.rows[0].user_id,
-                        user_full_name: courierName || 'System',
-                        alert_date: alertResult.rows[0].alert_date,
-                        isDateToday: true,
-                        alert_date_formatted: 'Just now',
-                        target_roles: ['Sales Associate', 'Branch Manager', 'Delivery Personnel'], // Delivery roles get delivery notifications
-                        creator_id: userID // Exclude creator from notification
-                    });
+                // CREATE DELIVERY STATUS CHANGE NOTIFICATION
+                try {
+                    await createDeliveryStatusNotification(saleID, status, courierName, saleData[0].branch_id, userID, userFullName);
+                } catch (alertError) {
+                    console.error(`❌ Failed to create delivery status notification:`, alertError);
+                    // Continue with operation even if notification fails
                 }
             }
         }

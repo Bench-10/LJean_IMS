@@ -15,6 +15,9 @@ router.post("/delivery", deliveryCoantrollers.addDeliveries);
 //SET TO DELIVERED DATA
 router.put("/delivery/:id", deliveryCoantrollers.updateDeliveries);
 
+//TEST DELIVERY NOTIFICATIONS
+router.get("/delivery/test/notifications", deliveryCoantrollers.testDeliveryNotifications);
+
 
 
 
