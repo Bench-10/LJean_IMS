@@ -275,3 +275,31 @@ CREATE INDEX idx_sales_stock_usage_stock_id ON Sales_Stock_Usage(add_stock_id);
 -- Optional: Add comments for clarity
 COMMENT ON TABLE Sales_Stock_Usage IS 'Tracks which stock batches were used for each sale item, enabling precise stock restoration';
 COMMENT ON COLUMN Sales_Stock_Usage.is_restored IS 'TRUE when stock has been restored due to order cancellation/undelivered status';
+
+
+
+
+
+
+-- PASSWORD RECOVERY
+CREATE TABLE password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INT NULL,                    
+    admin_id INT NULL,                   
+    user_type VARCHAR(10) NOT NULL,     
+    token VARCHAR(64) NOT NULL UNIQUE,  
+    email VARCHAR(255) NOT NULL,        
+    expires_at TIMESTAMP NOT NULL,    
+    created_at TIMESTAMP DEFAULT NOW(), 
+    used BOOLEAN DEFAULT FALSE,        
+    used_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (admin_id) REFERENCES Administrator(admin_id) ON DELETE CASCADE,
+    UNIQUE(user_id, admin_id, user_type)
+);
+
+-- FOR PERFORMANCE
+CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX idx_password_reset_tokens_expires ON password_reset_tokens(expires_at);
+CREATE INDEX idx_password_reset_tokens_user ON password_reset_tokens(user_id);
+CREATE INDEX idx_password_reset_tokens_admin ON password_reset_tokens(admin_id);

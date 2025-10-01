@@ -5,6 +5,7 @@ import { FaUser, FaLock, FaEye, FaExclamationCircle } from 'react-icons/fa';
 import './login.css';
 import { useAuth } from './Authentication'; 
 import TooMuchAttempts from '../components/dialogs/TooMuchAttempts';
+import ForgotPassword from '../components/auth/ForgotPassword';
 import api from '../utils/api';
 
 
@@ -23,6 +24,7 @@ function Login() {
   //FOR NOTIFYING THAT ACCOUNT IS DISABLED
   const [disabledDialog, setDisabledDialog] = useState(false);
   const [showTooManyAttempts, setShowTooManyAttempts] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const trials = useRef(0);
 
@@ -160,6 +162,10 @@ function Login() {
     }
   };
 
+  // Show Forgot Password component if requested
+  if (showForgotPassword) {
+    return <ForgotPassword onBackToLogin={() => setShowForgotPassword(false)} />;
+  }
 
   return (
     <div className="login-container">
@@ -236,6 +242,17 @@ function Login() {
           
         
           <button type='submit' className="login-btn">LOGIN</button>
+          
+          {/* Forgot Password Link */}
+          <div className="forgot-password-container">
+            <button 
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="forgot-password-link"
+            >
+              Forgot your password?
+            </button>
+          </div>
 
         </form>
       </div>

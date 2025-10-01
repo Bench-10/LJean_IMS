@@ -8,6 +8,7 @@ import userRoutes from './Routes/userRoutes.js';
 import saleRoutes from './Routes/saleRoutes.js';
 import analyticsRoutes from './Routes/analyticsRoutes.js';
 import deliveryRoutes from './Routes/deliveryRoutes.js';
+import passwordResetRoutes from './Routes/passwordResetRoutes.js';
 import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 
@@ -52,6 +53,9 @@ app.use('/api', deliveryRoutes)
 
 // ANALYTICS (historical inventory + sales aggregates)
 app.use('/api', analyticsRoutes);
+
+//FOR PASSWORD RESET
+app.use('/api', passwordResetRoutes);
 
 
 

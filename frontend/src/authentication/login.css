@@ -296,3 +296,25 @@
     padding: 20px;
   }
 }
+
+/* Forgot Password Styles */
+.forgot-password-container {
+  text-align: center;
+  margin-top: 15px;
+}
+
+.forgot-password-link {
+  background: none;
+  border: none;
+  color: #4a7c59;
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: underline;
+  transition: all 0.3s ease;
+  padding: 5px 0;
+}
+
+.forgot-password-link:hover {
+  color: #304C1C;
+  text-decoration: none;
+}

@@ -9,6 +9,7 @@ import Category from "./components/Category";
 import ProductTransactionHistory from "./components/ProductTransactionHistory";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import Login from "./authentication/Login";
+import ResetPassword from "./components/auth/ResetPassword";
 import PageLayout from "./components/PageLayout";
 import Dashboard from "./Pages/Dashboard";
 import RouteProtection from "./utils/RouteProtection";
@@ -776,6 +777,10 @@ function App() {
 
         <Route path="/" exact element={
           <Login/>
+        }/>
+
+        <Route path="/reset-password" element={
+          <ResetPassword />
         }/>
 
         
