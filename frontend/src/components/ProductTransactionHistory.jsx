@@ -20,6 +20,15 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   
   const {user} = useAuth();
 
+  
+  //PAGINATION LOGIC
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(20);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, startDate, endDate]);
+
 
   const closeFilterValue = () =>{
     setOpenFilter(false); 
@@ -117,17 +126,24 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
 
   }
 
-
-  let currentProductHistory = productHistory;
-
-  
-  currentProductHistory = currentProductHistory.filter(product =>
+  // PAGINATION: filter first, then paginate
+  const filteredHistory = productHistory.filter(product =>
     product.product_name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalItems = filteredHistory.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+  const currentData = filteredHistory.slice(startIndex, startIndex + itemsPerPage);
+
+  // Friendly display bounds
+  const displayStart = totalItems === 0 ? 0 : startIndex + 1;
+  const displayEnd = endIndex;
+
   // Export functionality
   const handleExportHistory = (format) => {
-    const exportData = formatForExport(currentProductHistory, []);
+    const exportData = formatForExport(filteredHistory, []);
     const filename = `product_history_export_${new Date().toISOString().split('T')[0]}`;
     
     const customHeaders = ['Date Added', 'Product Name', 'Category', 'Cost', 'Quantity'];
@@ -143,6 +159,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
       });
     }
   };
+
 
 
 
@@ -237,14 +254,14 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
                           </td>
                         </tr>
                       ) : 
-                      (currentProductHistory.length === 0 ?
+                      (filteredHistory.length === 0 ?
                         (
                           <NoInfoFound col={6}/>
                         ) :
 
                         (
-                          currentProductHistory.map((history, histoindx) => (
-                            <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
+                                  currentData.map((history, histoindx) => (
+                                    <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
                               <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
                               <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
                               <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
@@ -260,29 +277,81 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
                   </tbody>
                 </table>
               </div>
-    
-              {/*EXPORT BUTTON*/}
-              <div className='flex justify-end mt-4'>
-                <div className="relative group">
-                  <button className='bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
-                    <TbFileExport />Export History
-                  </button>
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                    <button 
-                      onClick={() => handleExportHistory('csv')}
-                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+
+              {/* PAGINATION CONTROLS + EXPORT (LEFT | CENTER | RIGHT) */}
+              {totalItems > 0 ? (
+                <div className='flex items-center mt-3 px-3'>
+                  <div className='flex-1 text-sm text-gray-600'>
+                    Showing {displayStart} to {displayEnd} of {totalItems} items
+                  </div>
+
+                  <div className='flex-1 flex justify-center items-center space-x-2'>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
                     >
-                      Export as CSV
+                      Previous
                     </button>
-                    <button 
-                      onClick={() => handleExportHistory('pdf')}
-                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                    <span className='text-sm text-gray-600'>Page {currentPage} of {totalPages}</span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
                     >
-                      Export as PDF
+                      Next
                     </button>
                   </div>
+
+                  <div className='flex-1 flex justify-end'>
+                    <div className="relative group">
+                      <button className='bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
+                        <TbFileExport />Export History
+                      </button>
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                        <button 
+                          onClick={() => handleExportHistory('csv')}
+                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                        >
+                          Export as CSV
+                        </button>
+                        <button 
+                          onClick={() => handleExportHistory('pdf')}
+                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                        >
+                          Export as PDF
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className='flex items-center mt-3 px-3'>
+                  <div className='flex-1' />
+                  <div className='flex-1' />
+                  <div className='flex-1 flex justify-end'>
+                    <div className="relative group">
+                      <button className='bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
+                        <TbFileExport />Export History
+                      </button>
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                        <button 
+                          onClick={() => handleExportHistory('csv')}
+                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                        >
+                          Export as CSV
+                        </button>
+                        <button 
+                          onClick={() => handleExportHistory('pdf')}
+                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                        >
+                          Export as PDF
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
 
 

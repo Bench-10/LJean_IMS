@@ -217,7 +217,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
               {loading ? 
                 (
                  <tr>
-                  <td colSpan={5}>
+                  <td colSpan={5} className='h-96 text-center'>
                     <ChartLoading message='Loading products...' />
                   </td>
                  </tr>

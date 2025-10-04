@@ -1,5 +1,5 @@
 import api from "./utils/api.js";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import ModalForm from "./components/ModalForm";
 import ProductInventory from "./Pages/ProductInventory";
@@ -25,6 +25,7 @@ import BranchKPI from "./Pages/BranchKPI.jsx";
 import AddDeliveryInformation from "./components/AddDeliveryInformation.jsx";
 import FormLoading from "./components/common/FormLoading";
 import AccountDisabledPopUp from "./components/dialogs/AccountDisabledPopUp";
+import InAppNotificationPopUp from "./components/dialogs/InAppNotificationPopUp";
 
 
 
@@ -48,9 +49,15 @@ function App() {
   const [openAddDelivery, setAddDelivery] = useState(false);
   const [openInAppNotif, setOpenInAppNotif] = useState(false);
   const [inAppNotifMessage, setInAppNotifMessage] = useState('');
+  const [currentNotificationType, setCurrentNotificationType] = useState('System Update');
   const [deliveryData, setDeliveryData] = useState([]);
   const [deliveryEditData, setDeliveryEdit] = useState([]);
   const [productValidityList, setProductValidityList] = useState([]);
+
+  // NOTIFICATION QUEUE SYSTEM
+  const [notificationQueue, setNotificationQueue] = useState([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const queueTimeoutRef = useRef(null);
 
   // ACCOUNT STATUS STATES
   const [showAccountDisabledPopup, setShowAccountDisabledPopup] = useState(false);
@@ -76,6 +83,81 @@ function App() {
   function sanitizeInput(input) {
     return input.replace(/[<>="']/g, '');
   }
+
+  // NOTIFICATION QUEUE MANAGEMENT
+  const addToNotificationQueue = (message, isLocal = false) => {
+    setNotificationQueue(prev => [...prev, { message, isLocal }]);
+  };
+
+  const processNotificationQueue = () => {
+    if (isProcessingQueue || notificationQueue.length === 0 || openNotif) return;
+
+    setIsProcessingQueue(true);
+    const nextNotification = notificationQueue[0];
+    
+    // Show the notification
+    setInAppNotifMessage(nextNotification.message);
+    setCurrentNotificationType(nextNotification.isLocal ? 'Success' : 'System Update');
+    setOpenInAppNotif(true);
+    
+    // Remove from queue after showing
+    setNotificationQueue(prev => prev.slice(1));
+    
+    // Hide notification after 3 seconds and process next
+    queueTimeoutRef.current = setTimeout(() => {
+      setOpenInAppNotif(false);
+      setInAppNotifMessage('');
+      setCurrentNotificationType('System Update');
+      setIsProcessingQueue(false);
+      
+      // Process next notification if queue not empty and notification panel not open
+      setTimeout(() => {
+        if (notificationQueue.length > 1 && !openNotif) {
+          processNotificationQueue();
+        }
+      }, 500); // Small delay between notifications
+      
+    }, 3000);
+  };
+
+  // CLEAR NOTIFICATION QUEUE WHEN NOTIFICATION PANEL IS OPENED
+  const handleNotificationPanelOpen = () => {
+    setOpenNotif(true);
+    
+    // Stop current notification and clear queue
+    if (queueTimeoutRef.current) {
+      clearTimeout(queueTimeoutRef.current);
+      queueTimeoutRef.current = null;
+    }
+    
+    setOpenInAppNotif(false);
+    setInAppNotifMessage('');
+    setCurrentNotificationType('System Update');
+    setNotificationQueue([]);
+    setIsProcessingQueue(false);
+  };
+
+  // Process queue when new notifications are added
+  useEffect(() => {
+    if (!isProcessingQueue && notificationQueue.length > 0 && !openNotif) {
+      processNotificationQueue();
+    }
+  }, [notificationQueue, isProcessingQueue, openNotif]);
+
+  // Clear queue and timeouts when notification panel opens
+  useEffect(() => {
+    if (openNotif) {
+      if (queueTimeoutRef.current) {
+        clearTimeout(queueTimeoutRef.current);
+        queueTimeoutRef.current = null;
+      }
+      setOpenInAppNotif(false);
+      setInAppNotifMessage('');
+      setCurrentNotificationType('System Update');
+      setNotificationQueue([]);
+      setIsProcessingQueue(false);
+    }
+  }, [openNotif]);
 
   // CHECK IF CURRENT USER IS DISABLED ON PAGE LOAD/REFRESH
   const checkUserStatus = async () => {
@@ -216,6 +298,10 @@ function App() {
       if (user.user_id !== inventoryData.user_id) {
         if (inventoryData.action === 'add') {
           setProductsData(prevData => [...prevData, inventoryData.product]);
+          
+          // Don't show "added successfully" to other users - that's only for the person who added it
+          // This WebSocket event just updates the data silently for other users
+          
         } else if (inventoryData.action === 'update') {
           setProductsData(prevData => 
             prevData.map(item => 
@@ -224,6 +310,10 @@ function App() {
                 : item
             )
           );
+          
+          // Don't show "updated successfully" to other users - that's only for the person who updated it
+          // This WebSocket event just updates the data silently for other users
+          
         } else if (inventoryData.action === 'sale_deduction' || inventoryData.action === 'delivery_stock_change') {
           // HANDLE INVENTORY CHANGES FROM SALES OR DELIVERY STATUS CHANGES
           setProductsData(prevData => 
@@ -233,11 +323,10 @@ function App() {
                 : item
             )
           );
+          
+          // Stock changes from sales/delivery are handled silently
+          // No need to show notifications for these automatic updates
         }
-        
-        // NOTE: No in-app notification here for other devices
-        // The notification will come through the 'new-notification' event
-        // which will show in the notification panel (old style)
       }
     });
 
@@ -278,14 +367,8 @@ function App() {
           // NEW SALE ADDED - UPDATE SALES LIST
           setSaleHeader(prevSales => [saleData.sale, ...prevSales]);
           
-          // SHOW IN-APP NOTIFICATION FOR NEW SALE
-          const message = `New sale created by ${saleData.sale.transaction_by} for ${saleData.sale.charge_to} - Total: ₱${saleData.sale.total_amount_due}`;
-          setOpenInAppNotif(true);
-          setInAppNotifMessage(message);
-          setTimeout(() => {
-            setOpenInAppNotif(false);
-            setInAppNotifMessage('');
-          }, 5000);
+          // Don't show "sale created successfully" to other users
+          // This WebSocket event just updates the data silently for other users
           
         } else if (saleData.action === 'delivery_status_change') {
           // DELIVERY STATUS CHANGED - UPDATE SALES LIST
@@ -309,9 +392,17 @@ function App() {
                 : delivery
             )
           );
+          
+          // Don't show delivery status changes to other users as success notifications
+          // This WebSocket event just updates the data silently for other users
+          
         } else if (saleData.action === 'add_delivery') {
           // NEW DELIVERY ADDED - UPDATE DELIVERY LIST
           setDeliveryData(prevDelivery => [saleData.delivery, ...prevDelivery]);
+          
+          // Don't show delivery creation to other users as success notifications
+          // This WebSocket event just updates the data silently for other users
+          
         } else if (saleData.action === 'delivery_added') {
           // DELIVERY ADDED TO EXISTING SALE - UPDATE SALES LIST
           setSaleHeader(prevSales => 
@@ -321,6 +412,9 @@ function App() {
                 : sale
             )
           );
+          
+          // Don't show delivery additions to other users as success notifications
+          // This WebSocket event just updates the data silently for other users
         }
       }
     });
@@ -332,6 +426,10 @@ function App() {
       if (userData.action === 'add') {
         // NEW USER ADDED - UPDATE USERS LIST
         setUsers(prevUsers => [userData.user, ...prevUsers]);
+        
+        // Don't show "user added successfully" to other users
+        // This WebSocket event just updates the data silently for other users
+        
       } else if (userData.action === 'update') {
         // USER UPDATED - CHECK IF CURRENT USER WAS DISABLED
         if (user && userData.user.user_id === user.user_id && userData.user.is_disabled && !showAccountDisabledPopup) {
@@ -348,6 +446,10 @@ function App() {
               : user
           )
         );
+        
+        // Don't show "user updated successfully" to other users
+        // This WebSocket event just updates the data silently for other users
+        
       } else if (userData.action === 'delete') {
         // CHECK IF CURRENT USER WAS DELETED
         if (user && userData.user_id === user.user_id && !showAccountDisabledPopup) {
@@ -360,6 +462,9 @@ function App() {
         setUsers(prevUsers => 
           prevUsers.filter(user => user.user_id !== userData.user_id)
         );
+        
+        // Don't show "user deleted successfully" to other users
+        // This WebSocket event just updates the data silently for other users
       }
     });
 
@@ -389,6 +494,12 @@ function App() {
 
     return () => {
       newSocket.close();
+      
+      // Cleanup notification queue timeout
+      if (queueTimeoutRef.current) {
+        clearTimeout(queueTimeoutRef.current);
+        queueTimeoutRef.current = null;
+      }
     };
   }, [user]);
 
@@ -439,16 +550,8 @@ function App() {
         setProductsData((prevData) => [...prevData, response.data]);
         console.log('Item Added', response.data);
 
-        const message = `${response.data.product_name} has been successfuly added to the Inventory!`;
-
-        setOpenInAppNotif(true);
-
-        setInAppNotifMessage(message);
-
-        setTimeout(() => {
-          setOpenInAppNotif(false);
-          setInAppNotifMessage('');
-        }, 5000); 
+        const message = `${response.data.product_name} has been successfully added to the Inventory!`;
+        addToNotificationQueue(message, true); // true = local notification for the person who made the change 
         
       } catch (error) {
          console.error('Error adding Item', error);
@@ -463,16 +566,8 @@ function App() {
         );
         console.log('Item Updated', response.data);
 
-        const message = `${response.data.product_name} has been successfuly updated to the Inventory!`;
-
-        setOpenInAppNotif(true);
-
-        setInAppNotifMessage(message);
-
-        setTimeout(() => {
-          setOpenInAppNotif(false);
-          setInAppNotifMessage('');
-        }, 5000); 
+        const message = `${response.data.product_name} has been successfully updated in the Inventory!`;
+        addToNotificationQueue(message, true); // true = local notification for the person who made the change 
         
       } catch (error) {
          console.error('Error adding Item', error);
@@ -682,6 +777,14 @@ function App() {
         onClose={handleClosePopup}
       />
 
+      {/*GLOBAL IN-APP NOTIFICATION POPUP (QUEUE SYSTEM)*/}
+      {openInAppNotif && (
+        <InAppNotificationPopUp 
+          title={currentNotificationType}
+          message={inAppNotifMessage}
+        />
+      )}
+
       {/*COMPONENTS*/}
       <AddSaleModalForm
         openSaleModal={openSaleModal}
@@ -766,8 +869,6 @@ function App() {
         unreadCount={unreadCount}
         setNotify={setNotify}
         onClose={() => setOpenNotif(false)}
-        
-
       />
 
   
@@ -785,7 +886,7 @@ function App() {
 
         
         {/*INVENTORY PAGE*/}
-        <Route element={<RouteProtection>  <PageLayout setOpenNotif={() => setOpenNotif(true)} unreadCount={unreadCount}/>  </RouteProtection>}>
+        <Route element={<RouteProtection>  <PageLayout setOpenNotif={handleNotificationPanelOpen} unreadCount={unreadCount}/>  </RouteProtection>}>
           <Route path="/inventory" exact element={ 
               <RouteProtection allowedRoles={['Owner', 'Inventory Staff', 'Branch Manager']}>
 
