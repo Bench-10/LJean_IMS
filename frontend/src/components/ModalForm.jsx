@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
+import api from '../utils/api';
 
 
 function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput}) {
@@ -23,6 +24,15 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const [unit_price, setPrice] = useState('');
   const [product_validity, setExpirationDate] = useState('');
 
+  // EXISTING PRODUCT SELECTION STATES
+  const [existingProducts, setExistingProducts] = useState([]);
+  const [selectedExistingProduct, setSelectedExistingProduct] = useState(null);
+  const [showExistingProducts, setShowExistingProducts] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  // INCREMENTAL RENDERING STATE FOR LARGE LISTS
+  const [visibleCount, setVisibleCount] = useState(20);
+  const BATCH_SIZE = 20;
+  const overlayRef = useRef(null);
 
   //STATES FOR ERROR HANDLING
   const [emptyField, setEmptyField] = useState({});
@@ -39,16 +49,28 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const message =  mode === 'add' ? "Are you sure you want to add this ?": "Are you sure you want to edit this ?";
 
 
+  // FETCH EXISTING PRODUCTS ON MODAL OPEN
+  const fetchExistingProducts = async () => {
+    try {
+      const response = await api.get('/api/items/unique');
+      setExistingProducts(response.data);
+    } catch (error) {
+      console.error('Error fetching existing products:', error);
+    }
+  };
+
   //CLEARS THE FORM EVERYTIME THE ADD ITEMS BUTTON IS PRESSED
   useEffect(() => {
     if (!user) return;
-
 
     if (isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))) {
       setInvalidNumber({});
       setIsExpiredEarly(false);
       setEmptyField({});
       setNotANumber({});
+      setSelectedExistingProduct(null);
+      setSearchTerm('');
+      
       if (mode === 'add') {
           setItemName('');
           setCategory('');
@@ -60,6 +82,9 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
           setThreshold('');
           setPrice('');
           setExpirationDate('');
+          
+          // FETCH EXISTING PRODUCTS FOR SELECTION
+          fetchExistingProducts();
       }
 
       if (isModalOpen && mode === 'edit' && itemData){
@@ -80,6 +105,49 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
   const constructionUnits = ["pcs", "ltr", "gal", "bag", "pairs", "roll", "set", "sheet", "kg", "m", "cu.m", "btl", "can", "bd.ft", "meter", "pail"];
+
+  // HANDLE SELECTING AN EXISTING PRODUCT
+  const handleSelectExistingProduct = (product) => {
+    setSelectedExistingProduct(product);
+    setItemName(product.product_name);
+    setUnit(product.unit);
+    setCategory(product.category_id);
+    setShowExistingProducts(false);
+  };
+
+  // FILTER EXISTING PRODUCTS BASED ON SEARCH TERM
+  const filteredExistingProducts = existingProducts.filter(product =>
+    product.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // TOGGLE EXISTING PRODUCTS PANEL
+  const toggleExistingProductsPanel = () => {
+    setShowExistingProducts(!showExistingProducts);
+    if (!showExistingProducts) {
+      setSearchTerm('');
+    }
+  };
+
+
+  // RESET VISIBLE COUNT WHEN SEARCH TERM OR PANEL OPENS/CLOSES
+  useEffect(() => {
+    setVisibleCount(BATCH_SIZE);
+    
+    if (overlayRef.current) {
+      overlayRef.current.scrollTop = 0;
+    }
+  }, [searchTerm, showExistingProducts, existingProducts]);
+
+
+  // HANDLE SCROLL TO LOAD MORE (FOR PERFORMANCE)
+  const handleOverlayScroll = useCallback((e) => {
+    const target = e.target;
+    if (!target) return;
+    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 120;
+    if (nearBottom && visibleCount < filteredExistingProducts.length) {
+      setVisibleCount((v) => Math.min(v + BATCH_SIZE, filteredExistingProducts.length));
+    }
+  }, [visibleCount, filteredExistingProducts.length]);
 
 
   const validateInputs = () => {
@@ -163,7 +231,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
         date_added,
         product_validity,
         userID: user.user_id,
-        fullName: user.full_name
+        fullName: user.full_name,
+        existing_product_id: selectedExistingProduct?.product_id || null
       };
 
       //SENDS THE DATA TO App.jsx TO BE SENT TO DATABASE
@@ -235,7 +304,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
         <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
-            <div className="relative flex flex-col border border-gray-600/40 bg-white h-[555px] w-[600px] rounded-md p-7 animate-popup" >
+      <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[760px] rounded-md p-7 animate-popup" >
 
 
               <div>
@@ -251,26 +320,96 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                 <form onSubmit={(e) => {e.preventDefault(); validateInputs();}}>
                 
                 <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 
-                  onClick={onClose}>✕</button>
+                  onClick={() => {onClose(); setShowExistingProducts(false)}}>✕</button>
 
 
                 {/*PRODUCT NAME*/}
                 <div className='relative'>
+                  <div className="flex gap-2">
+                    <input 
+                      id='item' 
+                      type="text"  
+                      placeholder='Item Name' 
+                      className={`${inputClass('product_name')} ${selectedExistingProduct ? 'border-green-500 bg-green-50' : ''} disabled:cursor-not-allowed`}
+                      value={product_name}  
+                      onChange={(e) => setItemName(sanitizeInput(e.target.value))} 
+                      disabled={selectedExistingProduct || mode === 'edit'}
+                    />
+                    
+                    {mode === 'add' && (
+                      <button
+                        type="button"
+                        onClick={toggleExistingProductsPanel}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${
+                          showExistingProducts 
+                            ? 'bg-red-500 text-white hover:bg-red-600' 
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                      >
+                        {showExistingProducts ? 'Cancel' : 'Browse'}
+                      </button>
+                    )}
+                  </div>
 
-                  <input 
-                    id='item' 
-                    type="text"  
-                    placeholder='Item Name' 
-                    className={inputClass('product_name')}  
-                    value={product_name}  
-                    onChange={(e) => setItemName(sanitizeInput(e.target.value))} 
-                  />
+                  {selectedExistingProduct && (
+                    <div className="text-xs text-green-600 mt-1">
+                      Selected existing product (ID: {selectedExistingProduct.product_id})
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setSelectedExistingProduct(null);
+                          setItemName('');
+                          setUnit('');
+                          setCategory('');
+                        }}
+                        className="ml-2 text-red-500 hover:text-red-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
 
                   {errorflag('product_name', 'product name')}
 
+                  {/* EXISTING PRODUCTS PANEL (OVERLAY) */}
+                  {mode === 'add' && showExistingProducts && (
+                    <div ref={overlayRef} onScroll={handleOverlayScroll} className="absolute left-0 top-full mt-2 border border-gray-300 rounded-md p-4 bg-white max-h-96 overflow-y-auto w-[640px] max-w-[80vw] shadow-lg z-50">
+                      <div className="mb-3">
+                        <input
+                          type="text"
+                          placeholder="Search existing products..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {filteredExistingProducts.length === 0 ? (
+                          <p className="text-gray-500 text-sm text-center py-4">
+                            {searchTerm ? 'No products found matching your search' : 'No existing products available'}
+                          </p>
+                        ) : (
+                        filteredExistingProducts.slice(0, visibleCount).map((product) => (
+                            <div
+                              key={product.product_id}
+                              onClick={() => handleSelectExistingProduct(product)}
+                              className="p-3 border border-gray-200 rounded-md cursor-pointer hover:bg-green-50 hover:border-green-300 transition-colors"
+                            >
+                              <div className="font-medium text-sm">{product.product_name}</div>
+                              <div className="text-xs text-gray-600">
+                                PRODUCT ID: {product.product_id} • Category: {product.category_name} • Unit: {product.unit}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Available in: {product.branches}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-
 
                 <div className="flex justify-between gap-x-5 mt-6">
 
@@ -358,9 +497,10 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
                         <select
-                          className={inputClass('unit')}
+                          className={`${inputClass('unit')}`}
                           value={unit}
                           onChange={(e) => setUnit(sanitizeInput(e.target.value))}
+                          
                         >
 
                           <option value="" >Select Unit</option>

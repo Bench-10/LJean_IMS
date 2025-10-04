@@ -10,6 +10,28 @@ const getCategoryName = async (categoryId) => {
 
 
 
+// GET ALL UNIQUE PRODUCTS ACROSS ALL BRANCHES (FOR PRODUCT SELECTION)
+export const getAllUniqueProducts = async () => {
+    const { rows } = await SQLquery(`
+        SELECT DISTINCT 
+            ip.product_id,
+            ip.product_name,
+            c.category_id,
+            c.category_name,
+            ip.unit,
+            STRING_AGG(DISTINCT b.branch_name, ', ' ORDER BY b.branch_name) as branches
+        FROM inventory_product ip
+        LEFT JOIN category c USING(category_id)
+        LEFT JOIN branch b ON ip.branch_id = b.branch_id
+        GROUP BY ip.product_id, ip.product_name, c.category_name, ip.unit, c.category_id
+        ORDER BY ip.product_name ASC
+    `);
+
+    return rows;
+};
+
+
+
 //INVENTORY SERVICES
 const getUpdatedInventoryList =  async (productId, branchId) => {
    const { rows } = await SQLquery(
@@ -118,41 +140,57 @@ export const getProductItems = async(branchId) => {
 
 
 export const addProductItem = async (productData) => {
-    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity, userID, fullName } = productData;
+    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity, userID, fullName, existing_product_id } = productData;
 
     const productAddedNotifheader = "New Product";
     const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
     const color = 'green';
 
-    //CREATES A UNIQUE PRODUCT ID WITH RETRY LOGIC
     let product_id;
-    let isUnique = false;
-    let retryCount = 0;
-    const maxRetries = 10;
-    
-    while (!isUnique && retryCount < maxRetries) {
-        product_id = Math.floor(100000 + Math.random() * 900000); 
+
+    // IF AN EXISTING PRODUCT ID IS PROVIDED, USE IT
+    if (existing_product_id) {
+        // CHECK IF THE PRODUCT ALREADY EXISTS IN THIS BRANCH
+        const existsInBranch = await SQLquery(
+            'SELECT 1 FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2', 
+            [existing_product_id, branch_id]
+        );
         
-        try {
-            const check = await SQLquery('SELECT 1 FROM Inventory_Product WHERE product_id = $1 FOR UPDATE', [product_id]);
-            if (check.rowCount === 0) {
-                isUnique = true;
-            } else {
+        if (existsInBranch.rowCount > 0) {
+            throw new Error(`Product already exists in this branch. "${product_name}" is already registered in your branch inventory.`);
+        }
+        
+        product_id = existing_product_id;
+    } else {
+        //CREATES A UNIQUE PRODUCT ID WITH RETRY LOGIC
+        let isUnique = false;
+        let retryCount = 0;
+        const maxRetries = 10;
+        
+        while (!isUnique && retryCount < maxRetries) {
+            product_id = Math.floor(100000 + Math.random() * 900000); 
+            
+            try {
+                const check = await SQLquery('SELECT 1 FROM Inventory_Product WHERE product_id = $1 FOR UPDATE', [product_id]);
+                if (check.rowCount === 0) {
+                    isUnique = true;
+                } else {
+                    retryCount++;
+                    
+                    
+                    await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
+                }
+            } catch (error) {
                 retryCount++;
-                // Add small delay to reduce contention
-                
-                await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
-            }
-        } catch (error) {
-            retryCount++;
-            if (retryCount >= maxRetries) {
-                throw new Error('Unable to generate unique product ID after multiple attempts');
+                if (retryCount >= maxRetries) {
+                    throw new Error('Unable to generate unique product ID after multiple attempts');
+                }
             }
         }
-    }
 
-    if (!isUnique) {
-        throw new Error('Unable to generate unique product ID');
+        if (!isUnique) {
+            throw new Error('Unable to generate unique product ID');
+        }
     }
 
     await SQLquery('BEGIN');

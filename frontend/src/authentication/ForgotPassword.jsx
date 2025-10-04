@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FiArrowLeft, FiCheck, FiAlertCircle } from 'react-icons/fi';
 import { IoMdMailUnread } from "react-icons/io";
-import api from '../../utils/api';
+import api from '../utils/api';
 
 const ForgotPassword = ({ onBackToLogin }) => {
   const [email, setEmail] = useState('');

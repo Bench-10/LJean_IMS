@@ -9,7 +9,7 @@ import Category from "./components/Category";
 import ProductTransactionHistory from "./components/ProductTransactionHistory";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import Login from "./authentication/Login";
-import ResetPassword from "./components/auth/ResetPassword";
+import ResetPassword from "./authentication/ResetPassword.jsx";
 import PageLayout from "./components/PageLayout";
 import Dashboard from "./Pages/Dashboard";
 import RouteProtection from "./utils/RouteProtection";
@@ -26,6 +26,7 @@ import AddDeliveryInformation from "./components/AddDeliveryInformation.jsx";
 import FormLoading from "./components/common/FormLoading";
 import AccountDisabledPopUp from "./components/dialogs/AccountDisabledPopUp";
 import InAppNotificationPopUp from "./components/dialogs/InAppNotificationPopUp";
+import ProductExistsDialog from "./components/dialogs/ProductExistsDialog";
 
 
 
@@ -63,6 +64,10 @@ function App() {
   const [showAccountDisabledPopup, setShowAccountDisabledPopup] = useState(false);
   const [accountStatusType, setAccountStatusType] = useState(''); // 'disabled' or 'deleted'
   const [hasLoggedOutDueToStatus, setHasLoggedOutDueToStatus] = useState(false);
+
+  // PRODUCT EXISTS DIALOG STATES
+  const [showProductExistsDialog, setShowProductExistsDialog] = useState(false);
+  const [productExistsMessage, setProductExistsMessage] = useState('');
 
   //LOADING STATES
   const [invetoryLoading, setInventoryLoading] = useState(false);
@@ -554,7 +559,17 @@ function App() {
         addToNotificationQueue(message, true); // true = local notification for the person who made the change 
         
       } catch (error) {
-         console.error('Error adding Item', error);
+        
+         console.error('Error adding item:', error);
+
+         const serverMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to add item';
+         const status = error?.response?.status;
+
+         
+         if (status === 409 || /product id already/i.test(serverMessage)) {
+           setProductExistsMessage(serverMessage || 'Product already exists in the inventory.');
+           setShowProductExistsDialog(true);
+         } 
       }
 
     } else{
@@ -567,7 +582,7 @@ function App() {
         console.log('Item Updated', response.data);
 
         const message = `${response.data.product_name} has been successfully updated in the Inventory!`;
-        addToNotificationQueue(message, true); // true = local notification for the person who made the change 
+        addToNotificationQueue(message, true); 
         
       } catch (error) {
          console.error('Error adding Item', error);
@@ -784,6 +799,13 @@ function App() {
           message={inAppNotifMessage}
         />
       )}
+
+      {/*PRODUCT EXISTS DIALOG*/}
+      <ProductExistsDialog
+        isOpen={showProductExistsDialog}
+        message={productExistsMessage}
+        onClose={() => setShowProductExistsDialog(false)}
+      />
 
       {/*COMPONENTS*/}
       <AddSaleModalForm

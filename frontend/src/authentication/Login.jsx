@@ -5,7 +5,7 @@ import { FaUser, FaLock, FaEye, FaExclamationCircle } from 'react-icons/fa';
 import './login.css';
 import { useAuth } from './Authentication'; 
 import TooMuchAttempts from '../components/dialogs/TooMuchAttempts';
-import ForgotPassword from '../components/auth/ForgotPassword';
+import ForgotPassword from './ForgotPassword';
 import api from '../utils/api';
 
 

@@ -232,8 +232,8 @@ export const addSale = async (headerAndProducts) => {
                 alert_date: alertResult.rows[0].alert_date,
                 isDateToday: true,
                 alert_date_formatted: 'Just now',
-                target_roles: ['Sales Associate', 'Branch Manager'], // Only these roles get sale notifications
-                creator_id: headerInformationAndTotal.userID // Exclude creator from notification
+                target_roles: ['Sales Associate', 'Branch Manager'], 
+                creator_id: headerInformationAndTotal.userID 
             });
         }
 

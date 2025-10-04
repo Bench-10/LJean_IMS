@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FiLock, FiEye, FiEyeOff, FiCheck, FiAlertCircle, FiX } from 'react-icons/fi';
-import api from '../../utils/api'; // Add this import
+import api from '../utils/api';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
