@@ -8,12 +8,14 @@ import {currencyFormat} from '../utils/formatCurrency.js';
 import ChartLoading from './common/ChartLoading.jsx';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
  
-function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInput }) {
+function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInput, listCategories}) {
 
   const [openFilter, setOpenFilter] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [productHistory, setProductHistory] = useState([]);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
   const [loading, setLoading] = useState(false)
@@ -40,6 +42,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
     setSearch('');
     setStartDate('');
     setEndDate('');
+    setSelectedCategory('');
     onClose();
     setOpenFilter(false); 
   };
@@ -126,16 +129,23 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
 
   }
 
+  let filteredHistory = productHistory;
+
+
+  //FILTER BY CATEGORY
+  filteredHistory = selectedCategory ? productHistory.filter((items) => items.category_id === Number(selectedCategory)) : filteredHistory;
+
+
   // PAGINATION: filter first, then paginate
-  const filteredHistory = productHistory.filter(product =>
+  let filteredHistoryData = filteredHistory.filter(product =>
     product.product_name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalItems = filteredHistory.length;
+  const totalItems = filteredHistoryData.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-  const currentData = filteredHistory.slice(startIndex, startIndex + itemsPerPage);
+  const currentData = filteredHistoryData.slice(startIndex, startIndex + itemsPerPage);
 
   // Friendly display bounds
   const displayStart = totalItems === 0 ? 0 : startIndex + 1;
@@ -143,7 +153,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
 
   // Export functionality
   const handleExportHistory = (format) => {
-    const exportData = formatForExport(filteredHistory, []);
+    const exportData = formatForExport(filteredHistoryData, []);
     const filename = `product_history_export_${new Date().toISOString().split('T')[0]}`;
     
     const customHeaders = ['Date Added', 'Product Name', 'Category', 'Cost', 'Quantity'];
@@ -180,15 +190,31 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
                 <div className='flex flex-col sm:flex-row gap-2 sm:gap-x-8 items-center w-full'>
                   <h1 className='font-bold text-3xl sm:text-4xl text-gray-800 tracking-tight'>Product History</h1>
                   <div className='flex items-center w-full sm:w-auto mt-2 sm:mt-0'>
-                   
-                    <input 
-                      type="text" 
-                      className='h-9 w-full sm:w-64 border border-gray-300 rounded-md px-3 py-1 text-sm ' 
-                      placeholder="Search product name..."
-                      onChange={handleSearch} 
-                      value={search}
-                    />
+                       <div className="flex items-center gap-2 w-full">
+
+                        <input 
+                          type="text" 
+                          className='h-9 flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm ' 
+                          placeholder="Search product name..."
+                          onChange={handleSearch} 
+                          value={search}
+                        />
+
+                         <select
+                            className="h-9 w-40 border border-gray-300 rounded-md px-2 text-sm"
+                            value={selectedCategory}
+                            onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
+                          >
+                            <option value="">All Categories</option>
+                            {listCategories && listCategories.map(cat => (
+                              <option key={cat.category_id} value={cat.category_id}>{cat.category_name}</option>
+                            ))}
+                          </select>
+
+                       </div>
+
                   </div>
+
                 </div>
                 
                 <div className='relative'>
@@ -254,7 +280,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
                           </td>
                         </tr>
                       ) : 
-                      (filteredHistory.length === 0 ?
+                      (filteredHistoryData.length === 0 ?
                         (
                           <NoInfoFound col={6}/>
                         ) :

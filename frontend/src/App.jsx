@@ -881,6 +881,7 @@ function App() {
         isProductTransactOpen={isProductTransactOpen}
         sanitizeInput={sanitizeInput}
         onClose={() => setIsProductTransactOpen(false)}
+        listCategories={listCategories}
 
       />
 

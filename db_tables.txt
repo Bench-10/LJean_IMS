@@ -83,7 +83,8 @@ CREATE TABLE Inventory_Product (
     unit_cost DECIMAL(10, 2) NOT NULL,
     quantity INT,
     threshold INT NOT NULL,
-    PRIMARY KEY (product_id, branch_id),  -- composite PK
+    low_stock_notified BOOLEAN NOT NULL
+    PRIMARY KEY (product_id, branch_id), 
     FOREIGN KEY (category_id) REFERENCES Category(category_id),
     FOREIGN KEY (branch_id) REFERENCES Branch(branch_id)
 );
@@ -152,7 +153,9 @@ CREATE TABLE Sales_Information (
     amount_net_vat DECIMAL(10, 2),
     total_amount_due DECIMAL(10, 2),
     discount DECIMAL(10,2),
-    transaction_by VARCHAR(100)
+    transaction_by VARCHAR(100),
+    delivery_fee INT,
+    is_for_delivery BOOLEAN
 	FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
 );
 
@@ -184,8 +187,8 @@ CREATE TABLE Delivery (
     destination_address VARCHAR(255),
     delivered_date DATE,
     courier_name VARCHAR(255),
-    is_delivered BOOL
-    is_pending BOOL
+    is_delivered BOOLEAN
+    is_pending BOOLEAN
 );
 
 
