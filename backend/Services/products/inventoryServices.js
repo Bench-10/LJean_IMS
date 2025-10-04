@@ -26,7 +26,7 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
             threshold 
         FROM inventory_product
         LEFT JOIN Category USING(category_id)
-        LEFT JOIN Add_Stocks ast USING(product_id)
+        LEFT JOIN Add_Stocks ast USING(product_id, branch_id)
         WHERE product_id = $1 AND branch_id = $2
         GROUP BY 
             inventory_product.product_id, 
@@ -63,7 +63,7 @@ export const getProductItems = async(branchId) => {
                 ip.threshold
             FROM inventory_product ip
             LEFT JOIN category c USING(category_id)
-            LEFT JOIN add_stocks ast USING(product_id)
+            LEFT JOIN add_stocks ast USING(product_id, branch_id)
             GROUP BY 
                 ip.product_id, 
                 ip.branch_id, 
@@ -96,7 +96,7 @@ export const getProductItems = async(branchId) => {
             threshold 
         FROM inventory_product  
         LEFT JOIN Category USING(category_id)
-        LEFT JOIN Add_Stocks ast USING(product_id)
+        LEFT JOIN Add_Stocks ast USING(product_id, branch_id)
         WHERE branch_id = $1
         GROUP BY 
             inventory_product.product_id, 
@@ -166,10 +166,10 @@ export const addProductItem = async (productData) => {
 
     await SQLquery(
         `INSERT INTO Add_Stocks 
-        (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left, branch_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *`,
-        [product_id, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added]
+        [product_id, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added, branch_id]
     );
 
     const alertResult = await SQLquery(
@@ -200,7 +200,7 @@ export const addProductItem = async (productData) => {
 
     const newProductRow = await getUpdatedInventoryList(product_id, branch_id);
 
-    await checkAndHandleLowStock(product_id, {
+    await checkAndHandleLowStock(product_id, branch_id, {
         triggeredByUserId: userID,
         triggerUserName: fullName
     });
@@ -284,18 +284,18 @@ export const updateProductItem = async (productData, itemId) => {
 
         return await SQLquery(
             `INSERT INTO Add_Stocks 
-            (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left, branch_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *`,
-            [itemId, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added]
+            [itemId, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added, branch_id]
         );
 
     }
 
     // LOCK THE PRODUCT ROW TO PREVENT CONCURRENT MODIFICATIONS
     const previousData = await SQLquery(
-        'SELECT branch_id, unit_price, unit_cost, product_name, unit, threshold, category_id FROM Inventory_Product WHERE product_id = $1 FOR UPDATE', 
-        [itemId]
+        'SELECT branch_id, unit_price, unit_cost, product_name, unit, threshold, category_id FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2 FOR UPDATE', 
+        [itemId, branch_id]
     );
 
     if (previousData.rowCount === 0) {
@@ -344,8 +344,8 @@ export const updateProductItem = async (productData, itemId) => {
         await SQLquery(
             `UPDATE Inventory_Product 
             SET unit_price = $1 
-            WHERE product_id = $2`,
-            [unit_price, itemId]
+            WHERE product_id = $2 AND branch_id = $3`,
+            [unit_price, itemId, branch_id]
         );
     }
 
@@ -396,8 +396,8 @@ export const updateProductItem = async (productData, itemId) => {
         await SQLquery(
             `UPDATE Inventory_Product 
             SET product_name = $1, unit = $2, threshold = $3, category_id = $4, unit_cost = $5
-            WHERE product_id = $6`,
-            [product_name, unit, threshold, category_id, unit_cost, itemId]
+            WHERE product_id = $6 AND branch_id = $7`,
+            [product_name, unit, threshold, category_id, unit_cost, itemId, branch_id]
         );
 
         // Create notification for product info update
@@ -430,7 +430,7 @@ export const updateProductItem = async (productData, itemId) => {
 
     const updatedProductRow = await getUpdatedInventoryList(itemId, branch_id);
 
-    await checkAndHandleLowStock(itemId, {
+    await checkAndHandleLowStock(itemId, branch_id, {
         triggeredByUserId: userID,
         triggerUserName: fullName
     });

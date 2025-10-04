@@ -150,13 +150,13 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   return (
     <div>
       
-      {isProductTransactOpen && <div className='fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]' onClick={() => {onClose(); closeFilterValue();}}/>}
+      {isProductTransactOpen && <div className='fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]' onClick={() => {onClose(); closeFilterValue(); setProductHistory([])}}/>}
 
       <dialog className='bg-transparent fixed top-0 bottom-0  z-50' open={isProductTransactOpen}>
 
           <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[1000px] rounded-md p-7 pb-14 border-gray-300 animate-popup">
             <button type='button' className=" absolute right-2 top-2 " 
-              onClick={() => {onClose(); setOpenFilter(false); closeFilterValue(); handleClose();}}>✕</button>
+              onClick={() => {onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([])}}>✕</button>
 
               {/*TITLE AND FILTER SECTION*/}
               <div className='flex  justify-between items-center mt-2 pr-6' >

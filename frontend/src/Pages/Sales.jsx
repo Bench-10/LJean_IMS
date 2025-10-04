@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import ChartLoading from '../components/common/ChartLoading.jsx';
@@ -19,6 +19,14 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   const [searchSale, setSearchSale] = useState('');
   const [saleFilter, setSaleFilter] = useState('all');
 
+  // PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50); // SHOW 50 ITEMS PER PAGE
+
+  // RESET PAGINATION WHEN FILTER CHANGES
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [saleFilter]);
 
   //HEADER AND TOTAL INFORMATION
   const [saleData, setSaleData ] = useState({sale_id: '', chargeTo: '', tin: '', address: '', date: '', amountNet: '', vat: '', total: '', discount: 0, transactionBy: '', deliveryFee: 0})
@@ -69,7 +77,8 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
   //SEARCH SALE INFORMATION
   const handleSaleSearch = (event) =>{
-    setSearchSale(sanitizeInput(event.target.value))
+    setSearchSale(sanitizeInput(event.target.value));
+    setCurrentPage(1); // RESET TO FIRST PAGE WHEN SEARCHING
   };
 
   //FILTER DROPDOWN SELECTION
@@ -97,6 +106,13 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
     sale.tin?.toLowerCase().includes(searchSale.toLowerCase()) ||
     sale.address?.toLowerCase().includes(searchSale.toLowerCase()) 
   );
+
+  // PAGINATION LOGIC
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentPageData = filteredData.slice(startIndex, endIndex);
 
   return (
     <div className=' ml-[220px] px-8 py-2 max-h-screen'>
@@ -163,7 +179,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
         <hr className="border-t-2 my-4 w-full border-gray-500"/>
 
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className={`w-full ${filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
+          <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
             <thead className="sticky top-0 bg-gray-100 z-10">
               <tr>
                 
@@ -208,13 +224,13 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
                 )
                :
               
-                filteredData.length === 0 ? 
+                currentPageData.length === 0 ? 
                   (
                     <NoInfoFound col={9}/>
                   ) : 
 
                   (
-                    filteredData.map((row, rowIndex) => (
+                    currentPageData.map((row, rowIndex) => (
                   
                       <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => {openSoldItems(row); setModalType("sales")}}>
                         <td className="px-4 py-2 text-center"  >{row.sales_information_id}</td>
@@ -235,6 +251,46 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
           </table>
         </div>
 
+        {/*PAGINATION AND CONTROLS */}
+        <div className='flex justify-between items-center mt-4 px-3'>
+          {/* LEFT: ITEM COUNT */}
+          <div className='text-sm text-gray-600 flex-1'>
+            {filteredData.length > 0 ? (
+              <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
+            ) : (
+              <span></span>
+            )}
+          </div>
+          
+          {/* CENTER: PAGINATION CONTROLS */}
+          <div className='flex justify-center flex-1'>
+            {filteredData.length > 0 && (
+              <div className='flex items-center space-x-2'>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                >
+                  Previous
+                </button>
+                <span className='text-sm text-gray-600'>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* RIGHT: PLACEHOLDER FOR CONSISTENCY */}
+          <div className='flex justify-end flex-1'>
+          </div>
+        </div>
 
         
     </div>

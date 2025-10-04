@@ -87,7 +87,6 @@ export const requestPasswordReset = async (email, userType = 'user') => {
 
             await SQLquery('COMMIT');
 
-            console.log(`✅ Password reset requested successfully for ${userType}: ${email}`);
             
             return {
                 success: true,
@@ -211,7 +210,7 @@ export const resetPassword = async (token, newPassword) => {
 
             await SQLquery('COMMIT');
 
-            console.log(`✅ Password reset successfully for ${user_type}: ${email}`);
+            
 
             return {
                 success: true,
@@ -225,7 +224,7 @@ export const resetPassword = async (token, newPassword) => {
         }
 
     } catch (error) {
-        console.error('❌ Error resetting password:', error);
+        
         return {
             success: false,
             message: 'An error occurred while resetting your password. Please try again.',
@@ -243,11 +242,10 @@ export const cleanupExpiredTokens = async () => {
             RETURNING id
         `);
 
-        console.log(`🧹 Cleaned up ${result.length} expired password reset tokens`);
         return { success: true, cleanedCount: result.length };
 
     } catch (error) {
-        console.error('❌ Error cleaning up expired tokens:', error);
+        
         return { success: false, error: error.message };
     }
 };

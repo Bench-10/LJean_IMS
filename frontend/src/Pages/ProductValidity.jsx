@@ -12,6 +12,10 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const [searchValidity, setSearchValidity] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50); // SHOW 50 ITEMS PER PAGE
+
   const {user} = useAuth();
   
 
@@ -92,7 +96,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   
   const handleSearch = (event) =>{
     setSearchValidity(sanitizeInput(event.target.value));
-
+    setCurrentPage(1); // RESET TO FIRST PAGE WHEN SEARCHING
   }
 
 
@@ -104,6 +108,13 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     validity.formated_product_validity.toLowerCase().includes(searchValidity.toLowerCase()) 
     
   );
+
+  // PAGINATION LOGIC
+  const totalItems = filteredValidityData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentPageData = filteredValidityData.slice(startIndex, endIndex);
 
   // Export functionality
   const handleExportValidity = (format) => {
@@ -177,7 +188,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
 
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className={`w-full ${filteredValidityData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
+          <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
             <thead className="sticky top-0 bg-gray-100 z-10">
               <tr>
                 
@@ -214,14 +225,14 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 )
                :
 
-                filteredValidityData.length === 0 ? 
+                currentPageData.length === 0 ? 
 
                   (
                   <NoInfoFound col={5}/>
                   ) :
 
                   (
-                    filteredValidityData.map((validity, index) => (
+                    currentPageData.map((validity, index) => (
                       <tr
                         key={index}
                         className={
@@ -272,25 +283,62 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           </table>
       </div>
 
-      <div className='flex mt-5 relative justify-end'> 
-        {/*EXPORT DROPDOWN*/}
-        <div className="relative group">
-          <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
-            <TbFileExport />EXPORT
-          </button>
-          <div className="absolute right-0 bottom-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-            <button 
-              onClick={() => handleExportValidity('csv')}
-              className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-            >
-              Export as CSV
+      {/*PAGINATION AND CONTROLS */}
+      <div className='flex justify-between items-center mt-4 px-3'>
+        {/* LEFT: ITEM COUNT */}
+        <div className='text-sm text-gray-600 flex-1'>
+          {filteredValidityData.length > 0 ? (
+            <>Showing {startIndex + 1} to {Math.min(endIndex, filteredValidityData.length)} of {filteredValidityData.length} items</>
+          ) : (
+            <span></span>
+          )}
+        </div>
+        
+        {/* CENTER: PAGINATION CONTROLS */}
+        <div className='flex justify-center flex-1'>
+          {filteredValidityData.length > 0 && (
+            <div className='flex items-center space-x-2'>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+              >
+                Previous
+              </button>
+              <span className='text-sm text-gray-600'>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* RIGHT: EXPORT DROPDOWN */}
+        <div className='flex justify-end flex-1'>
+          <div className="relative group">
+            <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
+              <TbFileExport />EXPORT
             </button>
-            <button 
-              onClick={() => handleExportValidity('pdf')}
-              className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-            >
-              Export as PDF
-            </button>
+            <div className="absolute right-0 bottom-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+              <button 
+                onClick={() => handleExportValidity('csv')}
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+              >
+                Export as CSV
+              </button>
+              <button 
+                onClick={() => handleExportValidity('pdf')}
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+              >
+                Export as PDF
+              </button>
+            </div>
           </div>
         </div>
       </div>

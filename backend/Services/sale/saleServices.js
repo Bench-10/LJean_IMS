@@ -37,9 +37,9 @@ export const viewSale = async (branchId) => {
 export const viewSelectedItem = async (saleId) => {
    const { rows } = await SQLquery(`
 
-        SELECT product_id, Inventory_Product.product_name,  Sales_Items.quantity, Sales_Items.unit, Sales_Items.unit_price, amount 
+        SELECT product_id, branch_id, Inventory_Product.product_name,  Sales_Items.quantity, Sales_Items.unit, Sales_Items.unit_price, amount 
         FROM Sales_Items
-        LEFT JOIN Inventory_Product USING(product_id)
+        LEFT JOIN Inventory_Product USING(product_id, branch_id)
         WHERE sales_information_id = $1;`
     
     , [saleId]);
@@ -74,8 +74,8 @@ export const addSale = async (headerAndProducts) => {
             for (const product of productRow) {
                 // CHECK AVAILABLE QUANTITY WITHOUT FOR UPDATE ON AGGREGATE
                 const inventoryCheck = await SQLquery(
-                    'SELECT SUM(quantity_left) as available_quantity FROM Add_Stocks WHERE product_id = $1 AND quantity_left > 0',
-                    [product.product_id]
+                    'SELECT SUM(quantity_left) as available_quantity FROM Add_Stocks WHERE product_id = $1 AND branch_id = $2 AND quantity_left > 0',
+                    [product.product_id, branch_id]
                 );
                 
                 if (inventoryCheck.rowCount === 0 || !inventoryCheck.rows[0].available_quantity) {
@@ -105,12 +105,12 @@ export const addSale = async (headerAndProducts) => {
             const values = [];
             const placeholders = [];
             productRow.forEach((p, i) => {
-            const baseIndex = i * 6;
-            placeholders.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6})`);
-            values.push(sale_id, p.product_id, p.quantity, p.unit, p.unitPrice, p.amount );
+            const baseIndex = i * 7;
+            placeholders.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7})`);
+            values.push(sale_id, p.product_id, p.quantity, p.unit, p.unitPrice, p.amount, branch_id);
             });
 
-            const query = `INSERT INTO Sales_Items(sales_information_id, product_id, quantity, unit, unit_price, amount) VALUES ${placeholders.join(', ')}`;
+            const query = `INSERT INTO Sales_Items(sales_information_id, product_id, quantity, unit, unit_price, amount, branch_id) VALUES ${placeholders.join(', ')}`;
             await SQLquery(query, values);
 
         // FIFO STOCK DEDUCTION WITH DEADLOCK PREVENTION
@@ -164,7 +164,7 @@ export const addSale = async (headerAndProducts) => {
                 const { rows: updatedProduct } = await SQLquery(`
                     SELECT 
                         inventory_product.product_id, 
-                        branch_id, 
+                        inventory_product.branch_id, 
                         Category.category_id, 
                         Category.category_name, 
                         product_name, 
@@ -175,11 +175,11 @@ export const addSale = async (headerAndProducts) => {
                         threshold 
                     FROM inventory_product
                     LEFT JOIN Category USING(category_id)
-                    LEFT JOIN Add_Stocks ast USING(product_id)
+                    LEFT JOIN Add_Stocks ast USING(product_id, branch_id)
                     WHERE inventory_product.product_id = $1 AND inventory_product.branch_id = $2
                     GROUP BY 
                         inventory_product.product_id, 
-                        branch_id, 
+                        inventory_product.branch_id, 
                         Category.category_id, 
                         Category.category_name, 
                         product_name, 
@@ -250,7 +250,11 @@ export const addSale = async (headerAndProducts) => {
 
 // DEDUCT STOCK AND TRACK WHICH BATCHES WERE USED
 // THIS ALLOWS US TO RESTORE STOCK TO EXACT SAME BATCHES IF ORDER IS CANCELED
-export const deductStockAndTrackUsage = async (salesInformationId, productId, quantityToDeduct, branchId = null, userID = null) => {
+export const deductStockAndTrackUsage = async (salesInformationId, productId, quantityToDeduct, branchId, userID = null) => {
+    if (!branchId) {
+        throw new Error('branchId is required for stock deduction');
+    }
+    
     let remainingToDeduct = quantityToDeduct;
 
     // CHECK IF THERE ARE EXISTING RESTORED RECORDS FOR THIS SALE
@@ -283,10 +287,10 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
     const batches = await SQLquery(
         `SELECT add_id, quantity_left 
          FROM Add_Stocks 
-         WHERE product_id = $1 AND quantity_left > 0 AND product_validity > CURRENT_DATE
+         WHERE product_id = $1 AND branch_id = $2 AND quantity_left > 0 AND product_validity > CURRENT_DATE
          ORDER BY date_added ASC, product_validity ASC
          FOR UPDATE SKIP LOCKED`,
-        [productId]
+        [productId, branchId]
     );
 
     // IF NO UNLOCKED BATCHES AVAILABLE, WAIT AND RETRY
@@ -295,10 +299,10 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
         const lockedBatches = await SQLquery(
             `SELECT add_id, quantity_left 
              FROM Add_Stocks 
-             WHERE product_id = $1 AND quantity_left > 0 AND product_validity > CURRENT_DATE
+             WHERE product_id = $1 AND branch_id = $2 AND quantity_left > 0 AND product_validity > CURRENT_DATE
              ORDER BY date_added ASC, product_validity ASC
              FOR UPDATE`,
-            [productId]
+            [productId, branchId]
         );
         
         if (lockedBatches.rowCount === 0) {
@@ -330,9 +334,9 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
 
     // ALWAYS CREATE NEW USAGE TRACKING RECORD FOR EACH BATCH USED
         await SQLquery(
-            `INSERT INTO Sales_Stock_Usage (sales_information_id, product_id, add_stock_id, quantity_used) 
-            VALUES ($1, $2, $3, $4)`,
-            [salesInformationId, productId, batch.add_id, deductFromThisBatch]
+            `INSERT INTO Sales_Stock_Usage (sales_information_id, product_id, add_stock_id, quantity_used, branch_id) 
+            VALUES ($1, $2, $3, $4, $5)`,
+            [salesInformationId, productId, batch.add_id, deductFromThisBatch, branchId]
         );
 
         remainingToDeduct -= deductFromThisBatch;
@@ -345,25 +349,23 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
         throw new Error(`Unable to deduct full quantity for product ID ${productId}. Remaining: ${remainingToDeduct}`);
     }
 
-    // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH (IF BRANCH ID PROVIDED)
-    if (branchId) {
-        broadcastValidityUpdate(branchId, {
-            action: 'stock_deducted',
-            product_id: productId,
-            sale_id: salesInformationId,
-            quantity_deducted: quantityToDeduct,
-            user_id: userID || null
-        });
-    }
+    // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH
+    broadcastValidityUpdate(branchId, {
+        action: 'stock_deducted',
+        product_id: productId,
+        sale_id: salesInformationId,
+        quantity_deducted: quantityToDeduct,
+        user_id: userID || null
+    });
 
-    await checkAndHandleLowStock(productId, {
+    await checkAndHandleLowStock(productId, branchId, {
         triggeredByUserId: userID
     });
 };
 
 
 // RESTORE STOCK TO ORIGINAL BATCHES WHEN ORDER IS CANCELED/UNDELIVERED
-export const restoreStockFromSale = async (salesInformationId, reason = 'Order canceled', branchId = null, userID = null) => {
+export const restoreStockFromSale = async (salesInformationId, reason = 'Order canceled', branchId, userID = null) => {
     try {
         await SQLquery('BEGIN');
         
@@ -409,13 +411,13 @@ export const restoreStockFromSale = async (salesInformationId, reason = 'Order c
         const restoredProductIds = [...new Set(stockUsage.map((usage) => usage.product_id))];
 
         for (const productId of restoredProductIds) {
-            await checkAndHandleLowStock(productId, {
+            await checkAndHandleLowStock(productId, branchId, {
                 triggeredByUserId: userID,
             });
         }
 
-        // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH (IF BRANCH ID PROVIDED)
-        if (branchId && stockUsage.length > 0) {
+        // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH
+        if (stockUsage.length > 0) {
             broadcastValidityUpdate(branchId, {
                 action: 'stock_restored',
                 sale_id: salesInformationId,
@@ -447,9 +449,9 @@ export const cancelSale = async (salesInformationId, reason = 'Sale canceled') =
     try {
         await SQLquery('BEGIN');
         
-    // CHECK IF SALE EXISTS AND GET ITS CURRENT STATUS
+    // CHECK IF SALE EXISTS AND GET ITS CURRENT STATUS AND BRANCH ID
         const {rows: saleInfo} = await SQLquery(
-            'SELECT sales_information_id, is_for_delivery FROM Sales_Information WHERE sales_information_id = $1',
+            'SELECT sales_information_id, is_for_delivery, branch_id FROM Sales_Information WHERE sales_information_id = $1',
             [salesInformationId]
         );
         
@@ -457,8 +459,10 @@ export const cancelSale = async (salesInformationId, reason = 'Sale canceled') =
             throw new Error(`Sale with ID ${salesInformationId} not found`);
         }
         
+        const branchId = saleInfo[0].branch_id;
+        
     // RESTORE STOCK TO ORIGINAL BATCHES
-        await restoreStockFromSale(salesInformationId, reason);
+        await restoreStockFromSale(salesInformationId, reason, branchId);
         
     // OPTIONAL: MARK SALE AS CANCELED (YOU MIGHT WANT TO ADD A STATUS COLUMN)
         // await SQLquery('UPDATE Sales_Information SET status = $1 WHERE sales_information_id = $2', ['canceled', salesInformationId]);

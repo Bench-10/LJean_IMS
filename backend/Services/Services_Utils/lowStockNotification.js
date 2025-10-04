@@ -5,8 +5,8 @@ import { broadcastNotification } from "../../server.js";
 
 
 
-export const checkAndHandleLowStock = async (productId, options = {}) => {
-  if (!productId) return;
+export const checkAndHandleLowStock = async (productId, branchId, options = {}) => {
+  if (!productId || !branchId) return;
 
   const { triggeredByUserId = null, triggerUserName = 'System' } = options;
 
@@ -19,10 +19,10 @@ export const checkAndHandleLowStock = async (productId, options = {}) => {
         ip.branch_id,
         COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity
       FROM Inventory_Product ip
-      LEFT JOIN Add_Stocks ast ON ast.product_id = ip.product_id
-      WHERE ip.product_id = $1
+      LEFT JOIN Add_Stocks ast ON ast.product_id = ip.product_id AND ast.branch_id = ip.branch_id
+      WHERE ip.product_id = $1 AND ip.branch_id = $2
       GROUP BY ip.product_id, ip.product_name, ip.threshold, ip.low_stock_notified, ip.branch_id`,
-    [productId]
+    [productId, branchId]
   );
 
   if (rows.length === 0) {
@@ -33,7 +33,7 @@ export const checkAndHandleLowStock = async (productId, options = {}) => {
     product_name: productName,
     threshold,
     low_stock_notified: lowStockNotified,
-    branch_id: branchId,
+    branch_id: dbBranchId,
     quantity
   } = rows[0];
   
@@ -49,7 +49,7 @@ export const checkAndHandleLowStock = async (productId, options = {}) => {
   // WHEN QUANTITY DROPS TO/BELOW THRESHOLD, SEND NOTIFICATION ONCE
   if (currentQuantity <= thresholdValue) {
     if (!alreadyNotified) {
-      await SQLquery('UPDATE Inventory_Product SET low_stock_notified = TRUE WHERE product_id = $1', [productId]);
+      await SQLquery('UPDATE Inventory_Product SET low_stock_notified = TRUE WHERE product_id = $1 AND branch_id = $2', [productId, branchId]);
 
       const message = `${productName} is low on stock (${currentQuantity} remaining).`;
 
@@ -84,7 +84,7 @@ export const checkAndHandleLowStock = async (productId, options = {}) => {
   } else if (alreadyNotified) {
 
     // QUANTITY RECOVERED ABOVE THRESHOLD; RESET FLAG SO FUTURE DROPS NOTIFY AGAIN
-    await SQLquery('UPDATE Inventory_Product SET low_stock_notified = FALSE WHERE product_id = $1', [productId]);
+    await SQLquery('UPDATE Inventory_Product SET low_stock_notified = FALSE WHERE product_id = $1 AND branch_id = $2', [productId, branchId]);
 
   }
 

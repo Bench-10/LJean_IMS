@@ -1,4 +1,4 @@
-import React, { useState }from 'react';
+import React, { useState, useEffect }from 'react';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp.jsx';
 import { TbFileExport } from "react-icons/tb";
@@ -21,10 +21,19 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
+  // PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50); // Show 50 items per page
+
   const handleSearch = (event) =>{
     setSearchItem(sanitizeInput(event.target.value));
-
+    setCurrentPage(1); // Reset to first page when searching
   }
+
+  // RESET PAGINATION WHEN FILTERS CHANGE
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, selectedBranch]);
 
   // OPEN DETAILS DIALOG ON ROW CLICK
   const openDetails = (item) => {
@@ -59,7 +68,14 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
     
   );
 
-  // Export functionality
+  // PAGINATION LOGIC
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentPageData = filteredData.slice(startIndex, endIndex);
+
+  // EXPORT FUNCTIONALITY
   const handleExportInventory = (format) => {
     const exportData = formatForExport(filteredData, ['product_id']);
     const filename = `inventory_export_${new Date().toISOString().split('T')[0]}`;
@@ -212,7 +228,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
 
         {/*TABLE */}
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className={`w-full ${filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
+          <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
             <thead className="sticky top-0 bg-gray-100 z-10 ">
               <tr>
                 
@@ -251,7 +267,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                   </th>
 
                   {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-                  {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) &&
+                  {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) && 
 
                     <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-20">
                       ACTION
@@ -266,20 +282,20 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
             <tbody className="bg-white relative">
               {invetoryLoading ? 
                 <tr>
-                  <th colSpan={10}>
+                  <td colSpan="12" className="h-96 text-center">
                     <ChartLoading message='Loading inventory products...' />
-                  </th>
+                  </td>
                 </tr>
               
               :
 
-                filteredData.length === 0 ? 
+                currentPageData.length === 0 ? 
                   (
                     <NoInfoFound col={10}/>
                   ) : 
 
                   (
-                    filteredData.map((row, rowIndex) => (
+                    currentPageData.map((row, rowIndex) => (
                   
                       <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => openDetails(row)} style={{cursor:'pointer'}}>
                         <td className="px-4 py-2 text-center"  >{row.product_id}</td>
@@ -301,11 +317,16 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                         </td>
 
                         {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-                        {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) &&
+                        {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) && 
 
                           <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white" onClick={() => handleOpen('edit', row)}>
-                                Edit
+                            <button 
+                              disabled={user.branch_id !== row.branch_id}
+                              className="bg-blue-600 hover:bg-blue-700 px-5 py-1 rounded-md text-white
+                                         disabled:bg-gray-400 disabled:cursor-not-allowed"
+                              onClick={() => handleOpen('edit', row)}
+                            >
+                              Edit
                             </button>
                           </td>
 
@@ -321,16 +342,54 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
            {error && <div className="flex font-bold justify-center px-4 py-4">{error}</div>} 
         </div>
 
-        <div className='flex justify-end mt-3 px-3 '>
-
-          <button className=' rounded-md border border-gray-800 hover:bg-gray-800/80 hover:text-white transition-all py-2 px-5 text-sm' onClick={() => setIsProductTransactOpen(true)}>
-            Show Inventory History
-          </button>
+        
+          {/*PAGINATION AND CONTROLS */}
+          <div className='flex justify-between items-center mt-4 px-3'>
+            {/* LEFT: ITEM COUNT */}
+            <div className='text-sm text-gray-600 flex-1'>
+              {filteredData.length > 0 ? (
+                <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
+              ) : (
+                <span></span>
+              )}
+            </div>
+            
+            {/* CENTER: PAGINATION CONTROLS */}
+            <div className='flex justify-center flex-1'>
+              {filteredData.length > 0 && (
+                <div className='flex items-center space-x-2'>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                  >
+                    Previous
+                  </button>
+                  <span className='text-sm text-gray-600'>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* RIGHT: INVENTORY HISTORY BUTTON */}
+            <div className='flex justify-end flex-1'>
+              <button className='rounded-md border hover:bg-gray-50 transition-all py-2 px-5 text-sm' onClick={() => setIsProductTransactOpen(true)}>
+                Show Inventory History
+              </button>
+            </div>
+          </div>
 
         </div>
 
-
-      </div>
+        
 
   )
 

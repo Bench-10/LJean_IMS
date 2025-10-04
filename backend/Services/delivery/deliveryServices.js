@@ -347,9 +347,10 @@ export const setToDelivered = async(saleID, update) => {
                         ip.threshold,
                         COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity
                     FROM Sales_Items si
-                    JOIN inventory_product ip USING(product_id)
+                    JOIN Sales_Information s_info ON si.sales_information_id = s_info.sales_information_id
+                    JOIN inventory_product ip ON si.product_id = ip.product_id AND s_info.branch_id = ip.branch_id
                     LEFT JOIN Category c USING(category_id)
-                    LEFT JOIN Add_Stocks ast USING(product_id)
+                    LEFT JOIN Add_Stocks ast ON si.product_id = ast.product_id AND s_info.branch_id = ast.branch_id
                     WHERE si.sales_information_id = $1
                     GROUP BY 
                         si.product_id, si.quantity, ip.branch_id, ip.category_id, 

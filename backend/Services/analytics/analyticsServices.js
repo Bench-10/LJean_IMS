@@ -29,33 +29,33 @@ export async function fetchInventoryLevels({ branch_id, range }) {
   if(branch_id) params.push(branch_id);
   const { rows } = await SQLquery(`
     WITH adds AS (
-      SELECT a.product_id, a.date_added::date AS d, SUM(a.quantity_added) qty_added
+      SELECT a.product_id, a.branch_id, a.date_added::date AS d, SUM(a.quantity_added) qty_added
       FROM Add_Stocks a
       WHERE a.date_added BETWEEN $1 AND $2
-      GROUP BY 1,2
+      GROUP BY 1,2,3
     ), sales AS (
-      SELECT si.product_id, s.date::date AS d, SUM(si.quantity) qty_sold
+      SELECT si.product_id, s.branch_id, s.date::date AS d, SUM(si.quantity) qty_sold
       FROM Sales_Items si
       JOIN Sales_Information s USING(sales_information_id)
       WHERE s.date BETWEEN $1 AND $2
-      GROUP BY 1,2
+      GROUP BY 1,2,3
     ), calendar AS (
       SELECT generate_series($1::date, $2::date, interval '1 day')::date AS d
     ), products AS (
       SELECT ip.product_id, ip.product_name, ip.branch_id FROM Inventory_Product ip WHERE 1=1 ${branchFilter}
     ), daily AS (
-      SELECT c.d, p.product_id, p.product_name, COALESCE(a.qty_added,0) qty_added, COALESCE(s.qty_sold,0) qty_sold
+      SELECT c.d, p.product_id, p.product_name, p.branch_id, COALESCE(a.qty_added,0) qty_added, COALESCE(s.qty_sold,0) qty_sold
       FROM calendar c CROSS JOIN products p
-      LEFT JOIN adds a ON a.product_id = p.product_id AND a.d = c.d
-      LEFT JOIN sales s ON s.product_id = p.product_id AND s.d = c.d
+      LEFT JOIN adds a ON a.product_id = p.product_id AND a.branch_id = p.branch_id AND a.d = c.d
+      LEFT JOIN sales s ON s.product_id = p.product_id AND s.branch_id = p.branch_id AND s.d = c.d
     ), cumulative AS (
-      SELECT d, product_id, product_name,
-        SUM(qty_added - qty_sold) OVER (PARTITION BY product_id ORDER BY d ROWS UNBOUNDED PRECEDING) AS stock_level
+      SELECT d, product_id, product_name, branch_id,
+        SUM(qty_added - qty_sold) OVER (PARTITION BY product_id, branch_id ORDER BY d ROWS UNBOUNDED PRECEDING) AS stock_level
       FROM daily
     )
-    SELECT d as date, product_id, product_name, stock_level
+    SELECT d as date, product_id, product_name, branch_id, stock_level
     FROM cumulative
-    ORDER BY product_id, d;`, params);
+    ORDER BY product_id, branch_id, d;`, params);
   return rows;
 }
 
@@ -97,7 +97,7 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
       SUM(si.quantity) AS units_sold
     FROM Sales_Items si
     JOIN Sales_Information s USING(sales_information_id)
-    JOIN Inventory_Product ip USING(product_id)
+    JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
     ${where}
     GROUP BY 1
     ORDER BY 1;`, params);
@@ -156,7 +156,7 @@ export async function fetchRestockTrends({ branch_id, interval, range }) {
     SELECT date_trunc('${dateTrunc}', a.date_added)::date AS period,
       SUM(a.quantity_added) AS total_added
     FROM Add_Stocks a
-    JOIN Inventory_Product ip USING(product_id)
+    JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
     WHERE a.date_added BETWEEN $1 AND $2 ${branchFilter}
     GROUP BY 1
     ORDER BY 1;`, params);
@@ -199,7 +199,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     SELECT si.product_id, ip.product_name, SUM(si.amount) AS sales_amount, SUM(si.quantity) AS units_sold
     FROM Sales_Items si
     JOIN Sales_Information s USING(sales_information_id)
-    JOIN Inventory_Product ip USING(product_id)
+    JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
     ${where}
     GROUP BY 1,2
     ORDER BY sales_amount DESC
@@ -276,7 +276,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
       SELECT COALESCE(SUM(si.amount),0) AS total_sales
       FROM Sales_Items si
       JOIN Sales_Information s USING(sales_information_id)
-      JOIN Inventory_Product ip USING(product_id)
+      JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
       ${where};`, params);
 
 
@@ -293,7 +293,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
       SELECT COALESCE(SUM(si.amount),0) AS total_sales
       FROM Sales_Items si
       JOIN Sales_Information s USING(sales_information_id)
-      JOIN Inventory_Product ip USING(product_id)
+      JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
       ${prevWhere};`, prevParams);
 
 
@@ -308,7 +308,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     const { rows: investRows } = await SQLquery(`
       SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
       FROM Add_Stocks a
-      JOIN Inventory_Product ip USING(product_id)
+      JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
       ${investWhere};`, investParams);
 
 
@@ -323,7 +323,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     const { rows: prevInvestRows } = await SQLquery(`
       SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
       FROM Add_Stocks a
-      JOIN Inventory_Product ip USING(product_id)
+      JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
       ${prevInvestWhere};`, prevInvestParams);
 
     // INVENTORY COUNT (FILTERED BY CATEGORY AND OPTIONAL BRANCH)
@@ -397,7 +397,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   const { rows: investRows } = await SQLquery(`
     SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
     FROM Add_Stocks a
-    JOIN Inventory_Product ip USING(product_id)
+    JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
     ${investWhere};`,
      investParams);
 
@@ -411,7 +411,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   const { rows: prevInvestRows } = await SQLquery(`
     SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
     FROM Add_Stocks a
-    JOIN Inventory_Product ip USING(product_id)
+    JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
     ${prevInvestWhere};`,
      prevInvestParams);
 
@@ -508,7 +508,7 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
       COUNT(DISTINCT s.sales_information_id) AS transaction_count
     FROM Sales_Items si
     JOIN Sales_Information s USING(sales_information_id)
-    JOIN Inventory_Product ip USING(product_id)
+    JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
     ${where}
     GROUP BY date_trunc('${dateTrunc}', s.date)
     ORDER BY period;`, params);
@@ -542,7 +542,7 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
   if (category_id) {
     categoryJoin = `
       LEFT JOIN Sales_Items si ON si.sales_information_id = s.sales_information_id
-      LEFT JOIN Inventory_Product ip ON ip.product_id = si.product_id
+      LEFT JOIN Inventory_Product ip ON ip.product_id = si.product_id AND ip.branch_id = s.branch_id
     `;
     categoryFilter = `AND (s.sales_information_id IS NULL OR ip.category_id = $3)`;
     params.push(category_id);

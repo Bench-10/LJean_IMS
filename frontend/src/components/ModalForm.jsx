@@ -79,22 +79,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
 
-  const constructionUnits = [
-    "kg",  
-    "g",  
-    "ton", 
-    "lb", 
-    "pc",   
-    "bag",   
-    "roll",  
-    "sheet", 
-    "bndl",  
-    "set", 
-    "lot",  
-    "can",   
-    "drum"  
-  ];
-
+  const constructionUnits = ["pcs", "ltr", "gal", "bag", "pairs", "roll", "set", "sheet", "kg", "m", "cu.m", "btl", "can", "bd.ft", "meter", "pail"];
 
 
   const validateInputs = () => {

@@ -12,6 +12,10 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
 
   const [search, setSearchDelivery] = useState('');
 
+  // PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50); // SHOW 50 ITEMS PER PAGE
+
   const {user} = useAuth();
 
 
@@ -64,7 +68,7 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
 
   const handleSearch = (event) =>{
     setSearchDelivery(sanitizeInput(event.target.value));
-
+    setCurrentPage(1); // RESET TO FIRST PAGE WHEN SEARCHING
   }
 
 
@@ -82,6 +86,13 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
 
 
   );
+
+  // PAGINATION LOGIC
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentPageData = filteredData.slice(startIndex, endIndex);
 
 
   
@@ -145,7 +156,7 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
 
         {/*TABLE */}
         <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className={`w-full ${!filteredData || filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
+          <table className={`w-full ${!currentPageData || currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
             <thead className="sticky top-0 bg-gray-100 z-10">
               <tr>
                 
@@ -191,13 +202,13 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
 
                :
 
-                (!filteredData || filteredData.length === 0 ? 
+                (!currentPageData || currentPageData.length === 0 ? 
                   (
                     <NoInfoFound col={6}/>
                   ) : 
 
                   (
-                    filteredData.map((row, idx) => (
+                    currentPageData.map((row, idx) => (
                       <tr key={idx} className={`hover:bg-gray-200/70 h-14 ${(idx + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}` } onClick={() => {openDetailes(row); setModalType("other")}}>
                         <td className="px-4 py-2 text-left">{row.delivery_id}</td>
                         <td className="px-4 py-2 font-medium whitespace-nowrap text-left"  >{row.courier_name}</td>
@@ -232,6 +243,47 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
             </tbody>
           </table>
            
+        </div>
+
+        {/*PAGINATION AND CONTROLS */}
+        <div className='flex justify-between items-center mt-4 px-3'>
+          {/* LEFT: ITEM COUNT */}
+          <div className='text-sm text-gray-600 flex-1'>
+            {filteredData.length > 0 ? (
+              <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
+            ) : (
+              <span></span>
+            )}
+          </div>
+          
+          {/* CENTER: PAGINATION CONTROLS */}
+          <div className='flex justify-center flex-1'>
+            {filteredData.length > 0 && (
+              <div className='flex items-center space-x-2'>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                >
+                  Previous
+                </button>
+                <span className='text-sm text-gray-600'>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* RIGHT: PLACEHOLDER FOR CONSISTENCY */}
+          <div className='flex justify-end flex-1'>
+          </div>
         </div>
 
       </div>

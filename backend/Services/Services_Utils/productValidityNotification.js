@@ -15,7 +15,7 @@ export const notifyProductShelfLife = async() =>{
                 a.product_validity,
                 SUM(a.quantity_left) AS total_quantity
             FROM Add_Stocks a
-            LEFT JOIN Inventory_product ip USING(product_id)
+            LEFT JOIN Inventory_product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
             LEFT JOIN Category c USING(category_id)
             WHERE a.product_validity >= CURRENT_DATE - 2
             GROUP BY a.product_id, ip.branch_id, a.product_validity, ip.product_name, c.category_name
@@ -38,9 +38,10 @@ export const notifyProductShelfLife = async() =>{
                 `SELECT 1
                 FROM Inventory_alerts 
                 WHERE product_id = $1 
-                AND alert_type = $2
-                AND DATE(alert_date) BETWEEN ($3::date) AND ($3::date + INTERVAL '3 days')`,
-                [row.product_id, 'Expired', row.product_validity]
+                AND branch_id = $2
+                AND alert_type = $3
+                AND DATE(alert_date) BETWEEN ($4::date) AND ($4::date + INTERVAL '3 days')`,
+                [row.product_id, row.branch_id, 'Expired', row.product_validity]
             );
 
             //IF THERE IS NOTHING EXISTING IN THE NOTIFICATION THEN IT ADDS A NEW NOTIFICATION
@@ -84,9 +85,10 @@ export const notifyProductShelfLife = async() =>{
                 `SELECT 1
                 FROM Inventory_alerts 
                 WHERE product_id = $1 
-                AND alert_type = $2
-                AND DATE(alert_date) = ($3::date - INTERVAL '3 days')`,
-                [row.product_id, 'Near Expired', row.product_validity]
+                AND branch_id = $2
+                AND alert_type = $3
+                AND DATE(alert_date) = ($4::date - INTERVAL '3 days')`,
+                [row.product_id, row.branch_id, 'Near Expired', row.product_validity]
             );
 
 
