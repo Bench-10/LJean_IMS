@@ -187,9 +187,9 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
 
               {/*TITLE AND FILTER SECTION*/}
               <div className='flex  justify-between items-center mt-2 pr-6' >
-                <div className='flex flex-col sm:flex-row gap-2 sm:gap-x-8 items-center w-full'>
+                <div className='flex flex-col justify-between sm:flex-row gap-2 sm:gap-x-8 items-center w-full'>
                   <h1 className='font-bold text-3xl sm:text-4xl text-gray-800 tracking-tight'>Product History</h1>
-                  <div className='flex items-center w-full sm:w-auto mt-2 sm:mt-0'>
+                  <div className='flex items-center w-full sm:w-auto mt-2 sm:mt-0 mr-12'>
                        <div className="flex items-center gap-2 w-full">
 
                         <input 

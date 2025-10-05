@@ -159,6 +159,10 @@ CREATE TABLE Sales_Information (
 	FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
 );
 
+--NEW TABLES
+ALTER TABLE Sales_Information ADD COLUMN delivery_fee INT
+ALTER TABLE Sales_Information ADD COLUMN is_for_delivery BOOLEAN
+
 
 
 
