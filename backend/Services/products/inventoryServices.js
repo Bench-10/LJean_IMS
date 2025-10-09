@@ -45,7 +45,8 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
             unit_price, 
             unit_cost, 
             COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
-            threshold 
+            min_threshold,
+            max_threshold 
         FROM inventory_product
         LEFT JOIN Category USING(category_id)
         LEFT JOIN Add_Stocks ast USING(product_id, branch_id)
@@ -59,7 +60,8 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
             unit, 
             unit_price, 
             unit_cost, 
-            threshold`,
+            min_threshold,
+            max_threshold`,
         [productId, branchId],
     );
 
@@ -82,7 +84,8 @@ export const getProductItems = async(branchId) => {
                 ip.unit_price, 
                 ip.unit_cost, 
                 COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
-                ip.threshold
+                ip.min_threshold,
+                ip.max_threshold
             FROM inventory_product ip
             LEFT JOIN category c USING(category_id)
             LEFT JOIN add_stocks ast USING(product_id, branch_id)
@@ -95,7 +98,8 @@ export const getProductItems = async(branchId) => {
                 ip.unit, 
                 ip.unit_price, 
                 ip.unit_cost, 
-                ip.threshold
+                ip.min_threshold,
+                ip.max_threshold
             ORDER BY ip.product_id ASC;
         `);
 
@@ -115,7 +119,8 @@ export const getProductItems = async(branchId) => {
             unit_price, 
             unit_cost, 
             COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
-            threshold 
+            min_threshold,
+            max_threshold 
         FROM inventory_product  
         LEFT JOIN Category USING(category_id)
         LEFT JOIN Add_Stocks ast USING(product_id, branch_id)
@@ -129,7 +134,8 @@ export const getProductItems = async(branchId) => {
             unit, 
             unit_price, 
             unit_cost, 
-            threshold
+            min_threshold,
+            max_threshold
         ORDER BY inventory_product.product_id ASC
     `,[branchId]);
 
@@ -140,7 +146,7 @@ export const getProductItems = async(branchId) => {
 
 
 export const addProductItem = async (productData) => {
-    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity, userID, fullName, existing_product_id } = productData;
+    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id } = productData;
 
     const productAddedNotifheader = "New Product";
     const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
@@ -197,9 +203,9 @@ export const addProductItem = async (productData) => {
 
     await SQLquery(
         `INSERT INTO Inventory_Product 
-        (product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, threshold)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, threshold]
+        (product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, min_threshold, max_threshold)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, min_threshold, max_threshold]
     );   
 
     await SQLquery(
@@ -305,7 +311,8 @@ export const addProductItem = async (productData) => {
                 month: 'long', 
                 day: 'numeric' 
             }),
-            date_added: date_added
+            date_added: date_added,
+            branch_id: branch_id
         },
         user_id: userID
     });
@@ -316,7 +323,7 @@ export const addProductItem = async (productData) => {
 
 
 export const updateProductItem = async (productData, itemId) => {
-    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, threshold, date_added, product_validity, userID, fullName } = productData;
+    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName } = productData;
 
     const addStocksQuery = async () =>{
 
@@ -332,7 +339,7 @@ export const updateProductItem = async (productData, itemId) => {
 
     // LOCK THE PRODUCT ROW TO PREVENT CONCURRENT MODIFICATIONS
     const previousData = await SQLquery(
-        'SELECT branch_id, unit_price, unit_cost, product_name, unit, threshold, category_id FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2 FOR UPDATE', 
+        'SELECT branch_id, unit_price, unit_cost, product_name, unit, min_threshold, max_threshold, category_id FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2 FOR UPDATE', 
         [itemId, branch_id]
     );
 
@@ -348,7 +355,8 @@ export const updateProductItem = async (productData, itemId) => {
     const productInfoChanged = 
         prev.product_name !== product_name ||
         prev.unit !== unit ||
-        Number(prev.threshold) !== Number(threshold) ||
+        Number(prev.min_threshold) !== Number(min_threshold) ||
+        Number(prev.max_threshold) !== Number(max_threshold) ||
         Number(prev.category_id) !== Number(category_id) ||
         Number(prev.unit_cost) !== Number(unit_cost);
 
@@ -433,9 +441,9 @@ export const updateProductItem = async (productData, itemId) => {
         
         await SQLquery(
             `UPDATE Inventory_Product 
-            SET product_name = $1, unit = $2, threshold = $3, category_id = $4, unit_cost = $5
-            WHERE product_id = $6 AND branch_id = $7`,
-            [product_name, unit, threshold, category_id, unit_cost, itemId, branch_id]
+            SET product_name = $1, unit = $2, min_threshold = $3, category_id = $4, unit_cost = $5
+            WHERE product_id = $6 AND branch_id = $7 AND max_threshold = $8`,
+            [product_name, unit, min_threshold, category_id, unit_cost, itemId, branch_id, max_threshold]
         );
 
         // Create notification for product info update
@@ -536,7 +544,8 @@ export const updateProductItem = async (productData, itemId) => {
                     month: 'long', 
                     day: 'numeric' 
                 }),
-                date_added: date_added
+                date_added: date_added,
+                branch_id: branch_id
             },
             user_id: userID
         });

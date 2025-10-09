@@ -6,8 +6,8 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
 
   const isBranchManager = user?.role?.some(role => ['Branch Manager'].includes(role));
   const isInventoryStaff = user?.role?.some(role => ['Inventory Staff'].includes(role));
-  const status = item.quantity <= item.threshold ? 'Low Stock' : 'In Stock';
-  const statusClass = item.quantity <= item.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700';
+  const status = item.quantity <= item.min_threshold ? 'Low Stock' : item.quantity >= item.max_threshold ? 'Max Stock' : 'In Stock';
+  const statusClass = item.quantity <= item.min_threshold ? 'bg-[#f05959] text-red-900' : item.quantity >= item.max_threshold ? 'bg-[#1e5e1b] text-white' : 'bg-[#61E85C] text-green-700';
 
   const handleOverlayClick = () => {
     if (onClose) onClose();
@@ -84,7 +84,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-600">THRESHOLD</label>
-                <div className="p-2 bg-gray-50 border rounded text-sm text-right">{Number(item.threshold).toLocaleString()}</div>
+                <div className="p-2 bg-gray-50 border rounded text-sm text-right">{Number(item.min_threshold).toLocaleString()}</div>
               </div>
             </div>
 

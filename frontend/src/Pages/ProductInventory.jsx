@@ -81,7 +81,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
     const filename = `inventory_export_${new Date().toISOString().split('T')[0]}`;
     
     const customHeaders = ['Product Name', 'Category', 'Unit', 'Stock Quantity', 'Price', 'Threshold'];
-    const dataKeys = ['product_name', 'category_name', 'unit', 'quantity', 'unit_price', 'threshold'];
+    const dataKeys = ['product_name', 'category_name', 'unit', 'quantity', 'unit_price', 'min_threshold'];
     
     if (format === 'csv') {
       exportToCSV(exportData, filename, customHeaders, dataKeys);
@@ -259,9 +259,7 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                   <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-4">
                     QUANTITY
                   </th>
-                  <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-4">
-                    THRESHOLD
-                  </th>
+                 
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-38">
                     STATUS
                   </th>
@@ -309,10 +307,9 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
                         }
                         
                         <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
-                        <td className="px-4 py-2 text-center"  >{row.threshold.toLocaleString()}</td>
                         <td className="px-4 py-2 text-center w-36"  >
-                          <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.threshold ? 'bg-[#f05959] text-red-900' : 'bg-[#61E85C] text-green-700'} font-medium`}>
-                            {row.quantity <= row.threshold ? 'Low Stock' : 'In Stock'}
+                          <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.min_threshold ? 'bg-[#f05959] text-red-900' : row.quantity >= row.max_threshold ? 'bg-[#1e5e1b] text-white' :  'bg-[#61E85C] text-green-700'} font-medium`}>
+                            {row.quantity <= row.min_threshold ? 'Low Stock' : row.quantity >= row.max_threshold ? 'Max Stock' : 'In Stock'}
                           </div>
                         </td>
 

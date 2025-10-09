@@ -11,33 +11,64 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const [productValidityList, setValidity] = useState(propValidityList || []);
   const [searchValidity, setSearchValidity] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showNearExpiry, setShowNearExpiry] = useState(false);
+  const [showExpired, setShowExpired] = useState(false);
+  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('');
 
   // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50); // SHOW 50 ITEMS PER PAGE
 
   const {user} = useAuth();
+  const cacheKey = `product_validity_branch_${user?.branch_id || 'unknown'}`;
   
 
-  const getProductInfo = async () =>{
+  const getProductInfo = async ({ force = false } = {}) =>{
+    // If we already have cached data and not forcing, show it immediately without spinner
     try {
-      setLoading(true);
+      if (!force) {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              setValidity(parsed);
+              if (setPropValidityList) setPropValidityList(parsed);
+            }
+          } catch (e) {
+            // ignore parse errors and continue to fetch
+            console.warn('Failed to parse product validity cache', e);
+          }
+        }
+      }
+
+      // show spinner only when there's no cached data or when force is true
+      const hasCache = Boolean(sessionStorage.getItem(cacheKey));
+      if (!hasCache || force) setLoading(true);
+
       const data = await api.get(`/api/product_validity?branch_id=${user.branch_id}`);
       setValidity(data.data);
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify(data.data));
+      } catch (e) {
+        console.warn('Failed to write product validity cache', e);
+      }
+
       if (setPropValidityList) {
         setPropValidityList(data.data);
       }
     } catch (error) {
       console.log(error.message);
-      
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() =>{
-      getProductInfo();
-  }, []);
+      // On mount: show cache if available, then refresh in background
+      getProductInfo({ force: false });
+  }, [user.branch_id]);
 
   // LISTEN FOR REAL-TIME VALIDITY UPDATES
   useEffect(() => {
@@ -49,8 +80,13 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
         // ADD NEW VALIDITY ENTRY
         const updateFunction = (prevValidity) => [validityData.product, ...prevValidity];
         setValidity(updateFunction);
-        if (setPropValidityList) {
-          setPropValidityList(updateFunction);
+        if (setPropValidityList) setPropValidityList(updateFunction);
+        // persist cache
+        try {
+          const cur = JSON.parse(sessionStorage.getItem(cacheKey) || '[]');
+          sessionStorage.setItem(cacheKey, JSON.stringify([validityData.product, ...cur]));
+        } catch (e) {
+          // ignore cache write errors
         }
       } else if (validityData.action === 'update') {
         // UPDATE EXISTING VALIDITY ENTRY OR ADD NEW ONE
@@ -71,8 +107,23 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           }
         };
         setValidity(updateFunction);
-        if (setPropValidityList) {
-          setPropValidityList(updateFunction);
+        if (setPropValidityList) setPropValidityList(updateFunction);
+        // update cache
+        try {
+          const cur = JSON.parse(sessionStorage.getItem(cacheKey) || '[]');
+          const existingIndex = cur.findIndex(
+            item => item.product_id === validityData.product.product_id && item.date_added === validityData.product.date_added
+          );
+          let updated;
+          if (existingIndex >= 0) {
+            updated = [...cur];
+            updated[existingIndex] = { ...updated[existingIndex], ...validityData.product };
+          } else {
+            updated = [validityData.product, ...cur];
+          }
+          sessionStorage.setItem(cacheKey, JSON.stringify(updated));
+        } catch (e) {
+          // ignore cache write errors
         }
       } else if (validityData.action === 'inventory_changed_by_sale' || 
                  validityData.action === 'inventory_changed_by_delivery' ||
@@ -80,7 +131,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                  validityData.action === 'stock_restored') {
         // REFRESH DATA WHEN INVENTORY CHANGES AFFECT VALIDITY DISPLAY
         console.log('Refreshing validity data due to inventory changes:', validityData.action);
-        getProductInfo();
+        // force refresh to get authoritative view
+        getProductInfo({ force: true });
       }
     };
 
@@ -101,13 +153,35 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
 
   const filteredValidityData = productValidityList.filter(validity =>
-
-    validity.product_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
+    // Basic search match
+    (validity.product_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
     validity.category_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
     validity.formated_date_added.toLowerCase().includes(searchValidity.toLowerCase()) ||
-    validity.formated_product_validity.toLowerCase().includes(searchValidity.toLowerCase()) 
-    
-  );
+    validity.formated_product_validity.toLowerCase().includes(searchValidity.toLowerCase()))
+  )
+  // Then apply expiry toggles and date filters
+  .filter(validity => {
+    // Expiry toggles: if either toggle is active, only include matching types
+    if (showNearExpiry || showExpired) {
+      const isNear = Boolean(validity.near_expy);
+      const isExp = Boolean(validity.expy);
+      if (!( (isNear && showNearExpiry) || (isExp && showExpired) )) {
+        return false;
+      }
+    }
+
+    // Year filter (use DB `year` column)
+    if (selectedYear) {
+      if (validity.year == null || String(validity.year) !== String(selectedYear)) return false;
+    }
+
+    // Month filter (use DB `month` column)
+    if (selectedMonth) {
+      if (validity.month == null || String(Number(validity.month)) !== String(Number(selectedMonth))) return false;
+    }
+
+    return true;
+  });
 
   // PAGINATION LOGIC
   const totalItems = filteredValidityData.length;
@@ -165,20 +239,59 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           <div  className="ml-auto flex gap-4 items-center">
             
     
-            {/*EXPIRY LABELS*/}
-            <div className="flex gap-4">
-              {/*NEAR EXPIRY DIV*/}
-              <div className='flex gap-4 align-middle'>
-                <span className="relative pl-6 content-center before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-4 before:h-4 before:rounded before:bg-[#FFF3C1]">
-                  Near Expiry
-                </span>
-              </div>
+            {/*EXPIRY FILTERS (clickable chips)*/}
+            <div className="flex gap-4 items-center">
+              <button
+                type="button"
+                onClick={() => { setShowNearExpiry(prev => !prev); setCurrentPage(1); }}
+                className={`relative pl-6 pr-4 py-1 rounded ${showNearExpiry ? 'bg-[#FFF3C1] text-gray-900' : 'bg-white text-gray-700 hover:bg-yellow-50'} border border-gray-200`}
+              >
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#FFF3C1]" />
+                Near Expiry
+              </button>
 
-              {/*EXPIRED DIV*/}
-              <div className='flex gap-4'>
-                <span className="relative pl-6 content-center before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-4 before:h-4 before:rounded before:bg-[#FF3131]">
-                  Expired
-                </span>
+              <button
+                type="button"
+                onClick={() => { setShowExpired(prev => !prev); setCurrentPage(1); }}
+                className={`relative pl-6 pr-4 py-1 rounded ${showExpired ? 'bg-[#FF3131] text-white' : 'bg-white text-gray-700 hover:bg-red-50'} border border-gray-200`}
+              >
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#FF3131]" />
+                Expired
+              </button>
+
+              {/* YEAR & MONTH FILTERS */}
+              <div className="flex items-center gap-2 ml-4">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
+                  className="h-9 px-2 border rounded-md text-sm"
+                >
+                  <option value="">All Years</option>
+                  {
+                    // derive years from DB `year` column
+                    Array.from(new Set(productValidityList.map(v => v.year).filter(Boolean)))
+                      .sort((a,b) => b - a)
+                      .map(y => <option key={y} value={y}>{y}</option>)
+                  }
+                </select>
+
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); }}
+                  className="h-9 px-2 border rounded-md text-sm"
+                >
+                  <option value="">All Months</option>
+                  {
+                    // derive months from DB `month` column and map to short names
+                    (() => {
+                      const monthNames = [null,'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                      const months = Array.from(new Set(productValidityList.map(v => v.month).filter(m => m != null).map(Number))).sort((a,b) => a - b);
+                      return months.map(m => (
+                        <option key={m} value={m}>{monthNames[m] || m}</option>
+                      ));
+                    })()
+                  }
+                </select>
               </div>
             </div>
           </div>

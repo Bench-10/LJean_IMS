@@ -14,14 +14,15 @@ export const checkAndHandleLowStock = async (productId, branchId, options = {}) 
     `SELECT 
         ip.product_id,
         ip.product_name,
-        ip.threshold,
+        ip.min_threshold,
+        ip.max_threshold,
         ip.low_stock_notified,
         ip.branch_id,
         COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity
       FROM Inventory_Product ip
       LEFT JOIN Add_Stocks ast ON ast.product_id = ip.product_id AND ast.branch_id = ip.branch_id
       WHERE ip.product_id = $1 AND ip.branch_id = $2
-      GROUP BY ip.product_id, ip.product_name, ip.threshold, ip.low_stock_notified, ip.branch_id`,
+      GROUP BY ip.product_id, ip.product_name, ip.min_threshold, max_threshold, ip.low_stock_notified, ip.branch_id`,
     [productId, branchId]
   );
 
@@ -31,7 +32,7 @@ export const checkAndHandleLowStock = async (productId, branchId, options = {}) 
 
   const {
     product_name: productName,
-    threshold,
+    min_threshold,
     low_stock_notified: lowStockNotified,
     branch_id: dbBranchId,
     quantity
@@ -39,7 +40,7 @@ export const checkAndHandleLowStock = async (productId, branchId, options = {}) 
   
   // NORMALIZE NUMERIC VALUES
   const currentQuantity = Number(quantity ?? 0);
-  const thresholdValue = Number(threshold ?? 0);
+  const thresholdValue = Number(min_threshold ?? 0);
   const alreadyNotified = Boolean(lowStockNotified);
 
   if (Number.isNaN(thresholdValue)) {

@@ -172,7 +172,8 @@ export const addSale = async (headerAndProducts) => {
                         unit_price, 
                         unit_cost, 
                         COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
-                        threshold 
+                        min_threshold,
+                        max_threshold
                     FROM inventory_product
                     LEFT JOIN Category USING(category_id)
                     LEFT JOIN Add_Stocks ast USING(product_id, branch_id)
@@ -186,7 +187,8 @@ export const addSale = async (headerAndProducts) => {
                         unit, 
                         unit_price, 
                         unit_cost, 
-                        threshold`,
+                        min_threshold,
+                        max_threshold`,
                     [product.product_id, branch_id]
                 );
 

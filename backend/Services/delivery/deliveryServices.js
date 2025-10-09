@@ -344,7 +344,8 @@ export const setToDelivered = async(saleID, update) => {
                         ip.unit,
                         ip.unit_price,
                         ip.unit_cost,
-                        ip.threshold,
+                        ip.min_threshold,
+                        ip.max_threshold
                         COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity
                     FROM Sales_Items si
                     JOIN Sales_Information s_info ON si.sales_information_id = s_info.sales_information_id
@@ -355,7 +356,7 @@ export const setToDelivered = async(saleID, update) => {
                     GROUP BY 
                         si.product_id, si.quantity, ip.branch_id, ip.category_id, 
                         c.category_name, ip.product_name, ip.unit, ip.unit_price, 
-                        ip.unit_cost, ip.threshold`,
+                        ip.unit_cost, ip.min_threshold, ip.max_threshold`,
                     [saleID]
                 );
 
@@ -372,7 +373,8 @@ export const setToDelivered = async(saleID, update) => {
                             unit_price: product.unit_price,
                             unit_cost: product.unit_cost,
                             quantity: product.quantity,
-                            threshold: product.threshold
+                            min_threshold: product.min_threshold,
+                            max_threshold: product.max_threshold
                         },
                         sale_id: saleID,
                         delivery_change: {

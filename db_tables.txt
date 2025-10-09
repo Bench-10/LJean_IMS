@@ -83,7 +83,7 @@ CREATE TABLE Inventory_Product (
     unit_cost DECIMAL(10, 2) NOT NULL,
     quantity INT,
     threshold INT NOT NULL,
-    low_stock_notified BOOLEAN NOT NULL
+    low_stock_notified BOOLEAN NOT NULL SET DEFAULT FALSE
     PRIMARY KEY (product_id, branch_id), 
     FOREIGN KEY (category_id) REFERENCES Category(category_id),
     FOREIGN KEY (branch_id) REFERENCES Branch(branch_id)

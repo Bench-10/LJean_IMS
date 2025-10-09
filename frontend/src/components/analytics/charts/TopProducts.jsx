@@ -6,7 +6,7 @@ import ChartLoading from '../../common/ChartLoading.jsx';
 import RestockSuggestionsDialog from '../../dialogs/RestockSuggestionsDialog.jsx';
 import { FaLightbulb, FaBoxOpen } from 'react-icons/fa';
 
-function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts }) {
+function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts, dateRangeDisplay }) {
 
   const [showRestockDialog, setShowRestockDialog] = useState(false);
   

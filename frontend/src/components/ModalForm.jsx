@@ -20,9 +20,12 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const [unit_cost, setPurchasedPrice] = useState('');
   const [date_added, setDatePurchased] = useState('');
   const [unit, setUnit] = useState('');
-  const [threshold, setThreshold] = useState('');
+  const [min_threshold, setMinThreshold]= useState('');
+  const [max_threshold, setMaxThreshold] = useState('');
   const [unit_price, setPrice] = useState('');
+  const [exceedQunatity, setForExeedQuantity] = useState('');
   const [product_validity, setExpirationDate] = useState('');
+  const [maxQuant, setMaxQuant] = useState(false);
 
   // EXISTING PRODUCT SELECTION STATES
   const [existingProducts, setExistingProducts] = useState([]);
@@ -79,9 +82,12 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
           setPurchasedPrice('');
           setDatePurchased('');
           setUnit('');
-          setThreshold('');
+          setMaxThreshold('')
+          setMinThreshold('');
           setPrice('');
           setExpirationDate('');
+          setMaxQuant(false);
+          setForExeedQuantity('');
           
           // FETCH EXISTING PRODUCTS FOR SELECTION
           fetchExistingProducts();
@@ -94,8 +100,10 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
         setQuantity('');
         setPurchasedPrice(itemData.unit_cost);
         setUnit(itemData.unit);
-        setThreshold(itemData.threshold);
+        setMinThreshold(itemData.min_threshold);
+        setMaxThreshold(itemData.max_threshold);
         setPrice(itemData.unit_price);
+        setForExeedQuantity(itemData.quantity)
         setDatePurchased('');
         setExpirationDate('');
       } 
@@ -139,6 +147,29 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   }, [searchTerm, showExistingProducts, existingProducts]);
 
 
+  const handleThreshold = (quantity, threshold) =>{
+
+    if (mode === 'add'){
+      if (Number(quantity) > threshold){
+        setMaxQuant(true);
+        
+      } else{
+        setMaxQuant(false);
+      }
+    }
+
+    if (mode === 'edit'){
+      if (Number(exceedQunatity) + Number(quantity) > threshold){
+        setMaxQuant(true);
+        
+      } else{
+        setMaxQuant(false);
+      }
+    }
+
+  }
+
+
   // HANDLE SCROLL TO LOAD MORE (FOR PERFORMANCE)
   const handleOverlayScroll = useCallback((e) => {
     const target = e.target;
@@ -165,7 +196,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     if (!String(unit_cost).trim()) isEmptyField.unit_cost = true;
     if (!String(date_added).trim()) isEmptyField.date_added = true;
     if (!String(unit).trim()) isEmptyField.unit = true;
-    if (!String(threshold).trim()) isEmptyField.threshold = true;
+    if (!String(min_threshold).trim()) isEmptyField.min_threshold = true;
+    if (!String(max_threshold).trim()) isEmptyField.max_threshold = true;
     if (!String(unit_price).trim()) isEmptyField.unit_price = true;
     if (!String(product_validity).trim()) isEmptyField.product_validity = true;
 
@@ -173,7 +205,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     //CHECK IF INPUT IS NOT A NUMBER
     if (isNaN(Number(quantity_added))) isnotANumber.quantity_added = true;
     if (isNaN(Number(unit_cost))) isnotANumber.unit_cost = true;
-    if (isNaN(Number(threshold))) isnotANumber.threshold = true;
+    if (isNaN(Number(min_threshold))) isnotANumber.min_threshold = true;
+    if (isNaN(Number(max_threshold))) isnotANumber.max_threshold = true;
     if (isNaN(Number(unit_price))) isnotANumber.unit_price = true;
 
 
@@ -185,7 +218,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       if (String(quantity_added).trim() && Number(quantity_added) < 0) invalidNumberValue.quantity_added = true;
     }
     if (String(unit_cost).trim() && Number(unit_cost) <= 0) invalidNumberValue.unit_cost = true;
-    if (String(threshold).trim()  && Number(threshold) <= 0) invalidNumberValue.threshold = true;
+    if (String(min_threshold).trim()  && Number(min_threshold) <= 0) invalidNumberValue.min_threshold = true;
+    if (String(max_threshold).trim()  && Number(max_threshold) <= 0) invalidNumberValue.max_threshold = true;
     if (String(unit_price).trim() && Number(unit_price) <= 0) invalidNumberValue.unit_price = true;
 
 
@@ -227,7 +261,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
         unit_price: Number(unit_price),
         unit_cost: Number(unit_cost),
         quantity_added: Number(quantity_added),
-        threshold: Number(threshold),
+        min_threshold: Number(min_threshold),
+        max_threshold: Number(max_threshold),
         date_added,
         product_validity,
         userID: user.user_id,
@@ -297,7 +332,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       {isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) &&(
         <div
           className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
-          style={{ pointerEvents: 'auto' }}  onClick={onClose}
+          style={{ pointerEvents: 'auto' }}  onClick={() => {onClose(); 
+          setMaxQuant(false);}}
         />
        )}
 
@@ -320,7 +356,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                 <form onSubmit={(e) => {e.preventDefault(); validateInputs();}}>
                 
                 <button type='button' className="btn-sm btn-circle btn-ghost absolute right-2 top-2 " 
-                  onClick={() => {onClose(); setShowExistingProducts(false)}}>✕</button>
+                  onClick={() => {onClose(); setShowExistingProducts(false); 
+          setMaxQuant(false);}}>✕</button>
 
 
                 {/*PRODUCT NAME*/}
@@ -444,10 +481,17 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                           placeholder={`${mode === 'add' ? 'Quantity': 'Add Quantity or Enter 0'}`}
                           className={inputClass('quantity_added')}
                           value={quantity_added}
-                          onChange={(e) => setQuantity(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setQuantity(value);
+                            handleThreshold(value, max_threshold);
+
+                          }}
                         />
 
                         {errorflag('quantity_added', 'value')}
+
+                        {maxQuant && <div className='absolute text-xs italic pl-2 text-red-500'>Quantity exceeding max threshold!</div>}
 
                       </div>
 
@@ -515,21 +559,35 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                       </div>
 
 
-                      {/*THRESHOLD*/}
-                      <div className='relative'> 
+                      {/*MIN AND MAX THRESHOLD*/}
+                      <div className='relative flex space-x-2'> 
 
                         <input
-                          placeholder="Threshold"
-                          className={inputClass('threshold')}
-                          value={threshold}
-                          onChange={(e) => setThreshold(e.target.value)}
+                          placeholder="Min Threshold"
+                          className={inputClass('min_threshold')}
+                          value={min_threshold}
+                          onChange={(e) => setMinThreshold(e.target.value)}
                         />
 
-                        {errorflag('threshold', 'value')}
+                        {errorflag('max_threshold', 'value')}
+
+                        <input
+                          placeholder="Max Threshold"
+                          className={inputClass('max_threshold')}
+                          value={max_threshold}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setMaxThreshold(value);
+                            handleThreshold(quantity_added, value);
+                            
+                          }}
+                        />
+
+                        {errorflag('min_threshold', 'value')}
 
                       </div>
 
-                      
+                            
                       {/*PRICE*/}
                       <div className='relative'>
 
@@ -570,7 +628,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                 <div className="absolute left-1/2 transform -translate-x-1/2 flex justify-end bottom-9">
 
                     {/*CONTROL MODAL*/}
-                    <button type="submit" className={`${mode === 'edit' ? 'bg-yellow-400' :'bg-green-600'} rounded-lg text-white px-5 py-2 text-bottom`} > 
+                    <button type="submit" disabled={maxQuant} className={`${mode === 'edit' ? 'bg-yellow-400' :'bg-green-600'} rounded-lg text-white px-5 py-2 text-bottom disabled:cursor-not-allowed`} > 
                       {mode === 'edit' ? 'UPDATE' : 'ADD'}
                     </button>
 

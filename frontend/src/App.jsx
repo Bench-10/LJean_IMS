@@ -246,7 +246,7 @@ function App() {
       return;
     }
 
-    const newSocket = io(`${import.meta.env.VITE_API_URL}`);
+    const newSocket = io(`${import.meta.env.VITE_API_URL}`); 
     
     newSocket.on('connect', () => {
       console.log('Connected to server');
@@ -303,6 +303,10 @@ function App() {
       if (user.user_id !== inventoryData.user_id) {
         if (inventoryData.action === 'add') {
           setProductsData(prevData => [...prevData, inventoryData.product]);
+          // notify UI components to reapply their local filters (e.g. branch filter)
+          try {
+            window.dispatchEvent(new CustomEvent('inventory-ui-updated', { detail: inventoryData }));
+          } catch (e) { /* ignore in non-browser env */ }
           
           // Don't show "added successfully" to other users - that's only for the person who added it
           // This WebSocket event just updates the data silently for other users
@@ -310,11 +314,15 @@ function App() {
         } else if (inventoryData.action === 'update') {
           setProductsData(prevData => 
             prevData.map(item => 
-              item.product_id === inventoryData.product.product_id 
+              item.product_id === inventoryData.product.product_id  && item.branch_id === inventoryData.product.branch_id
                 ? inventoryData.product 
                 : item
             )
           );
+          // notify UI components to reapply their local filters
+          try {
+            window.dispatchEvent(new CustomEvent('inventory-ui-updated', { detail: inventoryData }));
+          } catch (e) { }
           
           // Don't show "updated successfully" to other users - that's only for the person who updated it
           // This WebSocket event just updates the data silently for other users
@@ -328,6 +336,10 @@ function App() {
                 : item
             )
           );
+          // notify UI components to reapply their local filters
+          try {
+            window.dispatchEvent(new CustomEvent('inventory-ui-updated', { detail: inventoryData }));
+          } catch (e) { }
           
           // Stock changes from sales/delivery are handled silently
           // No need to show notifications for these automatic updates
@@ -577,7 +589,7 @@ function App() {
         console.log(itemData)
         const response = await api.put(`/api/items/${itemData.product_id}`, newItem);
         setProductsData((prevData) => 
-          prevData.map((item) => (item.product_id === itemData.product_id ? response.data : item))
+          prevData.map((item) => (item.product_id === itemData.product_id && item.branch_id === itemData.branch_id ? response.data : item))
         );
         console.log('Item Updated', response.data);
 

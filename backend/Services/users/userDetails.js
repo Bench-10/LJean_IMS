@@ -6,7 +6,7 @@ import * as passwordEncryption from '../Services_Utils/passwordEncryption.js';
 
 export const getAllUsers = async (branchId, userId) =>{
 
-    const where = [" NOT ('Owner' = ANY(role))"];
+    const where = [" NOT ('Owner' = ANY(role))", ];
     const conditions = [];
 
     if (branchId){
@@ -17,6 +17,11 @@ export const getAllUsers = async (branchId, userId) =>{
     if (userId){
         where.push('Users.user_id != $2'); 
         conditions.push(userId)
+    };
+
+
+    if (userId && branchId){
+        where.push(" NOT ('Branch Manager' = ANY(role))");
     };
 
 

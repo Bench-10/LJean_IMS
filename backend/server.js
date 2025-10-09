@@ -82,6 +82,12 @@ io.on('connection', (socket) => {
 
     // Join branch-specific room
     socket.join(`branch-${branchId}`);
+    // If user is an Owner, also join a global owners room so they receive cross-branch updates
+    const isOwner = Array.isArray(role) ? role.some(r => r === 'Owner') : role === 'Owner';
+    if (isOwner) {
+      socket.join('owners');
+      console.log(`User ${userId} joined owners room`);
+    }
     
     console.log(`User ${userId} joined branch ${branchId}`);
   });
@@ -133,6 +139,8 @@ export const broadcastSaleUpdate = (branchId, saleData) => {
 export const broadcastUserUpdate = (branchId, userData) => {
   console.log(`Broadcasting user update to branch-${branchId}:`, userData);
   io.to(`branch-${branchId}`).emit('user-update', userData);
+  // also notify all owners so they can see updates across branches
+  io.to('owners').emit('user-update', userData);
 };
 
 
@@ -141,6 +149,8 @@ export const broadcastUserUpdate = (branchId, userData) => {
 export const broadcastUserStatusUpdate = (branchId, statusData) => {
   console.log(`Broadcasting user status update to branch-${branchId}:`, statusData);
   io.to(`branch-${branchId}`).emit('user-status-update', statusData);
+  // also notify owners
+  io.to('owners').emit('user-status-update', statusData);
 };
 
 

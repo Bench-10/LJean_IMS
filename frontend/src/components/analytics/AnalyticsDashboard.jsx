@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
@@ -87,6 +87,25 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0, prev_total_sales:0, prev_total_investment:0, prev_total_profit:0, inventory_count: 0});
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
+
+  // Compute date range display for preset mode
+  const dateRangeDisplay = useMemo(() => {
+    if (rangeMode !== 'preset') return null;
+    const today = dayjs().startOf('day');
+    let s = today;
+    if (preset === 'current_day') {
+      s = today;
+    } else if (preset === 'current_week') {
+      s = today.isoWeekday(1).startOf('day');
+    } else if (preset === 'current_month') {
+      s = today.startOf('month');
+    } else if (preset === 'current_year') {
+      s = today.startOf('year');
+    }
+    const start = s.format('MMM DD, YYYY');
+    const end = today.format('MMM DD, YYYY');
+    return `${start} - ${end}`;
+  }, [rangeMode, preset]);
 
   // Keep startDate/endDate in sync when using preset mode so children (e.g., BranchPerformance) get accurate ranges
   useEffect(() => {
@@ -310,7 +329,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   <div className="flex flex-col gap-5 flex-1 min-h-0">
 
       <div className="flex flex-wrap items-center justify-between" >
-      {console.log(salesPerformance)}
+
         {(!branchId) &&
 
             <NavLink to="/branches" className={`relative py-2 px-4 border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100`} >
@@ -414,12 +433,12 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         
         
         
-      </div>
+      </div> 
 
       {/* KPI CARDS*/}
   <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 relative">
             
-            <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+            <div className="flex items-center w-full bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
               {loadingKPIs && <ChartLoading message='Loading total sales' type='kpi' /> }
               <div className='mr-5 ml-1'>
                 
@@ -432,17 +451,18 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               <div>
                 <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-400" />
 
-                <h3 className="text-[13px] font-semibold text-gray-700">Total Sales</h3>
-
-                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight">
+                <div className="flex w-full items-center mb-1">
+                  <h3 className="text-[13px] font-semibold text-gray-700 mr-2">Total Sales</h3>
+                  {dateRangeDisplay && (
+                    <span className="text-[9px] text-gray-600">{dateRangeDisplay}</span>
+                  )}
+                </div>
+                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight w-full text-left">
                   {currencyFormat(kpis.total_sales)}
-
                 </p>
-
-              
                 <p className="text-[11px] text-gray-400 font-medium mt-1">
                   {compareValues(kpis.total_sales, kpis.prev_total_sales)}
-                </p>  
+                </p>
               </div>
               
               
@@ -451,7 +471,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             </div>
 
 
-            <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
+            <div className="flex items-center w-full bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
 
               {loadingKPIs && <ChartLoading message='Loading total investments' type='kpi' /> }
 
@@ -465,9 +485,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
               <div>
                 <div className="absolute left-0 top-0 bottom-0 w-2 bg-yellow-400" />
-                <h3 className="text-[13px] font-semibold text-gray-700">Total Investment</h3>
-                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight">{currencyFormat(kpis.total_investment)}</p>
-                
+                <div className="flex w-full items-center mb-1">
+                  <h3 className="text-[13px] font-semibold text-gray-700 mr-2">Total Investment</h3>
+                  {dateRangeDisplay && (
+                    <span className="text-[9px] text-gray-600">{dateRangeDisplay}</span>
+                  )}
+                </div>
+                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight w-full text-left">{currencyFormat(kpis.total_investment)}</p>
                 <p className="text-[11px] text-gray-400 font-medium mt-1">
                   {compareValues(kpis.total_investment, kpis.prev_total_investment)}
                 </p>
@@ -492,9 +516,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
               <div>
                 <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-400" />
-                <h3 className="text-[13px] font-semibold text-gray-700">Total Profit</h3>
-                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit) : currencyFormat(0)}</p>
-                
+                <div className="flex w-full items-center mb-1">
+                  <h3 className="text-[13px] font-semibold text-gray-700 mr-2">Total Profit</h3>
+                  {dateRangeDisplay && (
+                    <span className="text-[9px] text-gray-600">{dateRangeDisplay}</span>
+                  )}
+                </div>
+                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight w-full text-left">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit) : currencyFormat(0)}</p>
                 <p className="text-[11px] text-gray-400 font-medium mt-1">
                   {compareValues(kpis.total_profit, kpis.prev_total_profit)}
                 </p>
@@ -508,7 +536,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             {/* INVENTORY COUNT KPI */}
             <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
 
-              {loadingKPIs && <ChartLoading message='Loading product count' type='kpi' /> }
+              {loadingKPIs && <ChartLoading message='Loading produc count' type='kpi' /> }
 
               <div className='mr-5 ml-1'>
                
@@ -517,13 +545,14 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
               <div>
                 <div className="absolute left-0 top-0 bottom-0 w-2 bg-purple-400" />  
-                <h3 className="text-[13px] font-semibold text-gray-700">Inventory Items</h3>
-                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight">{Number(kpis.inventory_count).toLocaleString()}</p>
-
-
+                <div className="flex w-full items-center mb-1">
+                  <h3 className="text-[13px] font-semibold text-gray-700 mr-2">Inventory Items</h3>
+                  {dateRangeDisplay && (
+                    <span className="text-[9px] text-gray-600">{dateRangeDisplay}</span>
+                  )}
+                </div>
+                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight w-full text-left">{Number(kpis.inventory_count).toLocaleString()}</p>
                 <p className="text-[11px] text-gray-400 font-medium mt-1">Total distinct products</p>
-
-
               </div>
 
             </div>
@@ -552,6 +581,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             productIdFilter={productIdFilter}
             loadingSalesPerformance={loadingSalesPerformance}
             loadingTopProducts={loadingTopProducts}
+            dateRangeDisplay={dateRangeDisplay}
           />
         )
 
