@@ -31,9 +31,13 @@ function Login() {
   //PREVENTS THE USER FROM GOING BACK TO THE LOGIN PAGE AFTER A SUCCESSFUL LOGIN
   useEffect(() => {
     if (user && user.role) {
-      if (user && user.role && user.role.some(role => ['Inventory Staff', 'Owner', 'Branch Manager'].includes(role))) {
+      if (user && user.role && user.role.some(role => ['Owner', 'Branch Manager'].includes(role))) {
+        navigate('/dashboard', { replace: true });
+
+      } else if (user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))) {
         navigate('/inventory', { replace: true });
-      } else {
+
+      } else{
         navigate('/sales', { replace: true });
       }
     }

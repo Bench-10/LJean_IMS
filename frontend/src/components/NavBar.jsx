@@ -39,6 +39,23 @@ function NavBar() {
             <ul className="flex flex-col gap-2 [&>a]:py-2 [&>a]:px-3 [&>a]:rounded-md [&>a]:transition-all [&>a]:border-l-4-transparent [&>a]:cursor-pointer [&>a:hover]:bg-[#254717] [&>a]:flex [&>a]:items-center [&>a]:gap-x-[7px]">
 
 
+              {/*DASHBOARD NAVIGATION*/}
+              {user && user.role && (user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
+
+                  <NavLink
+                    to="/dashboard"
+                    className={({ isActive }) =>
+                      (isActive || currentLocaion)
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <MdOutlineDashboard />Dasboard
+                  </NavLink>
+
+              }
+
+
 
               {/*INVENTORY NAVIGATION*/}
               {user && user.role && (user.role.some(role => ['Branch Manager', 'Owner','Inventory Staff'].includes(role))) &&
@@ -74,22 +91,6 @@ function NavBar() {
 
               }
 
-
-              {/*DASHBOARD NAVIGATION*/}
-              {user && user.role && (user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
-
-                  <NavLink
-                    to="/dashboard"
-                    className={({ isActive }) =>
-                      (isActive || currentLocaion)
-                        ? "border-l-8 bg-[#254717] border-l-green-400"
-                        : ""
-                    }
-                  >
-                    <MdOutlineDashboard />Dasboard
-                  </NavLink>
-
-              }
 
 
               {/*USER MANAGEMENT NAVIGATION*/}

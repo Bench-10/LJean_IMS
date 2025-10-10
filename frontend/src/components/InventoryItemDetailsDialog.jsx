@@ -43,7 +43,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
           <div className="pb-4 pt-2 px-8 w-full flex-1 flex flex-col">
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-bold text-gray-800">Inventory Item Details</h2>
+                <h2 className="text-xl font-bold text-gray-800">{item.product_name}</h2>
                 <div className={`border rounded-full px-4 py-1 text-sm font-medium ${statusClass}`}>
                   {status}
                 </div>
@@ -51,14 +51,17 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
               <p className="text-xs text-gray-500">Review the current details of this inventory item.</p>
             </div>
 
+            <div className="col-span-2 mb-6">
+                <label className="text-xs font-bold text-gray-600">DESCRIPTION</label>
+                <div className="p-3 bg-gray-50 border rounded text-sm min-h-[64px] whitespace-pre-line">
+                  {item.description || <span className="text-gray-400 italic">No description provided.</span>}
+                </div>
+              </div>
+
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="text-xs font-bold text-gray-600">ITEM ID</label>
                 <div className="p-2 bg-gray-50 border rounded text-sm">{item.product_id}</div>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-600">ITEM NAME</label>
-                <div className="p-2 bg-gray-50 border rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis">{item.product_name}</div>
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-600">CATEGORY</label>
@@ -83,9 +86,14 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
                 <div className="p-2 bg-gray-50 border rounded text-sm text-right">{Number(item.quantity).toLocaleString()}</div>
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-600">THRESHOLD</label>
+                <label className="text-xs font-bold text-gray-600">MIN THRESHOLD</label>
                 <div className="p-2 bg-gray-50 border rounded text-sm text-right">{Number(item.min_threshold).toLocaleString()}</div>
               </div>
+              <div>
+                <label className="text-xs font-bold text-gray-600">MAX THRESHOLD</label>
+                <div className="p-2 bg-gray-50 border rounded text-right text-sm whitespace-nowrap overflow-hidden text-ellipsis">{Number(item.max_threshold).toLocaleString()}</div>
+              </div>
+              
             </div>
 
           </div>

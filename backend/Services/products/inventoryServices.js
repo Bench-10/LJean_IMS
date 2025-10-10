@@ -19,11 +19,13 @@ export const getAllUniqueProducts = async () => {
             c.category_id,
             c.category_name,
             ip.unit,
+            p.description,
             STRING_AGG(DISTINCT b.branch_name, ', ' ORDER BY b.branch_name) as branches
         FROM inventory_product ip
         LEFT JOIN category c USING(category_id)
         LEFT JOIN branch b ON ip.branch_id = b.branch_id
-        GROUP BY ip.product_id, ip.product_name, c.category_name, ip.unit, c.category_id
+        LEFT JOIN products p ON ip.product_id = p.product_id
+        GROUP BY ip.product_id, ip.product_name, c.category_name, ip.unit, c.category_id, p.description
         ORDER BY ip.product_name ASC
     `);
 
@@ -36,32 +38,35 @@ export const getAllUniqueProducts = async () => {
 const getUpdatedInventoryList =  async (productId, branchId) => {
    const { rows } = await SQLquery(
         `SELECT 
-            inventory_product.product_id, 
-            branch_id, 
+            ip.product_id, 
+            ip.branch_id, 
             Category.category_id, 
             Category.category_name, 
-            product_name, 
-            unit, 
-            unit_price, 
-            unit_cost, 
+            ip.product_name, 
+            ip.unit, 
+            ip.unit_price, 
+            ip.unit_cost, 
             COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
-            min_threshold,
-            max_threshold 
-        FROM inventory_product
+            ip.min_threshold,
+            ip.max_threshold,
+            p.description
+        FROM inventory_product ip
         LEFT JOIN Category USING(category_id)
         LEFT JOIN Add_Stocks ast USING(product_id, branch_id)
-        WHERE product_id = $1 AND branch_id = $2
+        LEFT JOIN products p ON ip.product_id = p.product_id
+        WHERE ip.product_id = $1 AND ip.branch_id = $2
         GROUP BY 
-            inventory_product.product_id, 
-            branch_id, 
+            ip.product_id, 
+            ip.branch_id, 
             Category.category_id, 
             Category.category_name, 
-            product_name, 
-            unit, 
-            unit_price, 
-            unit_cost, 
-            min_threshold,
-            max_threshold`,
+            ip.product_name, 
+            ip.unit, 
+            ip.unit_price, 
+            ip.unit_cost, 
+            ip.min_threshold,
+            ip.max_threshold,
+            p.description`,
         [productId, branchId],
     );
 
@@ -85,10 +90,12 @@ export const getProductItems = async(branchId) => {
                 ip.unit_cost, 
                 COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
                 ip.min_threshold,
-                ip.max_threshold
+                ip.max_threshold,
+                p.description
             FROM inventory_product ip
             LEFT JOIN category c USING(category_id)
             LEFT JOIN add_stocks ast USING(product_id, branch_id)
+            LEFT JOIN products p ON ip.product_id = p.product_id
             GROUP BY 
                 ip.product_id, 
                 ip.branch_id, 
@@ -99,7 +106,8 @@ export const getProductItems = async(branchId) => {
                 ip.unit_price, 
                 ip.unit_cost, 
                 ip.min_threshold,
-                ip.max_threshold
+                ip.max_threshold,
+                p.description
             ORDER BY ip.product_id ASC;
         `);
 
@@ -110,33 +118,36 @@ export const getProductItems = async(branchId) => {
 
     const {rows} = await SQLquery(`
         SELECT 
-            inventory_product.product_id, 
-            branch_id, 
+            ip.product_id, 
+            ip.branch_id, 
             Category.category_id, 
             Category.category_name, 
-            product_name, 
-            unit, 
-            unit_price, 
-            unit_cost, 
+            ip.product_name, 
+            ip.unit, 
+            ip.unit_price, 
+            ip.unit_cost, 
             COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
-            min_threshold,
-            max_threshold 
-        FROM inventory_product  
+            ip.min_threshold,
+            ip.max_threshold,
+            p.description
+        FROM inventory_product ip  
         LEFT JOIN Category USING(category_id)
         LEFT JOIN Add_Stocks ast USING(product_id, branch_id)
-        WHERE branch_id = $1
+        LEFT JOIN products p ON ip.product_id = p.product_id
+        WHERE ip.branch_id = $1
         GROUP BY 
-            inventory_product.product_id, 
-            branch_id, 
+            ip.product_id, 
+            ip.branch_id, 
             Category.category_id, 
             Category.category_name, 
-            product_name, 
-            unit, 
-            unit_price, 
-            unit_cost, 
-            min_threshold,
-            max_threshold
-        ORDER BY inventory_product.product_id ASC
+            ip.product_name, 
+            ip.unit, 
+            ip.unit_price, 
+            ip.unit_cost, 
+            ip.min_threshold,
+            ip.max_threshold,
+            p.description
+        ORDER BY ip.product_id ASC
     `,[branchId]);
 
     return rows;
@@ -146,7 +157,7 @@ export const getProductItems = async(branchId) => {
 
 
 export const addProductItem = async (productData) => {
-    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id } = productData;
+    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id, description} = productData;
 
     const productAddedNotifheader = "New Product";
     const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
@@ -200,6 +211,23 @@ export const addProductItem = async (productData) => {
     }
 
     await SQLquery('BEGIN');
+
+    // Ensure the master `products` table has an entry for this product_id.
+    // If it doesn't exist, insert it. Do this inside the same transaction so the operation is atomic.
+    try {
+        const prodCheck = await SQLquery('SELECT 1 FROM products WHERE product_id = $1', [product_id]);
+        if (prodCheck.rowCount === 0) {
+            await SQLquery(
+                `INSERT INTO products (product_id, product_name, description)
+                 VALUES ($1, $2, $3)`,
+                [product_id, product_name, description || 'N/A']
+            );
+        }
+    } catch (err) {
+        // If product insert/check fails, rollback and rethrow to keep DB consistent
+        await SQLquery('ROLLBACK');
+        throw err;
+    }
 
     await SQLquery(
         `INSERT INTO Inventory_Product 

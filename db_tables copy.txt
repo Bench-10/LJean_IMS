@@ -85,6 +85,7 @@ CREATE TABLE Inventory_Product (
     threshold INT NOT NULL,
     low_stock_notified BOOLEAN NOT NULL SET DEFAULT FALSE
     PRIMARY KEY (product_id, branch_id), 
+    FOREIGN KEY (product_id) REFERENCES Products(product_id),
     FOREIGN KEY (category_id) REFERENCES Category(category_id),
     FOREIGN KEY (branch_id) REFERENCES Branch(branch_id)
 
@@ -306,3 +307,53 @@ ALTER TABLE Sales_Stock_Usage
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+CREATE TABLE products (
+    product_id INT,
+    product_name VARCHAR(100),
+    description TEXT DEFAULT 'N/A',
+	PRIMARY KEY (product_id) 
+);
+
+
+
+
+
+ALTER TABLE Inventory_Product
+    ADD CONSTRAINT inventory_product_product_fk
+    FOREIGN KEY (product_id)
+    REFERENCES Products(product_id);
+
+
+
+
+    INSERT INTO Products (product_id, product_name)
+SELECT DISTINCT ip.product_id, ip.product_name
+FROM Inventory_Product ip
+LEFT JOIN Products p
+    ON ip.product_id = p.product_id
+WHERE p.product_id IS NULL;
+
+
+
+
+-- Add approval workflow fields to Users table
+ALTER TABLE Users 
+ADD COLUMN status VARCHAR(20) DEFAULT 'active',
+ADD COLUMN created_by INT,
+ADD COLUMN approved_by INT,
+ADD COLUMN approved_at TIMESTAMP,
+ADD COLUMN rejection_reason TEXT;
+
+-- Update existing users to have active status
+UPDATE Users SET status = 'active' WHERE status IS NULL;

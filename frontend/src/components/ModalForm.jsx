@@ -26,6 +26,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const [exceedQunatity, setForExeedQuantity] = useState('');
   const [product_validity, setExpirationDate] = useState('');
   const [maxQuant, setMaxQuant] = useState(false);
+  const [description, setDescription] = useState('');
 
   // EXISTING PRODUCT SELECTION STATES
   const [existingProducts, setExistingProducts] = useState([]);
@@ -88,6 +89,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
           setExpirationDate('');
           setMaxQuant(false);
           setForExeedQuantity('');
+          setDescription('');
           
           // FETCH EXISTING PRODUCTS FOR SELECTION
           fetchExistingProducts();
@@ -106,6 +108,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
         setForExeedQuantity(itemData.quantity)
         setDatePurchased('');
         setExpirationDate('');
+        setDescription(itemData.description);
       } 
     }
   }, [isModalOpen, mode, itemData]); 
@@ -121,6 +124,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     setUnit(product.unit);
     setCategory(product.category_id);
     setShowExistingProducts(false);
+    setDescription(product.description);
   };
 
   // FILTER EXISTING PRODUCTS BASED ON SEARCH TERM
@@ -267,7 +271,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
         product_validity,
         userID: user.user_id,
         fullName: user.full_name,
-        existing_product_id: selectedExistingProduct?.product_id || null
+        existing_product_id: selectedExistingProduct?.product_id || null,
+        description,
       };
 
       //SENDS THE DATA TO App.jsx TO BE SENT TO DATABASE
@@ -340,7 +345,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
         <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
-      <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[760px] rounded-md p-7 animate-popup" >
+      <div className="relative flex flex-col border border-gray-600/40 bg-white h-[680px] w-[760px] rounded-md p-7 animate-popup ">
 
 
               <div>
@@ -446,6 +451,18 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* DESCRIPTION FIELD */}
+                <div className="mt-4 mb-4">
+                  <textarea
+                    placeholder="Enter product description"
+                    className="bg-gray-100 border-gray-300 py-2 px-3 w-full rounded-md border-2 min-h-[48px] resize-none" 
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    disabled={selectedExistingProduct || mode === 'edit'}
+
+                  />
                 </div>
 
                 <div className="flex justify-between gap-x-5 mt-6">
