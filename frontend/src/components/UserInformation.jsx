@@ -10,6 +10,47 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
   const {user} = useAuth();
 
+    const getStatusBadge = () => {
+        if (userDetailes.status === 'pending') {
+            return {
+                label: 'For Approval',
+                className: 'bg-amber-100 text-amber-700 border border-amber-300'
+            };
+        }
+
+        if (userDetailes.is_disabled) {
+            return {
+                label: 'Disabled',
+                className: 'bg-red-400 text-red-900'
+            };
+        }
+
+        if (userDetailes.is_active) {
+            return {
+                label: 'Active',
+                className: 'bg-green-500 text-green-900'
+            };
+        }
+
+        return {
+            label: 'Inactive',
+            className: 'bg-gray-200 text-gray-500'
+        };
+    };
+
+    const formatDateTime = (value) => {
+        if (!value) return null;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+    };
+
 
   //FOR DIALOG
   const [openDialog, setDialog] = useState(false);
@@ -82,11 +123,23 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                     </div>
 
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>STATUS</h1>
-                        <span className={`text-lg font-semibold py-1 px-4 rounded-full ${userDetailes.is_active ? 'bg-green-500 text-green-900': userDetailes.is_disabled ? 'bg-red-500 text-red-900' : 'bg-gray-200 text-gray-500' } `}>{userDetailes.is_active ? 'Active': userDetailes.is_disabled ? 'Disabled' : 'Inactive'}</span>
-
-                    </div>
+                                        <div className='p-5 bg-gray-100 rounded-md'>
+                                                <h1 className='mb-1 font-semibold text-xs'>ACCOUNT STATUS</h1>
+                                                {(() => {
+                                                    const badge = getStatusBadge();
+                                                    return (
+                                                        <span className={`text-lg font-semibold py-1 px-4 rounded-full inline-block ${badge.className}`}>
+                                                            {badge.label}
+                                                        </span>
+                                                    );
+                                                })()}
+                                                {userDetailes.status === 'pending' && (
+                                                    <p className='text-xs font-semibold text-amber-600 mt-2'>Awaiting owner approval before activation.</p>
+                                                )}
+                                                {userDetailes.status === 'active' && formatDateTime(userDetailes.approved_at) && (
+                                                    <p className='text-xs text-gray-500 mt-2'>Approved on {formatDateTime(userDetailes.approved_at)}</p>
+                                                )}
+                                        </div>
 
                     <div className='p-5 bg-gray-100 rounded-md'>
                         <h1 className='mb-1 font-semibold text-xs'>PERMISSIONS</h1>

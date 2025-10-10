@@ -116,6 +116,38 @@ export const userUpdateAccount = async (req, res) =>{
 
 
 
+export const approvePendingUser = async (req, res) => {
+    try {
+        const userID = req.params.id;
+        const { approver_id, approver_roles } = req.body;
+
+        let isOwner = false;
+
+        if (approver_id) {
+            const approver = await SQLquery('SELECT role FROM Users WHERE user_id = $1', [approver_id]);
+            const rolesFromDb = approver.rows[0]?.role || [];
+            isOwner = Array.isArray(rolesFromDb) ? rolesFromDb.includes('Owner') : rolesFromDb === 'Owner';
+        }
+
+        if (!isOwner && Array.isArray(approver_roles)) {
+            isOwner = approver_roles.includes('Owner');
+        }
+
+        if (!isOwner) {
+            return res.status(403).json({ message: 'Only owners can approve accounts' });
+        }
+
+        const user = await userCreation.approvePendingUser(userID, approver_id ?? null);
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Error approving user: ', error);
+        const statusCode = error.message === 'User not found or already processed' ? 400 : 500;
+        res.status(statusCode).json({message: error.message || 'Internal Server Error'});
+    }
+};
+
+
+
 //DELETING AN ACCOUNT
 export const userDeletionAccount = async (req, res) =>{
     try {

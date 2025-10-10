@@ -6,7 +6,7 @@ import EnableDisableAccountDialog from "../components/dialogs/EnableDisableAccou
 import ChartLoading from "../components/common/ChartLoading";
 
 
-function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUserDetailes, sanitizeInput, disableEnableAccount, usersLoading}) {
+function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUserDetailes, sanitizeInput, disableEnableAccount, usersLoading, approvePendingAccount}) {
 
 
 
@@ -16,6 +16,9 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
   const [openAccountStatusDialog, setOpenAccountStatusDialog] = useState(false);
   const [userStatus, setUserStatus] = useState(false);
   const [userInfo, setUserInfo] = useState({});
+  const [approvingUserId, setApprovingUserId] = useState(null);
+
+  const isOwnerUser = user && user.role && user.role.some(role => ['Owner'].includes(role));
   
 
   const handleSearch = (event) =>{
@@ -26,8 +29,53 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
 
   const filteredUserData = users.filter((user) => 
     user.full_name.toLowerCase().includes(searchItem.toLowerCase()) || 
-    user.branch.toLowerCase().includes(searchItem.toLowerCase())
+    user.branch.toLowerCase().includes(searchItem.toLowerCase()) ||
+    (user.status ? user.status.toLowerCase().includes(searchItem.toLowerCase()) : false)
   );
+
+
+  const getStatusBadge = (row) => {
+    if (row.status === 'pending') {
+      return {
+        label: 'For Approval',
+        className: 'bg-amber-100 text-amber-700 border border-amber-300'
+      };
+    }
+
+    if (row.is_disabled) {
+      return {
+        label: 'Disabled',
+        className: 'bg-red-400 text-red-800'
+      };
+    }
+
+    if (row.is_active) {
+      return {
+        label: 'Active',
+        className: 'bg-[#61E85C] text-green-700'
+      };
+    }
+
+    return {
+      label: 'Inactive',
+      className: 'bg-gray-200 text-gray-500'
+    };
+  };
+
+
+  const handleApprove = async (event, pendingUser) => {
+    event.stopPropagation();
+    if (!approvePendingAccount) return;
+
+    try {
+      setApprovingUserId(pendingUser.user_id);
+      await approvePendingAccount(pendingUser.user_id);
+    } catch (error) {
+      console.error('Error approving user:', error);
+    } finally {
+      setApprovingUserId(null);
+    }
+  };
 
 
 
@@ -135,11 +183,19 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
                   ) : 
 
                   (
-                    filteredUserData.map((row, rowIndex) => (
-                  
-                      <tr key={rowIndex} className={`${!row.is_disabled ? 'hover:bg-gray-200/70': ''} h-14 ${row.is_disabled ? 'bg-red-200': (rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} cursor-pointer ${row.is_disabled ? 'text-red-900':''}` } onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
+                    filteredUserData.map((row, rowIndex) => {
+                      const rowBaseClass = row.is_disabled
+                        ? 'h-14 bg-red-200 text-red-900 cursor-pointer'
+                        : row.status === 'pending'
+                          ? 'h-14 bg-amber-50 hover:bg-amber-100 cursor-pointer'
+                          : `h-14 ${((rowIndex + 1) % 2 === 0 ? 'bg-[#F6F6F6]' : '')} hover:bg-gray-200/70 cursor-pointer`;
+
+                      const statusBadge = getStatusBadge(row);
+
+                      return (
+                        <tr key={rowIndex} className={rowBaseClass} onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
                         <td className="px-4 py-2"  >{row.full_name}</td>
-                        {user && user.role.some(role => ['Owner'].includes(role)) && 
+                        {isOwnerUser && 
                           <td className="px-4 py-2 font-medium whitespace-nowrap" >{row.branch}</td>
                         }
                         <td className="px-4 py-2 whitespace-nowrap"  >
@@ -153,28 +209,43 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
                         </td>
                         <td className="px-4 py-2"  >{row.cell_number}</td>
                         <td className="px-4 py-2 text-center align-middle">
-                          <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${row.is_active ? 'bg-[#61E85C] text-green-700 ' : row.is_disabled ? 'bg-red-400 text-red-800' : 'bg-gray-200 text-gray-500' }`}> 
-                              {row.is_active ? 'Active' : row.is_disabled ? 'Disabled' : 'Inactive'}
+                          <div className={`mx-auto text-center font-semibold w-32 rounded-full px-5 py-1 ${statusBadge.className}`}>
+                              {statusBadge.label}
                           </div>
                         </td>
 
                         <td className="text-center align-middle">
-                          <button
-                            className={`py-2 px-4 ${row.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'} w-auto rounded-md flex items-center justify-center gap-2 mx-auto`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setUserStatus(row.is_disabled);
-                              setUserInfo(row);
-                              setOpenAccountStatusDialog(true);
-                            }}
-                          >
-                            {row.is_disabled ? <MdOutlineDesktopWindows /> : <MdOutlineDesktopAccessDisabled />}
-                            {row.is_disabled ? "Enable account" : "Disable account"}
-                          </button>
+                          {row.status === 'pending' ? (
+                            isOwnerUser ? (
+                              <button
+                                className={`py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white w-auto rounded-md flex items-center justify-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed`}
+                                onClick={(e) => handleApprove(e, row)}
+                                disabled={approvingUserId === row.user_id}
+                              >
+                                {approvingUserId === row.user_id ? 'Approving...' : 'Approve account'}
+                              </button>
+                            ) : (
+                              <span className="text-sm font-semibold text-amber-600">Awaiting owner approval</span>
+                            )
+                          ) : (
+                            <button
+                              className={`py-2 px-4 ${row.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'} w-auto rounded-md flex items-center justify-center gap-2 mx-auto`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setUserStatus(row.is_disabled);
+                                setUserInfo(row);
+                                setOpenAccountStatusDialog(true);
+                              }}
+                            >
+                              {row.is_disabled ? <MdOutlineDesktopWindows /> : <MdOutlineDesktopAccessDisabled />}
+                              {row.is_disabled ? "Enable account" : "Disable account"}
+                            </button>
+                          )}
                         </td>
 
                       </tr>
-                    ))
+                      );
+                    })
                   )
                 )
               }

@@ -32,6 +32,10 @@ router.post("/create_account", userControllers.userCreationAccount);
 router.put("/update_account/:id", userControllers.userUpdateAccount);
 
 
+//APPROVE PENDING USER ACCOUNT
+router.patch("/users/:id/approval", userControllers.approvePendingUser);
+
+
 //USER DELETION
 router.delete("/delete_account/:id", userControllers.userDeletionAccount);
 

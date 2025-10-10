@@ -108,6 +108,12 @@ export const broadcastNotification = (branchId, notification) => {
 };
 
 
+// BROADCAST A NOTIFICATION TO ALL OWNERS (CROSS-BRANCH)
+export const broadcastOwnerNotification = (notification) => {
+  io.to('owners').emit('new-notification', notification);
+};
+
+
 
 // BROADCAST INVENTORY UPDATE TO ALL USERS IN BRANCH
 export const broadcastInventoryUpdate = (branchId, inventoryData) => {

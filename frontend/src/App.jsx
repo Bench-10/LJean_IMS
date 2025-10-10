@@ -442,7 +442,10 @@ function App() {
       
       if (userData.action === 'add') {
         // NEW USER ADDED - UPDATE USERS LIST
-        setUsers(prevUsers => [userData.user, ...prevUsers]);
+        setUsers(prevUsers => {
+          const filtered = prevUsers.filter(existing => existing.user_id !== userData.user.user_id);
+          return [userData.user, ...filtered];
+        });
         
         // Don't show "user added successfully" to other users
         // This WebSocket event just updates the data silently for other users
@@ -782,6 +785,20 @@ function App() {
   };
 
 
+  const approvePendingAccount = async (userId) => {
+    if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) return;
+
+    try {
+      await api.patch(`/api/users/${userId}/approval`, {
+        approver_id: user.user_id ?? null,
+        approver_roles: user.role || []
+      });
+    } catch (error) {
+      console.error('Error approving user:', error);
+    }
+  };
+
+
   //CANCULATE UNREAD NOTIFICATION
   const unreadCount = notify.filter(notification => !notification.is_read).length;
 
@@ -1005,6 +1022,7 @@ function App() {
                     users={users}
                     user={user}
                     usersLoading={usersLoading}
+                    approvePendingAccount={approvePendingAccount}
                   
                   />
 

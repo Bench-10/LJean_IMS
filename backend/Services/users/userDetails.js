@@ -46,7 +46,11 @@ export const getAllUsers = async (branchId, userId) =>{
                 permissions, 
                 Users.address, 
                 username, 
-                password
+                password,
+                status,
+                Users.created_by,
+                Users.approved_by,
+                Users.approved_at
 
             FROM Users
             JOIN Branch ON Branch.branch_id = Users.branch_id

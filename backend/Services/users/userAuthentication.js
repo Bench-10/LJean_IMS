@@ -26,16 +26,15 @@ export const userAuth = async(loginInformation) =>{
     if (existingUser.rowCount) {
 
         //CHECK IF USER ACCOUNT IS CURRENTLY DISABLED
-        const checkDisabled = await SQLquery(
-            `SELECT u.is_disabled
+        const accountStatusResult = await SQLquery(
+            `SELECT u.is_disabled, u.status
                 FROM users u
-                LEFT JOIN login_credentials lc ON u.user_id = lc.user_id
+                JOIN login_credentials lc ON u.user_id = lc.user_id
                 WHERE lc.username = $1`,
             [username]
-            
-        )
+        );
 
-        if (checkDisabled.rowCount && checkDisabled.rows[0].is_disabled){
+        if (accountStatusResult.rowCount && accountStatusResult.rows[0].is_disabled){
 
             return { error: "Account Disabled" };
 
@@ -49,6 +48,14 @@ export const userAuth = async(loginInformation) =>{
             return { error: "Invalid password" };
 
         };
+
+        const accountStatus = accountStatusResult.rows[0]?.status || 'active';
+        if (accountStatus !== 'active') {
+            const errorMessage = accountStatus === 'pending'
+                ? 'Account pending owner approval'
+                : 'Account not active';
+            return { error: errorMessage };
+        }
 
 
         // RECORDS CURRENT TIME AND DAY using dayjs

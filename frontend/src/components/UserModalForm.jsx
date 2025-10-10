@@ -244,6 +244,8 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
         address,
         username,
         password,
+          created_by: user?.user_id,
+          creator_roles: user?.role || [],
 
      };
 
