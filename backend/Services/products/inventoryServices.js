@@ -1,5 +1,5 @@
 import { SQLquery } from "../../db.js";
-import { broadcastNotification, broadcastInventoryUpdate, broadcastValidityUpdate, broadcastHistoryUpdate, broadcastInventoryApprovalRequest, broadcastInventoryApprovalUpdate, broadcastToUser } from "../../server.js";
+import { broadcastNotification, broadcastOwnerNotification, broadcastInventoryUpdate, broadcastValidityUpdate, broadcastHistoryUpdate, broadcastInventoryApprovalRequest, broadcastInventoryApprovalRequestToOwners, broadcastInventoryApprovalUpdate, broadcastToUser } from "../../server.js";
 import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
 
 //HELPER FUNCTION TO GET CATEGORY NAME
@@ -53,12 +53,20 @@ const mapPendingRequest = (row) => {
     return {
         pending_id: row.pending_id,
         branch_id: row.branch_id,
+        branch_name: row.branch_name,
         product_id: row.product_id,
         action_type: row.action_type,
         status: row.status,
+        current_stage: row.current_stage,
+        requires_admin_review: row.requires_admin_review,
         created_by: row.created_by,
         created_by_name: row.created_by_name,
         created_by_roles: row.created_by_roles,
+        manager_approver_id: row.manager_approver_id,
+        manager_approved_at: row.manager_approved_at,
+    manager_approver_name: row.manager_approver_name,
+        admin_approver_id: row.admin_approver_id,
+        admin_approved_at: row.admin_approved_at,
         approved_by: row.approved_by,
         approved_at: row.approved_at,
         rejection_reason: row.rejection_reason,
@@ -75,6 +83,13 @@ const getUserFullName = async (userId) => {
     return `${rows[0].first_name} ${rows[0].last_name}`.trim();
 };
 
+const getAdminFullName = async (adminId) => {
+    if (!adminId) return null;
+    const { rows } = await SQLquery('SELECT first_name, last_name FROM Administrator WHERE admin_id = $1', [adminId]);
+    if (rows.length === 0) return null;
+    return `${rows[0].first_name ?? ''} ${rows[0].last_name ?? ''}`.trim();
+};
+
 
 const createPendingInventoryAction = async ({
     actionType,
@@ -85,6 +100,8 @@ const createPendingInventoryAction = async ({
 }) => {
     const sanitizedPayload = sanitizeProductPayload(productData);
     const categoryName = sanitizedPayload?.category_id ? await getCategoryName(sanitizedPayload.category_id) : null;
+    const isCreateAction = actionType === 'create';
+    const requiresAdminReview = isCreateAction && !(sanitizedPayload?.existing_product_id);
 
     const payload = {
         productData: sanitizedPayload,
@@ -94,14 +111,15 @@ const createPendingInventoryAction = async ({
 
     const { rows } = await SQLquery(
         `INSERT INTO Inventory_Pending_Actions
-            (branch_id, product_id, action_type, payload, status, created_by, created_by_name, created_by_roles)
-         VALUES ($1, $2, $3, $4::jsonb, 'pending', $5, $6, $7)
+            (branch_id, product_id, action_type, payload, status, current_stage, requires_admin_review, created_by, created_by_name, created_by_roles)
+         VALUES ($1, $2, $3, $4::jsonb, 'pending', 'manager_review', $5, $6, $7, $8)
          RETURNING *` ,
         [
             branchId,
             productId,
             actionType,
             JSON.stringify(payload),
+            requiresAdminReview,
             sanitizedPayload?.userID || null,
             sanitizedPayload?.fullName || null,
             sanitizedPayload?.requestor_roles || []
@@ -743,19 +761,42 @@ export const searchProductItem = async (searchItem) =>{
 
 export const getPendingInventoryRequests = async (branchId) => {
     const { rows } = await SQLquery(
-        `SELECT * FROM Inventory_Pending_Actions
-         WHERE branch_id = $1 AND status = 'pending'
-         ORDER BY created_at ASC`,
+        `SELECT ipa.*, b.branch_name,
+                (manager.first_name || ' ' || manager.last_name) AS manager_approver_name
+         FROM Inventory_Pending_Actions ipa
+         LEFT JOIN Branch b ON ipa.branch_id = b.branch_id
+         LEFT JOIN Users manager ON manager.user_id = ipa.manager_approver_id
+         WHERE ipa.branch_id = $1 AND ipa.status = 'pending' AND ipa.current_stage = 'manager_review'
+         ORDER BY ipa.created_at ASC`,
         [branchId]
     );
 
     return rows.map(mapPendingRequest);
 };
 
+export const getAdminPendingInventoryRequests = async () => {
+    const { rows } = await SQLquery(
+        `SELECT ipa.*, b.branch_name,
+                (manager.first_name || ' ' || manager.last_name) AS manager_approver_name
+         FROM Inventory_Pending_Actions ipa
+         LEFT JOIN Branch b ON ipa.branch_id = b.branch_id
+         LEFT JOIN Users manager ON manager.user_id = ipa.manager_approver_id
+         WHERE ipa.status = 'pending' AND ipa.current_stage = 'admin_review'
+         ORDER BY ipa.created_at ASC`
+    );
 
-export const approvePendingInventoryRequest = async (pendingId, approverId) => {
+    return rows.map(mapPendingRequest);
+};
+
+
+export const approvePendingInventoryRequest = async (pendingId, approverId, options = {}) => {
+    const { actorType = 'manager' } = options;
+
     const pendingResult = await SQLquery(
-        `SELECT * FROM Inventory_Pending_Actions WHERE pending_id = $1`,
+        `SELECT ipa.*, b.branch_name
+         FROM Inventory_Pending_Actions ipa
+         LEFT JOIN Branch b ON ipa.branch_id = b.branch_id
+         WHERE pending_id = $1`,
         [pendingId]
     );
 
@@ -777,7 +818,181 @@ export const approvePendingInventoryRequest = async (pendingId, approverId) => {
         roles: pending.created_by_roles
     };
 
+    if (actorType === 'admin') {
+        if (!pending.requires_admin_review) {
+            throw new Error('This inventory request does not require owner approval');
+        }
+
+        if (pending.current_stage !== 'admin_review') {
+            throw new Error('Pending inventory request is not awaiting owner approval');
+        }
+
+        const adminName = await getAdminFullName(approverId);
+
+        let approvalResult;
+
+        if (pending.action_type === 'update') {
+            const targetProductId = pending.product_id || productPayload.product_id;
+
+            if (!targetProductId) {
+                throw new Error('Pending update request is missing the target product ID');
+            }
+
+            approvalResult = await updateProductItem(
+                { ...productPayload, branch_id: pending.branch_id },
+                targetProductId,
+                {
+                    bypassApproval: true,
+                    requestedBy,
+                    actingUser: {
+                        userID: approverId,
+                        fullName: adminName
+                    }
+                }
+            );
+        } else if (pending.action_type === 'create') {
+            approvalResult = await addProductItem(productPayload, {
+                bypassApproval: true,
+                requestedBy,
+                actingUser: {
+                    userID: approverId,
+                    fullName: adminName
+                }
+            });
+        } else {
+            throw new Error(`Unsupported pending inventory action type: ${pending.action_type}`);
+        }
+
+        const { rows: updateRows } = await SQLquery(
+            `UPDATE Inventory_Pending_Actions
+             SET status = 'approved',
+                 current_stage = 'completed',
+                 admin_approver_id = $1,
+                 admin_approved_at = NOW()
+             WHERE pending_id = $2
+             RETURNING *`,
+            [approverId, pendingId]
+        );
+
+        const updatedPending = {
+            ...mapPendingRequest(updateRows[0]),
+            branch_name: pending.branch_name,
+            manager_approver_name: pending.manager_approver_name
+        };
+
+        broadcastInventoryApprovalUpdate(pending.branch_id, {
+            pending_id: pending.pending_id,
+            status: 'approved',
+            action: pending.action_type,
+            branch_id: pending.branch_id,
+            product: approvalResult.product
+        });
+
+        const productName = productPayload.product_name || 'Inventory item';
+
+        if (requestedBy.userID) {
+            broadcastToUser(requestedBy.userID, {
+                alert_id: `inventory-final-approved-${pendingId}-${Date.now()}`,
+                alert_type: 'Inventory Request Approved',
+                message: `${productName} was approved by the owner.`,
+                banner_color: 'green',
+                created_at: new Date().toISOString()
+            });
+        }
+
+        if (pending.manager_approver_id) {
+            broadcastToUser(pending.manager_approver_id, {
+                alert_id: `inventory-final-approved-manager-${pendingId}-${Date.now()}`,
+                alert_type: 'Inventory Request Approved',
+                message: `${productName} was approved by the owner.`,
+                banner_color: 'green',
+                created_at: new Date().toISOString()
+            });
+        }
+
+        return {
+            status: 'approved',
+            action: pending.action_type,
+            product: approvalResult.product,
+            pending: updatedPending
+        };
+    }
+
+    if (pending.current_stage !== 'manager_review') {
+        throw new Error('Pending inventory request is not awaiting branch manager approval');
+    }
+
     const approverName = await getUserFullName(approverId);
+
+    if (pending.requires_admin_review) {
+        const { rows: updatedRows } = await SQLquery(
+            `UPDATE Inventory_Pending_Actions
+             SET current_stage = 'admin_review',
+                 manager_approver_id = $1,
+                 manager_approved_at = NOW(),
+                 approved_by = $1,
+                 approved_at = NOW()
+             WHERE pending_id = $2
+             RETURNING *`,
+            [approverId, pendingId]
+        );
+
+        const updatedPending = {
+            ...mapPendingRequest(updatedRows[0]),
+            branch_name: pending.branch_name,
+            manager_approver_name: approverName || pending.manager_approver_name
+        };
+        const productName = productPayload.product_name || 'Inventory item';
+        const requesterName = requestedBy.fullName || 'Inventory staff member';
+        const message = `${approverName || 'Branch Manager'} approved ${productName}. Awaiting owner confirmation.`;
+
+        const alertResult = await SQLquery(
+            `INSERT INTO Inventory_Alerts 
+            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *`,
+            [pending.product_id || productPayload.product_id || null, pending.branch_id, 'Inventory Admin Approval Needed', message, 'orange', approverId, approverName]
+        );
+
+        if (alertResult.rows[0]) {
+            broadcastOwnerNotification({
+                alert_id: alertResult.rows[0].alert_id,
+                alert_type: 'Inventory Admin Approval Needed',
+                message,
+                banner_color: 'orange',
+                alert_date: alertResult.rows[0].alert_date,
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            }, { category: 'inventory', targetRoles: ['Owner'] });
+        }
+
+        broadcastInventoryApprovalRequestToOwners({ request: updatedPending });
+
+        if (requestedBy.userID) {
+            broadcastToUser(requestedBy.userID, {
+                alert_id: `inventory-forwarded-${pendingId}-${Date.now()}`,
+                alert_type: 'Inventory Request Forwarded',
+                message: `${productName} was approved by ${approverName || 'Branch Manager'} and is awaiting owner approval.`,
+                banner_color: 'blue',
+                created_at: new Date().toISOString()
+            });
+        }
+
+        broadcastInventoryApprovalUpdate(pending.branch_id, {
+            pending_id: pending.pending_id,
+            status: 'pending_admin',
+            action: pending.action_type,
+            branch_id: pending.branch_id,
+            next_stage: 'admin_review'
+        });
+
+        return {
+            status: 'pending',
+            next_stage: 'admin_review',
+            action: pending.action_type,
+            pending: updatedPending
+        };
+    }
 
     let approvalResult;
 
@@ -815,7 +1030,12 @@ export const approvePendingInventoryRequest = async (pendingId, approverId) => {
 
     await SQLquery(
         `UPDATE Inventory_Pending_Actions
-         SET status = 'approved', approved_by = $1, approved_at = NOW()
+         SET status = 'approved',
+             current_stage = 'completed',
+             manager_approver_id = $1,
+             manager_approved_at = NOW(),
+             approved_by = $1,
+             approved_at = NOW()
          WHERE pending_id = $2`,
         [approverId, pendingId]
     );
@@ -846,24 +1066,102 @@ export const approvePendingInventoryRequest = async (pendingId, approverId) => {
 };
 
 
-export const rejectPendingInventoryRequest = async (pendingId, approverId, reason = null) => {
-    const { rows } = await SQLquery(
-        `UPDATE Inventory_Pending_Actions
-         SET status = 'rejected', approved_by = $1, approved_at = NOW(), rejection_reason = $2
-         WHERE pending_id = $3 AND status = 'pending'
-         RETURNING *`,
-        [approverId, reason, pendingId]
+export const rejectPendingInventoryRequest = async (pendingId, approverId, reason = null, options = {}) => {
+    const { actorType = 'manager' } = options;
+
+    const pendingResult = await SQLquery(
+        `SELECT * FROM Inventory_Pending_Actions WHERE pending_id = $1`,
+        [pendingId]
     );
 
-    if (rows.length === 0) {
-        throw new Error('Pending inventory request not found or already processed');
+    if (pendingResult.rowCount === 0) {
+        throw new Error('Pending inventory request not found');
     }
 
-    const pending = rows[0];
+    const pending = pendingResult.rows[0];
+
+    if (pending.status !== 'pending') {
+        throw new Error('Pending inventory request has already been processed');
+    }
+
     const requestedBy = {
         userID: pending.created_by,
         fullName: pending.created_by_name
     };
+
+    if (actorType === 'admin') {
+        if (!pending.requires_admin_review || pending.current_stage !== 'admin_review') {
+            throw new Error('Pending inventory request is not awaiting owner approval');
+        }
+
+        const { rows } = await SQLquery(
+            `UPDATE Inventory_Pending_Actions
+             SET status = 'rejected',
+                 current_stage = 'completed',
+                 admin_approver_id = $1,
+                 admin_approved_at = NOW(),
+                 rejection_reason = $2
+             WHERE pending_id = $3
+             RETURNING *`,
+            [approverId, reason, pendingId]
+        );
+
+        const updated = rows[0];
+
+        broadcastInventoryApprovalUpdate(pending.branch_id, {
+            pending_id,
+            status: 'rejected',
+            action: pending.action_type,
+            branch_id: pending.branch_id,
+            reason
+        });
+
+        const rejectionMessage = reason
+            ? `Inventory request was rejected by the owner: ${reason}`
+            : 'Inventory request was rejected by the owner.';
+
+        if (requestedBy.userID) {
+            broadcastToUser(requestedBy.userID, {
+                alert_id: `inventory-admin-reject-${pendingId}-${Date.now()}`,
+                alert_type: 'Inventory Request Rejected',
+                message: rejectionMessage,
+                banner_color: 'red',
+                created_at: new Date().toISOString()
+            });
+        }
+
+        if (pending.manager_approver_id) {
+            broadcastToUser(pending.manager_approver_id, {
+                alert_id: `inventory-admin-reject-manager-${pendingId}-${Date.now()}`,
+                alert_type: 'Inventory Request Rejected',
+                message: rejectionMessage,
+                banner_color: 'red',
+                created_at: new Date().toISOString()
+            });
+        }
+
+        return mapPendingRequest(updated);
+    }
+
+    if (pending.current_stage !== 'manager_review') {
+        throw new Error('Pending inventory request is not awaiting branch manager approval');
+    }
+
+    const { rows } = await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET status = 'rejected',
+             current_stage = 'completed',
+             manager_approver_id = $1,
+             manager_approved_at = NOW(),
+             approved_by = $1,
+             approved_at = NOW(),
+             rejection_reason = $2
+         WHERE pending_id = $3
+         RETURNING *`,
+        [approverId, reason, pendingId]
+    );
+
+    const updated = rows[0];
 
     broadcastInventoryApprovalUpdate(pending.branch_id, {
         pending_id,
@@ -874,14 +1172,16 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
     });
 
     if (requestedBy.userID) {
+        const rejectionMessage = reason ? `Inventory request was rejected: ${reason}` : 'Inventory request was rejected by the branch manager.';
+
         broadcastToUser(requestedBy.userID, {
             alert_id: `inventory-reject-${pendingId}-${Date.now()}`,
             alert_type: 'Inventory Request Rejected',
-            message: reason ? `Inventory request was rejected: ${reason}` : 'Inventory request was rejected by the branch manager.',
+            message: rejectionMessage,
             banner_color: 'red',
             created_at: new Date().toISOString()
         });
     }
 
-    return mapPendingRequest(pending);
+    return mapPendingRequest(updated);
 };

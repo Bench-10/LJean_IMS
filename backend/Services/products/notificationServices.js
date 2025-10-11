@@ -52,7 +52,7 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
       FROM Inventory_Alerts ia
       LEFT JOIN admin_notification an
         ON ia.alert_id = an.alert_id AND an.admin_id = $1
-      WHERE ia.alert_type = 'User Approval Needed'
+      WHERE ia.alert_type IN ('User Approval Needed', 'Inventory Admin Approval Needed')
       ORDER BY ia.alert_date DESC
       LIMIT 100
     `, [adminId]);
@@ -113,7 +113,7 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
     const { rows: adminAlerts } = await SQLquery(`
       SELECT alert_id
       FROM Inventory_Alerts
-      WHERE alert_type = 'User Approval Needed'
+      WHERE alert_type IN ('User Approval Needed', 'Inventory Admin Approval Needed')
     `);
 
     if (adminAlerts.length === 0) {
@@ -124,7 +124,7 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
       `INSERT INTO admin_notification(admin_id, alert_id, is_read)
        SELECT $1, ia.alert_id, TRUE
        FROM Inventory_Alerts ia
-       WHERE ia.alert_type = 'User Approval Needed'
+       WHERE ia.alert_type IN ('User Approval Needed', 'Inventory Admin Approval Needed')
        ON CONFLICT (admin_id, alert_id) DO UPDATE SET is_read = TRUE`,
       [adminId]
     );

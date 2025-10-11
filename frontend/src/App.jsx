@@ -57,6 +57,8 @@ function App() {
   const [productValidityList, setProductValidityList] = useState([]);
   const [pendingInventoryRequests, setPendingInventoryRequests] = useState([]);
   const [pendingInventoryLoading, setPendingInventoryLoading] = useState(false);
+  const [adminInventoryRequests, setAdminInventoryRequests] = useState([]);
+  const [adminInventoryLoading, setAdminInventoryLoading] = useState(false);
 
   // NOTIFICATION QUEUE SYSTEM
   const [notificationQueue, setNotificationQueue] = useState([]);
@@ -363,11 +365,17 @@ function App() {
     newSocket.on('inventory-approval-request', (payload) => {
       if (!payload || !payload.request) return;
 
-      if (!user || payload.request.branch_id !== user.branch_id) {
+      if (!user) {
         return;
       }
 
-      if (!user.role || !user.role.some(role => ['Branch Manager'].includes(role))) {
+      const isBranchManager = user.role && user.role.some(role => ['Branch Manager'].includes(role));
+
+      if (!isBranchManager) {
+        return;
+      }
+
+      if (payload.request.branch_id !== user.branch_id) {
         return;
       }
 
@@ -377,42 +385,77 @@ function App() {
       });
     });
 
+    newSocket.on('inventory-approval-request-admin', (payload) => {
+      if (!payload || !payload.request) return;
+
+      if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
+        return;
+      }
+
+      setAdminInventoryRequests(prev => {
+        const exists = prev.some(req => req.pending_id === payload.request.pending_id);
+        if (exists) {
+          return prev.map(req => req.pending_id === payload.request.pending_id ? payload.request : req);
+        }
+        return [...prev, payload.request];
+      });
+    });
+
     // LISTEN FOR INVENTORY APPROVAL RESOLUTIONS
     newSocket.on('inventory-approval-updated', (payload) => {
       if (!payload || !payload.pending_id) return;
 
-      if (payload.branch_id && user && payload.branch_id !== user.branch_id) {
+      if (!user) {
         return;
       }
 
-      if (!user || !user.role || !user.role.some(role => ['Branch Manager'].includes(role))) {
-        return;
+      const isBranchManager = user.role && user.role.some(role => ['Branch Manager'].includes(role));
+      const isOwner = user.role && user.role.some(role => ['Owner'].includes(role));
+
+      if (isBranchManager && payload.branch_id && payload.branch_id === user.branch_id) {
+        setPendingInventoryRequests(prev => prev.filter(req => req.pending_id !== payload.pending_id));
+
+        if (payload.status === 'approved' && payload.product) {
+          setProductsData(prevData => {
+            if (payload.action === 'create') {
+              const exists = prevData.some(item => item.product_id === payload.product.product_id && item.branch_id === payload.product.branch_id);
+              return exists ? prevData : [...prevData, payload.product];
+            }
+
+            if (payload.action === 'update') {
+              return prevData.map(item => (
+                item.product_id === payload.product.product_id && item.branch_id === payload.product.branch_id
+                  ? payload.product
+                  : item
+              ));
+            }
+
+            return prevData;
+          });
+        }
+
+        if (payload.status === 'rejected') {
+          const message = payload.reason ? `Inventory request rejected: ${payload.reason}` : 'Inventory request was rejected.';
+          addToNotificationQueue(message, true);
+        }
       }
 
-      setPendingInventoryRequests(prev => prev.filter(req => req.pending_id !== payload.pending_id));
-
-      if (payload.status === 'approved' && payload.product) {
-        setProductsData(prevData => {
-          if (payload.action === 'create') {
-            const exists = prevData.some(item => item.product_id === payload.product.product_id && item.branch_id === payload.product.branch_id);
-            return exists ? prevData : [...prevData, payload.product];
+      if (isOwner) {
+        setAdminInventoryRequests(prev => {
+          if (payload.status === 'approved' || payload.status === 'rejected') {
+            return prev.filter(req => req.pending_id !== payload.pending_id);
           }
 
-          if (payload.action === 'update') {
-            return prevData.map(item => (
-              item.product_id === payload.product.product_id && item.branch_id === payload.product.branch_id
-                ? payload.product
-                : item
+          if (payload.status === 'pending_admin') {
+            return prev.map(req => (
+              req.pending_id === payload.pending_id
+                ? { ...req, status: 'pending', current_stage: 'admin_review' }
+                : req
             ));
           }
 
-          return prevData;
+          return prev;
         });
-      }
-
-      if (payload.status === 'rejected') {
-        const message = payload.reason ? `Inventory request rejected: ${payload.reason}` : 'Inventory request was rejected.';
-        addToNotificationQueue(message, true);
       }
     });
 
@@ -631,6 +674,24 @@ function App() {
   };
 
 
+  const fetchAdminPendingInventoryRequests = async () => {
+    if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
+      return;
+    }
+
+    try {
+      setAdminInventoryLoading(true);
+      const response = await api.get(`/api/items/pending?review_level=admin`);
+      const requests = Array.isArray(response.data) ? response.data : [];
+      setAdminInventoryRequests(requests);
+    } catch (error) {
+      console.error('Error fetching owner inventory approvals:', error);
+    } finally {
+      setAdminInventoryLoading(false);
+    }
+  };
+
+
   const handleApprovePendingInventory = async (pendingId) => {
     if (!user) return;
 
@@ -638,6 +699,12 @@ function App() {
       const response = await api.patch(`/api/items/pending/${pendingId}/approve`, {
         approver_id: user.user_id
       });
+
+      if (response.data?.next_stage === 'admin_review') {
+        setPendingInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+        addToNotificationQueue('Inventory request forwarded to the owner for final approval.', true);
+        return;
+      }
 
       if (response.data?.product) {
         const { product, action } = response.data;
@@ -663,6 +730,28 @@ function App() {
   };
 
 
+  const handleOwnerApprovePendingInventory = async (pendingId) => {
+    if (!user) return;
+
+    const adminIdentifier = user.admin_id ?? user.user_id;
+    if (!adminIdentifier) return;
+
+    try {
+      await api.patch(`/api/items/pending/${pendingId}/approve`, {
+        actor_type: 'admin',
+        admin_id: adminIdentifier
+      });
+
+      setAdminInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+      addToNotificationQueue('Inventory request approved.', true);
+      await fetchProductsData();
+      await fetchAdminPendingInventoryRequests();
+    } catch (error) {
+      console.error('Error approving inventory request as owner:', error);
+    }
+  };
+
+
   const handleRejectPendingInventory = async (pendingId, reason = '') => {
     if (!user) return;
 
@@ -679,6 +768,28 @@ function App() {
     }
   };
 
+
+  const handleOwnerRejectPendingInventory = async (pendingId, reason = '') => {
+    if (!user) return;
+
+    const adminIdentifier = user.admin_id ?? user.user_id;
+    if (!adminIdentifier) return;
+
+    try {
+      await api.patch(`/api/items/pending/${pendingId}/reject`, {
+        actor_type: 'admin',
+        admin_id: adminIdentifier,
+        reason
+      });
+
+      setAdminInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+      addToNotificationQueue('Inventory request rejected.', true);
+      await fetchAdminPendingInventoryRequests();
+    } catch (error) {
+      console.error('Error rejecting inventory request as owner:', error);
+    }
+  };
+
   //RENDERS THE TABLE
   useEffect(() =>{
 
@@ -691,6 +802,7 @@ function App() {
   useEffect(() => {
     if (!user) {
       setPendingInventoryRequests([]);
+      setAdminInventoryRequests([]);
       return;
     }
 
@@ -698,6 +810,12 @@ function App() {
       fetchPendingInventoryRequests();
     } else {
       setPendingInventoryRequests([]);
+    }
+
+    if (user.role && user.role.some(role => ['Owner'].includes(role))) {
+      fetchAdminPendingInventoryRequests();
+    } else {
+      setAdminInventoryRequests([]);
     }
   }, [user]);
 
@@ -1244,6 +1362,11 @@ function App() {
                 usersLoading={usersLoading}
                 approvePendingAccount={approvePendingAccount}
                 sanitizeInput={sanitizeInput}
+                inventoryRequests={adminInventoryRequests}
+                inventoryRequestsLoading={adminInventoryLoading}
+                approveInventoryRequest={handleOwnerApprovePendingInventory}
+                rejectInventoryRequest={handleOwnerRejectPendingInventory}
+                refreshInventoryRequests={fetchAdminPendingInventoryRequests}
               />
 
             </RouteProtection>

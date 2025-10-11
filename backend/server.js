@@ -315,8 +315,13 @@ export const broadcastInventoryApprovalRequest = (branchId, payload) => {
   io.to(`branch-${branchId}`).emit('inventory-approval-request', payload);
 };
 
+export const broadcastInventoryApprovalRequestToOwners = (payload) => {
+  io.to('owners').emit('inventory-approval-request-admin', payload);
+};
+
 export const broadcastInventoryApprovalUpdate = (branchId, payload) => {
   io.to(`branch-${branchId}`).emit('inventory-approval-updated', payload);
+  io.to('owners').emit('inventory-approval-updated', payload);
 };
 
 

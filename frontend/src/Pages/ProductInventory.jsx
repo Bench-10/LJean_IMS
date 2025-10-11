@@ -266,6 +266,11 @@ function ProductInventory({
                                   {request.action_type === 'update' ? 'Update' : 'Add'}
                                 </span>
                                 <span className="text-xs text-gray-500">Requested {formatDateTime(request.created_at)}</span>
+                                {request.requires_admin_review && (
+                                  <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                                    Owner approval required
+                                  </span>
+                                )}
                               </div>
                               <h3 className="text-lg font-semibold text-gray-800 mt-1">
                                 {requestedProduct?.product_name || 'Unnamed Product'}

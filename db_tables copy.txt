@@ -386,9 +386,15 @@ CREATE TABLE Inventory_Pending_Actions (
     action_type TEXT NOT NULL,
     payload JSONB NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
+    current_stage TEXT NOT NULL DEFAULT 'manager_review',
+    requires_admin_review BOOLEAN NOT NULL DEFAULT FALSE,
     created_by INT NOT NULL REFERENCES Users(user_id),
     created_by_name TEXT,
     created_by_roles TEXT[],
+    manager_approver_id INT REFERENCES Users(user_id),
+    manager_approved_at TIMESTAMP,
+    admin_approver_id INT REFERENCES Administrator(admin_id),
+    admin_approved_at TIMESTAMP,
     approved_by INT REFERENCES Users(user_id),
     approved_at TIMESTAMP,
     rejection_reason TEXT,
@@ -396,6 +402,8 @@ CREATE TABLE Inventory_Pending_Actions (
 );
 
 CREATE INDEX idx_inventory_pending_actions_branch ON Inventory_Pending_Actions(branch_id, status);
+CREATE INDEX idx_inventory_pending_actions_stage ON Inventory_Pending_Actions(current_stage, status);
+
 
 
 

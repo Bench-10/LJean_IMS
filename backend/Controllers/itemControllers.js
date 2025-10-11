@@ -97,6 +97,20 @@ export const getAllUniqueProducts = async (req, res) => {
 
 export const getPendingInventoryRequests = async (req, res) => {
     try {
+        const reviewLevel = req.query.review_level ?? 'manager';
+
+        if (reviewLevel === 'admin') {
+            const pendingForAdmin = await inventoryServices.getAdminPendingInventoryRequests();
+            const branchFilter = req.query.branch_id;
+
+            if (branchFilter) {
+                const filtered = pendingForAdmin.filter(request => String(request.branch_id) === String(branchFilter));
+                return res.status(200).json(filtered);
+            }
+
+            return res.status(200).json(pendingForAdmin);
+        }
+
         const branchId = req.query.branch_id;
 
         if (!branchId) {
@@ -115,13 +129,22 @@ export const getPendingInventoryRequests = async (req, res) => {
 export const approvePendingInventoryRequest = async (req, res) => {
     try {
         const pendingId = req.params.id;
-        const { approver_id } = req.body;
+        const { approver_id, admin_id, actor_type = 'manager' } = req.body;
+
+        if (actor_type === 'admin') {
+            if (!admin_id) {
+                return res.status(400).json({ message: 'admin_id is required for owner approval' });
+            }
+
+            const result = await inventoryServices.approvePendingInventoryRequest(Number(pendingId), Number(admin_id), { actorType: 'admin' });
+            return res.status(200).json(result);
+        }
 
         if (!approver_id) {
             return res.status(400).json({ message: 'approver_id is required' });
         }
 
-        const result = await inventoryServices.approvePendingInventoryRequest(Number(pendingId), Number(approver_id));
+        const result = await inventoryServices.approvePendingInventoryRequest(Number(pendingId), Number(approver_id), { actorType: 'manager' });
         res.status(200).json(result);
     } catch (error) {
         console.error('Error approving inventory request: ', error);
@@ -133,13 +156,22 @@ export const approvePendingInventoryRequest = async (req, res) => {
 export const rejectPendingInventoryRequest = async (req, res) => {
     try {
         const pendingId = req.params.id;
-        const { approver_id, reason } = req.body;
+        const { approver_id, admin_id, reason, actor_type = 'manager' } = req.body;
+
+        if (actor_type === 'admin') {
+            if (!admin_id) {
+                return res.status(400).json({ message: 'admin_id is required for owner rejection' });
+            }
+
+            const result = await inventoryServices.rejectPendingInventoryRequest(Number(pendingId), Number(admin_id), reason, { actorType: 'admin' });
+            return res.status(200).json(result);
+        }
 
         if (!approver_id) {
             return res.status(400).json({ message: 'approver_id is required' });
         }
 
-        const result = await inventoryServices.rejectPendingInventoryRequest(Number(pendingId), Number(approver_id), reason);
+        const result = await inventoryServices.rejectPendingInventoryRequest(Number(pendingId), Number(approver_id), reason, { actorType: 'manager' });
         res.status(200).json(result);
     } catch (error) {
         console.error('Error rejecting inventory request: ', error);
