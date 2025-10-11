@@ -790,7 +790,7 @@ function App() {
 
     try {
       await api.patch(`/api/users/${userId}/approval`, {
-        approver_id: user.user_id ?? null,
+        approver_id: user.admin_id ?? null,
         approver_roles: user.role || []
       });
     } catch (error) {

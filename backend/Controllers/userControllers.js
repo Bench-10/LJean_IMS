@@ -124,11 +124,12 @@ export const approvePendingUser = async (req, res) => {
         let isOwner = false;
 
         if (approver_id) {
-            const approver = await SQLquery('SELECT role FROM Users WHERE user_id = $1', [approver_id]);
+            const approver = await SQLquery('SELECT role FROM administrator WHERE admin_id = $1', [approver_id]);
             const rolesFromDb = approver.rows[0]?.role || [];
             isOwner = Array.isArray(rolesFromDb) ? rolesFromDb.includes('Owner') : rolesFromDb === 'Owner';
         }
 
+        //FALLBACK IF THERE IS NO USER ID BUT THERE IS A ROLE
         if (!isOwner && Array.isArray(approver_roles)) {
             isOwner = approver_roles.includes('Owner');
         }

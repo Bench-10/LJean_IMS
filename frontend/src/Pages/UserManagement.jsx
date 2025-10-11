@@ -227,7 +227,11 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
                             ) : (
                               <span className="text-sm font-semibold text-amber-600">Awaiting owner approval</span>
                             )
-                          ) : (
+                          ) 
+                          
+                          : 
+                          
+                          (
                             <button
                               className={`py-2 px-4 ${row.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'} w-auto rounded-md flex items-center justify-center gap-2 mx-auto`}
                               onClick={(e) => {
