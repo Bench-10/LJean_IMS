@@ -112,6 +112,36 @@ const createPendingInventoryAction = async ({
 
     if (mapped) {
         broadcastInventoryApprovalRequest(branchId, { request: mapped });
+
+        const requesterName = sanitizedPayload?.fullName || 'Inventory staff member';
+        const productName = sanitizedPayload?.product_name || 'an inventory item';
+        const categoryLabel = categoryName ? ` (${categoryName})` : '';
+        const verb = actionType === 'update' ? 'update' : 'add';
+        const notificationMessage = `${requesterName} submitted a request to ${verb} ${productName}${categoryLabel}.`;
+
+        const alertResult = await SQLquery(
+            `INSERT INTO Inventory_Alerts 
+            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *`,
+            [productId ?? sanitizedPayload?.product_id ?? null, branchId, 'Inventory Approval Needed', notificationMessage, 'orange', sanitizedPayload?.userID || null, requesterName]
+        );
+
+        if (alertResult.rows[0]) {
+            broadcastNotification(branchId, {
+                alert_id: alertResult.rows[0].alert_id,
+                alert_type: 'Inventory Approval Needed',
+                message: notificationMessage,
+                banner_color: 'orange',
+                user_id: alertResult.rows[0].user_id,
+                user_full_name: requesterName,
+                alert_date: alertResult.rows[0].alert_date,
+                isDateToday: true,
+                alert_date_formatted: 'Just now',
+                target_roles: ['Branch Manager'],
+                creator_id: sanitizedPayload?.userID || null
+            }, { category: 'inventory', targetRoles: ['Branch Manager'] });
+        }
     }
 
     return mapped;

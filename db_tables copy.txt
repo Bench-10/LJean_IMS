@@ -314,6 +314,19 @@ ALTER TABLE Sales_Stock_Usage
 
 
 
+--VERY NEW TABLE SCHEMa
+
+
+ALTER TABLE inventory_product ADD COLUMN max_threshold int 
+
+
+UPDATE inventory_product SET max_threshold = 2000
+
+
+
+ALTER TABLE inventory_product
+RENAME COLUMN threshold TO min_threshold;
+
 
 
 
@@ -326,6 +339,12 @@ CREATE TABLE products (
 );
 
 
+INSERT INTO Products (product_id, product_name)
+SELECT DISTINCT ip.product_id, ip.product_name
+FROM Inventory_Product ip
+LEFT JOIN Products p
+    ON ip.product_id = p.product_id
+WHERE p.product_id IS NULL;
 
 
 
@@ -337,42 +356,30 @@ ALTER TABLE Inventory_Product
 
 
 
-    INSERT INTO Products (product_id, product_name)
-SELECT DISTINCT ip.product_id, ip.product_name
-FROM Inventory_Product ip
-LEFT JOIN Products p
-    ON ip.product_id = p.product_id
-WHERE p.product_id IS NULL;
-
-
-
-
--- Add approval workflow fields to Users table
 ALTER TABLE Users 
 ADD COLUMN status VARCHAR(20) DEFAULT 'active',
 ADD COLUMN created_by INT,
 ADD COLUMN approved_by INT,
-ADD COLUMN approved_at TIMESTAMP,
-ADD COLUMN rejection_reason TEXT;
-
--- Update existing users to have active status
-UPDATE Users SET status = 'active' WHERE status IS NULL;
+ADD COLUMN approved_at TIMESTAMP;
 
 
+CREATE INDEX idx_users_status ON Users(status);
 
--- Add foreign key constraints for audit trail
+
 ALTER TABLE Users 
 ADD CONSTRAINT fk_users_created_by 
 FOREIGN KEY (created_by) REFERENCES Users(user_id);
 
 
--- fix values/migrate if necessary, then add FK
+
 ALTER TABLE Users
   ADD CONSTRAINT fk_users_approved_by
   FOREIGN KEY (approved_by) REFERENCES Administrator(admin_id);
 
 
--- INVENTORY PENDING ACTIONS TABLE FOR APPROVAL WORKFLOW
+
+
+
 CREATE TABLE Inventory_Pending_Actions (
     pending_id SERIAL PRIMARY KEY,
     branch_id INT NOT NULL REFERENCES Branch(branch_id),

@@ -236,7 +236,7 @@ export const addSale = async (headerAndProducts) => {
                 alert_date_formatted: 'Just now',
                 target_roles: ['Sales Associate', 'Branch Manager'], 
                 creator_id: headerInformationAndTotal.userID 
-            });
+            }, { category: 'sales' });
         }
 
         return newSaleRecord;

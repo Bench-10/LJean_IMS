@@ -63,33 +63,157 @@ app.use('/api', passwordResetRoutes);
 // STORE CURRNTLY CONNECTED USERS
 const connectedUsers = new Map();
 
+const normalizeRoles = (roles) => {
+  if (!roles) return [];
+  const arrayRoles = Array.isArray(roles) ? roles : [roles];
+  return [...new Set(arrayRoles
+    .map(role => typeof role === 'string' ? role.trim() : role)
+    .filter(Boolean))];
+};
+
+const normalizeBranchIds = (branchId, branchIds) => {
+  const collected = [];
+
+  if (Array.isArray(branchIds)) {
+    collected.push(...branchIds);
+  } else if (branchIds !== undefined && branchIds !== null && branchIds !== '') {
+    collected.push(branchIds);
+  }
+
+  if (branchId !== undefined && branchId !== null && branchId !== '') {
+    collected.push(branchId);
+  }
+
+  return [...new Set(collected
+    .map(value => {
+      if (value === null || value === undefined || value === '') return null;
+      const numeric = Number(value);
+      return Number.isNaN(numeric) ? String(value) : String(numeric);
+    })
+    .filter(Boolean))];
+};
+
+const matchesBranch = (subscriber, branchId) => {
+  if (branchId === null || branchId === undefined) {
+    return true;
+  }
+
+  const branchToken = String(branchId);
+  const branchPool = (Array.isArray(subscriber.branchIds) && subscriber.branchIds.length > 0)
+    ? subscriber.branchIds
+    : (subscriber.branchId !== undefined && subscriber.branchId !== null
+        ? [String(subscriber.branchId)]
+        : []);
+
+  if (subscriber.userType === 'admin' && branchPool.length === 0) {
+    return true;
+  }
+
+  return branchPool.includes(branchToken);
+};
+
+const shouldDispatchNotification = (subscriber, { category, branchId, targetRoles }) => {
+  if (!subscriber) return false;
+
+  const roles = normalizeRoles(subscriber.roles);
+  if (roles.length === 0) return false;
+
+  if (roles.includes('Owner') && category !== 'account-approval') {
+    return false;
+  }
+
+  if (!matchesBranch(subscriber, branchId)) {
+    return false;
+  }
+
+  if (targetRoles && targetRoles.length > 0) {
+    return targetRoles.some(role => roles.includes(role));
+  }
+
+  switch (category) {
+    case 'inventory':
+      return roles.includes('Branch Manager') || roles.includes('Inventory Staff');
+    case 'sales':
+      return roles.includes('Sales Associate');
+    case 'account-approval':
+      return roles.includes('Owner');
+    default:
+      return true;
+  }
+};
+
+const extractTargetRoles = (notification, options = {}) => {
+  const candidate = options.targetRoles
+    ?? options.target_roles
+    ?? notification?.target_roles
+    ?? notification?.targetRoles;
+
+  if (!candidate) return null;
+  const normalized = normalizeRoles(candidate);
+  return normalized.length > 0 ? normalized : null;
+};
+
+const dispatchRoleBasedNotification = ({ branchId = null, notification, category = 'inventory', targetRoles = null }) => {
+  const normalizedCategory = category;
+  const normalizedTargetRoles = targetRoles ? normalizeRoles(targetRoles) : null;
+
+  for (const [socketId, subscriber] of connectedUsers.entries()) {
+    if (shouldDispatchNotification(subscriber, {
+      category: normalizedCategory,
+      branchId,
+      targetRoles: normalizedTargetRoles
+    })) {
+      io.to(socketId).emit('new-notification', notification);
+    }
+  }
+};
+
 // CONNECTION HANCLE FOR WEB SOCKET
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   // User joins with their branch and user information
-  socket.on('join-branch', (userData) => {
-    const { userId, branchId, role } = userData;
-
-    
-    // Store user information with socket ID
-    connectedUsers.set(socket.id, {
+  socket.on('join-branch', (userData = {}) => {
+    const {
       userId,
-      branchId,
+      adminId,
+      branchId = null,
+      branchIds = null,
       role,
+      roles,
+      userType = 'user'
+    } = userData;
+
+    const normalizedRoles = normalizeRoles(roles ?? role);
+    const normalizedBranchIds = normalizeBranchIds(branchId, branchIds);
+    const entityType = userType === 'admin' ? 'admin' : 'user';
+    const entityId = entityType === 'admin' ? (adminId ?? userId) : userId;
+
+    if (entityId === undefined || entityId === null) {
+      console.warn('Socket attempted to join without valid identifier', userData);
+      return;
+    }
+
+    connectedUsers.set(socket.id, {
+      userId: entityId,
+      userType: entityType,
+      roles: normalizedRoles,
+      branchIds: normalizedBranchIds,
+      branchId: normalizedBranchIds[0] ?? (branchId !== null && branchId !== undefined ? String(branchId) : null),
       socketId: socket.id
     });
 
-    // Join branch-specific room
-    socket.join(`branch-${branchId}`);
-    // If user is an Owner, also join a global owners room so they receive cross-branch updates
-    const isOwner = Array.isArray(role) ? role.some(r => r === 'Owner') : role === 'Owner';
-    if (isOwner) {
-      socket.join('owners');
-      console.log(`User ${userId} joined owners room`);
+    if (normalizedBranchIds.length > 0) {
+      normalizedBranchIds.forEach(id => socket.join(`branch-${id}`));
+    } else if (branchId !== null && branchId !== undefined && branchId !== '') {
+      socket.join(`branch-${branchId}`);
     }
-    
-    console.log(`User ${userId} joined branch ${branchId}`);
+
+    if (normalizedRoles.includes('Owner')) {
+      socket.join('owners');
+    }
+
+    console.log(`User ${entityId} (${entityType}) connected with roles [${normalizedRoles.join(', ')}]${normalizedBranchIds.length ? ` on branches [${normalizedBranchIds.join(', ')}]` : ''}`);
   });
 
 
@@ -103,14 +227,29 @@ io.on('connection', (socket) => {
 
 
 // BROADCAST NOTIFICATION TO ALL USERS BASE ON BRANCH
-export const broadcastNotification = (branchId, notification) => {
-  io.to(`branch-${branchId}`).emit('new-notification', notification);
+export const broadcastNotification = (branchId, notification, options = {}) => {
+  const category = options.category ?? notification?.category ?? 'inventory';
+  const targetRoles = extractTargetRoles(notification, options);
+
+  dispatchRoleBasedNotification({
+    branchId,
+    notification,
+    category,
+    targetRoles
+  });
 };
 
 
 // BROADCAST A NOTIFICATION TO ALL OWNERS (CROSS-BRANCH)
-export const broadcastOwnerNotification = (notification) => {
-  io.to('owners').emit('new-notification', notification);
+export const broadcastOwnerNotification = (notification, options = {}) => {
+  const targetRoles = extractTargetRoles(notification, options) ?? ['Owner'];
+
+  dispatchRoleBasedNotification({
+    branchId: options.branchId ?? null,
+    notification,
+    category: 'account-approval',
+    targetRoles
+  });
 };
 
 
@@ -162,9 +301,10 @@ export const broadcastUserStatusUpdate = (branchId, statusData) => {
 
 
 // SENDS NOTIFICATION TO SPECIFIC USER
-export const broadcastToUser = (userId, notification) => {
+export const broadcastToUser = (userId, notification, options = {}) => {
+  const targetType = options.userType ?? 'user';
   for (const [socketId, userData] of connectedUsers) {
-    if (userData.userId === userId) {
+    if (userData.userType === targetType && String(userData.userId) === String(userId)) {
       io.to(socketId).emit('new-notification', notification);
       break;
     }

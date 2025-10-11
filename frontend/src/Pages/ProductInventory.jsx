@@ -279,7 +279,12 @@ function ProductInventory({
                                   <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Requested Update</p>
                                   <ul className="space-y-1 text-amber-900">
                                     {requestedProduct?.quantity_added !== undefined && (
-                                      <li><span className="font-medium">Quantity:</span> {Number(currentState.quantity).toLocaleString()} + <span className='font-bold'>{requestedProduct.quantity_added}</span> {requestedProduct.unit}</li>
+                                      <li>
+                                        <span className="font-medium">Quantity:</span>{' '}
+                                        {currentState ? `${Number(currentState.quantity).toLocaleString()} + ` : ''}
+                                        <span className='font-bold'>{requestedProduct.quantity_added}</span>{' '}
+                                        {requestedProduct.unit ?? ''}
+                                      </li>
                                     )}
                                     {requestedProduct?.unit_price !== undefined && (
                                       <li><span className="font-medium">Unit Price:</span> ₱ {Number(requestedProduct.unit_price).toLocaleString()}</li>

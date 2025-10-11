@@ -51,7 +51,7 @@ export const createDeliveryNotification = async (notificationData) => {
                 alert_date_formatted: 'Just now',
                 target_roles: targetRoles,
                 creator_id: creatorId
-            });
+            }, { category: 'sales' });
 
             console.log(`📡 Delivery notification broadcast via WebSocket to branch ${branchId}`);
             

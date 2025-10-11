@@ -43,7 +43,7 @@ function GlobalBanner({setOpenNotif, unreadCount}) {
 
             <div className='flex items-center space-x-8 mr-10'>
 
-                {(user && user.role && user.role.some(role => ['Inventory Staff', 'Branch Manager'].includes(role))) &&
+                {(user && user.role && user.role.some(role => ['Inventory Staff', 'Branch Manager', 'Owner'].includes(role))) &&
                     <div className='relative p-2 border-2 rounded-md border-gray-600 hover:text-white hover:bg-gray-600 transition-all cursor-pointer' onClick={setOpenNotif}>
                         <IoMdNotifications />
                         {unreadCount > 0 && (
