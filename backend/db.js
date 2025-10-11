@@ -14,9 +14,9 @@ function getDb() {
             password: process.env.PG_PASSWORD,
             port: process.env.PG_PORT,
             max: 20,
-            connectionTimeoutMillis: 5000,
-            idleTimeoutMillis: 30000,
-            query_timeout: 10000
+            connectionTimeoutMillis: 10000,
+            idleTimeoutMillis: 60000,
+            query_timeout: 60000
         });
         
         dbInstance.on('error', (err) => {
