@@ -229,7 +229,16 @@ export const getNotification = async (req, res) =>{
         const hireDate = req.query.hire_date;
         const userId = req.query.user_id;
         const branchId = req.query.branch_id;
-        const notification = await notificationServices.returnNotification(branchId, userId, hireDate);
+        const userType = req.query.user_type ?? 'user';
+        const adminId = req.query.admin_id ?? null;
+
+        const notification = await notificationServices.returnNotification({
+            branchId,
+            userId,
+            hireDate,
+            userType,
+            adminId
+        });
         res.status(200).json(notification);
     } catch (error) {
         console.error('Error fetching notifications: ', error);
@@ -257,13 +266,37 @@ export const markRead = async (req, res) =>{
 
 export const markAllRead = async (req, res) => {
     try {
-        const { user_id, branch_id, hire_date } = req.body;
-        
+        const { user_id, branch_id, hire_date, user_type = 'user', admin_id = null } = req.body;
+
+        if (user_type === 'admin') {
+            if (!admin_id) {
+                return res.status(400).json({ message: 'admin_id is required for admin notifications' });
+            }
+
+            const markedCount = await notificationServices.markAllAsRead({
+                userId: null,
+                branchId: null,
+                hireDate: null,
+                userType: 'admin',
+                adminId: admin_id
+            });
+
+            return res.status(200).json({ 
+                message: `${markedCount} notifications marked as read`,
+                markedCount: markedCount 
+            });
+        }
+
         if (!user_id || !branch_id || !hire_date) {
             return res.status(400).json({ message: 'user_id, branch_id, and hire_date are required' });
         }
-        
-        const markedCount = await notificationServices.markAllAsRead(user_id, branch_id, hire_date);
+
+        const markedCount = await notificationServices.markAllAsRead({
+            userId: user_id,
+            branchId: branch_id,
+            hireDate: hire_date,
+            userType: 'user'
+        });
 
         res.status(200).json({ 
             message: `${markedCount} notifications marked as read`,

@@ -811,14 +811,42 @@ function App() {
   //FOR NOTIFICATION DATA
   const getTime = async () =>{
     try {
+      if (!user) {
+        setNotify([]);
+        return;
+      }
 
-      const time = await api.get(`/api/notifications?branch_id=${user.branch_id}&user_id=${user.user_id}&hire_date=${user.hire_date}`);
-      setNotify(time.data);
+      const roles = Array.isArray(user.role)
+        ? user.role
+        : user.role
+          ? [user.role]
+          : [];
+
+      const isOwner = roles.includes('Owner');
+      const params = new URLSearchParams();
+
+      if (isOwner) {
+        params.append('user_type', 'admin');
+        if (user.admin_id) {
+          params.append('admin_id', user.admin_id);
+        }
+      } else {
+        if (!user.branch_id || !user.user_id || !user.hire_date) {
+          return;
+        }
+
+        params.append('branch_id', user.branch_id);
+        params.append('user_id', user.user_id);
+        params.append('hire_date', user.hire_date);
+      }
+
+      const queryString = params.toString();
+      const endpoint = `/api/notifications${queryString ? `?${queryString}` : ''}`;
+      const time = await api.get(endpoint);
+      setNotify(Array.isArray(time.data) ? time.data : []);
     } catch (error) {
       console.log(error.message);
-      
     } 
-
   };
 
 
@@ -831,8 +859,19 @@ function App() {
       setNotify([]);
       return;
     }
-    if (!user || !user.role || !user.role.some(role => ['Branch Manager', 'Inventory Staff'].includes(role))) return;
-    
+
+    const roles = Array.isArray(user.role)
+      ? user.role
+      : user.role
+        ? [user.role]
+        : [];
+
+    const shouldFetchNotifications = roles.some((role) => ['Branch Manager', 'Inventory Staff', 'Owner'].includes(role));
+
+    if (!shouldFetchNotifications) {
+      return;
+    }
+
     // FETCH NOTIFICATIONS FOR THE CURRENT USER
     getTime();
 

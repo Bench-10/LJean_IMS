@@ -144,6 +144,17 @@ CREATE TABLE user_notification (
 
 
 
+CREATE TABLE admin_notification (
+    admin_id INT,
+    alert_id INT,
+    is_read BOOLEAN DEFAULT TRUE,
+    PRIMARY KEY (admin_id, alert_id),
+    FOREIGN KEY (admin_id) REFERENCES Administrator(admin_id) ON DELETE CASCADE,
+    FOREIGN KEY (alert_id) REFERENCES Inventory_Alerts(alert_id) ON DELETE CASCADE
+);
+
+
+
 
 
 CREATE TABLE Sales_Information (

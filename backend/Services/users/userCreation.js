@@ -2,6 +2,15 @@ import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 import { broadcastUserUpdate, broadcastOwnerNotification } from "../../server.js";
+const getUserFullName = async (userId) => {
+    if (!userId) return null;
+    const { rows } = await SQLquery(
+        `SELECT first_name || ' ' || last_name AS full_name FROM Users WHERE user_id = $1`,
+        [userId]
+    );
+
+    return rows[0]?.full_name || null;
+};
 
 
 
@@ -126,19 +135,43 @@ export const createUserAccount = async (UserData) => {
         const creatorIsBranchManager = creatorRoles.includes('Branch Manager');
         if (accountStatus === 'pending' && creatorIsBranchManager) {
             const approvalMessage = `${userWithDecryptedPassword.full_name} needs approval for ${userWithDecryptedPassword.branch}.`;
+            const creatorName = await getUserFullName(creatorId) || 'Branch Manager';
 
-            broadcastOwnerNotification({
-                alert_id: `pending-${userWithDecryptedPassword.user_id}-${Date.now()}`,
-                alert_type: 'User Approval Needed',
-                message: approvalMessage,
-                banner_color: 'amber',
-                target_roles: ['Owner'],
-                creator_id: creatorId,
-                created_at: new Date().toISOString()
-            }, {
-                branchId: userWithDecryptedPassword.branch_id,
-                targetRoles: ['Owner']
-            });
+            const alertResult = await SQLquery(
+                `INSERT INTO Inventory_Alerts 
+                (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING *`,
+                [
+                    null,
+                    userWithDecryptedPassword.branch_id,
+                    'User Approval Needed',
+                    approvalMessage,
+                    'amber',
+                    creatorId,
+                    creatorName
+                ]
+            );
+
+            if (alertResult.rows[0]) {
+                broadcastOwnerNotification({
+                    alert_id: alertResult.rows[0].alert_id,
+                    alert_type: 'User Approval Needed',
+                    message: approvalMessage,
+                    banner_color: 'amber',
+                    user_id: alertResult.rows[0].user_id,
+                    user_full_name: creatorName,
+                    alert_date: alertResult.rows[0].alert_date,
+                    isDateToday: true,
+                    alert_date_formatted: 'Just now',
+                    target_roles: ['Owner'],
+                    creator_id: creatorId,
+                    created_at: new Date().toISOString()
+                }, {
+                    branchId: userWithDecryptedPassword.branch_id,
+                    targetRoles: ['Owner']
+                });
+            }
         }
 
         return userWithDecryptedPassword;

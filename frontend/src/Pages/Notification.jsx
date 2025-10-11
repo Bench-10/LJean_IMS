@@ -12,18 +12,20 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
   const [visibleCount, setVisibleCount] = useState(15);
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
+  const principalId = user?.user_id ?? user?.admin_id ?? null;
+  const isAdminUser = Boolean(user?.admin_id);
   const prevLengthRef = useRef(notify.length);
-  const currentUserRef = useRef(user?.user_id);
+  const currentUserRef = useRef(principalId);
 
   // RESET REFERENCE WHEN USER CHANGES
   useEffect(() => {
-    if (user?.user_id !== currentUserRef.current) {
+    if (principalId !== currentUserRef.current) {
       // RESET REFERENCE TO CURRENT NOTIFICATION COUNT TO PREVENT FALSE POPUPS
       prevLengthRef.current = notify.length;
-      currentUserRef.current = user?.user_id;
+      currentUserRef.current = principalId;
       setShowPopup(false);
     }
-  }, [user, notify.length]);
+  }, [user, notify.length, principalId]);
 
   // REQUEST FOR NOTIFICATION
   useEffect(() => {
@@ -103,6 +105,7 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
     'blue': 'border-l-blue-700',
     'green': 'border-l-green-600',
     'yellow': 'border-l-yellow-500',
+    'amber': 'border-l-amber-500',
   };
 
 
@@ -123,7 +126,11 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
     ));
 
     //UPDATES THE BACKEND
-    await api.post(`/api/notifications`,{ alert_id: alert_id, user_id: user.user_id});
+    const payload = isAdminUser
+      ? { alert_id, user_type: 'admin', admin_id: user.admin_id }
+      : { alert_id, user_id: user.user_id };
+
+    await api.post(`/api/notifications`, payload);
 
   };
 
@@ -131,13 +138,14 @@ function Notification({openNotif, notify, setNotify, unreadCount, onClose}) {
   const markAllAsRead = async () => {
     try {
       
-      await api.post(`/api/notifications/mark-all-read`, {user_id: user.user_id, branch_id: user.branch_id, hire_date: user.hire_date
-      });
+      const payload = isAdminUser
+        ? { user_type: 'admin', admin_id: user.admin_id }
+        : { user_id: user.user_id, branch_id: user.branch_id, hire_date: user.hire_date };
+
+      await api.post(`/api/notifications/mark-all-read`, payload);
 
       //UPDATES THE UI
       setNotify(notify => notify.map(n => ({ ...n, is_read: true })));
-
-
     } catch (error) {
       console.error('Error:', error);
       
