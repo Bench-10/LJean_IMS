@@ -125,14 +125,19 @@ export const createUserAccount = async (UserData) => {
         // NOTIFY OWNERS IF APPROVAL IS REQUIRED
         const creatorIsBranchManager = creatorRoles.includes('Branch Manager');
         if (accountStatus === 'pending' && creatorIsBranchManager) {
+            const approvalMessage = `${userWithDecryptedPassword.full_name} needs approval for ${userWithDecryptedPassword.branch}.`;
+
             broadcastOwnerNotification({
                 alert_id: `pending-${userWithDecryptedPassword.user_id}-${Date.now()}`,
                 alert_type: 'User Approval Needed',
-                message: `${userWithDecryptedPassword.full_name} (${userWithDecryptedPassword.branch}) is awaiting approval.`,
+                message: approvalMessage,
                 banner_color: 'amber',
                 target_roles: ['Owner'],
                 creator_id: creatorId,
                 created_at: new Date().toISOString()
+            }, {
+                branchId: userWithDecryptedPassword.branch_id,
+                targetRoles: ['Owner']
             });
         }
 

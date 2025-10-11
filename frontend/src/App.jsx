@@ -253,10 +253,19 @@ function App() {
     newSocket.on('connect', () => {
       console.log('Connected to server');
      
+      const resolvedRoles = Array.isArray(user.role)
+        ? user.role
+        : user.role
+          ? [user.role]
+          : [];
+
       newSocket.emit('join-branch', {
-        userId: user.user_id,
-        branchId: user.branch_id,
-        role: user.role
+        userId: user.user_id ?? user.admin_id ?? null,
+        adminId: user.admin_id ?? null,
+        branchId: user.branch_id ?? null,
+        roles: resolvedRoles,
+        role: resolvedRoles,
+        userType: user.admin_id ? 'admin' : 'user'
       });
 
       // CHECK USER STATUS WHEN WEBSOCKET RECONNECTS
