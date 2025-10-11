@@ -305,4 +305,25 @@ ALTER TABLE Sales_Stock_Usage
 
 
 
+-- INVENTORY PENDING ACTIONS TABLE FOR APPROVAL WORKFLOW
+CREATE TABLE Inventory_Pending_Actions (
+    pending_id SERIAL PRIMARY KEY,
+    branch_id INT NOT NULL REFERENCES Branch(branch_id),
+    product_id INT NULL,
+    action_type TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_by INT NOT NULL REFERENCES Users(user_id),
+    created_by_name TEXT,
+    created_by_roles TEXT[],
+    approved_by INT REFERENCES Users(user_id),
+    approved_at TIMESTAMP,
+    rejection_reason TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_inventory_pending_actions_branch ON Inventory_Pending_Actions(branch_id, status);
+
+
+
 

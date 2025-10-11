@@ -271,6 +271,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
         product_validity,
         userID: user.user_id,
         fullName: user.full_name,
+        requestor_roles: user.role,
         existing_product_id: selectedExistingProduct?.product_id || null,
         description,
       };

@@ -11,6 +11,9 @@ router.post("/items", itemControllers.addItem);
 router.put("/items/:id", itemControllers.updateItem);
 router.get("/items/search", itemControllers.searchItem);
 router.get("/items/unique", itemControllers.getAllUniqueProducts);
+router.get("/items/pending", itemControllers.getPendingInventoryRequests);
+router.patch("/items/pending/:id/approve", itemControllers.approvePendingInventoryRequest);
+router.patch("/items/pending/:id/reject", itemControllers.rejectPendingInventoryRequest);
 
 
 

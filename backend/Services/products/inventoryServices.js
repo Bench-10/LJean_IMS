@@ -1,11 +1,120 @@
 import { SQLquery } from "../../db.js";
-import { broadcastNotification, broadcastInventoryUpdate, broadcastValidityUpdate, broadcastHistoryUpdate } from "../../server.js";
+import { broadcastNotification, broadcastInventoryUpdate, broadcastValidityUpdate, broadcastHistoryUpdate, broadcastInventoryApprovalRequest, broadcastInventoryApprovalUpdate, broadcastToUser } from "../../server.js";
 import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
 
 //HELPER FUNCTION TO GET CATEGORY NAME
 const getCategoryName = async (categoryId) => {
     const { rows } = await SQLquery('SELECT category_name FROM Category WHERE category_id = $1', [categoryId]);
     return rows[0]?.category_name || '';
+};
+
+
+const normalizeRoles = (roles) => Array.isArray(roles) ? roles : [];
+
+const needsBranchManagerApproval = (roles) => {
+    const normalized = normalizeRoles(roles);
+
+    if (normalized.length === 0) {
+        return true;
+    }
+
+    return !normalized.some(role => ['Branch Manager', 'Owner'].includes(role));
+};
+
+
+const sanitizeProductPayload = (productData) => {
+    if (!productData) return null;
+
+    return {
+        product_id: productData.product_id ?? null,
+        product_name: productData.product_name,
+        category_id: Number(productData.category_id),
+        branch_id: Number(productData.branch_id),
+        unit: productData.unit,
+        unit_price: Number(productData.unit_price),
+        unit_cost: Number(productData.unit_cost),
+        quantity_added: Number(productData.quantity_added),
+        min_threshold: Number(productData.min_threshold),
+        max_threshold: Number(productData.max_threshold),
+        date_added: productData.date_added,
+        product_validity: productData.product_validity,
+        userID: productData.userID,
+        fullName: productData.fullName,
+        requestor_roles: normalizeRoles(productData.requestor_roles || productData.userRoles),
+        existing_product_id: productData.existing_product_id || null,
+        description: productData.description || null,
+    };
+};
+
+
+const mapPendingRequest = (row) => {
+    if (!row) return null;
+
+    return {
+        pending_id: row.pending_id,
+        branch_id: row.branch_id,
+        product_id: row.product_id,
+        action_type: row.action_type,
+        status: row.status,
+        created_by: row.created_by,
+        created_by_name: row.created_by_name,
+        created_by_roles: row.created_by_roles,
+        approved_by: row.approved_by,
+        approved_at: row.approved_at,
+        rejection_reason: row.rejection_reason,
+        created_at: row.created_at,
+        payload: row.payload,
+    };
+};
+
+
+const getUserFullName = async (userId) => {
+    if (!userId) return null;
+    const { rows } = await SQLquery('SELECT first_name, last_name FROM Users WHERE user_id = $1', [userId]);
+    if (rows.length === 0) return null;
+    return `${rows[0].first_name} ${rows[0].last_name}`.trim();
+};
+
+
+const createPendingInventoryAction = async ({
+    actionType,
+    productData,
+    branchId,
+    productId = null,
+    currentState = null
+}) => {
+    const sanitizedPayload = sanitizeProductPayload(productData);
+    const categoryName = sanitizedPayload?.category_id ? await getCategoryName(sanitizedPayload.category_id) : null;
+
+    const payload = {
+        productData: sanitizedPayload,
+        currentState,
+        category_name: categoryName
+    };
+
+    const { rows } = await SQLquery(
+        `INSERT INTO Inventory_Pending_Actions
+            (branch_id, product_id, action_type, payload, status, created_by, created_by_name, created_by_roles)
+         VALUES ($1, $2, $3, $4::jsonb, 'pending', $5, $6, $7)
+         RETURNING *` ,
+        [
+            branchId,
+            productId,
+            actionType,
+            JSON.stringify(payload),
+            sanitizedPayload?.userID || null,
+            sanitizedPayload?.fullName || null,
+            sanitizedPayload?.requestor_roles || []
+        ]
+    );
+
+    const mapped = mapPendingRequest(rows[0]);
+
+    if (mapped) {
+        broadcastInventoryApprovalRequest(branchId, { request: mapped });
+    }
+
+    return mapped;
 };
 
 
@@ -156,18 +265,44 @@ export const getProductItems = async(branchId) => {
 
 
 
-export const addProductItem = async (productData) => {
-    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id, description} = productData;
+export const addProductItem = async (productData, options = {}) => {
+    const { bypassApproval = false, requestedBy = null, actingUser = null } = options;
+
+    const roles = normalizeRoles(productData.requestor_roles || productData.userRoles);
+    const pendingBranchId = Number(productData.branch_id ?? productData.branchId);
+    const requiresApproval = !bypassApproval && needsBranchManagerApproval(roles);
+
+    if (requiresApproval) {
+        const pendingRecord = await createPendingInventoryAction({
+            actionType: 'create',
+            productData,
+            branchId: pendingBranchId,
+            productId: productData.existing_product_id || null,
+            currentState: null
+        });
+
+        return { status: 'pending', action: 'create', pending: pendingRecord };
+    }
+
+    const actingUserId = actingUser?.userID ?? productData.userID;
+    const actingUserName = actingUser?.fullName ?? productData.fullName;
+
+    const cleanedData = sanitizeProductPayload({
+        ...productData,
+        userID: actingUserId,
+        fullName: actingUserName
+    });
+
+    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id, description } = cleanedData;
 
     const productAddedNotifheader = "New Product";
-    const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.`;
+    const requestSuffix = requestedBy?.fullName && requestedBy.userID !== userID ? ` Requested by ${requestedBy.fullName}.` : '';
+    const notifMessage = `${product_name} has been added to the inventory with ${quantity_added} ${unit}.${requestSuffix}`;
     const color = 'green';
 
     let product_id;
 
-    // IF AN EXISTING PRODUCT ID IS PROVIDED, USE IT
     if (existing_product_id) {
-        // CHECK IF THE PRODUCT ALREADY EXISTS IN THIS BRANCH
         const existsInBranch = await SQLquery(
             'SELECT 1 FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2', 
             [existing_product_id, branch_id]
@@ -179,7 +314,6 @@ export const addProductItem = async (productData) => {
         
         product_id = existing_product_id;
     } else {
-        //CREATES A UNIQUE PRODUCT ID WITH RETRY LOGIC
         let isUnique = false;
         let retryCount = 0;
         const maxRetries = 10;
@@ -193,8 +327,6 @@ export const addProductItem = async (productData) => {
                     isUnique = true;
                 } else {
                     retryCount++;
-                    
-                    
                     await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
                 }
             } catch (error) {
@@ -212,19 +344,16 @@ export const addProductItem = async (productData) => {
 
     await SQLquery('BEGIN');
 
-    // Ensure the master `products` table has an entry for this product_id.
-    // If it doesn't exist, insert it. Do this inside the same transaction so the operation is atomic.
     try {
         const prodCheck = await SQLquery('SELECT 1 FROM products WHERE product_id = $1', [product_id]);
         if (prodCheck.rowCount === 0) {
             await SQLquery(
                 `INSERT INTO products (product_id, product_name, description)
-                 VALUES ($1, $2, $3)`,
+                 VALUES ($1, $2, $3)` ,
                 [product_id, product_name, description || 'N/A']
             );
         }
     } catch (err) {
-        // If product insert/check fails, rollback and rethrow to keep DB consistent
         await SQLquery('ROLLBACK');
         throw err;
     }
@@ -252,7 +381,8 @@ export const addProductItem = async (productData) => {
         [product_id, branch_id, productAddedNotifheader, notifMessage, color, userID, fullName]
     );
 
-    // SENDS DATA TO ALL USERS IN THE BRANCH
+    await SQLquery('COMMIT');
+
     if (alertResult.rows[0]) {
         broadcastNotification(branch_id, {
             alert_id: alertResult.rows[0].alert_id,
@@ -264,11 +394,8 @@ export const addProductItem = async (productData) => {
             alert_date: alertResult.rows[0].alert_date,
             isDateToday: true,
             alert_date_formatted: 'Just now'
-            
         });
     }
-
-    await SQLquery('COMMIT');
 
     const newProductRow = await getUpdatedInventoryList(product_id, branch_id);
 
@@ -277,23 +404,20 @@ export const addProductItem = async (productData) => {
         triggerUserName: fullName
     });
 
-    // BROADCAST INVENTORY UPDATE TO ALL USERS IN THE BRANCH
     broadcastInventoryUpdate(branch_id, {
         action: 'add',
         product: newProductRow,
-        user_id: userID
+        user_id: userID,
+        requested_by: requestedBy ? { user_id: requestedBy.userID, full_name: requestedBy.fullName } : null
     });
 
-    // GET CATEGORY NAME ONCE FOR BOTH VALIDITY AND HISTORY UPDATES
     const categoryName = await getCategoryName(category_id);
     const addedDateObj = new Date(date_added);
 
-    // BROADCAST VALIDITY UPDATE IF PRODUCT HAS EXPIRY DATE
     if (product_validity) {
         const validityDateObj = new Date(product_validity);
         const currentDate = new Date();
         
-        // Calculate if near expiry or expired
         const daysUntilExpiry = Math.ceil((validityDateObj - currentDate) / (1000 * 60 * 60 * 24));
         const near_expy = daysUntilExpiry <= 3 && daysUntilExpiry >= 0;
         const expy = validityDateObj <= currentDate;
@@ -325,7 +449,6 @@ export const addProductItem = async (productData) => {
         });
     }
 
-    // BROADCAST HISTORY UPDATE FOR NEW PRODUCT (always has quantity when adding)
     broadcastHistoryUpdate(branch_id, {
         action: 'add',
         historyEntry: {
@@ -345,16 +468,43 @@ export const addProductItem = async (productData) => {
         user_id: userID
     });
 
-    return newProductRow;
+    return { status: 'approved', action: 'create', product: newProductRow };
 };
 
 
 
-export const updateProductItem = async (productData, itemId) => {
-    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName } = productData;
+export const updateProductItem = async (productData, itemId, options = {}) => {
+    const { bypassApproval = false, requestedBy = null, actingUser = null } = options;
 
-    const addStocksQuery = async () =>{
+    const roles = normalizeRoles(productData.requestor_roles || productData.userRoles);
+    const branchIdNumeric = Number(productData.branch_id);
 
+    if (!bypassApproval && needsBranchManagerApproval(roles)) {
+        const currentState = await getUpdatedInventoryList(itemId, branchIdNumeric);
+        const pendingRecord = await createPendingInventoryAction({
+            actionType: 'update',
+            productData: { ...productData, product_id: itemId },
+            branchId: branchIdNumeric,
+            productId: itemId,
+            currentState
+        });
+
+        return { status: 'pending', action: 'update', pending: pendingRecord };
+    }
+
+    const actingUserId = actingUser?.userID ?? productData.userID;
+    const actingUserName = actingUser?.fullName ?? productData.fullName;
+
+    const cleanedData = sanitizeProductPayload({
+        ...productData,
+        userID: actingUserId,
+        fullName: actingUserName,
+        branch_id: branchIdNumeric
+    });
+
+    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName } = cleanedData;
+
+    const addStocksQuery = async () => {
         return await SQLquery(
             `INSERT INTO Add_Stocks 
             (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left, branch_id)
@@ -362,12 +512,10 @@ export const updateProductItem = async (productData, itemId) => {
             RETURNING *`,
             [itemId, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added, branch_id]
         );
+    };
 
-    }
-
-    // LOCK THE PRODUCT ROW TO PREVENT CONCURRENT MODIFICATIONS
     const previousData = await SQLquery(
-        'SELECT branch_id, unit_price, unit_cost, product_name, unit, min_threshold, max_threshold, category_id FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2 FOR UPDATE', 
+        'SELECT branch_id, unit_price, unit_cost, product_name, unit, min_threshold, max_threshold, category_id FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2 FOR UPDATE',
         [itemId, branch_id]
     );
 
@@ -378,9 +526,8 @@ export const updateProductItem = async (productData, itemId) => {
     const prev = previousData.rows[0];
     const returnPreviousPrice = Number(prev.unit_price);
     const returnBranchId = Number(prev.branch_id);
-    
-    // Check if any product information changed (excluding quantity additions)
-    const productInfoChanged = 
+
+    const productInfoChanged =
         prev.product_name !== product_name ||
         prev.unit !== unit ||
         Number(prev.min_threshold) !== Number(min_threshold) ||
@@ -388,33 +535,23 @@ export const updateProductItem = async (productData, itemId) => {
         Number(prev.category_id) !== Number(category_id) ||
         Number(prev.unit_cost) !== Number(unit_cost);
 
-
-
-    // PRODUCT UPDATE BANNER TITLE
     const productAddedNotifheader = "Product Update";
+    const requestSuffix = requestedBy?.fullName && requestedBy.userID !== userID ? ` (Requested by ${requestedBy.fullName})` : '';
 
-    // UPDATE MESSAGES
-    const addqQunatityNotifMessage = `Additional ${quantity_added} ${unit} has been added to ${product_name} at a cost of ₱ ${unit_cost}.`;
-    const changePriceNotifMessage = `The price of ${product_name} has been changed from ₱ ${returnPreviousPrice} to ₱ ${unit_price}.`
-
-    // BANNER COLOR
+    const addqQuantityNotifMessage = `Additional ${quantity_added} ${unit} has been added to ${product_name} at a cost of ₱ ${unit_cost}.`;
+    const changePriceNotifMessage = `The price of ${product_name} has been changed from ₱ ${returnPreviousPrice} to ₱ ${unit_price}.`;
     const color = 'blue';
 
     await SQLquery('BEGIN');
 
-
-    // Handle quantity addition and/or price change
     let alertResult = null;
     let finalMessage = '';
 
-    // Handle quantity addition (add new stock entry)
-    if (quantity_added !== 0){
+    if (quantity_added !== 0) {
         await addStocksQuery();
     }
 
-    // Handle price change (update product table)
-    if (returnPreviousPrice !== unit_price){
-        // UPDATE THE INVENTORY_PRODUCT TABLE WITH NEW PRICE
+    if (returnPreviousPrice !== unit_price) {
         await SQLquery(
             `UPDATE Inventory_Product 
             SET unit_price = $1 
@@ -423,23 +560,16 @@ export const updateProductItem = async (productData, itemId) => {
         );
     }
 
-    // Determine the message based on what changed and create single notification
     if (quantity_added !== 0 && returnPreviousPrice !== unit_price) {
-        // Both quantity and price changed - create combined message
-        finalMessage = `${addqQunatityNotifMessage} and ${changePriceNotifMessage}`;
-
+        finalMessage = `${addqQuantityNotifMessage} and ${changePriceNotifMessage}`;
     } else if (quantity_added !== 0 && returnPreviousPrice === unit_price) {
-        // Only quantity changed
-        finalMessage = addqQunatityNotifMessage;
-
+        finalMessage = addqQuantityNotifMessage;
     } else if (quantity_added === 0 && returnPreviousPrice !== unit_price) {
-        // Only price changed
         finalMessage = changePriceNotifMessage;
-
     }
 
-    // Create single notification entry if there were changes
     if (finalMessage) {
+        finalMessage = `${finalMessage}${requestSuffix}`;
         alertResult = await SQLquery(
             `INSERT INTO Inventory_Alerts 
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
@@ -448,7 +578,6 @@ export const updateProductItem = async (productData, itemId) => {
             [itemId, returnBranchId, productAddedNotifheader, finalMessage, color, userID, fullName]
         );
 
-        // Broadcast the single notification
         if (alertResult?.rows[0]) {
             broadcastNotification(returnBranchId, {
                 alert_id: alertResult.rows[0].alert_id,
@@ -464,9 +593,7 @@ export const updateProductItem = async (productData, itemId) => {
         }
     }
 
-    // Handle other product information updates (name, unit, threshold, category, cost)
     if (productInfoChanged) {
-        
         await SQLquery(
             `UPDATE Inventory_Product 
             SET product_name = $1, unit = $2, min_threshold = $3, category_id = $4, unit_cost = $5
@@ -474,9 +601,8 @@ export const updateProductItem = async (productData, itemId) => {
             [product_name, unit, min_threshold, category_id, unit_cost, itemId, branch_id, max_threshold]
         );
 
-        // Create notification for product info update
-        const updateMessage = `Product information for ${product_name} has been updated.`;
-        const alertResult = await SQLquery(
+        const updateMessage = `Product information for ${product_name} has been updated.${requestSuffix}`;
+        const infoAlertResult = await SQLquery(
             `INSERT INTO Inventory_Alerts 
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -484,22 +610,21 @@ export const updateProductItem = async (productData, itemId) => {
             [itemId, returnBranchId, productAddedNotifheader, updateMessage, color, userID, fullName]
         );
 
-        if (alertResult.rows[0]) {
+        if (infoAlertResult.rows[0]) {
             broadcastNotification(returnBranchId, {
-                alert_id: alertResult.rows[0].alert_id,
+                alert_id: infoAlertResult.rows[0].alert_id,
                 alert_type: productAddedNotifheader,
                 message: updateMessage,
                 banner_color: color,
-                user_id: alertResult.rows[0].user_id,
+                user_id: infoAlertResult.rows[0].user_id,
                 user_full_name: fullName,
-                alert_date: alertResult.rows[0].alert_date,
+                alert_date: infoAlertResult.rows[0].alert_date,
                 isDateToday: true,
                 alert_date_formatted: 'Just now'
             });
         }
     }
 
-   
     await SQLquery('COMMIT');
 
     const updatedProductRow = await getUpdatedInventoryList(itemId, branch_id);
@@ -509,24 +634,20 @@ export const updateProductItem = async (productData, itemId) => {
         triggerUserName: fullName
     });
 
-    // BROADCAST INVENTORY UPDATE TO ALL USERS IN THE BRANCH
     broadcastInventoryUpdate(branch_id, {
         action: 'update',
         product: updatedProductRow,
-        user_id: userID
+        user_id: userID,
+        requested_by: requestedBy ? { user_id: requestedBy.userID, full_name: requestedBy.fullName } : null
     });
 
-    // BROADCAST UPDATES ONLY IF QUANTITY WAS ADDED (new stock entry created)
     if (quantity_added > 0) {
         const categoryName = await getCategoryName(category_id);
         const addedDateObj = new Date(date_added);
 
-        // BROADCAST VALIDITY UPDATE IF EXPIRY DATE PROVIDED
         if (product_validity) {
             const validityDateObj = new Date(product_validity);
             const currentDate = new Date();
-            
-            // Calculate if near expiry or expired
             const daysUntilExpiry = Math.ceil((validityDateObj - currentDate) / (1000 * 60 * 60 * 24));
             const near_expy = daysUntilExpiry <= 3 && daysUntilExpiry >= 0;
             const expy = validityDateObj <= currentDate;
@@ -558,7 +679,6 @@ export const updateProductItem = async (productData, itemId) => {
             });
         }
 
-        // BROADCAST HISTORY UPDATE (always for quantity additions)
         broadcastHistoryUpdate(branch_id, {
             action: 'update',
             historyEntry: {
@@ -579,7 +699,7 @@ export const updateProductItem = async (productData, itemId) => {
         });
     }
 
-    return  updatedProductRow;
+    return { status: 'approved', action: 'update', product: updatedProductRow };
 };
 
 
@@ -588,4 +708,150 @@ export const searchProductItem = async (searchItem) =>{
     const {rows} = await SQLquery('SELECT * FROM Inventory_Product WHERE product_name ILIKE $1', [`%${searchItem}%`]);
 
     return rows;
+};
+
+
+export const getPendingInventoryRequests = async (branchId) => {
+    const { rows } = await SQLquery(
+        `SELECT * FROM Inventory_Pending_Actions
+         WHERE branch_id = $1 AND status = 'pending'
+         ORDER BY created_at ASC`,
+        [branchId]
+    );
+
+    return rows.map(mapPendingRequest);
+};
+
+
+export const approvePendingInventoryRequest = async (pendingId, approverId) => {
+    const pendingResult = await SQLquery(
+        `SELECT * FROM Inventory_Pending_Actions WHERE pending_id = $1`,
+        [pendingId]
+    );
+
+    if (pendingResult.rowCount === 0) {
+        throw new Error('Pending inventory request not found');
+    }
+
+    const pending = pendingResult.rows[0];
+
+    if (pending.status !== 'pending') {
+        throw new Error('Pending inventory request has already been processed');
+    }
+
+    const payload = pending.payload || {};
+    const productPayload = payload.productData || payload;
+    const requestedBy = {
+        userID: pending.created_by,
+        fullName: pending.created_by_name,
+        roles: pending.created_by_roles
+    };
+
+    const approverName = await getUserFullName(approverId);
+
+    let approvalResult;
+
+    if (pending.action_type === 'update') {
+        const targetProductId = pending.product_id || productPayload.product_id;
+
+        if (!targetProductId) {
+            throw new Error('Pending update request is missing the target product ID');
+        }
+
+        approvalResult = await updateProductItem(
+            { ...productPayload, branch_id: pending.branch_id },
+            targetProductId,
+            {
+                bypassApproval: true,
+                requestedBy,
+                actingUser: {
+                    userID: approverId,
+                    fullName: approverName
+                }
+            }
+        );
+    } else if (pending.action_type === 'create') {
+        approvalResult = await addProductItem(productPayload, {
+            bypassApproval: true,
+            requestedBy,
+            actingUser: {
+                userID: approverId,
+                fullName: approverName
+            }
+        });
+    } else {
+        throw new Error(`Unsupported pending inventory action type: ${pending.action_type}`);
+    }
+
+    await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET status = 'approved', approved_by = $1, approved_at = NOW()
+         WHERE pending_id = $2`,
+        [approverId, pendingId]
+    );
+
+    broadcastInventoryApprovalUpdate(pending.branch_id, {
+        pending_id: pending.pending_id,
+        status: 'approved',
+        action: pending.action_type,
+        branch_id: pending.branch_id,
+        product: approvalResult.product
+    });
+
+    if (requestedBy.userID) {
+        broadcastToUser(requestedBy.userID, {
+            alert_id: `inventory-approval-${pendingId}-${Date.now()}`,
+            alert_type: 'Inventory Request Approved',
+            message: `${productPayload.product_name || 'Inventory item'} request has been approved by ${approverName || 'Branch Manager'}.`,
+            banner_color: 'green',
+            created_at: new Date().toISOString()
+        });
+    }
+
+    return {
+        status: 'approved',
+        action: pending.action_type,
+        product: approvalResult.product
+    };
+};
+
+
+export const rejectPendingInventoryRequest = async (pendingId, approverId, reason = null) => {
+    const { rows } = await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET status = 'rejected', approved_by = $1, approved_at = NOW(), rejection_reason = $2
+         WHERE pending_id = $3 AND status = 'pending'
+         RETURNING *`,
+        [approverId, reason, pendingId]
+    );
+
+    if (rows.length === 0) {
+        throw new Error('Pending inventory request not found or already processed');
+    }
+
+    const pending = rows[0];
+    const requestedBy = {
+        userID: pending.created_by,
+        fullName: pending.created_by_name
+    };
+
+    broadcastInventoryApprovalUpdate(pending.branch_id, {
+        pending_id,
+        status: 'rejected',
+        action: pending.action_type,
+        branch_id: pending.branch_id,
+        reason
+    });
+
+    if (requestedBy.userID) {
+        broadcastToUser(requestedBy.userID, {
+            alert_id: `inventory-reject-${pendingId}-${Date.now()}`,
+            alert_type: 'Inventory Request Rejected',
+            message: reason ? `Inventory request was rejected: ${reason}` : 'Inventory request was rejected by the branch manager.',
+            banner_color: 'red',
+            created_at: new Date().toISOString()
+        });
+    }
+
+    return mapPendingRequest(pending);
 };

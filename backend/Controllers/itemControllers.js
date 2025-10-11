@@ -24,8 +24,13 @@ export const getAllItems = async (req, res) =>{
 export const addItem = async (req, res) =>{
     try {
         const addedItemData = req.body;
-        const newItem = await inventoryServices.addProductItem(addedItemData);
-        res.status(200).json(newItem);
+        const result = await inventoryServices.addProductItem(addedItemData);
+
+        if (result.status === 'pending') {
+            return res.status(202).json(result);
+        }
+
+        res.status(200).json(result.product);
     } catch (error) {
         await SQLquery('ROLLBACK');
 
@@ -46,13 +51,17 @@ export const updateItem = async (req, res) =>{
     try {
         const itemId = req.params.id;
         const updatedItemData = req.body;
-        const updatedItem = await inventoryServices.updateProductItem(updatedItemData, itemId);
+        const result = await inventoryServices.updateProductItem(updatedItemData, itemId);
 
-        if (!updatedItem){
+        if (result.status === 'pending') {
+            return res.status(202).json(result);
+        }
+
+        if (!result?.product){
             send.res.status(404).json({message: 'Item no found'})
         }
 
-        res.status(200).json(updatedItem);
+        res.status(200).json(result.product);
     } catch (error) {
         await SQLquery('ROLLBACK');
         console.error('Error fetching items: ', error);
@@ -82,6 +91,59 @@ export const getAllUniqueProducts = async (req, res) => {
     } catch (error) {
         console.error('Error fetching unique products: ', error);
         res.status(500).json({message: 'Internal Server Error'});
+    }
+};
+
+
+export const getPendingInventoryRequests = async (req, res) => {
+    try {
+        const branchId = req.query.branch_id;
+
+        if (!branchId) {
+            return res.status(400).json({ message: 'branch_id is required' });
+        }
+
+        const pending = await inventoryServices.getPendingInventoryRequests(branchId);
+        res.status(200).json(pending);
+    } catch (error) {
+        console.error('Error fetching pending inventory requests: ', error);
+        res.status(500).json({message: 'Internal Server Error'});
+    }
+};
+
+
+export const approvePendingInventoryRequest = async (req, res) => {
+    try {
+        const pendingId = req.params.id;
+        const { approver_id } = req.body;
+
+        if (!approver_id) {
+            return res.status(400).json({ message: 'approver_id is required' });
+        }
+
+        const result = await inventoryServices.approvePendingInventoryRequest(Number(pendingId), Number(approver_id));
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error approving inventory request: ', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
+
+export const rejectPendingInventoryRequest = async (req, res) => {
+    try {
+        const pendingId = req.params.id;
+        const { approver_id, reason } = req.body;
+
+        if (!approver_id) {
+            return res.status(400).json({ message: 'approver_id is required' });
+        }
+
+        const result = await inventoryServices.rejectPendingInventoryRequest(Number(pendingId), Number(approver_id), reason);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error rejecting inventory request: ', error);
+        res.status(500).json({ message: 'Internal Server Error' });
     }
 };
 

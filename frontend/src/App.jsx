@@ -54,6 +54,8 @@ function App() {
   const [deliveryData, setDeliveryData] = useState([]);
   const [deliveryEditData, setDeliveryEdit] = useState([]);
   const [productValidityList, setProductValidityList] = useState([]);
+  const [pendingInventoryRequests, setPendingInventoryRequests] = useState([]);
+  const [pendingInventoryLoading, setPendingInventoryLoading] = useState(false);
 
   // NOTIFICATION QUEUE SYSTEM
   const [notificationQueue, setNotificationQueue] = useState([]);
@@ -347,6 +349,63 @@ function App() {
       }
     });
 
+    // LISTEN FOR INVENTORY APPROVAL REQUESTS
+    newSocket.on('inventory-approval-request', (payload) => {
+      if (!payload || !payload.request) return;
+
+      if (!user || payload.request.branch_id !== user.branch_id) {
+        return;
+      }
+
+      if (!user.role || !user.role.some(role => ['Branch Manager'].includes(role))) {
+        return;
+      }
+
+      setPendingInventoryRequests(prev => {
+        const exists = prev.some(req => req.pending_id === payload.request.pending_id);
+        return exists ? prev : [...prev, payload.request];
+      });
+    });
+
+    // LISTEN FOR INVENTORY APPROVAL RESOLUTIONS
+    newSocket.on('inventory-approval-updated', (payload) => {
+      if (!payload || !payload.pending_id) return;
+
+      if (payload.branch_id && user && payload.branch_id !== user.branch_id) {
+        return;
+      }
+
+      if (!user || !user.role || !user.role.some(role => ['Branch Manager'].includes(role))) {
+        return;
+      }
+
+      setPendingInventoryRequests(prev => prev.filter(req => req.pending_id !== payload.pending_id));
+
+      if (payload.status === 'approved' && payload.product) {
+        setProductsData(prevData => {
+          if (payload.action === 'create') {
+            const exists = prevData.some(item => item.product_id === payload.product.product_id && item.branch_id === payload.product.branch_id);
+            return exists ? prevData : [...prevData, payload.product];
+          }
+
+          if (payload.action === 'update') {
+            return prevData.map(item => (
+              item.product_id === payload.product.product_id && item.branch_id === payload.product.branch_id
+                ? payload.product
+                : item
+            ));
+          }
+
+          return prevData;
+        });
+      }
+
+      if (payload.status === 'rejected') {
+        const message = payload.reason ? `Inventory request rejected: ${payload.reason}` : 'Inventory request was rejected.';
+        addToNotificationQueue(message, true);
+      }
+    });
+
     // LISTEN FOR PRODUCT VALIDITY UPDATES
     newSocket.on('validity-update', (validityData) => {
       console.log('Product validity update received:', validityData);
@@ -544,6 +603,72 @@ function App() {
       }
   };
 
+
+  const fetchPendingInventoryRequests = async () => {
+    if (!user || !user.role || !user.role.some(role => ['Branch Manager'].includes(role))) {
+      return;
+    }
+
+    try {
+      setPendingInventoryLoading(true);
+      const response = await api.get(`/api/items/pending?branch_id=${user.branch_id}`);
+      setPendingInventoryRequests(response.data);
+    } catch (error) {
+      console.error('Error fetching pending inventory requests:', error);
+    } finally {
+      setPendingInventoryLoading(false);
+    }
+  };
+
+
+  const handleApprovePendingInventory = async (pendingId) => {
+    if (!user) return;
+
+    try {
+      const response = await api.patch(`/api/items/pending/${pendingId}/approve`, {
+        approver_id: user.user_id
+      });
+
+      if (response.data?.product) {
+        const { product, action } = response.data;
+
+        if (action === 'create') {
+          setProductsData(prevData => {
+            const exists = prevData.some(item => item.product_id === product.product_id && item.branch_id === product.branch_id);
+            return exists ? prevData : [...prevData, product];
+          });
+        } else if (action === 'update') {
+          setProductsData(prevData => prevData.map(item => (
+            item.product_id === product.product_id && item.branch_id === product.branch_id ? product : item
+          )));
+        }
+      }
+
+      setPendingInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+      addToNotificationQueue('Inventory request approved and applied.', true);
+      await fetchProductsData();
+    } catch (error) {
+      console.error('Error approving inventory request:', error);
+    }
+  };
+
+
+  const handleRejectPendingInventory = async (pendingId, reason = '') => {
+    if (!user) return;
+
+    try {
+      await api.patch(`/api/items/pending/${pendingId}/reject`, {
+        approver_id: user.user_id,
+        reason
+      });
+
+      setPendingInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+      addToNotificationQueue('Inventory request rejected.', true);
+    } catch (error) {
+      console.error('Error rejecting inventory request:', error);
+    }
+  };
+
   //RENDERS THE TABLE
   useEffect(() =>{
 
@@ -551,6 +676,20 @@ function App() {
 
     fetchProductsData();
   }, [listCategories, user]);
+
+
+  useEffect(() => {
+    if (!user) {
+      setPendingInventoryRequests([]);
+      return;
+    }
+
+    if (user.role && user.role.some(role => ['Branch Manager'].includes(role))) {
+      fetchPendingInventoryRequests();
+    } else {
+      setPendingInventoryRequests([]);
+    }
+  }, [user]);
 
 
   //HANDLES OPENING ADD OR EDIT MODAL
@@ -567,11 +706,17 @@ function App() {
     if (modalMode === 'add'){
       try {
         const response = await api.post(`/api/items/`, newItem);
-        setProductsData((prevData) => [...prevData, response.data]);
-        console.log('Item Added', response.data);
+        if (response.status === 202 || response.data?.status === 'pending') {
+          addToNotificationQueue('Inventory request submitted for branch manager approval.', true);
+          await fetchPendingInventoryRequests();
+        } else {
+          const addedProduct = response.data?.product || response.data;
+          setProductsData((prevData) => [...prevData, addedProduct]);
+          console.log('Item Added', addedProduct);
 
-        const message = `${response.data.product_name} has been successfully added to the Inventory!`;
-        addToNotificationQueue(message, true); // true = local notification for the person who made the change 
+          const message = `${addedProduct.product_name} has been successfully added to the Inventory!`;
+          addToNotificationQueue(message, true); // true = local notification for the person who made the change 
+        }
         
       } catch (error) {
         
@@ -591,13 +736,19 @@ function App() {
       try {
         console.log(itemData)
         const response = await api.put(`/api/items/${itemData.product_id}`, newItem);
-        setProductsData((prevData) => 
-          prevData.map((item) => (item.product_id === itemData.product_id && item.branch_id === itemData.branch_id ? response.data : item))
-        );
-        console.log('Item Updated', response.data);
+        if (response.status === 202 || response.data?.status === 'pending') {
+          addToNotificationQueue('Inventory update sent for branch manager approval.', true);
+          await fetchPendingInventoryRequests();
+        } else {
+          const updatedProduct = response.data?.product || response.data;
+          setProductsData((prevData) => 
+            prevData.map((item) => (item.product_id === itemData.product_id && item.branch_id === itemData.branch_id ? updatedProduct : item))
+          );
+          console.log('Item Updated', updatedProduct);
 
-        const message = `${response.data.product_name} has been successfully updated in the Inventory!`;
-        addToNotificationQueue(message, true); 
+          const message = `${updatedProduct.product_name} has been successfully updated in the Inventory!`;
+          addToNotificationQueue(message, true); 
+        }
         
       } catch (error) {
          console.error('Error adding Item', error);
@@ -955,6 +1106,11 @@ function App() {
                     openInAppNotif={openInAppNotif}
                     message={inAppNotifMessage}
                     invetoryLoading={invetoryLoading}
+                    pendingRequests={pendingInventoryRequests}
+                    pendingRequestsLoading={pendingInventoryLoading}
+                    approvePendingRequest={handleApprovePendingInventory}
+                    rejectPendingRequest={handleRejectPendingInventory}
+                    refreshPendingRequests={fetchPendingInventoryRequests}
 
                   />
 

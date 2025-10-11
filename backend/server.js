@@ -171,6 +171,14 @@ export const broadcastToUser = (userId, notification) => {
   }
 };
 
+export const broadcastInventoryApprovalRequest = (branchId, payload) => {
+  io.to(`branch-${branchId}`).emit('inventory-approval-request', payload);
+};
+
+export const broadcastInventoryApprovalUpdate = (branchId, payload) => {
+  io.to(`branch-${branchId}`).emit('inventory-approval-updated', payload);
+};
+
 
 
 

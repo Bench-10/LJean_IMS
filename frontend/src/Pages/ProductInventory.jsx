@@ -7,15 +7,68 @@ import { useAuth } from '../authentication/Authentication';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import InventoryItemDetailsDialog from '../components/InventoryItemDetailsDialog.jsx';
 import ChartLoading from '../components/common/ChartLoading.jsx';
+import { FaBoxOpen } from "react-icons/fa6";
 
 
-function ProductInventory({branches, handleOpen, productsData, setIsCategory, setIsProductTransactOpen, sanitizeInput, listCategories, openInAppNotif, mode, message, invetoryLoading}) {
+function ProductInventory({
+  branches,
+  handleOpen,
+  productsData,
+  setIsCategory,
+  setIsProductTransactOpen,
+  sanitizeInput,
+  listCategories,
+  openInAppNotif,
+  mode,
+  message,
+  invetoryLoading,
+  pendingRequests = [],
+  pendingRequestsLoading = false,
+  approvePendingRequest,
+  rejectPendingRequest,
+  refreshPendingRequests
+}) {
   
   const {user} = useAuth();
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedBranch, setSelectedBranch] = useState(() => user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id : '' );
+  const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
+
+  const displayPendingApprovals = user && user.role && user.role.some(role => ['Branch Manager'].includes(role));
+
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    try {
+      return new Date(value).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return value;
+    }
+  };
+
+  const handleApproveClick = (pendingId) => {
+    if (typeof approvePendingRequest === 'function') {
+      approvePendingRequest(pendingId);
+    }
+  };
+
+  const handleRejectClick = (pendingId) => {
+    if (typeof rejectPendingRequest !== 'function') return;
+
+    const reason = window.prompt('Add an optional note for rejection (leave blank to skip):', '');
+    if (reason === null) {
+      return; // dialog cancelled
+    }
+
+    rejectPendingRequest(pendingId, reason.trim());
+  };
 
   // NEW: DIALOG STATE
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -118,13 +171,154 @@ function ProductInventory({branches, handleOpen, productsData, setIsCategory, se
     
         />
         
+        <div className='flex items-center justify-between'>
+          {/*TITLE*/}
+          <h1 className=' text-4xl font-bold text-green-900'>
+            INVENTORY
+          </h1>
 
-        {/*TITLE*/}
-        <h1 className=' text-4xl font-bold text-green-900'>
-          INVENTORY
-        </h1>
+          
+          {displayPendingApprovals && (
+            <div className="mb-4 flex justify-end items-center gap-3">
+              <button
+                className="relative flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-amber-600 text-white hover:bg-amber-700"
+                onClick={() => setIsPendingDialogOpen(true)}
+              >
+                Pending Inventory
+                <span className="inline-flex items-center justify-center min-w-[1.75rem] h-7 text-xs font-semibold bg-white text-amber-700 rounded-full px-2">
+                  {pendingRequests?.length ?? 0}
+                </span>
+              </button>
+            </div>
+          )}
+
+        </div>
 
         <hr className="mt-3 mb-6 border-t-4 border-green-800"/>
+
+        
+
+        {displayPendingApprovals && isPendingDialogOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="relative w-full max-w-4xl bg-white rounded-lg shadow-2xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b  rounded-t-lg">
+                <div>
+                  <h2 className="text-lg font-semibold">Pending Inventory Requests</h2>
+                  <p className="text-sm">Review inventory additions or updates awaiting your approval.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {typeof refreshPendingRequests === 'function' && (
+                    <button
+                      className="px-3 py-1.5 text-sm border border-amber-500 text-amber-600 rounded-md hover:bg-amber-100"
+                      onClick={refreshPendingRequests}
+                    >
+                      Refresh
+                    </button>
+                  )}
+                  <button
+                    className="w-8 h-8 flex items-center justify-center text-2xl border-none bg-transparent p-0"
+                    style={{ boxShadow: 'none', outline: 'none', background: 'none', border: 'none' }}
+                    onClick={() => setIsPendingDialogOpen(false)}
+                    aria-label="Close"
+                  >
+                    &#10005;
+                  </button>
+                </div>
+              </div>
+
+              <div className="min-h-40 max-h-[70vh] overflow-y-auto px-5 py-4">
+                {pendingRequestsLoading ? (
+                  <div className="py-10">
+                    <ChartLoading message="Loading pending inventory approvals..." />
+                  </div>
+                ) : (pendingRequests?.length ?? 0) === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10">
+                    <FaBoxOpen className='text-5xl opacity-50' />
+                    <p className="text-sm italic text-center mt-2">No pending requests at the moment.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingRequests.map(request => {
+                      const { payload } = request;
+                      const requestedProduct = payload?.productData || payload;
+                      const currentState = payload?.currentState;
+
+                      return (
+                        <div key={request.pending_id} className="border bg-white rounded-md p-4 shadow-sm">
+                          <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex-1 relative">
+                              <div className="absolute top-0 right-0 flex gap-2">
+                                <button
+                                  className="px-4 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700"
+                                  onClick={() => handleApproveClick(request.pending_id)}
+                                >
+                                  Approve & Apply
+                                </button>
+                                <button
+                                  className="px-4 py-2 rounded-md bg-red-500 text-white text-sm font-medium hover:bg-red-600"
+                                  onClick={() => handleRejectClick(request.pending_id)}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="uppercase text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                                  {request.action_type === 'update' ? 'Update' : 'Add'}
+                                </span>
+                                <span className="text-xs text-gray-500">Requested {formatDateTime(request.created_at)}</span>
+                              </div>
+                              <h3 className="text-lg font-semibold text-gray-800 mt-1">
+                                {requestedProduct?.product_name || 'Unnamed Product'}
+                              </h3>
+                              <p className="text-sm text-gray-600">
+                                Submitted by {request.created_by_name || 'Inventory Staff'}
+                              </p>
+
+                              <div className="mt-3 flex flex-col md:flex-row gap-3 text-sm w-full">
+                                <div className="bg-amber-100/60 border border-amber-200 rounded-md p-3 w-full md:w-1/2">
+                                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Requested Update</p>
+                                  <ul className="space-y-1 text-amber-900">
+                                    {requestedProduct?.quantity_added !== undefined && (
+                                      <li><span className="font-medium">Quantity:</span> {Number(currentState.quantity).toLocaleString()} + <span className='font-bold'>{requestedProduct.quantity_added}</span> {requestedProduct.unit}</li>
+                                    )}
+                                    {requestedProduct?.unit_price !== undefined && (
+                                      <li><span className="font-medium">Unit Price:</span> ₱ {Number(requestedProduct.unit_price).toLocaleString()}</li>
+                                    )}
+                                    {requestedProduct?.unit_cost !== undefined && (
+                                      <li><span className="font-medium">Unit Cost:</span> ₱ {Number(requestedProduct.unit_cost).toLocaleString()}</li>
+                                    )}
+                                    {requestedProduct?.min_threshold !== undefined && requestedProduct?.max_threshold !== undefined && (
+                                      <li><span className="font-medium">Threshold:</span> {requestedProduct.min_threshold} - {requestedProduct.max_threshold}</li>
+                                    )}
+                                    {requestedProduct?.product_validity && (
+                                      <li><span className="font-medium">Validity:</span> {requestedProduct.product_validity}</li>
+                                    )}
+                                  </ul>
+                                </div>
+
+                                {currentState && (
+                                  <div className="bg-gray-50 border border-gray-200 rounded-md p-3 w-full md:w-1/2">
+                                    <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">Current Values</p>
+                                    <ul className="space-y-1 text-gray-700">
+                                      <li><span className="font-medium">Quantity:</span> {Number(currentState.quantity).toLocaleString()} {currentState.unit}</li>
+                                      <li><span className="font-medium">Unit Price:</span> ₱ {Number(currentState.unit_price).toLocaleString()}</li>
+                                      <li><span className="font-medium">Unit Cost:</span> ₱ {Number(currentState.unit_cost).toLocaleString()}</li>
+                                      <li><span className="font-medium">Threshold:</span> {currentState.min_threshold} - {currentState.max_threshold}</li>
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
 
         {/*SEARCH AND ADD*/}
