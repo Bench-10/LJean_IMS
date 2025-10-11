@@ -330,7 +330,6 @@ RENAME COLUMN threshold TO min_threshold;
 
 
 
-
 CREATE TABLE products (
     product_id INT,
     product_name VARCHAR(100),

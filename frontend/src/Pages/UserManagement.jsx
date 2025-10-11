@@ -1,12 +1,13 @@
 import { MdGroupAdd } from "react-icons/md";
 import NoInfoFound from "../components/common/NoInfoFound";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
 import EnableDisableAccountDialog from "../components/dialogs/EnableDisableAccountDialog";
 import ChartLoading from "../components/common/ChartLoading";
 
 
-function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUserDetailes, sanitizeInput, disableEnableAccount, usersLoading, approvePendingAccount}) {
+function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUserDetailes, sanitizeInput, disableEnableAccount, usersLoading}) {
 
 
 
@@ -16,7 +17,8 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
   const [openAccountStatusDialog, setOpenAccountStatusDialog] = useState(false);
   const [userStatus, setUserStatus] = useState(false);
   const [userInfo, setUserInfo] = useState({});
-  const [approvingUserId, setApprovingUserId] = useState(null);
+
+  const navigate = useNavigate();
 
   const isOwnerUser = user && user.role && user.role.some(role => ['Owner'].includes(role));
   
@@ -61,23 +63,6 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
       className: 'bg-gray-200 text-gray-500'
     };
   };
-
-
-  const handleApprove = async (event, pendingUser) => {
-    event.stopPropagation();
-    if (!approvePendingAccount) return;
-
-    try {
-      setApprovingUserId(pendingUser.user_id);
-      await approvePendingAccount(pendingUser.user_id);
-    } catch (error) {
-      console.error('Error approving user:', error);
-    } finally {
-      setApprovingUserId(null);
-    }
-  };
-
-
 
   return (
       <div className='ml-[220px] px-8 py-2 max-h-screen'>
@@ -218,11 +203,13 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
                           {row.status === 'pending' ? (
                             isOwnerUser ? (
                               <button
-                                className={`py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white w-auto rounded-md flex items-center justify-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed`}
-                                onClick={(e) => handleApprove(e, row)}
-                                disabled={approvingUserId === row.user_id}
+                                className="py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white w-auto rounded-md flex items-center justify-center gap-2 mx-auto"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/approvals');
+                                }}
                               >
-                                {approvingUserId === row.user_id ? 'Approving...' : 'Approve account'}
+                                Manage approvals
                               </button>
                             ) : (
                               <span className="text-sm font-semibold text-amber-600">Awaiting owner approval</span>

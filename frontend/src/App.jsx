@@ -27,6 +27,7 @@ import FormLoading from "./components/common/FormLoading";
 import AccountDisabledPopUp from "./components/dialogs/AccountDisabledPopUp";
 import InAppNotificationPopUp from "./components/dialogs/InAppNotificationPopUp";
 import ProductExistsDialog from "./components/dialogs/ProductExistsDialog";
+import Approvals from "./Pages/Approvals";
 
 
 
@@ -1226,12 +1227,27 @@ function App() {
                     users={users}
                     user={user}
                     usersLoading={usersLoading}
-                    approvePendingAccount={approvePendingAccount}
                   
                   />
 
               </RouteProtection>
         
+          }/>
+
+
+          {/*APPROVAL CENTER*/}
+          <Route path="/approvals" exact element={
+            <RouteProtection allowedRoles={['Owner']}>
+
+              <Approvals
+                users={users}
+                usersLoading={usersLoading}
+                approvePendingAccount={approvePendingAccount}
+                sanitizeInput={sanitizeInput}
+              />
+
+            </RouteProtection>
+
           }/>
 
 

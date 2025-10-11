@@ -1,7 +1,7 @@
 import {React, useState} from 'react';
 import { MdOutlineInventory, MdOutlineLogout, MdOutlineDashboard } from "react-icons/md";
 import { PiSealWarningBold } from "react-icons/pi";
-import { FaUsersCog, FaMoneyBillWave, FaShippingFast} from "react-icons/fa";
+import { FaUsersCog, FaMoneyBillWave, FaShippingFast, FaClipboardCheck} from "react-icons/fa";
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../authentication/Authentication';
 import LogoutDialog from './dialogs/LogoutDialog';
@@ -143,6 +143,22 @@ function NavBar() {
 
               }
               
+
+              {/*APPROVAL CENTER NAVIGATION*/}
+              {user && user.role && (user.role.some(role => ['Owner'].includes(role))) &&
+
+                  <NavLink
+                    to="/approvals"
+                    className={({ isActive }) =>
+                      isActive
+                        ? "border-l-8 bg-[#254717] border-l-green-400"
+                        : ""
+                    }
+                  >
+                    <FaClipboardCheck />Approvals
+                  </NavLink>
+
+              }
 
             </ul>
         </div>
