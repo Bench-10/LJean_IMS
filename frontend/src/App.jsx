@@ -66,6 +66,8 @@ function App() {
   const [notificationQueue, setNotificationQueue] = useState([]);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const queueTimeoutRef = useRef(null);
+  const handledInventoryActionsRef = useRef(new Set());
+  const handledInventoryCleanupRef = useRef(new Map());
 
   // ACCOUNT STATUS STATES
   const [showAccountDisabledPopup, setShowAccountDisabledPopup] = useState(false);
@@ -97,8 +99,16 @@ function App() {
   }
 
   // NOTIFICATION QUEUE MANAGEMENT
-  const addToNotificationQueue = (message, isLocal = false) => {
-    setNotificationQueue(prev => [...prev, { message, isLocal }]);
+  const addToNotificationQueue = (message, options = {}) => {
+    let config = { isLocal: false, title: undefined, dedupeKey: undefined };
+
+    if (typeof options === 'boolean') {
+      config.isLocal = options;
+    } else if (options && typeof options === 'object') {
+      config = { ...config, ...options };
+    }
+
+    setNotificationQueue(prev => [...prev, { message, ...config }]);
   };
 
   const processNotificationQueue = () => {
@@ -109,7 +119,13 @@ function App() {
     
     // Show the notification
     setInAppNotifMessage(nextNotification.message);
-    setCurrentNotificationType(nextNotification.isLocal ? 'Success' : 'System Update');
+    setCurrentNotificationType(
+      nextNotification.title
+        ? nextNotification.title
+        : nextNotification.isLocal
+          ? 'Success'
+          : 'System Update'
+    );
     setOpenInAppNotif(true);
     
     // Remove from queue after showing
@@ -437,8 +453,28 @@ function App() {
         }
 
         if (payload.status === 'rejected') {
-          const message = payload.reason ? `Inventory request rejected: ${payload.reason}` : 'Inventory request was rejected.';
-          addToNotificationQueue(message, true);
+          const rejectionKey = `reject-${normalizePendingId(payload.pending_id)}`;
+          const existingTimer = handledInventoryCleanupRef.current.get(rejectionKey);
+
+          if (handledInventoryActionsRef.current.has(rejectionKey)) {
+            handledInventoryActionsRef.current.delete(rejectionKey);
+            if (existingTimer) {
+              clearTimeout(existingTimer);
+              handledInventoryCleanupRef.current.delete(rejectionKey);
+            }
+          } else {
+            if (existingTimer) {
+              clearTimeout(existingTimer);
+              handledInventoryCleanupRef.current.delete(rejectionKey);
+            }
+
+            const message = payload.reason ? `Inventory request rejected: ${payload.reason}` : 'Inventory request was rejected.';
+            addToNotificationQueue(message, {
+              isLocal: true,
+              title: 'Inventory Rejection',
+              dedupeKey: rejectionKey
+            });
+          }
         }
       }
 
@@ -704,7 +740,10 @@ function App() {
 
       if (response.data?.next_stage === 'admin_review') {
         setPendingInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
-        addToNotificationQueue('Inventory request forwarded to the owner for final approval.', true);
+        addToNotificationQueue('Inventory request forwarded to the owner for final approval.', {
+          isLocal: true,
+          title: 'Approval for Admin'
+        });
         return;
       }
 
@@ -757,6 +796,10 @@ function App() {
   const handleRejectPendingInventory = async (pendingId, reason = '') => {
     if (!user) return;
 
+    const normalizedId = normalizePendingId(pendingId);
+    const rejectionKey = `reject-${normalizedId}`;
+    handledInventoryActionsRef.current.add(rejectionKey);
+
     try {
       await api.patch(`/api/items/pending/${pendingId}/reject`, {
         approver_id: user.user_id,
@@ -764,8 +807,24 @@ function App() {
       });
 
   setPendingInventoryRequests(prev => prev.filter(request => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId)));
-      addToNotificationQueue('Inventory request rejected.', true);
+      const cleanupTimer = setTimeout(() => {
+        handledInventoryActionsRef.current.delete(rejectionKey);
+        handledInventoryCleanupRef.current.delete(rejectionKey);
+      }, 8000);
+      handledInventoryCleanupRef.current.set(rejectionKey, cleanupTimer);
+
+      addToNotificationQueue('Inventory request rejected.', {
+        isLocal: true,
+        title: 'Inventory Rejection',
+        dedupeKey: rejectionKey
+      });
     } catch (error) {
+      handledInventoryActionsRef.current.delete(rejectionKey);
+      const existingTimer = handledInventoryCleanupRef.current.get(rejectionKey);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        handledInventoryCleanupRef.current.delete(rejectionKey);
+      }
       console.error('Error rejecting inventory request:', error);
     }
   };
