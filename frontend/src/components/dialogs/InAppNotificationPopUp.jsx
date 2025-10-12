@@ -14,6 +14,7 @@ function InAppNotificationPopUp({title, message}) {
   return (
 
      <div className='fixed top-7 right-5 bg-white p-4 rounded-lg shadow-2xl z-[1000] border border-gray-400 max-w-sm animate-slideInRight'>
+      
         <p className="font-bold text-gray-800 mb-2">
             {displayTitle}
         </p>

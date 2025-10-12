@@ -459,8 +459,8 @@ function ProductInventory({
             <thead className="sticky top-0 bg-gray-100 z-10 ">
               <tr>
                 
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-24">
-                    ITEM ID
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-40">
+                    INVENTORY ID
                   </th>
                   <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white">
                     ITEM NAME
@@ -507,7 +507,7 @@ function ProductInventory({
             <tbody className="bg-white relative">
               {invetoryLoading ? 
                 <tr>
-                  <td colSpan="12" className="h-96 text-center">
+                  <td colSpan="13" className="h-96 text-center">
                     <ChartLoading message='Loading inventory products...' />
                   </td>
                 </tr>
@@ -516,14 +516,14 @@ function ProductInventory({
 
                 currentPageData.length === 0 ? 
                   (
-                    <NoInfoFound col={10}/>
+                    <NoInfoFound col={11}/>
                   ) : 
 
                   (
                     currentPageData.map((row, rowIndex) => (
                   
                       <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => openDetails(row)} style={{cursor:'pointer'}}>
-                        <td className="px-4 py-2 text-center"  >{row.product_id}</td>
+                        <td className="px-4 py-2 text-center"  >{`${String(row.branch_id).padStart(2, '0')}${String(row.category_id).padStart(2, '0')}-${row.product_id}`}</td>
                         <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
                         <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
                         <td className="px-4 py-2"  >{row.unit}</td>
