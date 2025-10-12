@@ -46,8 +46,24 @@ CREATE TABLE Users (
     permissions TEXT[],
     address VARCHAR(255),
     is_disabled BOOL DEFAULT FALSE,
+    status VARCHAR(20) DEFAULT 'active',
+    created_by INT,
+    approved_by INT,
+    approved_at TIMESTAMP;
     FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
 );
+
+CREATE INDEX idx_users_status ON Users(status);
+
+
+ALTER TABLE Users 
+ADD CONSTRAINT fk_users_created_by 
+FOREIGN KEY (created_by) REFERENCES Users(user_id);
+
+
+ALTER TABLE Users
+  ADD CONSTRAINT fk_users_approved_by
+  FOREIGN KEY (approved_by) REFERENCES Administrator(admin_id);
 
 
 
@@ -73,6 +89,17 @@ CREATE TABLE Category (
 
 
 
+CREATE TABLE Products (
+    product_id INT,
+    product_name VARCHAR(100),
+    description TEXT DEFAULT 'N/A',
+	PRIMARY KEY (product_id) 
+);
+
+
+
+
+
 CREATE TABLE Inventory_Product (
     product_id INT NOT NULL,
     branch_id INT NOT NULL,
@@ -82,11 +109,13 @@ CREATE TABLE Inventory_Product (
     unit_price DECIMAL(10, 2) NOT NULL,
     unit_cost DECIMAL(10, 2) NOT NULL,
     quantity INT,
-    threshold INT NOT NULL,
+    min_threshold INT NOT NULL,
+    max_threshold INT NOT NULL,
     low_stock_notified BOOLEAN NOT NULL SET DEFAULT FALSE
     PRIMARY KEY (product_id, branch_id), 
     FOREIGN KEY (category_id) REFERENCES Category(category_id),
-    FOREIGN KEY (branch_id) REFERENCES Branch(branch_id)
+    FOREIGN KEY (branch_id) REFERENCES Branch(branch_id),
+    FOREIGN KEY (product_id) REFERENCES Products(product_id);
 
 );
 
@@ -265,6 +294,50 @@ CREATE INDEX idx_password_reset_tokens_admin ON password_reset_tokens(admin_id);
 
 
 
+CREATE TABLE Inventory_Pending_Actions (
+    pending_id SERIAL PRIMARY KEY,
+    branch_id INT NOT NULL REFERENCES Branch(branch_id),
+    product_id INT NULL,
+    action_type TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    current_stage TEXT NOT NULL DEFAULT 'manager_review',
+    requires_admin_review BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by INT NOT NULL REFERENCES Users(user_id),
+    created_by_name TEXT,
+    created_by_roles TEXT[],
+    manager_approver_id INT REFERENCES Users(user_id),
+    manager_approved_at TIMESTAMP,
+    admin_approver_id INT REFERENCES Administrator(admin_id),
+    admin_approved_at TIMESTAMP,
+    approved_by INT REFERENCES Users(user_id),
+    approved_at TIMESTAMP,
+    rejection_reason TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_inventory_pending_actions_branch ON Inventory_Pending_Actions(branch_id, status);
+CREATE INDEX idx_inventory_pending_actions_stage ON Inventory_Pending_Actions(current_stage, status);
+
+
+
+
+
+CREATE TABLE admin_notification (
+    admin_id INT,
+    alert_id INT,
+    is_read BOOLEAN DEFAULT TRUE,
+    PRIMARY KEY (admin_id, alert_id),
+    FOREIGN KEY (admin_id) REFERENCES Administrator(admin_id) ON DELETE CASCADE,
+    FOREIGN KEY (alert_id) REFERENCES Inventory_Alerts(alert_id) ON DELETE CASCADE
+);
+
+
+
+
+
+
+
 
 
 
@@ -316,7 +389,79 @@ ALTER TABLE Sales_Stock_Usage
 
 
 
--- INVENTORY PENDING ACTIONS TABLE FOR APPROVAL WORKFLOW
+
+
+
+
+
+
+
+
+--NEW SCHEMA
+
+
+ALTER TABLE inventory_product ADD COLUMN max_threshold int 
+
+
+UPDATE inventory_product SET max_threshold = 2000
+
+
+
+ALTER TABLE inventory_product
+RENAME COLUMN threshold TO min_threshold;
+
+
+
+
+CREATE TABLE Products (
+    product_id INT,
+    product_name VARCHAR(100),
+    description TEXT DEFAULT 'N/A',
+	PRIMARY KEY (product_id) 
+);
+
+
+
+INSERT INTO Products (product_id, product_name)
+SELECT DISTINCT ip.product_id, ip.product_name
+FROM Inventory_Product ip
+LEFT JOIN Products p
+    ON ip.product_id = p.product_id
+WHERE p.product_id IS NULL;
+
+
+
+ALTER TABLE Inventory_Product
+    ADD CONSTRAINT inventory_product_product_fk
+    FOREIGN KEY (product_id)
+    REFERENCES Products(product_id);
+
+
+
+
+ALTER TABLE Users 
+ADD COLUMN status VARCHAR(20) DEFAULT 'active',
+ADD COLUMN created_by INT,
+ADD COLUMN approved_by INT,
+ADD COLUMN approved_at TIMESTAMP;
+
+
+CREATE INDEX idx_users_status ON Users(status);
+
+
+ALTER TABLE Users 
+ADD CONSTRAINT fk_users_created_by 
+FOREIGN KEY (created_by) REFERENCES Users(user_id);
+
+
+
+ALTER TABLE Users
+  ADD CONSTRAINT fk_users_approved_by
+  FOREIGN KEY (approved_by) REFERENCES Administrator(admin_id);
+
+
+
+
 CREATE TABLE Inventory_Pending_Actions (
     pending_id SERIAL PRIMARY KEY,
     branch_id INT NOT NULL REFERENCES Branch(branch_id),
@@ -345,3 +490,11 @@ CREATE INDEX idx_inventory_pending_actions_stage ON Inventory_Pending_Actions(cu
 
 
 
+CREATE TABLE admin_notification (
+    admin_id INT,
+    alert_id INT,
+    is_read BOOLEAN DEFAULT TRUE,
+    PRIMARY KEY (admin_id, alert_id),
+    FOREIGN KEY (admin_id) REFERENCES Administrator(admin_id) ON DELETE CASCADE,
+    FOREIGN KEY (alert_id) REFERENCES Inventory_Alerts(alert_id) ON DELETE CASCADE
+);
