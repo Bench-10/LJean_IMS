@@ -60,6 +60,8 @@ function App() {
   const [adminInventoryRequests, setAdminInventoryRequests] = useState([]);
   const [adminInventoryLoading, setAdminInventoryLoading] = useState(false);
 
+  const normalizePendingId = (value) => (value === null || value === undefined ? '' : String(value));
+
   // NOTIFICATION QUEUE SYSTEM
   const [notificationQueue, setNotificationQueue] = useState([]);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
@@ -380,7 +382,7 @@ function App() {
       }
 
       setPendingInventoryRequests(prev => {
-        const exists = prev.some(req => req.pending_id === payload.request.pending_id);
+        const exists = prev.some(req => normalizePendingId(req.pending_id) === normalizePendingId(payload.request.pending_id));
         return exists ? prev : [...prev, payload.request];
       });
     });
@@ -393,9 +395,9 @@ function App() {
       }
 
       setAdminInventoryRequests(prev => {
-        const exists = prev.some(req => req.pending_id === payload.request.pending_id);
+        const exists = prev.some(req => normalizePendingId(req.pending_id) === normalizePendingId(payload.request.pending_id));
         if (exists) {
-          return prev.map(req => req.pending_id === payload.request.pending_id ? payload.request : req);
+          return prev.map(req => normalizePendingId(req.pending_id) === normalizePendingId(payload.request.pending_id) ? payload.request : req);
         }
         return [...prev, payload.request];
       });
@@ -413,7 +415,7 @@ function App() {
       const isOwner = user.role && user.role.some(role => ['Owner'].includes(role));
 
       if (isBranchManager && payload.branch_id && payload.branch_id === user.branch_id) {
-        setPendingInventoryRequests(prev => prev.filter(req => req.pending_id !== payload.pending_id));
+        setPendingInventoryRequests(prev => prev.filter(req => normalizePendingId(req.pending_id) !== normalizePendingId(payload.pending_id)));
 
         if (payload.status === 'approved' && payload.product) {
           setProductsData(prevData => {
@@ -443,12 +445,12 @@ function App() {
       if (isOwner) {
         setAdminInventoryRequests(prev => {
           if (payload.status === 'approved' || payload.status === 'rejected') {
-            return prev.filter(req => req.pending_id !== payload.pending_id);
+            return prev.filter(req => normalizePendingId(req.pending_id) !== normalizePendingId(payload.pending_id));
           }
 
           if (payload.status === 'pending_admin') {
             return prev.map(req => (
-              req.pending_id === payload.pending_id
+              normalizePendingId(req.pending_id) === normalizePendingId(payload.pending_id)
                 ? { ...req, status: 'pending', current_stage: 'admin_review' }
                 : req
             ));
@@ -665,7 +667,7 @@ function App() {
     try {
       setPendingInventoryLoading(true);
       const response = await api.get(`/api/items/pending?branch_id=${user.branch_id}`);
-      setPendingInventoryRequests(response.data);
+  setPendingInventoryRequests(response.data);
     } catch (error) {
       console.error('Error fetching pending inventory requests:', error);
     } finally {
@@ -721,7 +723,7 @@ function App() {
         }
       }
 
-      setPendingInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+  setPendingInventoryRequests(prev => prev.filter(request => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId)));
       addToNotificationQueue('Inventory request approved and applied.', true);
       await fetchProductsData();
     } catch (error) {
@@ -742,7 +744,7 @@ function App() {
         admin_id: adminIdentifier
       });
 
-      setAdminInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+  setAdminInventoryRequests(prev => prev.filter(request => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId)));
       addToNotificationQueue('Inventory request approved.', true);
       await fetchProductsData();
       await fetchAdminPendingInventoryRequests();
@@ -761,7 +763,7 @@ function App() {
         reason
       });
 
-      setPendingInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+  setPendingInventoryRequests(prev => prev.filter(request => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId)));
       addToNotificationQueue('Inventory request rejected.', true);
     } catch (error) {
       console.error('Error rejecting inventory request:', error);
@@ -782,7 +784,7 @@ function App() {
         reason
       });
 
-      setAdminInventoryRequests(prev => prev.filter(request => request.pending_id !== pendingId));
+  setAdminInventoryRequests(prev => prev.filter(request => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId)));
       addToNotificationQueue('Inventory request rejected.', true);
       await fetchAdminPendingInventoryRequests();
     } catch (error) {

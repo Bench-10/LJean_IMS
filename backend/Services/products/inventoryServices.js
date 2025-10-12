@@ -194,15 +194,7 @@ const createPendingInventoryAction = async ({
                 }
             }
 
-            if (sanitizedPayload?.userID) {
-                broadcastToUser(sanitizedPayload.userID, {
-                    alert_id: `inventory-forwarded-${mapped.pending_id}-${Date.now()}`,
-                    alert_type: 'Inventory Request Forwarded',
-                    message: `${productName}${categoryLabel} has been submitted for owner approval.`,
-                    banner_color: 'blue',
-                    created_at: new Date().toISOString()
-                });
-            }
+            // No direct notification for branch manager in this path to avoid duplicate pop-ups
         } else {
             broadcastInventoryApprovalRequest(branchId, { request: mapped });
 
@@ -1204,7 +1196,7 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
         const updated = rows[0];
 
         broadcastInventoryApprovalUpdate(pending.branch_id, {
-            pending_id,
+            pending_id: pendingId,
             status: 'rejected',
             action: pending.action_type,
             branch_id: pending.branch_id,
@@ -1259,7 +1251,7 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
     const updated = rows[0];
 
     broadcastInventoryApprovalUpdate(pending.branch_id, {
-        pending_id,
+        pending_id: pendingId,
         status: 'rejected',
         action: pending.action_type,
         branch_id: pending.branch_id,
