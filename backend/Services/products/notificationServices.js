@@ -5,6 +5,22 @@ import isToday from 'dayjs/plugin/isToday.js';
 import isYesterday from 'dayjs/plugin/isYesterday.js';
 
 
+const normalizeRoles = (roles) => {
+  if (!roles) return [];
+  if (Array.isArray(roles)) {
+    return roles
+      .map(role => (role === undefined || role === null ? null : String(role).trim()))
+      .filter(Boolean);
+  }
+
+  if (typeof roles === 'string') {
+    const trimmed = roles.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  return [];
+};
+
 
 //CONVERTS THE TIME TO EX: 2 hours ago, 1 minute ago, July, 3, 2025
 dayjs.extend(relativeTime);
@@ -36,7 +52,7 @@ function formatTime(timestamp) {
 
 
 
-export const returnNotification = async ({ branchId, userId, hireDate, userType = 'user', adminId = null }) => {
+export const returnNotification = async ({ branchId, userId, hireDate, userType = 'user', adminId = null, roles = [] }) => {
   if (userType === 'admin') {
     const { rows } = await SQLquery(`
       SELECT 
@@ -64,6 +80,20 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
     }));
   }
 
+  const normalizedRoles = normalizeRoles(roles);
+  const roleSet = new Set(normalizedRoles);
+
+  const disallowedTypes = new Set();
+
+  if (!roleSet.has('Owner')) {
+    disallowedTypes.add('User Approval Needed');
+    disallowedTypes.add('Inventory Admin Approval Needed');
+  }
+
+  if (!roleSet.has('Branch Manager')) {
+    disallowedTypes.add('Inventory Approval Needed');
+  }
+
   const { rows } = await SQLquery(`
     SELECT 
       Inventory_Alerts.alert_id, 
@@ -77,9 +107,15 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
     FROM Inventory_Alerts
     LEFT JOIN user_notification
       ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1
-    WHERE Inventory_Alerts.branch_id = $2 AND Inventory_Alerts.alert_date >= $3 AND Inventory_Alerts.user_id != $4
+    WHERE Inventory_Alerts.branch_id = $2
+      AND Inventory_Alerts.alert_date >= $3
+      AND Inventory_Alerts.user_id != $4
+      ${disallowedTypes.size > 0 ? 'AND NOT (Inventory_Alerts.alert_type = ANY($5::text[]))' : ''}
     ORDER BY Inventory_Alerts.alert_date DESC;
-  `, [userId, branchId, hireDate, userId]);
+  `, disallowedTypes.size > 0
+      ? [userId, branchId, hireDate, userId, Array.from(disallowedTypes)]
+      : [userId, branchId, hireDate, userId]
+  );
 
   return rows.map((row) => ({
     ...row,

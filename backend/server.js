@@ -118,16 +118,16 @@ const shouldDispatchNotification = (subscriber, { category, branchId, targetRole
   const roles = normalizeRoles(subscriber.roles);
   if (roles.length === 0) return false;
 
-  if (roles.includes('Owner') && category !== 'account-approval') {
-    return false;
-  }
-
   if (!matchesBranch(subscriber, branchId)) {
     return false;
   }
 
   if (targetRoles && targetRoles.length > 0) {
     return targetRoles.some(role => roles.includes(role));
+  }
+
+  if (roles.includes('Owner') && category !== 'account-approval') {
+    return false;
   }
 
   switch (category) {

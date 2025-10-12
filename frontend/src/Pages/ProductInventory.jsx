@@ -8,6 +8,7 @@ import {currencyFormat} from '../utils/formatCurrency.js';
 import InventoryItemDetailsDialog from '../components/InventoryItemDetailsDialog.jsx';
 import ChartLoading from '../components/common/ChartLoading.jsx';
 import { FaBoxOpen } from "react-icons/fa6";
+import RejectionReasonDialog from '../components/dialogs/RejectionReasonDialog.jsx';
 
 
 function ProductInventory({
@@ -35,6 +36,8 @@ function ProductInventory({
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedBranch, setSelectedBranch] = useState(() => user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id : '' );
   const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [pendingRejectId, setPendingRejectId] = useState(null);
 
   const displayPendingApprovals = user && user.role && user.role.some(role => ['Branch Manager'].includes(role));
 
@@ -62,12 +65,21 @@ function ProductInventory({
   const handleRejectClick = (pendingId) => {
     if (typeof rejectPendingRequest !== 'function') return;
 
-    const reason = window.prompt('Add an optional note for rejection (leave blank to skip):', '');
-    if (reason === null) {
-      return; // dialog cancelled
-    }
+    setPendingRejectId(pendingId);
+    setIsRejectDialogOpen(true);
+  };
 
-    rejectPendingRequest(pendingId, reason.trim());
+  const handleRejectDialogCancel = () => {
+    setIsRejectDialogOpen(false);
+    setPendingRejectId(null);
+  };
+
+  const handleRejectDialogConfirm = (reason) => {
+    if (typeof rejectPendingRequest === 'function' && pendingRejectId !== null) {
+      rejectPendingRequest(pendingRejectId, reason);
+    }
+    setIsRejectDialogOpen(false);
+    setPendingRejectId(null);
   };
 
   // NEW: DIALOG STATE
@@ -160,6 +172,17 @@ function ProductInventory({
             
             />
         }
+
+
+        {/*REJECTION REASON */}
+        <RejectionReasonDialog
+          open={isRejectDialogOpen}
+          onCancel={handleRejectDialogCancel}
+          onConfirm={handleRejectDialogConfirm}
+          sanitizeInput={sanitizeInput}
+          title="Reject Inventory Request"
+          confirmLabel="Submit Rejection"
+        />
 
 
         {/* DETAILS DIALOG */}
@@ -589,8 +612,6 @@ function ProductInventory({
           </div>
 
         </div>
-
-        
 
   )
 

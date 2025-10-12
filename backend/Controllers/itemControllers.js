@@ -263,13 +263,18 @@ export const getNotification = async (req, res) =>{
         const branchId = req.query.branch_id;
         const userType = req.query.user_type ?? 'user';
         const adminId = req.query.admin_id ?? null;
+        const rolesParam = req.query.role ?? req.query.roles ?? [];
+        const roles = Array.isArray(rolesParam)
+            ? rolesParam
+            : (rolesParam ? [rolesParam] : []);
 
         const notification = await notificationServices.returnNotification({
             branchId,
             userId,
             hireDate,
             userType,
-            adminId
+            adminId,
+            roles
         });
         res.status(200).json(notification);
     } catch (error) {

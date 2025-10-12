@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ChartLoading from "../components/common/ChartLoading";
 import NoInfoFound from "../components/common/NoInfoFound";
+import RejectionReasonDialog from "../components/dialogs/RejectionReasonDialog";
 
 function Approvals({
   users = [],
@@ -17,6 +18,8 @@ function Approvals({
   const [searchItem, setSearchItem] = useState("");
   const [approvingUserId, setApprovingUserId] = useState(null);
   const [processingInventoryId, setProcessingInventoryId] = useState(null);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [pendingRejectId, setPendingRejectId] = useState(null);
   const navigate = useNavigate();
 
   const handleSearch = (event) => {
@@ -134,21 +137,32 @@ function Approvals({
     }
   };
 
-  const handleInventoryReject = async (pendingId) => {
+  const handleInventoryReject = (pendingId) => {
     if (!rejectInventoryRequest) return;
 
-    const reason = window.prompt('Add an optional note for rejection (leave blank to skip):', '');
-    if (reason === null) {
+    setPendingRejectId(pendingId);
+    setRejectDialogOpen(true);
+  };
+
+  const handleRejectDialogCancel = () => {
+    setRejectDialogOpen(false);
+    setPendingRejectId(null);
+  };
+
+  const handleRejectDialogConfirm = async (reason) => {
+    if (!rejectInventoryRequest || pendingRejectId === null) {
+      handleRejectDialogCancel();
       return;
     }
 
     try {
-      setProcessingInventoryId(pendingId);
-      await rejectInventoryRequest(pendingId, reason.trim());
+      setProcessingInventoryId(pendingRejectId);
+      await rejectInventoryRequest(pendingRejectId, reason);
     } catch (error) {
       console.error("Error rejecting inventory request:", error);
     } finally {
       setProcessingInventoryId(null);
+      handleRejectDialogCancel();
     }
   };
 
@@ -327,6 +341,14 @@ function Approvals({
           </tbody>
         </table>
       </div>
+      <RejectionReasonDialog
+        open={rejectDialogOpen}
+        onCancel={handleRejectDialogCancel}
+        onConfirm={handleRejectDialogConfirm}
+        sanitizeInput={sanitizeInput}
+        title="Reject Inventory Request"
+        confirmLabel="Submit Rejection"
+      />
     </div>
   );
 }

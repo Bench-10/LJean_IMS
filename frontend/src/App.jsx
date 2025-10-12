@@ -946,6 +946,12 @@ function App() {
       const isOwner = roles.includes('Owner');
       const params = new URLSearchParams();
 
+      roles.forEach((role) => {
+        if (role) {
+          params.append('role', role);
+        }
+      });
+
       if (isOwner) {
         params.append('user_type', 'admin');
         if (user.admin_id) {
