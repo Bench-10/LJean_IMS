@@ -96,12 +96,27 @@ const createPendingInventoryAction = async ({
     productData,
     branchId,
     productId = null,
-    currentState = null
+    currentState = null,
+    initialStage = 'manager_review',
+    managerApproverId = null,
+    managerApproverName = null,
+    managerApprovedAt = null
 }) => {
     const sanitizedPayload = sanitizeProductPayload(productData);
     const categoryName = sanitizedPayload?.category_id ? await getCategoryName(sanitizedPayload.category_id) : null;
     const isCreateAction = actionType === 'create';
     const requiresAdminReview = isCreateAction && !(sanitizedPayload?.existing_product_id);
+    const stage = initialStage;
+
+    const managerId = managerApproverId ?? null;
+    let managerApprovedTimestamp = managerApprovedAt ? new Date(managerApprovedAt).toISOString() : null;
+
+    if (!managerApprovedTimestamp && stage === 'admin_review' && managerId) {
+        managerApprovedTimestamp = new Date().toISOString();
+    }
+
+    const approvedByValue = stage === 'admin_review' && managerId ? managerId : null;
+    const approvedAtValue = approvedByValue ? managerApprovedTimestamp : null;
 
     const payload = {
         productData: sanitizedPayload,
@@ -111,54 +126,111 @@ const createPendingInventoryAction = async ({
 
     const { rows } = await SQLquery(
         `INSERT INTO Inventory_Pending_Actions
-            (branch_id, product_id, action_type, payload, status, current_stage, requires_admin_review, created_by, created_by_name, created_by_roles)
-         VALUES ($1, $2, $3, $4::jsonb, 'pending', 'manager_review', $5, $6, $7, $8)
+            (branch_id, product_id, action_type, payload, status, current_stage, requires_admin_review, created_by, created_by_name, created_by_roles, manager_approver_id, manager_approved_at, approved_by, approved_at)
+         VALUES ($1, $2, $3, $4::jsonb, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING *` ,
         [
             branchId,
             productId,
             actionType,
             JSON.stringify(payload),
+            stage,
             requiresAdminReview,
             sanitizedPayload?.userID || null,
             sanitizedPayload?.fullName || null,
-            sanitizedPayload?.requestor_roles || []
+            sanitizedPayload?.requestor_roles || [],
+            managerId,
+            managerApprovedTimestamp,
+            approvedByValue,
+            approvedAtValue
         ]
     );
 
     const mapped = mapPendingRequest(rows[0]);
 
     if (mapped) {
-        broadcastInventoryApprovalRequest(branchId, { request: mapped });
-
         const requesterName = sanitizedPayload?.fullName || 'Inventory staff member';
         const productName = sanitizedPayload?.product_name || 'an inventory item';
         const categoryLabel = categoryName ? ` (${categoryName})` : '';
         const verb = actionType === 'update' ? 'update' : 'add';
-        const notificationMessage = `${requesterName} submitted a request to ${verb} ${productName}${categoryLabel}.`;
+        const managerName = managerApproverName || requesterName;
 
-        const alertResult = await SQLquery(
-            `INSERT INTO Inventory_Alerts 
-            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *`,
-            [productId ?? sanitizedPayload?.product_id ?? null, branchId, 'Inventory Approval Needed', notificationMessage, 'orange', sanitizedPayload?.userID || null, requesterName]
-        );
+        if (mapped.current_stage === 'admin_review') {
+            const ownerRequest = managerName
+                ? { ...mapped, manager_approver_name: managerName }
+                : mapped;
 
-        if (alertResult.rows[0]) {
-            broadcastNotification(branchId, {
-                alert_id: alertResult.rows[0].alert_id,
-                alert_type: 'Inventory Approval Needed',
-                message: notificationMessage,
-                banner_color: 'orange',
-                user_id: alertResult.rows[0].user_id,
-                user_full_name: requesterName,
-                alert_date: alertResult.rows[0].alert_date,
-                isDateToday: true,
-                alert_date_formatted: 'Just now',
-                target_roles: ['Branch Manager'],
-                creator_id: sanitizedPayload?.userID || null
-            }, { category: 'inventory', targetRoles: ['Branch Manager'] });
+            broadcastInventoryApprovalRequestToOwners({ request: ownerRequest });
+
+            if (requiresAdminReview) {
+                const adminNotificationMessage = `${managerName || 'Branch Manager'} submitted a request to ${verb} ${productName}${categoryLabel}. Awaiting owner approval.`;
+
+                const alertResult = await SQLquery(
+                    `INSERT INTO Inventory_Alerts 
+                    (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    RETURNING *`,
+                    [
+                        productId ?? sanitizedPayload?.product_id ?? null,
+                        branchId,
+                        'Inventory Admin Approval Needed',
+                        adminNotificationMessage,
+                        'orange',
+                        managerId || sanitizedPayload?.userID || null,
+                        managerName
+                    ]
+                );
+
+                if (alertResult.rows[0]) {
+                    broadcastOwnerNotification({
+                        alert_id: alertResult.rows[0].alert_id,
+                        alert_type: 'Inventory Admin Approval Needed',
+                        message: adminNotificationMessage,
+                        banner_color: 'orange',
+                        alert_date: alertResult.rows[0].alert_date,
+                        isDateToday: true,
+                        alert_date_formatted: 'Just now'
+                    }, { category: 'inventory', targetRoles: ['Owner'] });
+                }
+            }
+
+            if (sanitizedPayload?.userID) {
+                broadcastToUser(sanitizedPayload.userID, {
+                    alert_id: `inventory-forwarded-${mapped.pending_id}-${Date.now()}`,
+                    alert_type: 'Inventory Request Forwarded',
+                    message: `${productName}${categoryLabel} has been submitted for owner approval.`,
+                    banner_color: 'blue',
+                    created_at: new Date().toISOString()
+                });
+            }
+        } else {
+            broadcastInventoryApprovalRequest(branchId, { request: mapped });
+
+            const notificationMessage = `${requesterName} submitted a request to ${verb} ${productName}${categoryLabel}.`;
+
+            const alertResult = await SQLquery(
+                `INSERT INTO Inventory_Alerts 
+                (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING *`,
+                [productId ?? sanitizedPayload?.product_id ?? null, branchId, 'Inventory Approval Needed', notificationMessage, 'orange', sanitizedPayload?.userID || null, requesterName]
+            );
+
+            if (alertResult.rows[0]) {
+                broadcastNotification(branchId, {
+                    alert_id: alertResult.rows[0].alert_id,
+                    alert_type: 'Inventory Approval Needed',
+                    message: notificationMessage,
+                    banner_color: 'orange',
+                    user_id: alertResult.rows[0].user_id,
+                    user_full_name: requesterName,
+                    alert_date: alertResult.rows[0].alert_date,
+                    isDateToday: true,
+                    alert_date_formatted: 'Just now',
+                    target_roles: ['Branch Manager'],
+                    creator_id: sanitizedPayload?.userID || null
+                }, { category: 'inventory', targetRoles: ['Branch Manager'] });
+            }
         }
     }
 
@@ -318,6 +390,12 @@ export const addProductItem = async (productData, options = {}) => {
 
     const roles = normalizeRoles(productData.requestor_roles || productData.userRoles);
     const pendingBranchId = Number(productData.branch_id ?? productData.branchId);
+    const isBranchManager = roles.includes('Branch Manager');
+    const isOwner = roles.includes('Owner');
+    const existingProductId = productData.existing_product_id ?? productData.existingProductId ?? null;
+    const isNewProductSubmission = !existingProductId;
+    const actingUserId = actingUser?.userID ?? productData.userID;
+    const actingUserName = actingUser?.fullName ?? productData.fullName;
     const requiresApproval = !bypassApproval && needsBranchManagerApproval(roles);
 
     if (requiresApproval) {
@@ -325,15 +403,32 @@ export const addProductItem = async (productData, options = {}) => {
             actionType: 'create',
             productData,
             branchId: pendingBranchId,
-            productId: productData.existing_product_id || null,
+            productId: existingProductId || null,
             currentState: null
         });
 
         return { status: 'pending', action: 'create', pending: pendingRecord };
     }
 
-    const actingUserId = actingUser?.userID ?? productData.userID;
-    const actingUserName = actingUser?.fullName ?? productData.fullName;
+    if (!bypassApproval && isNewProductSubmission && isBranchManager && !isOwner) {
+        const pendingRecord = await createPendingInventoryAction({
+            actionType: 'create',
+            productData,
+            branchId: pendingBranchId,
+            productId: null,
+            currentState: null,
+            initialStage: 'admin_review',
+            managerApproverId: actingUserId || null,
+            managerApproverName: actingUserName || null
+        });
+
+        return {
+            status: 'pending',
+            next_stage: 'admin_review',
+            action: 'create',
+            pending: pendingRecord
+        };
+    }
 
     const cleanedData = sanitizeProductPayload({
         ...productData,

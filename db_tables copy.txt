@@ -407,6 +407,7 @@ CREATE INDEX idx_inventory_pending_actions_stage ON Inventory_Pending_Actions(cu
 
 
 
+
 CREATE TABLE admin_notification (
     admin_id INT,
     alert_id INT,
