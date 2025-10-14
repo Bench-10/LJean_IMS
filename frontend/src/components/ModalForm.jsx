@@ -17,7 +17,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const [product_name, setItemName] = useState('');
   const [category_id, setCategory] = useState('');
   const [branch_id, setBranch] = useState(''); 
-  const [quantity_added, setQuantity] = useState('');
+  const [quantity_added, setQuantity] = useState(0);
   const [unit_cost, setPurchasedPrice] = useState('');
   const [date_added, setDatePurchased] = useState('');
   const [unit, setUnit] = useState('');
@@ -28,6 +28,9 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const [product_validity, setExpirationDate] = useState('');
   const [maxQuant, setMaxQuant] = useState(false);
   const [description, setDescription] = useState('');
+  
+  
+  const [editChoice, setEditChoice] = useState(null); 
 
   // EXISTING PRODUCT SELECTION STATES
   const [existingProducts, setExistingProducts] = useState([]);
@@ -77,12 +80,14 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       setUnitValidationError({});
       setSelectedExistingProduct(null);
       setSearchTerm('');
+      // reset edit choice when modal opens
+      setEditChoice(null);
       
       if (mode === 'add') {
           setItemName('');
           setCategory('');
           setBranch(user.branch_id);
-          setQuantity('');
+          setQuantity(0);
           setPurchasedPrice('');
           setDatePurchased('');
           setUnit('');
@@ -102,7 +107,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
         setItemName(itemData.product_name);
         setCategory(itemData.category_id);
         setBranch(user.branch_id); //BRANCH ID FROM USER INFORMATION
-        setQuantity('');
+        setQuantity(0);
         setPurchasedPrice(itemData.unit_cost);
         setUnit(itemData.unit);
         setMinThreshold(itemData.min_threshold);
@@ -198,37 +203,53 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   
 
     //CHECK IF INPUT IS EMPTY
-    if (!String(product_name).trim()) isEmptyField.product_name = true;
-    if (!String(category_id).trim()) isEmptyField.category_id = true;
-    if (!String(quantity_added).trim()) isEmptyField.quantity_added = true;
-    if (!String(unit_cost).trim()) isEmptyField.unit_cost = true;
-    if (!String(date_added).trim()) isEmptyField.date_added = true;
-    if (!String(unit).trim()) isEmptyField.unit = true;
-    if (!String(min_threshold).trim()) isEmptyField.min_threshold = true;
-    if (!String(max_threshold).trim()) isEmptyField.max_threshold = true;
-    if (!String(unit_price).trim()) isEmptyField.unit_price = true;
-    if (!String(product_validity).trim()) isEmptyField.product_validity = true;
+    if (mode === 'edit' && editChoice === 'addStocks') {
+      // only require quantity and unit_cost (and date) for add-stocks flow
+      if (!String(quantity_added).trim()) isEmptyField.quantity_added = true;
+      if (!String(unit_cost).trim()) isEmptyField.unit_cost = true;
+      if (!String(date_added).trim()) isEmptyField.date_added = true;
+      if (!String(product_validity).trim()) isEmptyField.product_validity = true;
+    } else {
+      if (!String(product_name).trim()) isEmptyField.product_name = true;
+      if (!String(category_id).trim()) isEmptyField.category_id = true;
+      if (!String(quantity_added).trim()) isEmptyField.quantity_added = true;
+      if (!String(unit_cost).trim()) isEmptyField.unit_cost = true;
+      if (!String(unit).trim()) isEmptyField.unit = true;
+      if (!String(min_threshold).trim()) isEmptyField.min_threshold = true;
+      if (!String(max_threshold).trim()) isEmptyField.max_threshold = true;
+      if (!String(unit_price).trim()) isEmptyField.unit_price = true;
+    }
 
 
     //CHECK IF INPUT IS NOT A NUMBER
-    if (isNaN(Number(quantity_added))) isnotANumber.quantity_added = true;
-    if (isNaN(Number(unit_cost))) isnotANumber.unit_cost = true;
-    if (isNaN(Number(min_threshold))) isnotANumber.min_threshold = true;
-    if (isNaN(Number(max_threshold))) isnotANumber.max_threshold = true;
-    if (isNaN(Number(unit_price))) isnotANumber.unit_price = true;
+    if (mode === 'edit' && editChoice === 'addStocks') {
+      if (isNaN(Number(quantity_added))) isnotANumber.quantity_added = true;
+      if (isNaN(Number(unit_cost))) isnotANumber.unit_cost = true;
+    } else {
+      if (isNaN(Number(quantity_added))) isnotANumber.quantity_added = true;
+      if (isNaN(Number(unit_cost))) isnotANumber.unit_cost = true;
+      if (isNaN(Number(min_threshold))) isnotANumber.min_threshold = true;
+      if (isNaN(Number(max_threshold))) isnotANumber.max_threshold = true;
+      if (isNaN(Number(unit_price))) isnotANumber.unit_price = true;
+    }
 
 
     //CHECK IF NUMBER IS 0 OR LESS
     if (mode === 'add'){
       if (String(quantity_added).trim() && Number(quantity_added) <= 0) invalidNumberValue.quantity_added = true;
-
     } else{
       if (String(quantity_added).trim() && Number(quantity_added) < 0) invalidNumberValue.quantity_added = true;
     }
+
+
     if (String(unit_cost).trim() && Number(unit_cost) <= 0) invalidNumberValue.unit_cost = true;
-    if (String(min_threshold).trim()  && Number(min_threshold) <= 0) invalidNumberValue.min_threshold = true;
-    if (String(max_threshold).trim()  && Number(max_threshold) <= 0) invalidNumberValue.max_threshold = true;
-    if (String(unit_price).trim() && Number(unit_price) <= 0) invalidNumberValue.unit_price = true;
+
+
+    if (!(mode === 'edit' && editChoice === 'addStocks')) {
+      if (String(min_threshold).trim()  && Number(min_threshold) <= 0) invalidNumberValue.min_threshold = true;
+      if (String(max_threshold).trim()  && Number(max_threshold) <= 0) invalidNumberValue.max_threshold = true;
+      if (String(unit_price).trim() && Number(unit_price) <= 0) invalidNumberValue.unit_price = true;
+    }
 
 
     //CHECK IF DATE ADDED IS GREATER THAN THE EXPIRY DATE
@@ -290,7 +311,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       };
 
       //SENDS THE DATA TO App.jsx TO BE SENT TO DATABASE
-      await OnSubmit(itemData);
+      await OnSubmit(itemData); 
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -300,30 +321,30 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   };
 
 
-  const inputClass = (field) => 
-    `bg-gray-100 border-gray-300 py-2 px-3 w-full rounded-md border border-2 ${
-      emptyField[field] || notANumber[field] || invalidNumber[field] ? 'border-red-500' : ''
-  } ${isExpiredEarly && field === 'product_validity' ? 'border-red-500' : ''}`;
+  const inputClass = (field) => {
+    const hasError = emptyField[field] || notANumber[field] || invalidNumber[field] || (isExpiredEarly && field === 'product_validity');
+    return `w-full py-3 px-4 rounded-lg bg-white border ${hasError ? 'border-red-500 ring-1 ring-red-50' : 'border-gray-200'} text-sm placeholder-gray-400 shadow-sm focus:outline-none transition focus:shadow-outline disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed ${hasError ? 'focus:ring-red-500' : 'focus:ring-indigo-500'}`;
+  };
 
   
-  const label = (field) => `ml-1 text-[13px]  ${emptyField[field] ? 'text-red-500' : ''} ${isExpiredEarly && field === 'product_validity' ? 'text-red-500' : ''}`;
+  const label = (field) => `block text-xs font-medium mb-1 ${emptyField[field] ? 'text-red-600' : 'text-gray-600'} ${isExpiredEarly && field === 'product_validity' ? 'text-red-600' : ''}`;
 
 
 
   const errorflag = (field, field_warn) =>{
     if (emptyField[field])
-      return <div className={`italic text-red-500 absolute ${field_warn === 'date' ? 'top-16':'top-9'} pl-2 text-xs mt-1`}>{`Please enter a ${field_warn}!`}</div>
+      return <p className="mt-1 text-xs text-red-600">{`Please enter a ${field_warn}!`}</p>;
 
-    else if (notANumber[field])
-      return <div className="italic text-red-500 absolute top-9 pl-2 text-xs mt-1">Must be a positive number!</div>
+    if (notANumber[field])
+      return <p className="mt-1 text-xs text-red-600">Must be a positive number!</p>;
 
+    if (invalidNumber[field])
+      return <p className="mt-1 text-xs text-red-600">Value must not be less than 1!</p>;
 
-    else if (invalidNumber[field])
-      return <div className="italic text-red-500 absolute top-9 pl-2 text-xs mt-1">Value must not be less than 1!</div>
+    if (isExpiredEarly && field === 'product_validity')
+      return <p className="mt-1 text-xs text-red-600">Expiry date must be after purchase date!</p>;
 
-    else if (isExpiredEarly && field === 'product_validity')
-      return <div className="italic text-red-500 absolute top-16 pl-2 text-xs mt-1">Expiry date must be after purchase date!</div>
-      
+    return null;
   };
 
 
@@ -348,9 +369,48 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       
       }
 
+
+      {/* When editing, prompt the user to choose action before showing edit fields */}
+      {isModalOpen && mode === 'edit' && !editChoice && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center">
+
+          <div className="bg-white rounded-md p-6 shadow-2xl w-[640px]">
+
+            <h4 className="font-semibold text-2xl mb-6">Choose an action</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <button type="button" onClick={() => setEditChoice('edit')} className="p-4 border 
+              border-gray-100 rounded-lg hover:shadow-md text-left">
+                <div className="flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0z"/></svg>
+                  <span className="font-medium">Edit Product Data</span>
+
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Change product attributes such as unit, price, thresholds and description.</p>
+
+              </button>
+              <button type="button" onClick={() => setEditChoice('addStocks')} className="p-4 border border-gray-100 rounded-lg hover:shadow-md text-left">
+                <div className="flex items-center gap-3">
+
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd"/></svg>
+                  <span className="font-medium">Add Stocks</span>
+                </div>
+
+                <p className="text-xs text-gray-500 mt-2">Quickly add stock quantity and cost without changing other product details.</p>
+              </button>
+            </div>
+            <div className="mt-4 text-center">
+              <button type="button" onClick={() => { onClose(); setEditChoice(null); setShowExistingProducts(false); setMaxQuant(false); }} className="text-sm text-gray-500 hover:underline">Cancel</button>
+
+            </div>
+          </div>
+
+        </div>
+
+      )}
+
       {isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) &&(
-        <div
-          className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
+          <div
+            className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity"
           style={{ pointerEvents: 'auto' }}  onClick={() => {onClose(); 
           setMaxQuant(false);}}
         />
@@ -358,14 +418,20 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
 
 
-        <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
-      <div className="relative flex flex-col border border-gray-600/40 bg-white h-[680px] w-[760px] rounded-md p-7 animate-popup ">
+        <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={mode === 'edit' ? isModalOpen && user && user.role && editChoice && user.role.some(role => ['Inventory Staff'].includes(role)) : isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
+  <div className="relative bg-white max-h-[86vh] overflow-y-auto w-full sm:w-[860px] max-w-4xl rounded-md p-8 shadow-2xl border border-gray-100 animate-popup">
 
 
-              <div>
-                <h3 className="font-bold text-3xl py-4 text-center">
-                  {mode === 'edit' ? 'EDIT ITEM' : 'ADD ITEM'}
-                </h3>
+              <div className="mb-6">
+                <div className="flex items-center justify-between p-4 ">
+                  <div>
+                    <h3 className="text-2xl font-bold">{mode === 'edit' ? 'Edit Item' : 'Add Item'}</h3>
+                    <p className="text-sm opacity-90">{mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}</p>
+                  </div>
+
+                  
+
+                </div>
               </div>
 
 
@@ -381,17 +447,24 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
 
                 {/*PRODUCT NAME*/}
                 <div className='relative'>
-                  <div className="flex gap-2">
-                    <input 
-                      id='item' 
-                      type="text"  
-                      placeholder='Item Name' 
-                      className={`${inputClass('product_name')} ${selectedExistingProduct ? 'border-green-500 bg-green-50' : ''} disabled:cursor-not-allowed`}
-                      value={product_name}  
-                      onChange={(e) => setItemName(sanitizeInput(e.target.value))} 
-                      disabled={selectedExistingProduct || mode === 'edit'}
-                    />
-                    
+                  <label className={label('product_name')}>Product name</label>
+                  <div className="flex gap-2 items-center">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" />
+                        </svg>
+                      </span>
+                      <input 
+                        id='item' 
+                        type="text"  
+                        placeholder='Item Name' 
+                        className={`${inputClass('product_name')} pl-10 ${selectedExistingProduct ? 'border-green-500 bg-green-50' : ''}`}
+                        value={product_name}  
+                        onChange={(e) => setItemName(sanitizeInput(e.target.value))} 
+                        disabled={selectedExistingProduct || mode === 'edit'}
+                      />
+                    </div>
                     {mode === 'add' && (
                       <button
                         type="button"
@@ -408,8 +481,8 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                   </div>
 
                   {selectedExistingProduct && (
-                    <div className="text-xs text-green-600 mt-1">
-                      Selected existing product (ID: {selectedExistingProduct.product_id})
+                    <div className="mt-2 inline-flex items-center gap-3 bg-green-50 border border-green-200 text-green-800 rounded-full px-3 py-1 text-sm">
+                      <span className="font-medium">{selectedExistingProduct.product_name}</span>
                       <button 
                         type="button" 
                         onClick={() => {
@@ -418,7 +491,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                           setUnit('');
                           setCategory('');
                         }}
-                        className="ml-2 text-red-500 hover:text-red-700"
+                        className="ml-2 text-sm text-green-700 underline"
                       >
                         Clear
                       </button>
@@ -434,7 +507,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                         <input
                           type="text"
                           placeholder="Search existing products..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -450,15 +523,16 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                             <div
                               key={product.product_id}
                               onClick={() => handleSelectExistingProduct(product)}
-                              className="p-3 border border-gray-200 rounded-md cursor-pointer hover:bg-green-50 hover:border-green-300 transition-colors"
+                              className="p-4 border border-gray-100 rounded-lg cursor-pointer hover:shadow-md transform hover:-translate-y-0.5 transition"
                             >
-                              <div className="font-medium text-sm">{product.product_name}</div>
-                              <div className="text-xs text-gray-600">
-                                PRODUCT ID: {product.product_id} • Category: {product.category_name} • Unit: {product.unit}
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-semibold text-sm">{product.product_name}</div>
+                                  <div className="text-xs text-gray-500">{product.category_name} • {product.unit}</div>
+                                </div>
+                                <div className="text-xs text-gray-400">ID: {product.product_id}</div>
                               </div>
-                              <div className="text-xs text-gray-500">
-                                Available in: {product.branches}
-                              </div>
+                              <div className="mt-2 text-xs text-gray-400">Available in: {product.branches}</div>
                             </div>
                           ))
                         )}
@@ -467,107 +541,104 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                   )}
                 </div>
 
-                {/* DESCRIPTION FIELD */}
-                <div className="mt-4 mb-4">
-                  <textarea
-                    placeholder="Enter product description"
-                    className="bg-gray-100 border-gray-300 py-2 px-3 w-full rounded-md border-2 min-h-[48px] resize-none" 
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    disabled={selectedExistingProduct || mode === 'edit'}
 
-                  />
-                </div>
+                 {/* DESCRIPTION FIELD */}
 
-                <div className="flex justify-between gap-x-5 mt-6">
+                {!(mode === 'edit' && editChoice === 'addStocks') && (
+                  <div className="mt-4 mb-4">
+                    <label className={label('description')}>Description</label>
+                    <textarea
+                      placeholder="Enter product description"
+                      className="w-full p-3 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[72px] shadow-sm"
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      disabled={selectedExistingProduct || mode === 'edit'}
+                    />
+                  </div>
+                )}
+
+                
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
 
                     {/* Left column inputs */}
                     <div className="flex flex-col gap-y-6 w-full">
 
 
-                      {/*CATEGORY*/}
-                      <div className='relative'>
-                        <select
-                          className={inputClass('category_id')}
-                          value={category_id}
-                          onChange={(e) => setCategory(e.target.value)}
-                        >
-
-                          <option value="" >Select Category</option>
-                            {listCategories.map((option) => (
-                              <option key={option.category_id} value={option.category_id}>{option.category_name}</option>
-                            ))}
-
-                        </select>
-
-                        {errorflag('category_id', 'category')}
-
-                      </div>
-
+                      {/* If user chose addStocks while editing, only show quantity & unit cost (plus date) */}
+                      {!(mode === 'edit' && editChoice === 'addStocks') && 
                       
-                      {/*QUANTITY ADDED*/}
-                      <div className='relative'>
-
-                        <input
-                          type="number"
-                          step={unit ? getQuantityStep(unit) : "0.001"}
-                          min={unit ? getQuantityStep(unit) : "0.001"}
-                          placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity': 'Add Quantity or Enter 0'}`}
-                          className={inputClass('quantity_added')}
-                          value={quantity_added}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setQuantity(value);
-                            handleThreshold(value, max_threshold);
-                          }}
-                        />
-
-                        {errorflag('quantity_added', 'value')}
-                        
-                        {unitValidationError.quantity_added && (
-                          <div className="text-red-500 text-xs mt-1 pl-2">
-                            {unitValidationError.quantity_added}
+                          <div className='relative'>
+                            <label className={label('category_id')}>Category</label>
+                            <select
+                              className={inputClass('category_id')}
+                              value={category_id}
+                              onChange={(e) => setCategory(e.target.value)}
+                            >
+                              <option value="" >Select Category</option>
+                              {listCategories.map((option) => (
+                                <option key={option.category_id} value={option.category_id}>{option.category_name}</option>
+                              ))}
+                            </select>
+                            {errorflag('category_id', 'category')}
                           </div>
-                        )}
-
-                        {maxQuant && <div className='absolute text-xs italic pl-2 text-red-500'>Quantity exceeding max threshold!</div>}
-
-                      </div>
+                      }
 
 
-                      {/*UNIT COST*/}
-                      <div className='relative'>
+                      {!(mode === 'edit' && editChoice === 'edit') && 
+                          <div className='relative'>
+                            <label className={label('quantity_added')}>Quantity</label>
+                            <input
+                              type="number"
+                              step={unit ? getQuantityStep(unit) : "0.001"}
+                              min={unit ? getQuantityStep(unit) : "0.001"}
+                              placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity': 'Add Quantity or Enter 0'}`}
+                              className={inputClass('quantity_added')}
+                              value={quantity_added}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setQuantity(value);
+                                handleThreshold(value, max_threshold);
+                              }}
+                            />
+                            {errorflag('quantity_added', 'value')}
+                            {unitValidationError.quantity_added && (
+                              <p className="text-red-600 text-xs mt-1">{unitValidationError.quantity_added}</p>
+                            )}
+                            {maxQuant && <p className='mt-1 text-xs italic text-red-600'>Quantity exceeds the max threshold!</p>}
+                          </div>
+                      }
 
-                        <input
-                          placeholder="Cost"
-                          className={inputClass('unit_cost')}
-                          value={unit_cost}
-                          onChange={(e) => setPurchasedPrice(e.target.value)}
-                        />
 
-                        {errorflag('unit_cost', 'value')}
+                      {!(mode === 'edit' && editChoice === 'edit') && 
 
-                      </div>
+                          <div className='relative'>
+                            <label className={label('unit_cost')}>Unit cost</label>
+                            <input
+                              placeholder="Cost"
+                              className={inputClass('unit_cost')}
+                              value={unit_cost}
+                              onChange={(e) => setPurchasedPrice(e.target.value)}
+                            />
+                            {errorflag('unit_cost', 'value')}
+                          </div>
+                      }
 
 
-                      {/*DATE ADDED*/}
-                      <div className='relative'>
-                        
-                        <label htmlFor="date_added" className={label('date_added')}>Enter Date Added</label>
-                        
-                        <input
-                          id="date_added"
-                          type="date"
-                          placeholder="Date Purchased"
-                          className={inputClass('date_added')}
-                          value={date_added}
-                          onChange={(e) => setDatePurchased(e.target.value)}
-                        />
-
-                        {errorflag('date_added', 'date')}
-
-                      </div>
-
+                      {!(mode === 'edit' && editChoice === 'edit') && 
+                          <div className='relative'>
+                            <label htmlFor="date_added" className={label('date_added')}>Enter Date Added</label>
+                            <input
+                              id="date_added"
+                              type="date"
+                              placeholder="Date Purchased"
+                              className={inputClass('date_added')}
+                              value={date_added}
+                              onChange={(e) => setDatePurchased(e.target.value)}
+                            />
+                            {errorflag('date_added', 'date')}
+                          </div>
+                      }
                     </div>
 
 
@@ -575,102 +646,90 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                     <div className="flex flex-col gap-y-6 w-full">
 
 
-                      {/*UNIT*/}
-                      <div className='relative'>
+                      {/* If addStocks was chosen, hide product-edit-only fields on the right side */}
+                      {!(mode === 'edit' && editChoice === 'addStocks') &&
+                      
+                          <div className='relative'>
+                            <label className={label('unit')}>Unit</label>
+                            <select
+                              className={`${inputClass('unit')} appearance-none`}
+                              value={unit}
+                              onChange={(e) => setUnit(sanitizeInput(e.target.value))}
+                            >
+                              <option value="" >Select Unit</option>
+                                {constructionUnits.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                            </select>
+                            {errorflag('unit', 'unit')}
+                          </div>
+                      }
 
+                      {!(mode === 'edit' && editChoice === 'addStocks') &&
 
-                        <select
-                          className={`${inputClass('unit')}`}
-                          value={unit}
-                          onChange={(e) => setUnit(sanitizeInput(e.target.value))}
-                          
-                        >
+                          <div className='relative'>
+                            <label className={label('min_threshold')}>Min threshold</label>
+                            <input
+                              placeholder="Min Threshold"
+                              className={inputClass('min_threshold')}
+                              value={min_threshold}
+                              onChange={(e) => setMinThreshold(e.target.value)}
+                            />
+                            {errorflag('min_threshold', 'value')}
+                            <label className={label('max_threshold')}>Max threshold</label>
+                            <input
+                              placeholder="Max Threshold"
+                              className={`${inputClass('max_threshold')} mt-1`}
+                              value={max_threshold}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setMaxThreshold(value);
+                                handleThreshold(quantity_added, value);
+                              }}
+                            />
+                            {errorflag('max_threshold', 'value')}
+                          </div>
 
-                          <option value="" >Select Unit</option>
-                            {constructionUnits.map((option) => (
-                              <option key={option} value={option}>{option}</option>
-                            ))}
+                      }
 
-                        </select>
+                      {!(mode === 'edit' && editChoice === 'addStocks') &&
 
-                         {errorflag('unit', 'unit')}
+                  <div className='relative'>
+                    <label className={label('unit_price')}>Price</label>
+                    <input
+                      placeholder="Price"
+                      className={inputClass('unit_price')}
+                      value={unit_price}
+                      onChange={(e) => setPrice(e.target.value)}
+                    />
+                    {errorflag('unit_price', 'value')}
+                  </div>
+                      }
 
-                      </div>
+                      {!(mode === 'edit' && editChoice === 'edit') &&
 
-
-                      {/*MIN AND MAX THRESHOLD*/}
-                      <div className='relative flex space-x-2'> 
-
-                        <input
-                          placeholder="Min Threshold"
-                          className={inputClass('min_threshold')}
-                          value={min_threshold}
-                          onChange={(e) => setMinThreshold(e.target.value)}
-                        />
-
-                        {errorflag('max_threshold', 'value')}
-
-                        <input
-                          placeholder="Max Threshold"
-                          className={inputClass('max_threshold')}
-                          value={max_threshold}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setMaxThreshold(value);
-                            handleThreshold(quantity_added, value);
-                            
-                          }}
-                        />
-
-                        {errorflag('min_threshold', 'value')}
-
-                      </div>
-
-                            
-                      {/*PRICE*/}
-                      <div className='relative'>
-
-                         <input
-                            placeholder="Price"
-                            className={inputClass('unit_price')}
-                            value={unit_price}
-                            onChange={(e) => setPrice(e.target.value)}
-                          />
-
-                          {errorflag('unit_price', 'value')}
-
-                      </div>
-
-
-                      {/*PROCT VALIDITY*/}
-                      <div className='relative'>
-
-                        <label htmlFor="product_validity" className={label('product_validity')}>Enter Product Validity</label>
-
-                        <input
-                          id="product_validity"
-                          type="date"
-                          placeholder="Expiration Date"
-                          className={inputClass('product_validity')}
-                          value={product_validity}
-                          onChange={(e) => setExpirationDate(e.target.value)}
-                        />
-
-                        {errorflag('product_validity', 'date')}
-
-                      </div>
-
+                          <div className='relative'>
+                            <label htmlFor="product_validity" className={label('product_validity')}>Enter Product Validity</label>
+                            <input
+                              id="product_validity"
+                              type="date"
+                              placeholder="Expiration Date"
+                              className={inputClass('product_validity')}
+                              value={product_validity}
+                              onChange={(e) => setExpirationDate(e.target.value)}
+                            />
+                            {errorflag('product_validity', 'date')}
+                          </div>
+                      
+                      }
                     </div>
 
                 </div>
 
-                <div className="absolute left-1/2 transform -translate-x-1/2 flex justify-end bottom-9">
-
-                    {/*CONTROL MODAL*/}
-                    <button type="submit" disabled={maxQuant} className={`${mode === 'edit' ? 'bg-yellow-400' :'bg-green-600'} rounded-lg text-white px-5 py-2 text-bottom disabled:cursor-not-allowed`} > 
-                      {mode === 'edit' ? 'UPDATE' : 'ADD'}
-                    </button>
-
+                <div className="mt-6 flex justify-center">
+                  <button type="submit" disabled={maxQuant} className={`flex items-center gap-3 ${mode === 'edit' ? 'bg-blue-700' :'bg-green-700'} text-white font-semibold rounded-md px-6 py-2 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed`} >
+                    <span>{mode === 'edit' ? 'UPDATE' : 'ADD'}</span>
+                  </button>
                 </div>
 
                </form>
