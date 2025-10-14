@@ -2,6 +2,7 @@ import { SQLquery } from "../../db.js";
 import {correctDateFormat} from "../Services_Utils/convertRedableDate.js";
 import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
 import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, broadcastValidityUpdate } from "../../server.js";
+import { convertToBaseUnit, convertToDisplayUnit } from "../Services_Utils/unitConversion.js";
 
 
 
@@ -37,7 +38,7 @@ export const viewSale = async (branchId) => {
 export const viewSelectedItem = async (saleId) => {
    const { rows } = await SQLquery(`
 
-        SELECT product_id, branch_id, Inventory_Product.product_name,  Sales_Items.quantity, Sales_Items.unit, Sales_Items.unit_price, amount 
+        SELECT product_id, branch_id, Inventory_Product.product_name,  Sales_Items.quantity_display as quantity, Sales_Items.unit, Sales_Items.unit_price, amount 
         FROM Sales_Items
         LEFT JOIN Inventory_Product USING(product_id, branch_id)
         WHERE sales_information_id = $1;`
@@ -72,19 +73,33 @@ export const addSale = async (headerAndProducts) => {
     // CHECK DATABASE AGAIN FOR IF AVAILABLE QUANTITY IS ENOUGH (INSIDE TRANSACTION)
         if (productRow && productRow.length > 0) {
             for (const product of productRow) {
-                // CHECK AVAILABLE QUANTITY WITHOUT FOR UPDATE ON AGGREGATE
-                const inventoryCheck = await SQLquery(
-                    'SELECT SUM(quantity_left) as available_quantity FROM Add_Stocks WHERE product_id = $1 AND branch_id = $2 AND quantity_left > 0',
+                // GET UNIT INFO FOR CONVERSION
+                const unitResult = await SQLquery(
+                    'SELECT unit, conversion_factor FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2',
                     [product.product_id, branch_id]
                 );
                 
-                if (inventoryCheck.rowCount === 0 || !inventoryCheck.rows[0].available_quantity) {
+                if (unitResult.rowCount === 0) {
                     throw new Error(`Product with ID ${product.product_id} not found in inventory`);
                 }
                 
-                const availableQuantity = Number(inventoryCheck.rows[0].available_quantity);
-                if (Number(product.quantity) > availableQuantity) {
-                    throw new Error(`Insufficient inventory for product ID ${product.product_id}. Available: ${availableQuantity}, Requested: ${product.quantity}`);
+                const { unit, conversion_factor } = unitResult.rows[0];
+                const quantity_base = convertToBaseUnit(product.quantity, unit, conversion_factor);
+                
+                // CHECK AVAILABLE QUANTITY WITHOUT FOR UPDATE ON AGGREGATE (using base units)
+                const inventoryCheck = await SQLquery(
+                    'SELECT SUM(quantity_left_base) as available_quantity_base FROM Add_Stocks WHERE product_id = $1 AND branch_id = $2 AND quantity_left_base > 0',
+                    [product.product_id, branch_id]
+                );
+                
+                if (inventoryCheck.rowCount === 0 || !inventoryCheck.rows[0].available_quantity_base) {
+                    throw new Error(`Product with ID ${product.product_id} not found in inventory`);
+                }
+                
+                const availableQuantityBase = Number(inventoryCheck.rows[0].available_quantity_base);
+                if (quantity_base > availableQuantityBase) {
+                    const availableDisplay = convertToDisplayUnit(availableQuantityBase, unit, conversion_factor);
+                    throw new Error(`Insufficient inventory for product ID ${product.product_id}. Available: ${availableDisplay} ${unit}, Requested: ${product.quantity} ${unit}`);
                 }
             }
         }
@@ -104,13 +119,25 @@ export const addSale = async (headerAndProducts) => {
 
             const values = [];
             const placeholders = [];
-            productRow.forEach((p, i) => {
-            const baseIndex = i * 7;
-            placeholders.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7})`);
-            values.push(sale_id, p.product_id, p.quantity, p.unit, p.unitPrice, p.amount, branch_id);
-            });
+            for (let i = 0; i < productRow.length; i++) {
+                const p = productRow[i];
+                
+                // GET CONVERSION FACTOR FOR THIS PRODUCT
+                const unitResult = await SQLquery(
+                    'SELECT unit, conversion_factor FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2',
+                    [p.product_id, branch_id]
+                );
+                
+                const { unit, conversion_factor } = unitResult.rows[0];
+                const quantity_display = Number(p.quantity);
+                const quantity_base = convertToBaseUnit(quantity_display, unit, conversion_factor);
+                
+                const baseIndex = i * 9;
+                placeholders.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8}, $${baseIndex + 9})`);
+                values.push(sale_id, p.product_id, quantity_display, quantity_base, p.unit, p.unitPrice, p.amount, branch_id, conversion_factor);
+            }
 
-            const query = `INSERT INTO Sales_Items(sales_information_id, product_id, quantity, unit, unit_price, amount, branch_id) VALUES ${placeholders.join(', ')}`;
+            const query = `INSERT INTO Sales_Items(sales_information_id, product_id, quantity_display, quantity_base, unit, unit_price, amount, branch_id, conversion_factor) VALUES ${placeholders.join(', ')}`;
             await SQLquery(query, values);
 
         // FIFO STOCK DEDUCTION WITH DEADLOCK PREVENTION
@@ -171,7 +198,7 @@ export const addSale = async (headerAndProducts) => {
                         unit, 
                         unit_price, 
                         unit_cost, 
-                        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
+                        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
                         min_threshold,
                         max_threshold
                     FROM inventory_product
@@ -257,7 +284,21 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
         throw new Error('branchId is required for stock deduction');
     }
     
-    let remainingToDeduct = quantityToDeduct;
+    // GET CONVERSION FACTOR FOR THIS PRODUCT
+    const unitResult = await SQLquery(
+        'SELECT unit, conversion_factor FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2',
+        [productId, branchId]
+    );
+    
+    if (unitResult.rowCount === 0) {
+        throw new Error(`Product with ID ${productId} not found in branch ${branchId}`);
+    }
+    
+    const { unit, conversion_factor } = unitResult.rows[0];
+    
+    // CONVERT DISPLAY QUANTITY TO BASE UNITS FOR FIFO PROCESSING
+    const quantityToDeductBase = convertToBaseUnit(quantityToDeduct, unit, conversion_factor);
+    let remainingToDeduct = quantityToDeductBase;
 
     // CHECK IF THERE ARE EXISTING RESTORED RECORDS FOR THIS SALE
     const { rows } = await SQLquery(
@@ -286,10 +327,11 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
 
     // PROCEED WITH STOCK DEDUCTION (EITHER FIRST TIME OR RE-DEDUCTION AFTER RESTORE)
     // USE SKIP LOCKED TO PREVENT DEADLOCKS IN HIGH-CONCURRENCY SCENARIOS
+    // NOW USES BASE UNITS FOR ACCURATE FIFO WITH FRACTIONAL QUANTITIES
     const batches = await SQLquery(
-        `SELECT add_id, quantity_left 
+        `SELECT add_id, quantity_left_base 
          FROM Add_Stocks 
-         WHERE product_id = $1 AND branch_id = $2 AND quantity_left > 0 AND product_validity > CURRENT_DATE
+         WHERE product_id = $1 AND branch_id = $2 AND quantity_left_base > 0 AND product_validity > CURRENT_DATE
          ORDER BY date_added ASC, product_validity ASC
          FOR UPDATE SKIP LOCKED`,
         [productId, branchId]
@@ -299,9 +341,9 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
     if (batches.rowCount === 0) {
     // FALLBACK: TRY REGULAR FOR UPDATE (WILL WAIT FOR LOCKS)
         const lockedBatches = await SQLquery(
-            `SELECT add_id, quantity_left 
+            `SELECT add_id, quantity_left_base 
              FROM Add_Stocks 
-             WHERE product_id = $1 AND branch_id = $2 AND quantity_left > 0 AND product_validity > CURRENT_DATE
+             WHERE product_id = $1 AND branch_id = $2 AND quantity_left_base > 0 AND product_validity > CURRENT_DATE
              ORDER BY date_added ASC, product_validity ASC
              FOR UPDATE`,
             [productId, branchId]
@@ -315,18 +357,23 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
         batches.rows = lockedBatches.rows;
     }
 
-    // PROCESS EACH BATCH USING FIFO
+    // PROCESS EACH BATCH USING FIFO (NOW WITH BASE UNITS)
     for (const batch of batches.rows) {
         if (remainingToDeduct <= 0) break;
 
-        const batchQuantity = Number(batch.quantity_left);
-        const deductFromThisBatch = Math.min(remainingToDeduct, batchQuantity);
-        const newQuantityLeft = batchQuantity - deductFromThisBatch;
+        const batchQuantityBase = Number(batch.quantity_left_base);
+        const deductFromThisBatchBase = Math.min(remainingToDeduct, batchQuantityBase);
+        const newQuantityLeftBase = batchQuantityBase - deductFromThisBatchBase;
+        
+        // ALSO UPDATE DISPLAY QUANTITY
+        const deductFromThisBatchDisplay = convertToDisplayUnit(deductFromThisBatchBase, unit, conversion_factor);
+        const batchQuantityDisplay = convertToDisplayUnit(batchQuantityBase, unit, conversion_factor);
+        const newQuantityLeftDisplay = convertToDisplayUnit(newQuantityLeftBase, unit, conversion_factor);
 
-    // ATOMIC UPDATE WITH VERSION CHECK
+    // ATOMIC UPDATE WITH VERSION CHECK (UPDATE BOTH BASE AND DISPLAY)
         const updateResult = await SQLquery(
-            'UPDATE Add_Stocks SET quantity_left = $1 WHERE add_id = $2 AND quantity_left = $3',
-            [newQuantityLeft, batch.add_id, batchQuantity]
+            'UPDATE Add_Stocks SET quantity_left_base = $1, quantity_left_display = $2 WHERE add_id = $3 AND quantity_left_base = $4',
+            [newQuantityLeftBase, newQuantityLeftDisplay, batch.add_id, batchQuantityBase]
         );
 
     // IF UPDATE FAILED (QUANTITY CHANGED BY ANOTHER TRANSACTION)
@@ -334,21 +381,22 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
             throw new Error(`Concurrent modification detected for batch ${batch.add_id}. Please retry the transaction.`);
         }
 
-    // ALWAYS CREATE NEW USAGE TRACKING RECORD FOR EACH BATCH USED
+    // ALWAYS CREATE NEW USAGE TRACKING RECORD FOR EACH BATCH USED (STORE BOTH BASE AND DISPLAY)
         await SQLquery(
-            `INSERT INTO Sales_Stock_Usage (sales_information_id, product_id, add_stock_id, quantity_used, branch_id) 
-            VALUES ($1, $2, $3, $4, $5)`,
-            [salesInformationId, productId, batch.add_id, deductFromThisBatch, branchId]
+            `INSERT INTO Sales_Stock_Usage (sales_information_id, product_id, add_stock_id, quantity_used_display, quantity_used_base, branch_id) 
+            VALUES ($1, $2, $3, $4, $5, $6)`,
+            [salesInformationId, productId, batch.add_id, deductFromThisBatchDisplay, deductFromThisBatchBase, branchId]
         );
 
-        remainingToDeduct -= deductFromThisBatch;
+        remainingToDeduct -= deductFromThisBatchBase;
         
-        console.log(`Deducted ${deductFromThisBatch} units from batch ${batch.add_id} for sale ${salesInformationId}`);
+        console.log(`Deducted ${deductFromThisBatchDisplay} ${unit} (${deductFromThisBatchBase} base units) from batch ${batch.add_id} for sale ${salesInformationId}`);
     }
 
     // CHECK IF ALL QUANTITY WAS DEDUCTED
     if (remainingToDeduct > 0) {
-        throw new Error(`Unable to deduct full quantity for product ID ${productId}. Remaining: ${remainingToDeduct}`);
+        const remainingDisplay = convertToDisplayUnit(remainingToDeduct, unit, conversion_factor);
+        throw new Error(`Unable to deduct full quantity for product ID ${productId}. Remaining: ${remainingDisplay} ${unit}`);
     }
 
     // BROADCAST VALIDITY UPDATE FOR PRODUCT VALIDITY PAGE REFRESH
@@ -373,7 +421,8 @@ export const restoreStockFromSale = async (salesInformationId, reason = 'Order c
         
     // GET ALL STOCK USAGE RECORDS FOR THIS SALE THAT HAVEN'T BEEN RESTORED YET
         const { rows: stockUsage } = await SQLquery(`
-            SELECT usage_id, product_id, add_stock_id, quantity_used 
+            SELECT usage_id, product_id, add_stock_id, 
+                   quantity_used_display, quantity_used_base 
             FROM Sales_Stock_Usage 
             WHERE sales_information_id = $1 AND is_restored = false`,
             [salesInformationId]
@@ -387,10 +436,13 @@ export const restoreStockFromSale = async (salesInformationId, reason = 'Order c
         
     // RESTORE STOCK TO EACH ORIGINAL BATCH
         for (const usage of stockUsage) {
-            // ADD THE QUANTITY BACK TO THE ORIGINAL BATCH
+            // ADD THE QUANTITY BACK TO THE ORIGINAL BATCH (both _display and _base)
             const updateResult = await SQLquery(
-                'UPDATE Add_Stocks SET quantity_left = quantity_left + $1 WHERE add_id = $2',
-                [usage.quantity_used, usage.add_stock_id]
+                `UPDATE Add_Stocks 
+                 SET quantity_left_display = quantity_left_display + $1, 
+                     quantity_left_base = quantity_left_base + $2 
+                 WHERE add_id = $3`,
+                [usage.quantity_used_display, usage.quantity_used_base, usage.add_stock_id]
             );
             
             if (updateResult.rowCount === 0) {
@@ -405,7 +457,7 @@ export const restoreStockFromSale = async (salesInformationId, reason = 'Order c
                 [usage.usage_id]
             );
             
-            console.log(`Restored ${usage.quantity_used} units to batch ${usage.add_stock_id} from sale ${salesInformationId} (${reason})`);
+            console.log(`Restored ${usage.quantity_used_display} units to batch ${usage.add_stock_id} from sale ${salesInformationId} (${reason})`);
         }
         
         await SQLquery('COMMIT');
@@ -425,7 +477,7 @@ export const restoreStockFromSale = async (salesInformationId, reason = 'Order c
                 sale_id: salesInformationId,
                 restored_products: stockUsage.map(usage => ({
                     product_id: usage.product_id,
-                    quantity_restored: usage.quantity_used
+                    quantity_restored: usage.quantity_used_display
                 })),
                 reason: reason,
                 user_id: userID || null

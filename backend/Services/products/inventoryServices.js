@@ -1,6 +1,7 @@
 import { SQLquery } from "../../db.js";
 import { broadcastNotification, broadcastOwnerNotification, broadcastInventoryUpdate, broadcastValidityUpdate, broadcastHistoryUpdate, broadcastInventoryApprovalRequest, broadcastInventoryApprovalRequestToOwners, broadcastInventoryApprovalUpdate, broadcastToUser } from "../../server.js";
 import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
+import { convertToBaseUnit, getUnitConversion } from "../Services_Utils/unitConversion.js";
 
 //HELPER FUNCTION TO GET CATEGORY NAME
 const getCategoryName = async (categoryId) => {
@@ -267,7 +268,7 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
             ip.unit, 
             ip.unit_price, 
             ip.unit_cost, 
-            COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
+            COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
             ip.min_threshold,
             ip.max_threshold,
             p.description
@@ -309,7 +310,7 @@ export const getProductItems = async(branchId) => {
                 ip.unit, 
                 ip.unit_price, 
                 ip.unit_cost, 
-                COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
+                COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
                 ip.min_threshold,
                 ip.max_threshold,
                 p.description
@@ -347,7 +348,7 @@ export const getProductItems = async(branchId) => {
             ip.unit, 
             ip.unit_price, 
             ip.unit_cost, 
-            COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity,
+            COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
             ip.min_threshold,
             ip.max_threshold,
             p.description
@@ -493,19 +494,25 @@ export const addProductItem = async (productData, options = {}) => {
         throw err;
     }
 
+    // Get base unit and conversion factor for the unit
+    const unitConversion = getUnitConversion(unit);
+    
     await SQLquery(
         `INSERT INTO Inventory_Product 
-        (product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, min_threshold, max_threshold)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, min_threshold, max_threshold]
+        (product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, min_threshold, max_threshold, base_unit, conversion_factor)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, min_threshold, max_threshold, unitConversion.base_unit, unitConversion.conversion_factor]
     );   
 
+    // Calculate base units for storage - ensure quantity_added is a number
+    const quantity_added_base = convertToBaseUnit(Number(quantity_added), unit);
+    
     await SQLquery(
         `INSERT INTO Add_Stocks 
-        (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left, branch_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        (product_id, h_unit_price, h_unit_cost, quantity_added_display, quantity_added_base, date_added, product_validity, quantity_left_display, quantity_left_base, branch_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *`,
-        [product_id, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added, branch_id]
+        [product_id, unit_price, unit_cost, Number(quantity_added), quantity_added_base, date_added, product_validity, Number(quantity_added), quantity_added_base, branch_id]
     );
 
     const alertResult = await SQLquery(
@@ -640,12 +647,15 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
     const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName } = cleanedData;
 
     const addStocksQuery = async () => {
+        // Calculate base units for storage - ensure quantity_added is a number
+        const quantity_added_base = convertToBaseUnit(Number(quantity_added), unit);
+        
         return await SQLquery(
             `INSERT INTO Add_Stocks 
-            (product_id, h_unit_price, h_unit_cost, quantity_added, date_added, product_validity, quantity_left, branch_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (product_id, h_unit_price, h_unit_cost, quantity_added_display, quantity_added_base, date_added, product_validity, quantity_left_display, quantity_left_base, branch_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *`,
-            [itemId, unit_price, unit_cost, quantity_added, date_added, product_validity, quantity_added, branch_id]
+            [itemId, unit_price, unit_cost, Number(quantity_added), quantity_added_base, date_added, product_validity, Number(quantity_added), quantity_added_base, branch_id]
         );
     };
 
@@ -729,11 +739,14 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
     }
 
     if (productInfoChanged) {
+        // Get base unit and conversion factor for the new unit
+        const unitConversion = getUnitConversion(unit);
+        
         await SQLquery(
             `UPDATE Inventory_Product 
-            SET product_name = $1, unit = $2, min_threshold = $3, category_id = $4, unit_cost = $5
-            WHERE product_id = $6 AND branch_id = $7 AND max_threshold = $8`,
-            [product_name, unit, min_threshold, category_id, unit_cost, itemId, branch_id, max_threshold]
+            SET product_name = $1, unit = $2, min_threshold = $3, category_id = $4, unit_cost = $5, base_unit = $6, conversion_factor = $7
+            WHERE product_id = $8 AND branch_id = $9 AND max_threshold = $10`,
+            [product_name, unit, min_threshold, category_id, unit_cost, unitConversion.base_unit, unitConversion.conversion_factor, itemId, branch_id, max_threshold]
         );
 
         const updateMessage = `Product information for ${product_name} has been updated.${requestSuffix}`;

@@ -3,6 +3,7 @@ import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
 import api from '../utils/api';
+import { getQuantityStep, validateQuantity, getQuantityPlaceholder, allowsFractional } from '../utils/unitConversion';
 
 
 function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput}) {
@@ -43,6 +44,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
   const [notANumber, setNotANumber] = useState({});
   const [invalidNumber, setInvalidNumber] = useState({});
   const [isExpiredEarly, setIsExpiredEarly] = useState(false);
+  const [unitValidationError, setUnitValidationError] = useState({});
 
   // LOADING STATE
   const [loading, setLoading] = useState(false);
@@ -72,6 +74,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
       setIsExpiredEarly(false);
       setEmptyField({});
       setNotANumber({});
+      setUnitValidationError({});
       setSelectedExistingProduct(null);
       setSearchTerm('');
       
@@ -191,6 +194,7 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     const isEmptyField = {};
     const isnotANumber = {};
     const invalidNumberValue = {};
+    const unitValidationErrors = {};
   
 
     //CHECK IF INPUT IS EMPTY
@@ -231,17 +235,26 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
     const isExpiryEarly = date_added > product_validity;
     setIsExpiredEarly(isExpiryEarly);
 
+    // NEW: Unit-aware quantity validation
+    if (unit && quantity_added && !isNaN(Number(quantity_added))) {
+      const validation = validateQuantity(Number(quantity_added), unit);
+      if (!validation.valid) {
+        unitValidationErrors.quantity_added = validation.error;
+      }
+    }
 
     //SET THE VALUES TO THE STATE VARIABLE
     setEmptyField(isEmptyField);
     setNotANumber(isnotANumber);
     setInvalidNumber(invalidNumberValue);
+    setUnitValidationError(unitValidationErrors);
 
 
     //STOP SUBMISSION IF INPUT IS INVALID
     if (Object.keys(isEmptyField).length > 0) return; 
     if (Object.keys(isnotANumber).length > 0) return;
     if (Object.keys(invalidNumberValue).length > 0) return;
+    if (Object.keys(unitValidationErrors).length > 0) return;
     if (isExpiryEarly) return;
 
 
@@ -496,18 +509,26 @@ function ModalForm({isModalOpen, OnSubmit, mode, onClose, itemData, listCategori
                       <div className='relative'>
 
                         <input
-                          placeholder={`${mode === 'add' ? 'Quantity': 'Add Quantity or Enter 0'}`}
+                          type="number"
+                          step={unit ? getQuantityStep(unit) : "0.001"}
+                          min={unit ? getQuantityStep(unit) : "0.001"}
+                          placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity': 'Add Quantity or Enter 0'}`}
                           className={inputClass('quantity_added')}
                           value={quantity_added}
                           onChange={(e) => {
                             const value = e.target.value;
                             setQuantity(value);
                             handleThreshold(value, max_threshold);
-
                           }}
                         />
 
                         {errorflag('quantity_added', 'value')}
+                        
+                        {unitValidationError.quantity_added && (
+                          <div className="text-red-500 text-xs mt-1 pl-2">
+                            {unitValidationError.quantity_added}
+                          </div>
+                        )}
 
                         {maxQuant && <div className='absolute text-xs italic pl-2 text-red-500'>Quantity exceeding max threshold!</div>}
 

@@ -6,7 +6,7 @@ import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 //GET PRODUCT VALIDITY LIST
 export const getProductValidity = async(branchId) =>{
     const { rows } =  await SQLquery(`
-        SELECT ${correctDateFormat('date_added')}, ${correctDateFormat('product_validity')}, Inventory_product.product_name, branch_id, Category.category_name, quantity_added, quantity_left,
+        SELECT ${correctDateFormat('date_added')}, ${correctDateFormat('product_validity')}, Inventory_product.product_name, branch_id, Category.category_name, quantity_added_display as quantity_added, quantity_left_display as quantity_left,
            (product_validity > CURRENT_DATE AND (product_validity - CURRENT_DATE) <= 3) AS near_expy,
            product_validity <= CURRENT_DATE AS expy,
            TO_CHAR(product_validity, 'MM') AS month, TO_CHAR(product_validity, 'YYYY') AS year

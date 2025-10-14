@@ -7,6 +7,12 @@ import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 import FormLoading from './common/FormLoading';
 import dayjs from 'dayjs';
 import api from '../utils/api.js';
+import { 
+  getQuantityStep, 
+  validateQuantity, 
+  getQuantityPlaceholder,
+  allowsFractional
+} from '../utils/unitConversion';
 
 
 function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSaleHeader, fetchProductsData}) {
@@ -80,6 +86,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   //SEARCH TERM ERROR HANDLING
   const [someEmpy, setSomeEmpty] = useState(false);
   const [emptyQuantity, setEmptyQuantiy] = useState(false);
+  const [quantityValidationErrors, setQuantityValidationErrors] = useState({});
 
 
   //QUANTITY VALIDATION
@@ -124,7 +131,27 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
     const availableQuantity = product ? Number(product.quantity) : 0;
 
     const currentQuantity = Number(rows[index].quantity) || 0;
+    const unit = rows[index].unit;
 
+    // Validate quantity for unit
+    if (unit && currentQuantity > 0) {
+      const validation = validateQuantity(currentQuantity, unit);
+      if (!validation.valid) {
+        // Show validation error
+        setQuantityValidationErrors(prev => ({
+          ...prev,
+          [index]: validation.error
+        }));
+        return;
+      } else {
+        // Clear validation error
+        setQuantityValidationErrors(prev => {
+          const newErrors = {...prev};
+          delete newErrors[index];
+          return newErrors;
+        });
+      }
+    }
 
     if (currentId && currentQuantity > availableQuantity){
 
@@ -579,17 +606,28 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
 
                                           <td className="px-2 relative">
                                             <div className="relative">
-                                              <input type="text" className="border w-full" value={row.quantity} onChange={e => {
-                                                const newRows = [...rows];
-                                                newRows[idx].quantity = e.target.value;
-                                                setRows(newRows);
-                                              }} onKeyUp={() => createAnAmount(idx)}
-                                              onKeyDown={(e) => {
-                                                if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
-                                                  e.preventDefault();
-                                                }
-                                              }}
+                                              <input 
+                                                type="number" 
+                                                step={row.unit ? getQuantityStep(row.unit) : "0.001"}
+                                                min={row.unit ? getQuantityStep(row.unit) : "0.001"}
+                                                className="border w-full" 
+                                                value={row.quantity} 
+                                                onChange={e => {
+                                                  const newRows = [...rows];
+                                                  newRows[idx].quantity = e.target.value;
+                                                  setRows(newRows);
+                                                }} 
+                                                onKeyUp={() => createAnAmount(idx)}
+                                                placeholder={row.unit ? getQuantityPlaceholder(row.unit) : "0"}
                                               />
+                                              {quantityValidationErrors[idx] && (
+                                                <div
+                                                  className="absolute left-0 w-full text-xs text-red-600 mt-1 z-10 bg-white pointer-events-none"
+                                                  style={{ bottom: '-3em' }}
+                                                >
+                                                  {quantityValidationErrors[idx]}
+                                                </div>
+                                              )}
                                               {exceedQuanity.includes(row.product_id) && (
                                                 <div
                                                   className="absolute left-0 w-full text-xs text-red-600 mt-1 z-10 bg-white pointer-events-none"
@@ -737,13 +775,13 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                             {/*SUBMIT BUTTON*/}
                             <div className='text-center'>
                                 <button 
-                                  disabled={!amountNetVat || !totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0}
+                                  disabled={!amountNetVat || !totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0 || Object.keys(quantityValidationErrors).length > 0}
                                   type='submit' 
                                   className={`py-3 px-8 font-medium rounded-sm transition-all  disabled:bg-green-200 disabled:text-green-600 disabled:cursor-not-allowed disabled:border disabled:border-green-200  bg-green-600 hover:bg-green-700 text-white border border-green-600 shadow-sm hover:shadow-md`}>
                                     Confirm Sale
                                 </button>
 
-                                {(!amountNetVat || !totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0) &&
+                                {(!amountNetVat || !totalAmountDue  || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0 || Object.keys(quantityValidationErrors).length > 0) &&
                                   <p className='font-thin italic text-xs text-red-500 mt-3'>*Please complete the required fields</p>
                                 }
                             </div>

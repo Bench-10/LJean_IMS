@@ -29,12 +29,12 @@ export async function fetchInventoryLevels({ branch_id, range }) {
   if(branch_id) params.push(branch_id);
   const { rows } = await SQLquery(`
     WITH adds AS (
-      SELECT a.product_id, a.branch_id, a.date_added::date AS d, SUM(a.quantity_added) qty_added
+      SELECT a.product_id, a.branch_id, a.date_added::date AS d, SUM(a.quantity_added_display) qty_added
       FROM Add_Stocks a
       WHERE a.date_added BETWEEN $1 AND $2
       GROUP BY 1,2,3
     ), sales AS (
-      SELECT si.product_id, s.branch_id, s.date::date AS d, SUM(si.quantity) qty_sold
+      SELECT si.product_id, s.branch_id, s.date::date AS d, SUM(si.quantity_display) qty_sold
       FROM Sales_Items si
       JOIN Sales_Information s USING(sales_information_id)
       WHERE s.date BETWEEN $1 AND $2
@@ -94,7 +94,7 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
   const { rows } = await SQLquery(`
     SELECT date_trunc('${dateTrunc}', s.date)::date AS period,
       SUM(si.amount) AS sales_amount,
-      SUM(si.quantity) AS units_sold
+      SUM(si.quantity_display) AS units_sold
     FROM Sales_Items si
     JOIN Sales_Information s USING(sales_information_id)
     JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
@@ -154,7 +154,7 @@ export async function fetchRestockTrends({ branch_id, interval, range }) {
   if(branch_id) params.push(branch_id);
   const { rows } = await SQLquery(`
     SELECT date_trunc('${dateTrunc}', a.date_added)::date AS period,
-      SUM(a.quantity_added) AS total_added
+      SUM(a.quantity_added_display) AS total_added
     FROM Add_Stocks a
     JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
     WHERE a.date_added BETWEEN $1 AND $2 ${branchFilter}
@@ -196,7 +196,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
   if (category_id) { conditions.push(`ip.category_id = $${idx++}`); params.push(category_id); }
   const where = 'WHERE ' + conditions.join(' AND ');
   const { rows } = await SQLquery(`
-    SELECT si.product_id, ip.product_name, SUM(si.amount) AS sales_amount, SUM(si.quantity) AS units_sold
+    SELECT si.product_id, ip.product_name, SUM(si.amount) AS sales_amount, SUM(si.quantity_display) AS units_sold
     FROM Sales_Items si
     JOIN Sales_Information s USING(sales_information_id)
     JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
@@ -306,7 +306,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     if (product_id) { investConditions.push(`ip.product_id = $${investIdx++}`); investParams.push(product_id); }
     const investWhere = 'WHERE ' + investConditions.join(' AND ');
     const { rows: investRows } = await SQLquery(`
-      SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
+      SELECT COALESCE(SUM(a.quantity_added_display * ip.unit_cost), 0) AS total_investment
       FROM Add_Stocks a
       JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
       ${investWhere};`, investParams);
@@ -321,7 +321,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     if (product_id) { prevInvestConditions.push(`ip.product_id = $${prevInvestIdx++}`); prevInvestParams.push(product_id); }
     const prevInvestWhere = 'WHERE ' + prevInvestConditions.join(' AND ');
     const { rows: prevInvestRows } = await SQLquery(`
-      SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
+      SELECT COALESCE(SUM(a.quantity_added_display * ip.unit_cost), 0) AS total_investment
       FROM Add_Stocks a
       JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
       ${prevInvestWhere};`, prevInvestParams);
@@ -395,7 +395,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   if (product_id) { investConditions.push(`ip.product_id = $${investIdx++}`); investParams.push(product_id); }
   const investWhere = 'WHERE ' + investConditions.join(' AND ');
   const { rows: investRows } = await SQLquery(`
-    SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
+    SELECT COALESCE(SUM(a.quantity_added_display * ip.unit_cost), 0) AS total_investment
     FROM Add_Stocks a
     JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
     ${investWhere};`,
@@ -409,7 +409,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   if (product_id) { prevInvestConditions.push(`ip.product_id = $${prevInvestIdx++}`); prevInvestParams.push(product_id); }
   const prevInvestWhere = 'WHERE ' + prevInvestConditions.join(' AND ');
   const { rows: prevInvestRows } = await SQLquery(`
-    SELECT COALESCE(SUM(a.quantity_added * ip.unit_cost), 0) AS total_investment
+    SELECT COALESCE(SUM(a.quantity_added_display * ip.unit_cost), 0) AS total_investment
     FROM Add_Stocks a
     JOIN Inventory_Product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
     ${prevInvestWhere};`,
@@ -504,7 +504,7 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
   const { rows } = await SQLquery(`
     SELECT ${dateSelect},
       SUM(si.amount) AS sales_amount,
-      SUM(si.quantity) AS units_sold,
+      SUM(si.quantity_display) AS units_sold,
       COUNT(DISTINCT s.sales_information_id) AS transaction_count
     FROM Sales_Items si
     JOIN Sales_Information s USING(sales_information_id)

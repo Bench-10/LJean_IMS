@@ -13,7 +13,7 @@ export const notifyProductShelfLife = async() =>{
                 a.product_id, 
                 ip.branch_id, 
                 a.product_validity,
-                SUM(a.quantity_left) AS total_quantity
+                SUM(a.quantity_left_display) AS total_quantity
             FROM Add_Stocks a
             LEFT JOIN Inventory_product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
             LEFT JOIN Category c USING(category_id)

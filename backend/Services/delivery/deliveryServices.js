@@ -346,7 +346,7 @@ export const setToDelivered = async(saleID, update) => {
                         ip.unit_cost,
                         ip.min_threshold,
                         ip.max_threshold,
-                        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left END), 0) AS quantity
+                        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity
                     FROM Sales_Items si
                     JOIN Sales_Information s_info ON si.sales_information_id = s_info.sales_information_id
                     JOIN inventory_product ip ON si.product_id = ip.product_id AND s_info.branch_id = ip.branch_id

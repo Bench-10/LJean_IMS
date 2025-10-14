@@ -11,6 +11,7 @@ import deliveryRoutes from './Routes/deliveryRoutes.js';
 import passwordResetRoutes from './Routes/passwordResetRoutes.js';
 import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
+import { loadUnitConversionCache } from './Services/Services_Utils/unitConversion.js';
 
 const app  = express();
 
@@ -329,7 +330,16 @@ export const broadcastInventoryApprovalUpdate = (branchId, payload) => {
 
 
 server.listen(PORT, '0.0.0.0', async ()=>{
-    console.log('Port '+ PORT + ' is currently running....' )
+    console.log('Port '+ PORT + ' is currently running....' );
+    
+    // Initialize unit conversion cache
+    try {
+        await loadUnitConversionCache();
+        console.log('✓ Unit conversion system initialized');
+    } catch (error) {
+        console.error('⚠ Failed to initialize unit conversion:', error.message);
+        console.log('⚠ Fractional quantity features may not work until database migration is complete');
+    }
 });
 
 
