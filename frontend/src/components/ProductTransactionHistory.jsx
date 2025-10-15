@@ -181,7 +181,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
 
       <dialog className='bg-transparent fixed top-0 bottom-0  z-50' open={isProductTransactOpen}>
 
-          <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[1000px] rounded-md p-7 pb-14 border-gray-300 animate-popup">
+          <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[1100px] rounded-md p-7 pb-14 border-gray-300 animate-popup">
             <button type='button' className=" absolute right-2 top-2 " 
               onClick={() => {onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([])}}>✕</button>
 

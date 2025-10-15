@@ -23,7 +23,7 @@ export const viewSale = async (branchId) => {
         delivery_fee, 
         is_for_delivery,
         COALESCE(is_delivered, false) AS is_delivered,
-        COALESCE(is_pending, false) AS is_pending
+        COALESCE(is_pending, true) AS is_pending
     FROM Sales_Information 
     LEFT JOIN Delivery 
     USING(sales_information_id)
