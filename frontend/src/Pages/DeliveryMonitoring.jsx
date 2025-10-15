@@ -26,7 +26,16 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
 
 
   //HEADER INFORMATION FOR DELIVERY
-  const [deliveryInfoData, setDeliveryInfoData ] = useState({delivery_id: '', courier_name: '', sale_id: '', address: '', date: ''})
+  const [deliveryInfoData, setDeliveryInfoData ] = useState({
+    delivery_id: '',
+    courier_name: '',
+    sale_id: '',
+    address: '',
+    date: '',
+    isForDelivery: true,
+    isDelivered: false,
+    isPending: false
+  });
 
 
   //VIEW THE PRUDUCTS UNDER SALE ID
@@ -37,8 +46,10 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
       courier_name: Info.courier_name, 
       sale_id: Info.sales_information_id, 
       address: Info.destination_address, 
-      date: Info.formated_delivered_date
-
+      date: Info.formated_delivered_date,
+      isForDelivery: true,
+      isDelivered: Boolean(Info.is_delivered),
+      isPending: Boolean(Info.is_pending)
     });
 
     setOpeneliveryInfo(true);
@@ -50,14 +61,14 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
     setModalType("")
   
     setDeliveryInfoData({
+      delivery_id: '',
+      courier_name: '',
       sale_id: '', 
-      chargeTo: '', 
-      tin: '', 
       address: '', 
       date: '', 
-      amountNet: '', 
-      vat: '', 
-      total: ''
+      isForDelivery: true,
+      isDelivered: false,
+      isPending: false
     });
 
 

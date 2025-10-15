@@ -29,7 +29,22 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   }, [saleFilter]);
 
   //HEADER AND TOTAL INFORMATION
-  const [saleData, setSaleData ] = useState({sale_id: '', chargeTo: '', tin: '', address: '', date: '', amountNet: '', vat: '', total: '', discount: 0, transactionBy: '', deliveryFee: 0})
+  const [saleData, setSaleData ] = useState({
+    sale_id: '',
+    chargeTo: '',
+    tin: '',
+    address: '',
+    date: '',
+    amountNet: '',
+    vat: '',
+    total: '',
+    discount: 0,
+    transactionBy: '',
+    deliveryFee: 0,
+    isForDelivery: false,
+    isDelivered: false,
+    isPending: false
+  });
 
 
   //VIEW THE PRUDUCTS UNDER SALE ID
@@ -46,7 +61,10 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
       total: sailInfo.total_amount_due,
       discount: sailInfo.discount,
       transactionBy: sailInfo.transaction_by,
-      deliveryFee: sailInfo.delivery_fee
+      deliveryFee: sailInfo.delivery_fee,
+      isForDelivery: Boolean(sailInfo.is_for_delivery),
+      isDelivered: Boolean(sailInfo.is_delivered),
+      isPending: Boolean(sailInfo.is_pending)
 
     });
 
@@ -69,7 +87,10 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
       total: '',
       discount: 0,
       transactionBy: '',
-      deliveryFee: 0
+  deliveryFee: 0,
+  isForDelivery: false,
+  isDelivered: false,
+  isPending: false
     });
 
 
@@ -85,9 +106,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   let filteredSale = saleHeader;
   if (saleFilter === 'normal') {
     filteredSale = filteredSale.filter(sale => !sale.is_for_delivery);
-
-  } else if (saleFilter === 'for_delivery') {
-    filteredSale = filteredSale.filter(sale => sale.is_for_delivery);
 
   } else if (saleFilter === 'delivered') {
     filteredSale = filteredSale.filter(sale => sale.is_for_delivery && sale.is_delivered && !sale.is_pending);
@@ -158,7 +176,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
             >
               <option value="all">All Sales</option>
               <option value="normal">Normal Sales</option>
-              <option value="for_delivery">For Delivery Sales</option>
               <option value="delivered">Delivered Sales</option>
               <option value="undelivered">Undelivered Sales</option>
               <option value="out_for_delivery">Out for Delivery Sales</option>

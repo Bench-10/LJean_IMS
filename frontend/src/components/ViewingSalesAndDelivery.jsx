@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import NoInfoFound from './common/NoInfoFound';
 import api from '../utils/api';
 import { currencyFormat } from '../utils/formatCurrency';
@@ -11,6 +11,52 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
 
     const [soldItems, setSoldItems] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    const statusDetails = useMemo(() => {
+        if (!headerInformation) return null;
+
+        const isForDelivery = Boolean(headerInformation.isForDelivery);
+        const isDelivered = Boolean(headerInformation.isDelivered);
+        const isPending = Boolean(headerInformation.isPending);
+
+        if (!isForDelivery) {
+            return {
+                label: 'Counter Sale',
+                description: 'This transaction is not marked for delivery.',
+                containerClass: 'border border-gray-200 bg-gray-100',
+                labelClass: 'text-gray-700',
+                showDeliveryTag: false
+            };
+        }
+
+        if (isDelivered) {
+            return {
+                label: 'Delivered',
+                description: 'Delivery has been completed successfully.',
+                containerClass: 'border border-green-200 bg-green-50',
+                labelClass: 'text-green-700',
+                showDeliveryTag: true
+            };
+        }
+
+        if (isPending) {
+            return {
+                label: 'Out for Delivery',
+                description: 'Order has been dispatched and is currently out for delivery.',
+                containerClass: 'border border-sky-200 bg-sky-50',
+                labelClass: 'text-sky-700',
+                showDeliveryTag: true
+            };
+        }
+
+        return {
+            label: 'Undelivered',
+            description: 'Delivery was unssuccessful or cancelled.',    
+            containerClass: 'border border-red-200 bg-red-50',
+            labelClass: 'text-red-700',
+            showDeliveryTag: true
+        };
+    }, [headerInformation]);
 
     useEffect(() =>{
         if (!sale_id) return;
@@ -107,6 +153,19 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                         <p className='text-xs mb-3'>
                             Person In-charge: <span className='font-bold italic'>{headerInformation.transactionBy}</span>
                         </p>
+
+                        {statusDetails && (
+                            <div className={`mb-4 rounded-md px-4 py-3 text-sm shadow-sm ${statusDetails.containerClass}`}>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className={`text-base font-semibold ${statusDetails.labelClass}`}>
+                                        {statusDetails.label}
+                                    </span>
+                                </div>
+                                {statusDetails.description && (
+                                    <p className="mt-1 text-xs text-gray-600">{statusDetails.description}</p>
+                                )}
+                            </div>
+                        )}
                         <div className={`grid grid-cols-2 gap-3 mb-3`}>
                             
                             <div>

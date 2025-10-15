@@ -197,7 +197,7 @@ export const setToDelivered = async(saleID, update) => {
             const {rows: itemsToRededuct} = await SQLquery(`
                 SELECT 
                     product_id,
-                    quantity
+                    quantity_display AS quantity
                 FROM Sales_Items
                 WHERE sales_information_id = $1`,
                 [saleID]
@@ -251,7 +251,7 @@ export const setToDelivered = async(saleID, update) => {
                 const {rows: itemsToDeduct} = await SQLquery(`
                     SELECT 
                         product_id,
-                        quantity
+                        quantity_display AS quantity
                     FROM Sales_Items
                     WHERE sales_information_id = $1`,
                     [saleID]
@@ -336,7 +336,7 @@ export const setToDelivered = async(saleID, update) => {
                 const {rows: affectedProducts} = await SQLquery(`
                     SELECT 
                         si.product_id,
-                        si.quantity,
+                        si.quantity_display AS sold_quantity,
                         ip.branch_id,
                         ip.category_id,
                         c.category_name,
@@ -354,7 +354,7 @@ export const setToDelivered = async(saleID, update) => {
                     LEFT JOIN Add_Stocks ast ON si.product_id = ast.product_id AND s_info.branch_id = ast.branch_id
                     WHERE si.sales_information_id = $1
                     GROUP BY 
-                        si.product_id, si.quantity, ip.branch_id, ip.category_id, 
+                        si.product_id, si.quantity_display, ip.branch_id, ip.category_id, 
                         c.category_name, ip.product_name, ip.unit, ip.unit_price, 
                         ip.unit_cost, ip.min_threshold, ip.max_threshold`,
                     [saleID]
