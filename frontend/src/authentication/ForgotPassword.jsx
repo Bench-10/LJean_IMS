@@ -4,108 +4,93 @@ import { IoMdMailUnread } from "react-icons/io";
 import api from '../utils/api';
 
 const ForgotPassword = ({ onBackToLogin }) => {
-  const [email, setEmail] = useState('');
-  const [userType, setUserType] = useState('user');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+
+    const [email, setEmail] = useState('');
+    const [userType, setUserType] = useState('user');
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
+    const [success, setSuccess] = useState(false);
+    const [error, setError] = useState('');
 
 
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setMessage('');
+        setError('');
+        setSuccess(false);
 
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    setError('');
-    setSuccess(false);
+        try {
+          const response = await api.post('/api/password-reset/request', {
+            email: email.trim(),
+            userType,
+          });
 
 
-    try {
-      const response = await api.post('/api/password-reset/request', {
-        email: email.trim(),
-        userType,
-      });
+          const data = response.data;
 
-      const data = response.data;
+          if (data.success) {
+            setSuccess(true);
+            setMessage(data.message);
+            setEmail(''); //CLEAR FORM
+          } else {
+            setError(data.message);
+          }
 
+        } catch (err) {
 
+          console.error('Password reset request error:', err);
+          if (err.response && err.response.data && err.response.data.message) {
+            setError(err.response.data.message);
+          } else {
+            setError('Network error. Please check your connection and try again.');
+          }
+        } finally {
+          setLoading(false);
+        }
+    };
 
-      if (data.success) {
-        setSuccess(true);
-        setMessage(data.message);
-        setEmail(''); //CLEAR FORM
-      } else {
-        setError(data.message);
-      }
+    if (success) {
 
-    } catch (err) {
+      return (
 
-      console.error('Password reset request error:', err);
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Network error. Please check your connection and try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (success) {
-
-    return (
-
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <FiCheck className="text-green-600 text-2xl" />
-            </div>
-
-            
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-
-              Email Sent!
-            </h2>
-            
-            <p className="text-gray-600 mb-6 leading-relaxed">
-              {message}
-            </p>
-            
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <p className="text-yellow-800 text-sm">
-                <FiAlertCircle className="inline mr-2" />
-                The reset link will expire in 1 hour for security reasons.
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <FiCheck className="text-green-600 text-2xl" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                Email Sent!
+              </h2>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                {message}
               </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <p className="text-yellow-800 text-sm">
+                  <FiAlertCircle className="inline mr-2" />
+                  The reset link will expire in 1 hour for security reasons.
+                </p>
+              </div>
+              <button
+                onClick={onBackToLogin}
+                className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <FiArrowLeft className="mr-2" />
+                Back to Login
+              </button>
             </div>
-            
-            <button
-              onClick={onBackToLogin}
-              className="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <FiArrowLeft className="mr-2" />
-              
-              Back to Login
-
-            </button>
-
           </div>
-
         </div>
+      );
+    }
 
-      </div>
-
-    );
-
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative">
       <div className="w-full max-w-md">
-         {/*ERROR MESSAGE*/}
-            
+         {/*ERROR MESSAGE*/}      
         <div className="bg-white rounded-2xl shadow-xl p-8 border-2 relative">
             {error && (
               <div className="bg-red-500 rounded-md p-3 absolute top-4 inset-x-4 z-50 shadow-md">
@@ -115,6 +100,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
                 </p>
               </div>
             )}
+
           {/* Header */}
           <div className="text-center mb-8">
             <div className=" flex items-center justify-center mx-auto mb-9">
@@ -127,7 +113,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
               Enter your email address and we'll send you a reset link.
             </p>
           </div>
-
+          
           {/*FORME */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/*USER SELECTION */}
@@ -178,8 +164,6 @@ const ForgotPassword = ({ onBackToLogin }) => {
               />
             </div>
 
-           
-
             {/*SUBMIT */}
             <button
               type="submit"
@@ -212,5 +196,6 @@ const ForgotPassword = ({ onBackToLogin }) => {
     </div>
   );
 };
+
 
 export default ForgotPassword;
