@@ -172,7 +172,7 @@ export async function fetchRestockTrends({ branch_id, interval, range }) {
 
 
 
-export async function fetchTopProducts({ branch_id, category_id, limit, range, start_date, end_date }) {
+export async function fetchTopProducts({ branch_id, category_id, limit, range, start_date, end_date, interval = 'monthly', include_forecast = false }) {
   // Use custom dates if provided, otherwise use range
   let start, end;
   if (start_date && end_date) {
@@ -196,7 +196,14 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
   if (category_id) { conditions.push(`ip.category_id = $${idx++}`); params.push(category_id); }
   const where = 'WHERE ' + conditions.join(' AND ');
   const { rows } = await SQLquery(`
-    SELECT si.product_id, ip.product_name, SUM(si.amount) AS sales_amount, SUM(si.quantity_display) AS units_sold
+    SELECT
+      si.product_id,
+      ip.product_name,
+      SUM(si.amount) AS sales_amount,
+      SUM(si.quantity_display) AS units_sold,
+      MAX(ip.quantity) AS current_quantity,
+      MAX(ip.min_threshold) AS min_threshold,
+      MAX(ip.max_threshold) AS max_threshold
     FROM Sales_Items si
     JOIN Sales_Information s USING(sales_information_id)
     JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
@@ -204,7 +211,84 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     GROUP BY 1,2
     ORDER BY sales_amount DESC
     LIMIT ${parseInt(limit)};`, params);
-  return rows;
+  if (!include_forecast || rows.length === 0) {
+    return rows;
+  }
+
+  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
+  const MAX_FORECAST_PRODUCTS = 10;
+  const enriched = [];
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const product = rows[i];
+
+    if (i >= MAX_FORECAST_PRODUCTS) {
+      enriched.push({ ...product, history: [], forecast: [] });
+      continue;
+    }
+
+    const historyConditions = [
+      'si.product_id = $1',
+      's.date BETWEEN $2 AND $3',
+      `NOT EXISTS (
+        SELECT 1 FROM Sales_Stock_Usage ssu
+        WHERE ssu.sales_information_id = s.sales_information_id
+          AND ssu.is_restored = true
+      )`
+    ];
+    const historyParams = [product.product_id, start, end];
+    let hIdx = 4;
+    if (branch_id) {
+      historyConditions.push(`s.branch_id = $${hIdx++}`);
+      historyParams.push(branch_id);
+    }
+    if (category_id) {
+      historyConditions.push(`ip.category_id = $${hIdx++}`);
+      historyParams.push(category_id);
+    }
+
+    const { rows: historyRows } = await SQLquery(`
+      SELECT date_trunc('${dateTrunc}', s.date)::date AS period,
+             SUM(si.quantity_display) AS units_sold,
+             SUM(si.amount) AS sales_amount
+      FROM Sales_Items si
+      JOIN Sales_Information s USING(sales_information_id)
+      JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
+      WHERE ${historyConditions.join(' AND ')}
+      GROUP BY 1
+      ORDER BY 1;`, historyParams);
+
+    const historySeries = historyRows.map(row => ({
+      period: dayjs(row.period).format('YYYY-MM-DD'),
+      units_sold: Number(row.units_sold || 0),
+      sales_amount: Number(row.sales_amount || 0)
+    }));
+
+    let forecastSeries = [];
+    if (historySeries.length >= 2) {
+      try {
+        const forecastInput = historySeries.map(item => ({ period: item.period, value: item.units_sold }));
+        const forecast = await runDemandForecast({ history: forecastInput, interval });
+        forecastSeries = forecast.map(point => ({
+          period: point.period,
+          forecast_units: Number(point.forecast || 0),
+          forecast_lower: point.forecast_lower != null ? Number(point.forecast_lower) : null,
+          forecast_upper: point.forecast_upper != null ? Number(point.forecast_upper) : null
+        }));
+      } catch (err) {
+        console.error('Top product forecast error', err);
+        forecastSeries = [];
+      }
+    }
+
+    enriched.push({
+      ...product,
+      history: historySeries,
+      forecast: forecastSeries
+    });
+  }
+
+  return enriched;
 }
 
 

@@ -188,7 +188,15 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     const paramsLevels = {};
     if (branchId) paramsLevels.branch_id = branchId;
 
-    const paramsTop = { branch_id: branchId, category_id: categoryFilter || undefined, start_date, end_date, limit: 50 };
+    const paramsTop = {
+      branch_id: branchId,
+      category_id: categoryFilter || undefined,
+      start_date,
+      end_date,
+      limit: 50,
+      interval: salesInterval,
+      include_forecast: true
+    };
 
     const paramsKPI = { 
       branch_id: branchId, 

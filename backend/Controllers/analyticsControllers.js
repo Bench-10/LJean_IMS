@@ -79,8 +79,26 @@ export const getTopProducts = async (req, res) => {
 
   try {
 
-    const { branch_id, category_id, limit = 10, range = '3m', start_date, end_date } = req.query;
-    const rows = await analyticsServices.fetchTopProducts({ branch_id, category_id, limit, range, start_date, end_date });
+    const {
+      branch_id,
+      category_id,
+      limit = 10,
+      range = '3m',
+      start_date,
+      end_date,
+      interval = 'monthly',
+      include_forecast
+    } = req.query;
+    const rows = await analyticsServices.fetchTopProducts({
+      branch_id,
+      category_id,
+      limit,
+      range,
+      start_date,
+      end_date,
+      interval,
+      include_forecast: include_forecast === 'true' || include_forecast === true
+    });
     res.json(rows);
 
   } catch (err) {
