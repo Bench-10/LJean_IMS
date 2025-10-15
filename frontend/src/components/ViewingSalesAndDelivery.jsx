@@ -192,7 +192,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
 
                                     { loading ? (
                                            
-                                            <ChartLoading message="Loading sales information..." />
+                                            <ChartLoading asTableRow={true} colSpan={5} message="Loading sales information..." />
                                                
                                         ) : 
 

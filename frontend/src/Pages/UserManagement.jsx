@@ -178,7 +178,7 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
                       const statusBadge = getStatusBadge(row);
 
                       return (
-                        <tr key={rowIndex} className={rowBaseClass} onClick={() => {setOpenUsers(true); setUserDetailes(row);}} >
+                        <tr key={rowIndex} className={rowBaseClass} onClick={() => {row.status === 'pending' ? '' : setOpenUsers(true); setUserDetailes(row);}} >
                         <td className="px-4 py-2"  >{row.full_name}</td>
                         {isOwnerUser && 
                           <td className="px-4 py-2 font-medium whitespace-nowrap" >{row.branch}</td>
