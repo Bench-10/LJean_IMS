@@ -1,4 +1,6 @@
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import 'jspdf-autotable';
 
 // SIMPLE EXPORT UTILITIES
 
@@ -160,4 +162,70 @@ export const formatForExport = (data, excludeFields = []) => {
 
   });
 
+};
+
+
+// MULTI-CHART PDF EXPORT
+export const exportChartsAsPDF = async (chartRefs = [], filename = 'analytics-report.pdf') => {
+  if (!chartRefs || chartRefs.length === 0) {
+    alert('No charts selected for export');
+    return;
+  }
+
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+
+  let isFirstPage = true;
+
+  for (const chartRef of chartRefs) {
+    if (!chartRef || !chartRef.current) continue;
+
+    try {
+      // CAPTURE CHART AS IMAGE
+      const canvas = await html2canvas(chartRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+        useCORS: true
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgRatio = imgProps.width / imgProps.height;
+
+      // CALCULATE IMAGE SIZE TO FIT PAGE
+      let imgWidth = pageWidth - (margin * 2);
+      let imgHeight = imgWidth / imgRatio;
+
+      // IF IMAGE IS TOO TALL, SCALE DOWN
+      if (imgHeight > pageHeight - (margin * 2)) {
+        imgHeight = pageHeight - (margin * 2);
+        imgWidth = imgHeight * imgRatio;
+      }
+
+      // ADD NEW PAGE IF NOT FIRST
+      if (!isFirstPage) {
+        pdf.addPage();
+      }
+      isFirstPage = false;
+
+      // CENTER THE IMAGE
+      const xPos = (pageWidth - imgWidth) / 2;
+      const yPos = margin;
+
+      pdf.addImage(imgData, 'PNG', xPos, yPos, imgWidth, imgHeight);
+
+    } catch (error) {
+      console.error('Error capturing chart:', error);
+    }
+  }
+
+  pdf.save(filename);
 };

@@ -3,11 +3,11 @@ import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Ba
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 
-function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval, deliveryStatus, setDeliveryStatus, loadingDelivery}) {
+function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval, deliveryStatus, setDeliveryStatus, loadingDelivery, deliveryChartRef}) {
   return (
     <>
       <Card title={"Delivery Analytics"} className="col-span-full h-[500px]">
-          <div className="flex flex-col h-full max-h-full overflow-hidden relative">
+          <div ref={deliveryChartRef} className="flex flex-col h-full max-h-full overflow-hidden relative">
             {loadingDelivery && <ChartLoading message="Loading delivery data..." />}
             {/* Delivery Controls */}
             <div className="flex items-center gap-2 justify-end mb-4 p-2rounded-md">

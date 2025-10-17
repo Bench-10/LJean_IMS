@@ -6,7 +6,7 @@ import ChartLoading from '../../common/ChartLoading.jsx';
 import RestockSuggestionsDialog from '../../dialogs/RestockSuggestionsDialog.jsx';
 import { FaLightbulb, FaBoxOpen } from 'react-icons/fa';
 
-function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts, dateRangeDisplay }) {
+function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts, dateRangeDisplay, topProductsRef, salesChartRef }) {
 
   const [showRestockDialog, setShowRestockDialog] = useState(false);
   
@@ -121,7 +121,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
   return (
     <>
         <Card title={selectedProductName ? `${categoryName} - ${selectedProductName}` : categoryName} className=" relative col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
-            <div className="flex flex-col h-full">
+            <div ref={topProductsRef} className="flex flex-col h-full">
               {loadingTopProducts && <ChartLoading message="Loading top products..." />}
               {selectedProductName && (
                 <div className="absolute top-2 right-3 mb-2">
@@ -208,7 +208,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
             </Card>
 
             <Card title={selectedProductName ? `Sales Performance - ${selectedProductName}` : "Sales Performance"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
-            <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
+            <div ref={salesChartRef} className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
                 {loadingSalesPerformance && <ChartLoading message="Loading sales performance..." />}
                 {/* Sales Performance Filter */}
                 <div className="flex justify-end">

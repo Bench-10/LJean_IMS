@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
@@ -9,8 +9,9 @@ import TopProducts from './charts/TopProducts.jsx';
 import Delivery from './charts/Delivery.jsx';
 import BranchPerformance from './charts/BranchPerformance.jsx';
 import BranchTimeline from './charts/BranchTimeline.jsx';
+import ExportReportDialog from '../dialogs/ExportReportDialog.jsx';
 import { TbTruckDelivery } from "react-icons/tb";
-import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown, FaShoppingCart, FaPiggyBank, FaWallet } from "react-icons/fa";
+import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown, FaShoppingCart, FaPiggyBank, FaWallet, FaFileExport } from "react-icons/fa";
 import { HiOutlineBuildingOffice2 } from "react-icons/hi2";
 import { AiFillProduct } from "react-icons/ai";
 import { useAuth } from '../../authentication/Authentication.jsx';
@@ -47,6 +48,14 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
   // ROLE CHECK: ONLY OWNER SHOULD SEE BRANCH PERFORMANCE OPTION
   const isOwner = user?.role?.some(role => ['Owner'].includes(role));
+
+  // REFS FOR EXPORT
+  const salesChartRef = useRef(null);
+  const topProductsRef = useRef(null);
+  const deliveryChartRef = useRef(null);
+  const branchPerformanceRef = useRef(null);
+  const branchTimelineRef = useRef(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   const [salesPerformance, setSalesPerformance] = useState({ history: [], forecast: [], series: [] });
   const [restockTrends, setRestockTrends] = useState([]);
@@ -333,21 +342,55 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const latestDate = inventoryLevels.length>0 ? inventoryLevels[inventoryLevels.length-1].date : null;
   const latestSnapshot = latestDate ? inventoryLevels.filter(r=> r.date=== latestDate) : [];
 
+  // BUILD AVAILABLE CHARTS FOR EXPORT
+  const availableChartsForExport = useMemo(() => {
+    const charts = [];
+    
+    if (currentCharts === 'sale') {
+      charts.push({ id: 'sales-performance', label: 'Sales Performance Timeline', ref: salesChartRef });
+      charts.push({ id: 'top-products', label: 'Top Products', ref: topProductsRef });
+    }
+    
+    if (currentCharts === 'delivery') {
+      charts.push({ id: 'delivery', label: 'Delivery Analytics', ref: deliveryChartRef });
+    }
+    
+    if (currentCharts === 'branch' && !branchId && isOwner) {
+      charts.push({ id: 'branch-performance', label: 'Branch Performance', ref: branchPerformanceRef });
+      charts.push({ id: 'branch-timeline', label: 'Branch Timeline', ref: branchTimelineRef });
+    }
+    
+    return charts;
+  }, [currentCharts, branchId, isOwner]);
+
   return (
   <div className="flex flex-col gap-5 flex-1 min-h-0">
 
+      <ExportReportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        availableCharts={availableChartsForExport}
+      />
+
       <div className="flex flex-wrap items-center justify-between" >
 
-        {(!branchId) &&
+        <div className="flex gap-3 items-center">
+          {(!branchId) &&
+              <NavLink to="/branches" className={`relative py-2 px-4 border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100`} >
+                <span className="text-sm">
+                    View Branch Analytics
+                </span>
+              </NavLink>
+          }
 
-            <NavLink to="/branches" className={`relative py-2 px-4 border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100`} >
-
-              <span className="text-sm">
-                  View Branch Anlytics
-              </span>
-            </NavLink>
-        
-        }
+          <button
+            onClick={() => setShowExportDialog(true)}
+            className="flex items-center gap-2 py-2 px-4 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-all shadow-sm"
+          >
+            <FaFileExport />
+            <span className="text-sm">Export Report</span>
+          </button>
+        </div>
 
         <div className={`flex flex-wrap gap-3 items-center ${!branchId ? 'justify-between' : ''}`}>
           <CategorySelect categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} onCategoryNameChange={setCategoryName} />
@@ -590,6 +633,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             loadingSalesPerformance={loadingSalesPerformance}
             loadingTopProducts={loadingTopProducts}
             dateRangeDisplay={dateRangeDisplay}
+            salesChartRef={salesChartRef}
+            topProductsRef={topProductsRef}
           />
         )
 
@@ -607,6 +652,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             deliveryStatus={deliveryStatus}
             setDeliveryStatus={setDeliveryStatus}
             loadingDelivery={loadingDelivery}
+            deliveryChartRef={deliveryChartRef}
           />
         )
        
@@ -626,6 +672,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               todayISO={todayISO}
               categoryFilter={categoryFilter}
               loadingBranchPerformance={loadingBranchPerformance}
+              branchPerformanceRef={branchPerformanceRef}
             />
             
             <BranchTimeline
@@ -633,6 +680,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               categoryFilter={categoryFilter}
               allBranches={allBranches}
               loadingBranchTimeline={loadingBranchPerformance}
+              branchTimelineRef={branchTimelineRef}
             />
           </>
         )

@@ -6,7 +6,7 @@ import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 import api from '../../../utils/api.js';
 
-function BranchTimeline({ Card, categoryFilter, allBranches, loadingBranchTimeline }) {
+function BranchTimeline({ Card, categoryFilter, allBranches, loadingBranchTimeline, branchTimelineRef }) {
   const { user } = useAuth();
   const [branchTimelineData, setBranchTimelineData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,7 @@ function BranchTimeline({ Card, categoryFilter, allBranches, loadingBranchTimeli
     <>
       {/* BRANCH TIMELINE CHART */}
       <Card title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`} className="col-span-full h-[220px] md:h-[260px] lg:h-[280px]">
-        <div className="flex flex-col h-full max-h-full overflow-hidden relative">
+        <div ref={branchTimelineRef} className="flex flex-col h-full max-h-full overflow-hidden relative">
           {(loading || loadingBranchTimeline) && <ChartLoading message="Loading branch timeline..." />}
           
           {/* CONTROLS */}
