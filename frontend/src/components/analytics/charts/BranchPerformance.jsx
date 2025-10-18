@@ -6,7 +6,7 @@ import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 import api from '../../../utils/api.js';
 
-function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, categoryFilter, loadingBranchPerformance, branchPerformanceRef }) {
+function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, categoryFilter, loadingBranchPerformance, branchPerformanceRef, revenueDistributionRef }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]); 
   const [loading, setLoading] = useState(false);
@@ -209,7 +209,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
       </Card>
 
       {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
-      <Card title={"REVENUE DISTRIBUTION (%)"} className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]">
+      <Card title={"REVENUE DISTRIBUTION (%)"} className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]" exportRef={revenueDistributionRef}>
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {(loading || loadingBranchPerformance) && <ChartLoading message="Loading distribution..." />}
           

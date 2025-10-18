@@ -57,6 +57,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const topProductsRef = useRef(null);
   const deliveryChartRef = useRef(null);
   const branchPerformanceRef = useRef(null);
+  const revenueDistributionRef = useRef(null);
   const branchTimelineRef = useRef(null);
   const kpiRef = useRef(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -363,6 +364,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     
     if (currentCharts === 'branch' && !branchId && isOwner) {
       charts.push({ id: 'branch-performance', label: 'Branch Performance', ref: branchPerformanceRef });
+      charts.push({ id: 'revenue-distribution', label: 'Revenue Distribution', ref: revenueDistributionRef });
       charts.push({ id: 'branch-timeline', label: 'Branch Timeline', ref: branchTimelineRef });
     }
     
@@ -679,6 +681,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               categoryFilter={categoryFilter}
               loadingBranchPerformance={loadingBranchPerformance}
               branchPerformanceRef={branchPerformanceRef}
+              revenueDistributionRef={revenueDistributionRef}
             />
             
             <BranchTimeline

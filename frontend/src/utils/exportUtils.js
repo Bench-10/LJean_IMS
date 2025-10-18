@@ -309,7 +309,58 @@ export const exportChartsAsPDF = async (chartRefs = [], filename = 'analytics-re
     const topProductsChart = otherCharts.find(c => c.id === 'top-products');
     const salesChart = otherCharts.find(c => c.id === 'sales-performance');
     
-    if (topProductsChart && salesChart) {
+    // CHECK FOR BRANCH ANALYTICS LAYOUT (BRANCH PERFORMANCE + REVENUE DISTRIBUTION + BRANCH TIMELINE)
+    const branchPerformanceChart = otherCharts.find(c => c.id === 'branch-performance');
+    const revenueDistributionChart = otherCharts.find(c => c.id === 'revenue-distribution');
+    const branchTimelineChart = otherCharts.find(c => c.id === 'branch-timeline');
+    
+    if (branchPerformanceChart && revenueDistributionChart && branchTimelineChart) {
+      // BRANCH ANALYTICS LAYOUT: TOP ROW (PERFORMANCE + PIE) + BOTTOM ROW (TIMELINE)
+      const topRowHeight = availableHeight * 0.45;
+      const bottomRowHeight = availableHeight * 0.55 - gap;
+      
+      // TOP LEFT: BRANCH PERFORMANCE (67% width)
+      const perfWidth = availableWidth * 0.67;
+      const perfRatio = branchPerformanceChart.width / branchPerformanceChart.height;
+      let perfImgWidth = perfWidth;
+      let perfImgHeight = perfImgWidth / perfRatio;
+      
+      if (perfImgHeight > topRowHeight) {
+        perfImgHeight = topRowHeight;
+        perfImgWidth = perfImgHeight * perfRatio;
+      }
+      
+      pdf.addImage(branchPerformanceChart.data, 'PNG', margin, yPosition, perfImgWidth, perfImgHeight);
+      
+      // TOP RIGHT: REVENUE DISTRIBUTION (33% width)
+      const pieWidth = availableWidth * 0.33 - gap;
+      const pieRatio = revenueDistributionChart.width / revenueDistributionChart.height;
+      let pieImgWidth = pieWidth;
+      let pieImgHeight = pieImgWidth / pieRatio;
+      
+      if (pieImgHeight > topRowHeight) {
+        pieImgHeight = topRowHeight;
+        pieImgWidth = pieImgHeight * pieRatio;
+      }
+      
+      const pieXPos = margin + perfWidth + gap;
+      pdf.addImage(revenueDistributionChart.data, 'PNG', pieXPos, yPosition, pieImgWidth, pieImgHeight);
+      
+      // BOTTOM: BRANCH TIMELINE (FULL WIDTH)
+      const timelineYPos = yPosition + topRowHeight + gap;
+      const timelineRatio = branchTimelineChart.width / branchTimelineChart.height;
+      let timelineImgWidth = availableWidth;
+      let timelineImgHeight = timelineImgWidth / timelineRatio;
+      
+      if (timelineImgHeight > bottomRowHeight) {
+        timelineImgHeight = bottomRowHeight;
+        timelineImgWidth = timelineImgHeight * timelineRatio;
+      }
+      
+      const timelineXPos = margin + (availableWidth - timelineImgWidth) / 2;
+      pdf.addImage(branchTimelineChart.data, 'PNG', timelineXPos, timelineYPos, timelineImgWidth, timelineImgHeight);
+      
+    } else if (topProductsChart && salesChart) {
       // DASHBOARD LAYOUT: LEFT COLUMN (TOP PRODUCTS) + RIGHT COLUMN (SALES PERFORMANCE)
       // Top Products takes ~33% width, Sales Performance takes ~67% width
       const leftWidth = availableWidth * 0.33;
