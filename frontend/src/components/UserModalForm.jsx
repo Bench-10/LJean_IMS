@@ -234,6 +234,8 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
   const submitUserConfirmation = async () => {
     try {
       setLoading(true);
+      
+      console.log(user?.user_id)
 
      const userData = {
         first_name,
@@ -244,8 +246,9 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
         address,
         username,
         password,
-          created_by: user?.user_id,
-          creator_roles: user?.role || [],
+        created_by_id: user && user.role.some(role => ['Owner'].includes(role)) ? user.admin_id : user.user_id,
+        created_by: user?.full_name,
+        creator_roles: user?.role || [],
 
      };
 

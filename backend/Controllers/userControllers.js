@@ -119,7 +119,7 @@ export const userUpdateAccount = async (req, res) =>{
 export const approvePendingUser = async (req, res) => {
     try {
         const userID = req.params.id;
-        const { approver_id, approver_roles } = req.body;
+        const { approver_id, approverName, approver_roles } = req.body;
 
         let isOwner = false;
 
@@ -138,7 +138,7 @@ export const approvePendingUser = async (req, res) => {
             return res.status(403).json({ message: 'Only owners can approve accounts' });
         }
 
-        const user = await userCreation.approvePendingUser(userID, approver_id ?? null);
+        const user = await userCreation.approvePendingUser(userID, approver_id ?? null, approverName ?? null);
         res.status(200).json(user);
     } catch (error) {
         console.error('Error approving user: ', error);

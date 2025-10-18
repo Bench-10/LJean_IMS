@@ -32,7 +32,7 @@ function ChartLoading({ message = "Loading data...", type='chart', asTableRow = 
 
   // Default overlay rendering (for charts/pages)
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full bg-white absolute inset-0 z-50 rounded-md">
+    <div className="flex flex-col items-center justify-center h-full w-full bg-white absolute inset-0 z-10 rounded-md">
       {content}
     </div>
   );

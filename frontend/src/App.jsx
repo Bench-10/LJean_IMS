@@ -1176,6 +1176,7 @@ function App() {
     try {
       await api.patch(`/api/users/${userId}/approval`, {
         approver_id: user.admin_id ?? null,
+        approverName: user.full_name ?? null,
         approver_roles: user.role || []
       });
     } catch (error) {

@@ -32,12 +32,10 @@ CREATE TABLE Users (
     address VARCHAR(255),
     is_disabled BOOL DEFAULT FALSE,
     status VARCHAR(20) DEFAULT 'active',
-    created_by INT,
-    approved_by INT,
+    created_by VARCHAR(225),
+    approved_by VARCHAR(225),
     approved_at TIMESTAMP,
-    FOREIGN KEY(branch_id) REFERENCES Branch(branch_id),
-    FOREIGN KEY (created_by) REFERENCES Users(user_id),
-    FOREIGN KEY (approved_by) REFERENCES Administrator(admin_id)
+    FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
 );
 
 CREATE INDEX idx_users_status ON Users(status);

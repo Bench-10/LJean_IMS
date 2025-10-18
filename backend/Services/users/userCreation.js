@@ -2,6 +2,7 @@ import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 import { broadcastUserUpdate, broadcastOwnerNotification } from "../../server.js";
+
 const getUserFullName = async (userId) => {
     if (!userId) return null;
     const { rows } = await SQLquery(
@@ -28,7 +29,7 @@ export const checkExistingUsername = async (username) =>{
 
 
 export const createUserAccount = async (UserData) => {
-    const { branch, role, first_name, last_name, cell_number, address, username, password, created_by, creator_roles } = UserData;
+    const { branch, role, first_name, last_name, cell_number, address, username, password, created_by_id, created_by, creator_roles } = UserData;
 
     const {isManager, isInventoryStaff, isSalesAssociate} = role;
 
@@ -86,11 +87,11 @@ export const createUserAccount = async (UserData) => {
 
     const securePassword = await passwordEncryption.encryptPassword(password);
 
-    const creatorId = created_by ?? null;
+    const creatorId = created_by_id ?? null;
     const creatorRoles = Array.isArray(creator_roles) ? creator_roles : [];
     const isOwnerCreator = creatorRoles.includes("Owner");
     const accountStatus = isOwnerCreator ? 'active' : 'pending';
-    const approvedBy = isOwnerCreator ? creatorId : null;
+    const approvedBy = isOwnerCreator ? created_by : null;
     const approvedAt = isOwnerCreator ? new Date() : null;
 
     await SQLquery('BEGIN');
@@ -98,7 +99,7 @@ export const createUserAccount = async (UserData) => {
     await SQLquery(
         `INSERT INTO Users(user_id, branch_id, role, first_name, last_name, cell_number, is_active, last_login, permissions, address, status, created_by, approved_by, approved_at) 
         VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-        [user_id, branch, allowedRoles, first_name, last_name, cell_number, false, 'Not yet logged in.', permissions, address, accountStatus, creatorId, approvedBy, approvedAt]
+        [user_id, branch, allowedRoles, first_name, last_name, cell_number, false, 'Not yet logged in.', permissions, address, accountStatus, created_by, approvedBy, approvedAt]
     );
 
     await SQLquery(
@@ -295,7 +296,7 @@ export const deleteUser = async (userID, branchId) =>{
 
 
 
-export const approvePendingUser = async (userId, approverId) => {
+export const approvePendingUser = async (userId, approverId, approverName) => {
     const userIdInt = parseInt(userId, 10);
     const approverIdInt = approverId !== null && approverId !== undefined ? parseInt(approverId, 10) : null;
 
@@ -312,7 +313,7 @@ export const approvePendingUser = async (userId, approverId) => {
          SET status = 'active', approved_by = $1, approved_at = NOW()
          WHERE user_id = $2 AND status = 'pending'
          RETURNING branch_id`,
-        [approverIdInt, userIdInt]
+        [approverName, userIdInt]
     );
 
     const { rows } = await SQLquery(`

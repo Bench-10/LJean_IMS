@@ -56,15 +56,6 @@ CREATE TABLE Users (
 CREATE INDEX idx_users_status ON Users(status);
 
 
-ALTER TABLE Users 
-ADD CONSTRAINT fk_users_created_by 
-FOREIGN KEY (created_by) REFERENCES Users(user_id);
-
-
-ALTER TABLE Users
-  ADD CONSTRAINT fk_users_approved_by
-  FOREIGN KEY (approved_by) REFERENCES Administrator(admin_id);
-
 
 
 
@@ -498,3 +489,22 @@ CREATE TABLE admin_notification (
     FOREIGN KEY (admin_id) REFERENCES Administrator(admin_id) ON DELETE CASCADE,
     FOREIGN KEY (alert_id) REFERENCES Inventory_Alerts(alert_id) ON DELETE CASCADE
 );
+
+
+
+
+ALTER TABLE Users
+DROP CONSTRAINT fk_users_created_by;
+
+ALTER TABLE Users
+ALTER COLUMN created_by TYPE VARCHAR(255)
+USING created_by::VARCHAR;
+
+
+ALTER TABLE Users
+DROP CONSTRAINT fk_users_approved_by
+
+
+ALTER TABLE Users
+ALTER COLUMN approved_by TYPE VARCHAR(255)
+USING approved_by::VARCHAR;
