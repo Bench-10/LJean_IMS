@@ -79,12 +79,12 @@ function BranchTimeline({ Card, categoryFilter, allBranches, loadingBranchTimeli
   return (
     <>
       {/* BRANCH TIMELINE CHART */}
-      <Card title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`} className="col-span-full h-[220px] md:h-[260px] lg:h-[280px]">
-        <div ref={branchTimelineRef} className="flex flex-col h-full max-h-full overflow-hidden relative">
+      <Card title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`} className="col-span-full h-[220px] md:h-[260px] lg:h-[280px]" exportRef={branchTimelineRef}>
+        <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {(loading || loadingBranchTimeline) && <ChartLoading message="Loading branch timeline..." />}
           
           {/* CONTROLS */}
-          <div className="flex items-center gap-3 justify-end mb-4 flex-wrap">
+          <div data-export-exclude className="flex items-center gap-3 justify-end mb-4 flex-wrap">
             {/* BRANCH SELECTOR */}
             <div className="flex items-center gap-2">
               <label className="text-[11px] text-gray-600 font-semibold">Branch</label>

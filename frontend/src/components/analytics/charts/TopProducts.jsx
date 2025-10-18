@@ -120,11 +120,11 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
   
   return (
     <>
-        <Card title={selectedProductName ? `${categoryName} - ${selectedProductName}` : categoryName} className=" relative col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
-            <div ref={topProductsRef} className="flex flex-col h-full">
+        <Card title={selectedProductName ? `${categoryName} - ${selectedProductName}` : categoryName} className=" relative col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]" exportRef={topProductsRef}>
+            <div className="flex flex-col h-full">
               {loadingTopProducts && <ChartLoading message="Loading top products..." />}
               {selectedProductName && (
-                <div className="absolute top-2 right-3 mb-2">
+                <div data-export-exclude className="absolute top-2 right-3 mb-2">
                   <button 
                     onClick={clearProductFilter}
                     className="text-xs text-red-600 hover:text-red-800 underline"
@@ -207,11 +207,11 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
             </Card>
 
-            <Card title={selectedProductName ? `Sales Performance - ${selectedProductName}` : "Sales Performance"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]">
-            <div ref={salesChartRef} className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
+      <Card title={selectedProductName ? `Sales Performance - ${selectedProductName}` : "Sales Performance"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]" exportRef={salesChartRef}>
+      <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
                 {loadingSalesPerformance && <ChartLoading message="Loading sales performance..." />}
                 {/* Sales Performance Filter */}
-                <div className="flex justify-end">
+        <div data-export-exclude className="flex justify-end">
                     <select value={salesInterval} onChange={e=>setSalesInterval(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white">
                         <option value="daily">Daily</option>
                         <option value="weekly">Weekly</option>
@@ -385,7 +385,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
             {/* Restocking Suggestions Button */}
             {(hasActualData || hasForecastData) && (
-              <div className="mt-4 flex justify-center">
+              <div data-export-exclude className="mt-4 flex justify-center">
                 <button
                   onClick={() => setShowRestockDialog(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"

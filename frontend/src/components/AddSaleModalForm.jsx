@@ -468,6 +468,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                     
                                     value={chargeTo}
                                     onChange={(e) => setChargeTo(e.target.value)}
+                                    required
                                   />
                               </div>
 
@@ -479,6 +480,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                     
                                     value={tin}
                                     onChange={(e) => setTin(e.target.value)}
+                                    required
                                   />
                               </div>
 
@@ -490,6 +492,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                     
                                     value={address}
                                     onChange={(e) => setAddress(e.target.value)}
+                                    required
                                   />
                               </div>
 
@@ -619,6 +622,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                                 }} 
                                                 onKeyUp={() => createAnAmount(idx)}
                                                 placeholder={row.unit ? getQuantityPlaceholder(row.unit) : "0"}
+                                                required
                                               />
                                               {quantityValidationErrors[idx] && (
                                                 <div
@@ -701,7 +705,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                 <label className='block text-xs font-medium mb-1 text-gray-700 uppercase tracking-wide'>Delivery Fee</label>
                                 <input 
                                   type="text"
-                                  className='w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all' 
+                                  className='w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:cursor-not-allowed' 
                                   value={deliveryFee}
                                   onKeyDown={(e) => {
                                     if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
@@ -710,6 +714,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                   }}
                                   onChange={e => handleDeliveryFeeChange(Number(e.target.value) || 0)}
                                   placeholder="Enter delivery fee"
+                                  disabled={!isForDelivery}
                                 />
                             </div>
 

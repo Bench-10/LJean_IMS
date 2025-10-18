@@ -30,8 +30,8 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
 
     setExporting(true);
     try {
-      const chartsToExport = availableCharts
-        .filter(chart => selectedCharts.includes(chart.id))
+      const selectedChartData = availableCharts.filter(chart => selectedCharts.includes(chart.id));
+      const chartsToExport = selectedChartData
         .map(chart => chart.ref)
         .filter(ref => ref.current); // Filter out refs that haven't been populated yet
 
@@ -41,7 +41,9 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
         return;
       }
 
-      await exportChartsAsPDF(chartsToExport, 'analytics-report.pdf');
+      // Pass chart IDs along with refs for layout identification
+      const chartIds = selectedChartData.map(chart => chart.id);
+      await exportChartsAsPDF(chartsToExport, 'analytics-report.pdf', chartIds);
       onClose();
       setSelectedCharts([]);
     } catch (error) {

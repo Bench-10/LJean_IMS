@@ -149,8 +149,8 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
   return (
     <>
       {/* BRANCH PERFORMANCE COMPARISON */}
-      <Card title={"BRANCH SALES PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]">
-        <div ref={branchPerformanceRef} className="flex flex-col h-full max-h-full overflow-hidden relative">
+      <Card title={"BRANCH SALES PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]" exportRef={branchPerformanceRef}>
+        <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {(loading || loadingBranchPerformance) && <ChartLoading message="Loading branch performance..." />}
           
           {!loading && !loadingBranchPerformance && !error && branchTotals.length > 0 && hasPositiveBarValues && (

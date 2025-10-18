@@ -19,12 +19,15 @@ import ChartLoading from '../common/ChartLoading.jsx';
 
 
 
-const Card = ({ title, children, className='' }) => (
-  <div className={`flex flex-col border border-gray-200 rounded-md bg-white p-4 shadow-sm ${className}`}>
-    {title && <h2 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase mb-2">{title}</h2>}
-    <div className="flex-1">{children}</div>
-  </div>
-);
+const Card = ({ title, children, className = '', exportRef, bodyClassName = '' }) => {
+  const bodyClasses = ['flex-1', bodyClassName].filter(Boolean).join(' ');
+  return (
+    <div ref={exportRef} className={`flex flex-col border border-gray-200 rounded-md bg-white p-4 shadow-sm ${className}`}>
+      {title && <h2 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase mb-2">{title}</h2>}
+      <div className={bodyClasses}>{children}</div>
+    </div>
+  );
+};
 
 
 
@@ -55,6 +58,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const deliveryChartRef = useRef(null);
   const branchPerformanceRef = useRef(null);
   const branchTimelineRef = useRef(null);
+  const kpiRef = useRef(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   const [salesPerformance, setSalesPerformance] = useState({ history: [], forecast: [], series: [] });
@@ -344,10 +348,12 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
   // BUILD AVAILABLE CHARTS FOR EXPORT
   const availableChartsForExport = useMemo(() => {
-    const charts = [];
+    const charts = [
+      { id: 'kpi-summary', label: 'KPI Summary', ref: kpiRef }
+    ];
     
     if (currentCharts === 'sale') {
-      charts.push({ id: 'sales-performance', label: 'Sales Performance Timeline', ref: salesChartRef });
+      charts.push({ id: 'sales-performance', label: 'Sales Performance & Forecast', ref: salesChartRef });
       charts.push({ id: 'top-products', label: 'Top Products', ref: topProductsRef });
     }
     
@@ -486,8 +492,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         
       </div> 
 
-      {/* KPI CARDS*/}
-  <div className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 relative">
+    {/* KPI CARDS*/}
+  <div ref={kpiRef} className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 relative">
             
             <div className="flex items-center w-full bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
               {loadingKPIs && <ChartLoading message='Loading total sales' type='kpi' /> }

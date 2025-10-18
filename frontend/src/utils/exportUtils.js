@@ -165,8 +165,8 @@ export const formatForExport = (data, excludeFields = []) => {
 };
 
 
-// MULTI-CHART PDF EXPORT
-export const exportChartsAsPDF = async (chartRefs = [], filename = 'analytics-report.pdf') => {
+// MULTI-CHART PDF EXPORT WITH DASHBOARD LAYOUT PRESERVATION
+export const exportChartsAsPDF = async (chartRefs = [], filename = 'analytics-report.pdf', chartIds = []) => {
   if (!chartRefs || chartRefs.length === 0) {
     alert('No charts selected for export');
     return;
@@ -180,50 +180,196 @@ export const exportChartsAsPDF = async (chartRefs = [], filename = 'analytics-re
 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 10;
-
-  let isFirstPage = true;
-
-  for (const chartRef of chartRefs) {
+  
+  // CAPTURE ALL CHARTS FIRST WITH METADATA
+  const capturedCharts = [];
+  
+  for (let i = 0; i < chartRefs.length; i++) {
+    const chartRef = chartRefs[i];
+    const chartId = chartIds[i] || `chart-${i}`;
+    
     if (!chartRef || !chartRef.current) continue;
 
+    const containerNode = chartRef.current;
+    const excludedElements = Array.from(containerNode.querySelectorAll('[data-export-exclude]'));
+    const previousDisplays = excludedElements.map(element => element.style.display);
+    const restoreExcludedElements = () => {
+      excludedElements.forEach((element, index) => {
+        const previousDisplay = previousDisplays[index];
+        if (previousDisplay) {
+          element.style.display = previousDisplay;
+        } else {
+          element.style.removeProperty('display');
+        }
+      });
+    };
+
     try {
+      // HIDE EXCLUDED ELEMENTS
+      excludedElements.forEach(element => {
+        element.style.setProperty('display', 'none', 'important');
+      });
+
       // CAPTURE CHART AS IMAGE
-      const canvas = await html2canvas(chartRef.current, {
+      const canvas = await html2canvas(containerNode, {
         backgroundColor: '#ffffff',
         scale: 2,
         logging: false,
         useCORS: true
       });
 
+      restoreExcludedElements();
+
       const imgData = canvas.toDataURL('image/png');
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgRatio = imgProps.width / imgProps.height;
-
-      // CALCULATE IMAGE SIZE TO FIT PAGE
-      let imgWidth = pageWidth - (margin * 2);
-      let imgHeight = imgWidth / imgRatio;
-
-      // IF IMAGE IS TOO TALL, SCALE DOWN
-      if (imgHeight > pageHeight - (margin * 2)) {
-        imgHeight = pageHeight - (margin * 2);
-        imgWidth = imgHeight * imgRatio;
-      }
-
-      // ADD NEW PAGE IF NOT FIRST
-      if (!isFirstPage) {
-        pdf.addPage();
-      }
-      isFirstPage = false;
-
-      // CENTER THE IMAGE
-      const xPos = (pageWidth - imgWidth) / 2;
-      const yPos = margin;
-
-      pdf.addImage(imgData, 'PNG', xPos, yPos, imgWidth, imgHeight);
+      capturedCharts.push({
+        id: chartId,
+        data: imgData,
+        width: canvas.width,
+        height: canvas.height
+      });
 
     } catch (error) {
+      restoreExcludedElements();
       console.error('Error capturing chart:', error);
+    }
+  }
+
+  if (capturedCharts.length === 0) {
+    alert('No charts were successfully captured');
+    return;
+  }
+
+  // ADD PROFESSIONAL HEADER
+  const addHeader = (pageNum, totalPages) => {
+    pdf.setFontSize(18);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(31, 41, 55); // gray-800
+    pdf.text('Analytics Report', 15, 15);
+    
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(107, 114, 128); // gray-500
+    const dateStr = new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    pdf.text(`Generated: ${dateStr}`, 15, 21);
+    
+    // PAGE NUMBER
+    pdf.setTextColor(156, 163, 175); // gray-400
+    pdf.text(`Page ${pageNum} of ${totalPages}`, pageWidth - 15, 15, { align: 'right' });
+    
+    // SEPARATOR LINE
+    pdf.setDrawColor(229, 231, 235); // gray-200
+    pdf.setLineWidth(0.5);
+    pdf.line(15, 24, pageWidth - 15, 24);
+  };
+
+  addHeader(1, 1);
+
+  // LAYOUT TO MATCH DASHBOARD INTERFACE
+  const margin = 12;
+  const headerSpace = 28;
+  const gap = 6;
+  
+  let yPosition = headerSpace;
+  
+  // FIND KPI CHART
+  const kpiChart = capturedCharts.find(c => c.id === 'kpi-summary');
+  const otherCharts = capturedCharts.filter(c => c.id !== 'kpi-summary');
+  
+  // 1. RENDER KPI SUMMARY AT TOP (FULL WIDTH, SHORT HEIGHT)
+  if (kpiChart) {
+    const availableWidth = pageWidth - (margin * 2);
+    const kpiHeight = 25; // Fixed height for KPI row
+    
+    const imgRatio = kpiChart.width / kpiChart.height;
+    let imgWidth = availableWidth;
+    let imgHeight = imgWidth / imgRatio;
+    
+    // Scale to fit fixed height
+    if (imgHeight > kpiHeight) {
+      imgHeight = kpiHeight;
+      imgWidth = imgHeight * imgRatio;
+    }
+    
+    const xPos = margin + (availableWidth - imgWidth) / 2;
+    pdf.addImage(kpiChart.data, 'PNG', xPos, yPosition, imgWidth, imgHeight);
+    
+    yPosition += kpiHeight + gap;
+  }
+  
+  // 2. RENDER CHARTS BELOW IN DASHBOARD LAYOUT
+  if (otherCharts.length > 0) {
+    const availableWidth = pageWidth - (margin * 2);
+    const availableHeight = pageHeight - yPosition - margin;
+    
+    // CHECK IF WE HAVE THE TYPICAL DASHBOARD LAYOUT (TOP PRODUCTS + SALES PERFORMANCE)
+    const topProductsChart = otherCharts.find(c => c.id === 'top-products');
+    const salesChart = otherCharts.find(c => c.id === 'sales-performance');
+    
+    if (topProductsChart && salesChart) {
+      // DASHBOARD LAYOUT: LEFT COLUMN (TOP PRODUCTS) + RIGHT COLUMN (SALES PERFORMANCE)
+      // Top Products takes ~33% width, Sales Performance takes ~67% width
+      const leftWidth = availableWidth * 0.33;
+      const rightWidth = availableWidth * 0.67 - gap;
+      
+      // LEFT: TOP PRODUCTS (TALL)
+      const leftRatio = topProductsChart.width / topProductsChart.height;
+      let leftImgWidth = leftWidth;
+      let leftImgHeight = leftImgWidth / leftRatio;
+      
+      if (leftImgHeight > availableHeight) {
+        leftImgHeight = availableHeight;
+        leftImgWidth = leftImgHeight * leftRatio;
+      }
+      
+      pdf.addImage(topProductsChart.data, 'PNG', margin, yPosition, leftImgWidth, leftImgHeight);
+      
+      // RIGHT: SALES PERFORMANCE (TALL)
+      const rightRatio = salesChart.width / salesChart.height;
+      let rightImgWidth = rightWidth;
+      let rightImgHeight = rightImgWidth / rightRatio;
+      
+      if (rightImgHeight > availableHeight) {
+        rightImgHeight = availableHeight;
+        rightImgWidth = rightImgHeight * rightRatio;
+      }
+      
+      const rightXPos = margin + leftWidth + gap;
+      pdf.addImage(salesChart.data, 'PNG', rightXPos, yPosition, rightImgWidth, rightImgHeight);
+      
+    } else {
+      // FALLBACK: ARRANGE OTHER CHARTS IN GRID
+      const cols = otherCharts.length === 1 ? 1 : 2;
+      const rows = Math.ceil(otherCharts.length / cols);
+      
+      const cellWidth = cols === 1 ? availableWidth : (availableWidth - gap) / 2;
+      const cellHeight = (availableHeight - (gap * (rows - 1))) / rows;
+      
+      otherCharts.forEach((chart, index) => {
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        
+        const xStart = margin + (col * (cellWidth + gap));
+        const yStart = yPosition + (row * (cellHeight + gap));
+        
+        const imgRatio = chart.width / chart.height;
+        
+        let imgWidth = cellWidth;
+        let imgHeight = imgWidth / imgRatio;
+        
+        if (imgHeight > cellHeight) {
+          imgHeight = cellHeight;
+          imgWidth = imgHeight * imgRatio;
+        }
+        
+        const xPos = xStart + (cellWidth - imgWidth) / 2;
+        const yPos = yStart + (cellHeight - imgHeight) / 2;
+        
+        pdf.addImage(chart.data, 'PNG', xPos, yPos, imgWidth, imgHeight);
+      });
     }
   }
 
