@@ -43,14 +43,14 @@ export const exportToCSV = (data, filename, customHeaders = null, dataKeys = nul
 
 };
 
-// SIMPLE PDF EXPORT - NO COMPLEX TABLES, JUST TEXT
+// SIMPLE PDF EXPORT WITH CATEGORY SUMMARY FOR INVENTORY
 export const exportToPDF = (data, filename, options = {}) => {
   if (!data || data.length === 0) {
     alert('No data to export');
     return;
   }
 
-  const { title = filename, customHeaders = null, dataKeys = null } = options;
+  const { title = filename, customHeaders = null, dataKeys = null, showCategorySummary = false } = options;
 
   // CREATE PDF
   const pdf = new jsPDF({
@@ -75,19 +75,112 @@ export const exportToPDF = (data, filename, options = {}) => {
 
   const margin = 20;
   const pageWidth = pdf.internal.pageSize.width;
+  const pageHeight = pdf.internal.pageSize.height;
+  const lineHeight = 6;
+  let yPosition = 45;
+
+  // CATEGORY SUMMARY TABLE (IF ENABLED FOR INVENTORY)
+  if (showCategorySummary && data.length > 0 && data[0].category_name) {
+    // Calculate category counts
+    const categoryCounts = {};
+    data.forEach(item => {
+      const category = item.category_name || 'Uncategorized';
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    });
+
+    // Sort categories alphabetically
+    const sortedCategories = Object.entries(categoryCounts).sort((a, b) => a[0].localeCompare(b[0]));
+
+    // DRAW CATEGORY SUMMARY TITLE
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('CATEGORY SUMMARY', margin, yPosition);
+    yPosition += 8;
+
+    // DRAW CATEGORY SUMMARY TABLE
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    
+    // Headers
+    const categoryColWidth = 100;
+    const countColWidth = 40;
+    pdf.text('Category', margin, yPosition);
+    pdf.text('Item Count', margin + categoryColWidth, yPosition);
+    
+    // Header line
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, yPosition + 2, margin + categoryColWidth + countColWidth, yPosition + 2);
+    yPosition += lineHeight;
+
+    // Category rows
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    
+    sortedCategories.forEach(([category, count]) => {
+      // Check if need new page
+      if (yPosition > pageHeight - 30) {
+        pdf.addPage();
+        drawHeader();
+        yPosition = 45;
+        
+        // Redraw summary header
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('CATEGORY SUMMARY (continued)', margin, yPosition);
+        yPosition += 8;
+        
+        pdf.setFontSize(9);
+        pdf.text('Category', margin, yPosition);
+        pdf.text('Item Count', margin + categoryColWidth, yPosition);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, yPosition + 2, margin + categoryColWidth + countColWidth, yPosition + 2);
+        yPosition += lineHeight;
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+      }
+
+      pdf.text(category, margin, yPosition);
+      pdf.text(String(count), margin + categoryColWidth, yPosition);
+      
+      // Row line
+      pdf.setLineWidth(0.1);
+      pdf.line(margin, yPosition + 2, margin + categoryColWidth + countColWidth, yPosition + 2);
+      yPosition += lineHeight;
+    });
+
+    // Total row
+    const totalItems = data.length;
+    pdf.setFont('helvetica', 'bold');
+    yPosition += 2;
+    pdf.text('TOTAL ITEMS', margin, yPosition);
+    pdf.text(String(totalItems), margin + categoryColWidth, yPosition);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, yPosition + 2, margin + categoryColWidth + countColWidth, yPosition + 2);
+    
+    // Add spacing before product table
+    yPosition += 15;
+    
+    // Check if we need a new page for the product table
+    if (yPosition > pageHeight - 60) {
+      pdf.addPage();
+      drawHeader();
+      yPosition = 45;
+    }
+    
+    // DRAW PRODUCT TABLE TITLE
+    pdf.setFontSize(12);
+    pdf.text('PRODUCT INVENTORY DETAILS', margin, yPosition);
+    yPosition += 8;
+  }
+
+  // PRODUCT TABLE
   const keys = dataKeys || Object.keys(data[0]);
   const colCount = keys.length;
   const colWidth = (pageWidth - margin * 2) / colCount;
 
-
   // GET HEADERS AND FORMAT THEM
   const formattedHeaders = customHeaders || keys.map(h => h.replace(/_/g, ' ').toUpperCase());
-
-  
-  // START TABLE AT Y=40
-  let yPosition = 45;
-  const lineHeight = 6;
-  const pageHeight = pdf.internal.pageSize.height;
 
   // DRAW HEADERS
   pdf.setFontSize(8);

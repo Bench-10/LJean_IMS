@@ -154,7 +154,8 @@ function ProductInventory({
       exportToPDF(exportData, filename, {
         title: 'Product Inventory Report',
         customHeaders: customHeaders,
-        dataKeys: dataKeys
+        dataKeys: dataKeys,
+        showCategorySummary: true  // Enable category summary for inventory
       });
     }
   };
