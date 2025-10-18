@@ -14,7 +14,7 @@ function GlobalBanner({setOpenNotif, unreadCount}) {
   };
 
   return (
-    <div className='ml-[220px] pt-4  pb-2 px-8 bg-white/95 backdrop-blur-sm '>
+    <div className='hidden lg:block lg:ml-[var(--sidebar-width)] pt-12 sm:pt-4 pb-4 px-8 bg-white/95 backdrop-blur-sm '>
         {/*GREETINGS BANNER */}
         <div className='flex items-center justify-between'>
 
@@ -41,10 +41,9 @@ function GlobalBanner({setOpenNotif, unreadCount}) {
 
             </div>
 
-            <div className='flex items-center space-x-8 mr-10'>
 
                 {(user && user.role && user.role.some(role => ['Inventory Staff', 'Branch Manager', 'Owner'].includes(role))) &&
-                    <div className='relative p-2 border-2 rounded-md border-gray-600 hover:text-white hover:bg-gray-600 transition-all cursor-pointer' onClick={setOpenNotif}>
+                    <div className='relative p-2 border-2 rounded-lg border-gray-600 hover:text-white hover:bg-gray-600 transition-all cursor-pointer' onClick={setOpenNotif}>
                         <IoMdNotifications />
                         {unreadCount > 0 && (
                             <div className='absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium'>
@@ -55,8 +54,6 @@ function GlobalBanner({setOpenNotif, unreadCount}) {
                     </div>
                
                }
-
-            </div>
 
         </div>
         
