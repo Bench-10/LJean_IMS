@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global reset to prevent overflow issues START*/
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+} /* END */
+
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
