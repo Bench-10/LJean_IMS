@@ -17,7 +17,7 @@ function Dashboard() {
 
 
   return (
-    <div className='px-6 py-4 h-full overflow-hidden bg-[#eef2ee] flex flex-col'>
+    <div className='pt-20 lg:pt-8 px-4 lg:px-8 pb-6 h-screen overflow-hidden bg-[#eef2ee] flex flex-col'>
       <AnalyticsDashboard branchId={branchId} />
     </div>
     

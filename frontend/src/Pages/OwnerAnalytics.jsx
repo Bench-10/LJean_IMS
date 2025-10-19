@@ -97,7 +97,7 @@ export default function OwnerAnalytics(){
   };
 
   return (
-    <div className='px-6 py-8 h-full flex flex-col gap-6 bg-[#eef2ee] min-h-0 overflow-hidden'>
+    <div className='pt-20 lg:pt-8 px-4 lg:px-8 pb-6 h-screen flex flex-col gap-6 bg-[#eef2ee] min-h-0 overflow-hidden'>
       <div className="flex items-center gap-4 flex-wrap">
 
         <h1 className="text-lg font-semibold text-gray-700">Overall Performance (All Branches)</h1>

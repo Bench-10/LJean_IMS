@@ -167,7 +167,7 @@ function Approvals({
   };
 
   return (
-    <div className="px-8 py-2 max-h-screen">
+    <div className="pt-20 lg:pt-8 px-4 lg:px-8 pb-6 h-screen">
       <h1 className="text-4xl font-bold text-green-900">APPROVAL CENTER</h1>
       <hr className="mt-4 mb-6 border-t-4 border-green-800" />
 
