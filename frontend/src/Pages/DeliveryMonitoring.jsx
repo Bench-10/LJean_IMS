@@ -108,7 +108,7 @@ function DeliveryMonitoring({setAddDelivery, deliveryData, sanitizeInput, delive
 
   
   return (
-    <div className=" ml-[220px] px-8 py-2 max-h-screen" >
+    <div className="px-8 py-2 max-h-screen" >
 
       <ViewingSalesAndDelivery 
         openModal={openDeliveryInfo}

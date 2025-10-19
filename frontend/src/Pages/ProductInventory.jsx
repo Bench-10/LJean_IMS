@@ -164,7 +164,7 @@ function ProductInventory({
   return (
    
       
-      <div className=" ml-[220px] px-8 py-2 max-h-screen" >
+      <div className="px-8 py-2 max-h-screen" >
 
         {openInAppNotif &&
             <InAppNotificationPopUp 

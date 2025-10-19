@@ -133,7 +133,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   const currentPageData = filteredData.slice(startIndex, endIndex);
 
   return (
-    <div className=' ml-[220px] px-8 py-2 max-h-screen'>
+    <div className='px-8 py-2 max-h-screen'>
 
       <ViewingSalesAndDelivery 
         openModal={openItems}

@@ -65,7 +65,7 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
   };
 
   return (
-      <div className='ml-[220px] px-8 py-2 max-h-screen'>
+      <div className='px-8 py-2 max-h-screen'>
 
         {openAccountStatusDialog && 
               
