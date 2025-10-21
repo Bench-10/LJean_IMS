@@ -1,4 +1,4 @@
-import {React, useState, useEffect } from 'react';
+import { React, useState, useEffect } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
 import { TbFileExport } from "react-icons/tb";
 import api from '../utils/api';
@@ -6,6 +6,7 @@ import NoInfoFound from '../components/common/NoInfoFound';
 import { useAuth } from '../authentication/Authentication';
 import ChartLoading from '../components/common/ChartLoading';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
+import DropdownCustom from '../components/DropdownCustom';
 
 function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList }) {
   const [productValidityList, setValidity] = useState(propValidityList || []);
@@ -20,11 +21,11 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50); // SHOW 50 ITEMS PER PAGE
 
-  const {user} = useAuth();
+  const { user } = useAuth();
   const cacheKey = `product_validity_branch_${user?.branch_id || 'unknown'}`;
-  
 
-  const getProductInfo = async ({ force = false } = {}) =>{
+
+  const getProductInfo = async ({ force = false } = {}) => {
     // If we already have cached data and not forcing, show it immediately without spinner
     try {
       if (!force) {
@@ -65,9 +66,9 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     }
   }
 
-  useEffect(() =>{
-      // On mount: show cache if available, then refresh in background
-      getProductInfo({ force: false });
+  useEffect(() => {
+    // On mount: show cache if available, then refresh in background
+    getProductInfo({ force: false });
   }, [user.branch_id]);
 
   // LISTEN FOR REAL-TIME VALIDITY UPDATES
@@ -75,7 +76,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     const handleValidityUpdate = (event) => {
       const validityData = event.detail;
       console.log('Validity update received in component:', validityData);
-      
+
       if (validityData.action === 'add') {
         // ADD NEW VALIDITY ENTRY
         const updateFunction = (prevValidity) => [validityData.product, ...prevValidity];
@@ -92,10 +93,10 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
         // UPDATE EXISTING VALIDITY ENTRY OR ADD NEW ONE
         const updateFunction = (prevValidity) => {
           const existingIndex = prevValidity.findIndex(
-            item => item.product_id === validityData.product.product_id && 
-                   item.date_added === validityData.product.date_added
+            item => item.product_id === validityData.product.product_id &&
+              item.date_added === validityData.product.date_added
           );
-          
+
           if (existingIndex >= 0) {
             // UPDATE EXISTING
             const updated = [...prevValidity];
@@ -125,10 +126,10 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
         } catch (e) {
           // ignore cache write errors
         }
-      } else if (validityData.action === 'inventory_changed_by_sale' || 
-                 validityData.action === 'inventory_changed_by_delivery' ||
-                 validityData.action === 'stock_deducted' ||
-                 validityData.action === 'stock_restored') {
+      } else if (validityData.action === 'inventory_changed_by_sale' ||
+        validityData.action === 'inventory_changed_by_delivery' ||
+        validityData.action === 'stock_deducted' ||
+        validityData.action === 'stock_restored') {
         // REFRESH DATA WHEN INVENTORY CHANGES AFFECT VALIDITY DISPLAY
         console.log('Refreshing validity data due to inventory changes:', validityData.action);
         // force refresh to get authoritative view
@@ -144,44 +145,44 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   }, []);
 
 
-  
-  
-  const handleSearch = (event) =>{
+
+
+  const handleSearch = (event) => {
     setSearchValidity(sanitizeInput(event.target.value));
     setCurrentPage(1); // RESET TO FIRST PAGE WHEN SEARCHING
   }
 
 
   const filteredValidityData = productValidityList.filter(validity =>
-    // Basic search match
-    (validity.product_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
+  // Basic search match
+  (validity.product_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
     validity.category_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
     validity.formated_date_added.toLowerCase().includes(searchValidity.toLowerCase()) ||
     validity.formated_product_validity.toLowerCase().includes(searchValidity.toLowerCase()))
   )
-  // Then apply expiry toggles and date filters
-  .filter(validity => {
-    // Expiry toggles: if either toggle is active, only include matching types
-    if (showNearExpiry || showExpired) {
-      const isNear = Boolean(validity.near_expy);
-      const isExp = Boolean(validity.expy);
-      if (!( (isNear && showNearExpiry) || (isExp && showExpired) )) {
-        return false;
+    // Then apply expiry toggles and date filters
+    .filter(validity => {
+      // Expiry toggles: if either toggle is active, only include matching types
+      if (showNearExpiry || showExpired) {
+        const isNear = Boolean(validity.near_expy);
+        const isExp = Boolean(validity.expy);
+        if (!((isNear && showNearExpiry) || (isExp && showExpired))) {
+          return false;
+        }
       }
-    }
 
-    // Year filter (use DB `year` column)
-    if (selectedYear) {
-      if (validity.year == null || String(validity.year) !== String(selectedYear)) return false;
-    }
+      // Year filter (use DB `year` column)
+      if (selectedYear) {
+        if (validity.year == null || String(validity.year) !== String(selectedYear)) return false;
+      }
 
-    // Month filter (use DB `month` column)
-    if (selectedMonth) {
-      if (validity.month == null || String(Number(validity.month)) !== String(Number(selectedMonth))) return false;
-    }
+      // Month filter (use DB `month` column)
+      if (selectedMonth) {
+        if (validity.month == null || String(Number(validity.month)) !== String(Number(selectedMonth))) return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
 
   // PAGINATION LOGIC
   const totalItems = filteredValidityData.length;
@@ -194,10 +195,10 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const handleExportValidity = (format) => {
     const exportData = formatForExport(filteredValidityData, []);
     const filename = `product_validity_export_${new Date().toISOString().split('T')[0]}`;
-    
+
     const customHeaders = ['Product Name', 'Category', 'Date Added', 'Product Validity Date', 'Quantity Left'];
     const dataKeys = ['product_name', 'category_name', 'formated_date_added', 'formated_product_validity', 'quantity_left'];
-    
+
     if (format === 'csv') {
       exportToCSV(exportData, filename, customHeaders, dataKeys);
     } else if (format === 'pdf') {
@@ -211,241 +212,370 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
 
 
-  
+
   return (
-    <div className="pt-20 lg:pt-8 px-4 lg:px-8 pb-6 h-screen" >
-        {/*TITLE*/}
-        <h1 className=' text-4xl font-bold text-green-900'>
-          PRODUCT VALIDITY
-        </h1>
+    <div className="pt-20 lg:pt-8 px-4 lg:px-8 h-screen" >
+      {/*TITLE*/}
+      <h1 className=' text-4xl font-bold text-green-900'>
+        PRODUCT VALIDITY
+      </h1>
 
-        <hr className="mt-3 mb-6 border-t-4 border-green-800"/>
+      <hr className="mt-3 mb-6 border-t-4 border-green-800 rounded-lg" />
 
-        {/*SEARCH AND ADD*/}
-        <div className='flex w-full'>
-          {/*SEARCH */}
-          <div className='w-[400px]'>
-            
-            <input
-              type="text"
-              placeholder="Search Date Item Name or Category"
-              className={`border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9`}
-              onChange={handleSearch}
-             
-            />
+      {/*SEARCH AND ADD*/}
+      <div className='lg:flex w-full'>
+        {/*SEARCH */}
+        <div className='w-auto min-w-[350px] text-sm lg:text-base pb-3 lg:pb-0'>
 
-          </div>
+          <input
+            type="text"
+            placeholder="Search Item Name or Category"
+            className={`border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:py-2 transition-all px-3 py-2 rounded-lg w-full h-9`}
+            onChange={handleSearch}
 
-          <div  className="ml-auto flex gap-4 items-center">
-            
-    
-            {/*EXPIRY FILTERS (clickable chips)*/}
-            <div className="flex gap-4 items-center">
-              <button
-                type="button"
-                onClick={() => { setShowNearExpiry(prev => !prev); setCurrentPage(1); }}
-                className={`relative pl-6 pr-4 py-1 rounded ${showNearExpiry ? 'bg-[#FFF3C1] text-gray-900' : 'bg-white text-gray-700 hover:bg-yellow-50'} border border-gray-200`}
-              >
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#FFF3C1]" />
-                Near Expiry
-              </button>
+          />
 
-              <button
-                type="button"
-                onClick={() => { setShowExpired(prev => !prev); setCurrentPage(1); }}
-                className={`relative pl-6 pr-4 py-1 rounded ${showExpired ? 'bg-[#FF3131] text-white' : 'bg-white text-gray-700 hover:bg-red-50'} border border-gray-200`}
-              >
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#FF3131]" />
-                Expired
-              </button>
+        </div>
 
-              {/* YEAR & MONTH FILTERS */}
-              <div className="flex items-center gap-2 ml-4">
-                <select
+        <div className="ml-auto lg:flex gap-4 items-center rounded-lg">
+
+
+          {/*EXPIRY FILTERS (clickable chips)*/}
+          <div className="flex flex-wrap gap-2 lg:gap-4 items-center justify-center lg:justify-start">
+            <button
+              type="button"
+              onClick={() => {
+                setShowNearExpiry(prev => !prev);
+                setCurrentPage(1);
+              }}
+              className={`flex h-[36px] w-[45vw] lg:w-auto items-center justify-center gap-2 px-3 lg:px-4 text-sm lg:text-base rounded-lg border transition-all
+                  ${showNearExpiry
+                  ? 'bg-[#FFF3C1] text-gray-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-yellow-50 '}`}
+            >
+              <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#f8e189]" />
+              <span className="whitespace-nowrap">Near Expiry</span>
+            </button>
+
+
+
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowExpired(prev => !prev);
+                setCurrentPage(1);
+              }}
+              className={` h-[36px] lg:h-[38px] w-[45vw] lg:w-auto px-3 lg:px-4 gap-2 flex items-center justify-center text-sm lg:text-base rounded-lg border transition-all
+              ${showExpired
+                  ? 'bg-[#FF3131] text-white border-red-500 ring-2 ring-red-400 ring-offset-2'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-red-50'}`}
+            >
+              <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#c32525]" />
+              <span className="whitespace-nowrap">Expired</span>
+            </button>
+
+
+
+
+            {/* YEAR & MONTH FILTERS */}
+            <div className="relative flex gap-2 lg:ml-4 h-9 lg:h-11 w-full lg:w-auto mt-2 lg:mt-0">
+              <div className="flex-1 lg:flex-initial">
+                <DropdownCustom
                   value={selectedYear}
-                  onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
-                  className="h-9 px-2 border rounded-md text-sm"
-                >
-                  <option value="">All Years</option>
-                  {
-                    // derive years from DB `year` column
-                    Array.from(new Set(productValidityList.map(v => v.year).filter(Boolean)))
-                      .sort((a,b) => b - a)
-                      .map(y => <option key={y} value={y}>{y}</option>)
-                  }
-                </select>
+                  onChange={(e) => {
+                    setSelectedYear(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  variant="simple"
+                  options={[
+                    { value: '', label: 'All Years' },
+                    ...Array.from(new Set(productValidityList.map(v => v.year).filter(Boolean)))
+                      .sort((a, b) => b - a)
+                      .map(y => ({
+                        value: y,
+                        label: y
+                      }))
+                  ]}
+                />
+              </div>
 
-                <select
+              <div className="flex-1 lg:flex-initial">
+                <DropdownCustom
                   value={selectedMonth}
-                  onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); }}
-                  className="h-9 px-2 border rounded-md text-sm"
-                >
-                  <option value="">All Months</option>
-                  {
-                    // derive months from DB `month` column and map to short names
-                    (() => {
-                      const monthNames = [null,'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                      const months = Array.from(new Set(productValidityList.map(v => v.month).filter(m => m != null).map(Number))).sort((a,b) => a - b);
-                      return months.map(m => (
-                        <option key={m} value={m}>{monthNames[m] || m}</option>
-                      ));
+                  onChange={(e) => {
+                    setSelectedMonth(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  variant="simple"
+                  options={[
+                    { value: '', label: 'All Months' },
+                    ...(() => {
+                      const monthNames = [null, 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      const months = Array.from(new Set(productValidityList.map(v => v.month).filter(m => m != null).map(Number)))
+                        .sort((a, b) => a - b);
+                      return months.map(m => ({
+                        value: m,
+                        label: monthNames[m] || m
+                      }));
                     })()
-                  }
-                </select>
+                  ]}
+                />
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <hr className="border-t-2 my-4 w-full border-gray-500"/>
+      <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
-
-        <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
-            <thead className="sticky top-0 bg-gray-100 z-10">
-              <tr>
-                
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
-                    DATE PURCHASED
-                  </th>
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
-                    EXPIRY DATE
-                  </th>
-                  <th className="bg-green-500 pl-7 pr-4 py-2 text-left text-sm font-medium text-white">
-                    ITEM NAME
-                  </th>
-                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
-                    CATEGORY
-                  </th>
-                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
-                    QUANTITY
-                  </th>
-                  
+      {/* MOBILE CARD VIEW */}
+      <div className="block lg:hidden space-y-3 overflow-y-auto h-[55vh] pb-6 hide-scrollbar">
+        {loading ? (
+          <div className='h-96 flex items-center justify-center'>
+            <ChartLoading message='Loading products...' />
+          </div>
+        ) : currentPageData.length === 0 ? (
+          <div className='h-96 flex items-center justify-center'>
+            <NoInfoFound />
+          </div>
+        ) : (
+          currentPageData.map((validity, index) => (
+            <div
+              key={index}
+              className={`rounded-lg p-4 border-l-4 shadow-sm ${
+                validity.expy
+                  ? 'bg-[#FF3131] text-white border-red-700'
+                  : validity.near_expy
+                  ? 'bg-[#FFF3C1] border-yellow-500'
+                  : 'bg-white border-gray-300'
+              }`}
+            >
+              {(validity.expy || validity.near_expy) && (
+                <div className="flex items-center gap-2 mb-2">
+                  <RiErrorWarningLine className="text-xl" />
+                  <span className="font-semibold text-sm">
+                    {validity.expy ? 'EXPIRED' : 'NEAR EXPIRY'}
+                  </span>
+                </div>
+              )}
+             
+              <div className="space-y-2 text-sm">
+                <div className="font-bold text-base">{validity.product_name}</div>
                
-              </tr>
-            </thead>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Category:</span>
+                  <span className="font-medium">{validity.category_name}</span>
+                </div>
+               
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Date Purchased:</span>
+                  <span className="font-medium">{validity.formated_date_added}</span>
+                </div>
+               
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Expiry Date:</span>
+                  <span className="font-medium">{validity.formated_product_validity}</span>
+                </div>
+               
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Quantity:</span>
+                  <span className="font-bold text-base">{validity.quantity_left}</span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+        
+      </div>
 
-            
-            <tbody className="bg-white relative">
-              {loading ? 
-                (
-                 <tr>
+      <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg lg:hidden" />
+
+
+      {/*DESKTOP VIEW*/}
+      <div className="hidden lg:block overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+        <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
+          <thead className="sticky top-0 z-20">
+
+            <tr>
+
+              <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
+                DATE PURCHASED
+              </th>
+              <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
+                EXPIRY DATE
+              </th>
+              <th className="bg-green-500 pl-7 pr-4 py-2 text-left text-sm font-medium text-white">
+                ITEM NAME
+              </th>
+              <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
+                CATEGORY
+              </th>
+              <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
+                QUANTITY
+              </th>
+
+
+            </tr>
+          </thead>
+
+
+          <tbody className="bg-white relative">
+            {loading ?
+              (
+                <tr>
                   <td colSpan={5} className='h-96 text-center'>
                     <ChartLoading message='Loading products...' />
                   </td>
-                 </tr>
-                
-                )
-               :
+                </tr>
 
-                currentPageData.length === 0 ? 
+              )
+              :
 
-                  (
-                  <NoInfoFound col={5}/>
-                  ) :
+              currentPageData.length === 0 ?
 
-                  (
-                    currentPageData.map((validity, index) => (
-                      <tr
-                        key={index}
-                        className={
-                          validity.expy
-                            ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90 h-14'
-                            : validity.near_expy
+                (
+                  <NoInfoFound col={5} />
+                ) :
+
+                (
+                  currentPageData.map((validity, index) => (
+                    <tr
+                      key={index}
+                      className={
+                        validity.expy
+                          ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90 h-14'
+                          : validity.near_expy
                             ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
                             : 'hover:bg-gray-200/70 h-14'
-                        }
-                      >
-                        {(validity.expy || validity.near_expy) ? 
-                        
-                            ( <td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
-                              
-                                  <div className='flex items-center'>
-                                    <RiErrorWarningLine className='h-[100%]'/>
-                                  </div>
+                      }
+                    >
+                      {(validity.expy || validity.near_expy) ?
 
-                                  <div>
-                                    {validity.formated_date_added}
-                                  </div>
-                                
-                              </td>
-                            ) : 
-                              
-                            (
-                              <td className="px-4 py-2 text-center items-center "  > 
-                                {validity.formated_date_added}
-                              </td>
-                            )
-                      
-                        }
-                      
+                        (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
 
-                        <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
-                        <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
-                        <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
-                        <td className="px-4 py-2 text-center "  >{validity.quantity_left}</td>
-                        
-                      </tr>
-                      
-                    ))
-                    
-                  )
-              }
+                          <div className='flex items-center'>
+                            <RiErrorWarningLine className='h-[100%]' />
+                          </div>
 
-            </tbody>
-          </table>
+                          <div>
+                            {validity.formated_date_added}
+                          </div>
+
+                        </td>
+                        ) :
+
+                        (
+                          <td className="px-4 py-2 text-center items-center "  >
+                            {validity.formated_date_added}
+                          </td>
+                        )
+
+                      }
+
+
+                      <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
+                      <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
+                      <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
+                      <td className="px-4 py-2 text-center "  >{validity.quantity_left}</td>
+
+                    </tr>
+
+                  ))
+
+                )
+            }
+
+          </tbody>
+        </table>
       </div>
 
       {/*PAGINATION AND CONTROLS */}
-      <div className='flex justify-between items-center mt-4 px-3'>
-        {/* LEFT: ITEM COUNT */}
-        <div className='text-sm text-gray-600 flex-1'>
-          {filteredValidityData.length > 0 ? (
-            <>Showing {startIndex + 1} to {Math.min(endIndex, filteredValidityData.length)} of {filteredValidityData.length} items</>
-          ) : (
-            <span></span>
-          )}
-        </div>
-        
-        {/* CENTER: PAGINATION CONTROLS */}
-        <div className='flex justify-center flex-1'>
+      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-4 lg:pb-6 px-3'>
+        {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
+        <div className='flex justify-between items-center gap-2 sm:hidden'>
+          {/* LEFT: ITEM COUNT (MOBILE) */}
+          <div className='text-xs text-gray-600 flex-shrink-0'>
+            {filteredValidityData.length > 0 ? (
+              <>Showing {startIndex + 1} to {Math.min(endIndex, filteredValidityData.length)} of {filteredValidityData.length}</>
+            ) : (
+              <span></span>
+            )}
+          </div>
+
+          {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
           {filteredValidityData.length > 0 && (
-            <div className='flex items-center space-x-2'>
+            <div className='flex items-center gap-1'>
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
               >
                 Previous
               </button>
-              <span className='text-sm text-gray-600'>
+              <span className='text-xs text-gray-600 whitespace-nowrap'>
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
               >
                 Next
               </button>
             </div>
           )}
         </div>
-        
+
+        {/* DESKTOP LAYOUT: THREE COLUMNS */}
+        {/* LEFT: ITEM COUNT (DESKTOP) */}
+        <div className='hidden sm:block text-sm lg:text-sm text-gray-600 sm:flex-1'>
+          {filteredValidityData.length > 0 ? (
+            <>Showing {startIndex + 1} to {Math.min(endIndex, filteredValidityData.length)} of {filteredValidityData.length} items</>
+          ) : (
+            <span></span>
+          )}
+        </div>
+
+        {/* CENTER: PAGINATION CONTROLS (DESKTOP) */}
+        <div className='hidden sm:flex sm:justify-center sm:flex-1'>
+          {filteredValidityData.length > 0 && (
+            <div className='flex items-center gap-2'>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className='px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+              >
+                Previous
+              </button>
+              <span className='text-sm text-gray-600 whitespace-nowrap'>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className='px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* RIGHT: EXPORT DROPDOWN */}
-        <div className='flex justify-end flex-1'>
-          <div className="relative group">
-            <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
+        <div className='flex justify-center sm:justify-end w-full sm:flex-1'>
+          <div className="relative group w-full sm:w-auto">
+            <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 lg:px-5 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-sm lg:text-base w-full sm:w-auto'>
               <TbFileExport />EXPORT
             </button>
-            <div className="absolute right-0 bottom-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-              <button 
+            <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 bottom-full mb-2 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+              <button
                 onClick={() => handleExportValidity('csv')}
                 className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
               >
                 Export as CSV
               </button>
-              <button 
+              <button
                 onClick={() => handleExportValidity('pdf')}
                 className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
               >
@@ -455,7 +585,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           </div>
         </div>
       </div>
-      </div>
+    </div>
   )
 }
 
