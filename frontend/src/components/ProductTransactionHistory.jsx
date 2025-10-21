@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import api from '../utils/api.js';
+import DropdownCustom from '../components/DropdownCustom';
 import { BsFunnelFill } from "react-icons/bs";
 import { TbFileExport } from "react-icons/tb";
 import NoInfoFound from './common/NoInfoFound.jsx';
 import { useAuth } from '../authentication/Authentication';
-import {currencyFormat} from '../utils/formatCurrency.js';
+import { currencyFormat } from '../utils/formatCurrency.js';
 import ChartLoading from './common/ChartLoading.jsx';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
- 
-function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInput, listCategories}) {
+
+function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInput, listCategories }) {
 
   const [openFilter, setOpenFilter] = useState(false);
   const [startDate, setStartDate] = useState('');
@@ -19,10 +20,10 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   const [search, setSearch] = useState('');
 
   const [loading, setLoading] = useState(false)
-  
-  const {user} = useAuth();
 
-  
+  const { user } = useAuth();
+
+
   //PAGINATION LOGIC
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(20);
@@ -32,69 +33,69 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   }, [search, startDate, endDate]);
 
 
-  const closeFilterValue = () =>{
-    setOpenFilter(false); 
-    setEndDate(''); 
+  const closeFilterValue = () => {
+    setOpenFilter(false);
+    setEndDate('');
     setStartDate('');
   };
 
-  const handleClose = () =>{
+  const handleClose = () => {
     setSearch('');
     setStartDate('');
     setEndDate('');
     setSelectedCategory('');
     onClose();
-    setOpenFilter(false); 
+    setOpenFilter(false);
   };
 
 
-  const applyFilter = () =>  {
-    
-    if (!startDate && !endDate){
+  const applyFilter = () => {
+
+    if (!startDate && !endDate) {
       fetchProductHistory();
       setOpenFilter(false);
       return
     }
 
-    if ((startDate > endDate) && endDate){
+    if ((startDate > endDate) && endDate) {
       alert('End date must not be before the Start date!');
       return
     }
 
-    if (startDate && !endDate){
+    if (startDate && !endDate) {
       fetchProductHistory();
     }
 
 
     fetchProductHistory();
-    setOpenFilter(false); 
-      
+    setOpenFilter(false);
+
   };
 
 
-  const fetchProductHistory = async () =>{
-      const dates = {startDate, endDate}
+  const fetchProductHistory = async () => {
+    const dates = { startDate, endDate }
 
-      try {
-        setLoading(true);
-        let response;
-        if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))){
-          response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
-        } else{
-          response = await api.post(`/api/product_history/`, dates);
-        }
-        setProductHistory(response.data);
-      } catch (error) {
-        setError(error.message);
-        
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+      let response;
+      if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
+        response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
+      } else {
+        response = await api.post(`/api/product_history/`, dates);
       }
+      setProductHistory(response.data);
+    } catch (error) {
+      setError(error.message);
+
+    } finally {
+      setLoading(false);
+    }
   };
 
 
   useEffect(() => {
-    if(isProductTransactOpen)
+    if (isProductTransactOpen)
       fetchProductHistory();
   }, [isProductTransactOpen]);
 
@@ -103,11 +104,11 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
     const handleHistoryUpdate = (event) => {
       const historyData = event.detail;
       console.log('History update received in component:', historyData);
-      
+
       if (historyData.action === 'add' || historyData.action === 'update') {
         // ADD NEW HISTORY ENTRY AT THE TOP
         setProductHistory(prevHistory => [historyData.historyEntry, ...prevHistory]);
-        
+
         // SHOW A BRIEF VISUAL INDICATOR (if modal is open)
         if (isProductTransactOpen) {
           // You could add a toast notification here or temporary visual feedback
@@ -124,7 +125,7 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   }, []);
 
 
-  const handleSearch = (event) =>{
+  const handleSearch = (event) => {
     setSearch(sanitizeInput(event.target.value));
 
   }
@@ -155,10 +156,10 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
   const handleExportHistory = (format) => {
     const exportData = formatForExport(filteredHistoryData, []);
     const filename = `product_history_export_${new Date().toISOString().split('T')[0]}`;
-    
+
     const customHeaders = ['Date Added', 'Product Name', 'Category', 'Cost', 'Quantity'];
     const dataKeys = ['formated_date_added', 'product_name', 'category_name', 'h_unit_cost', 'quantity_added'];
-    
+
     if (format === 'csv') {
       exportToCSV(exportData, filename, customHeaders, dataKeys);
     } else if (format === 'pdf') {
@@ -170,222 +171,268 @@ function ProductTransactionHistory({isProductTransactOpen, onClose, sanitizeInpu
     }
   };
 
-
-
-
-
   return (
     <div>
-      
-      {isProductTransactOpen && <div className='fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]' onClick={() => {onClose(); closeFilterValue(); setProductHistory([])}}/>}
 
-      <dialog className='bg-transparent fixed top-0 bottom-0  z-50' open={isProductTransactOpen}>
+      {isProductTransactOpen && <div className='fixed inset-0 bg-black/35 bg-opacity-50 z-[9998] backdrop-blur-sm' onClick={() => { onClose(); closeFilterValue(); setProductHistory([]) }} />}
 
-          <div className="relative flex flex-col border border-gray-600/40 bg-white h-[600px] w-[1100px] rounded-md p-7 pb-14 border-gray-300 animate-popup">
-            <button type='button' className=" absolute right-2 top-2 " 
-              onClick={() => {onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([])}}>✕</button>
+      <dialog className='bg-transparent fixed top-0 bottom-0 z-[9999]' open={isProductTransactOpen}>
 
-              {/*TITLE AND FILTER SECTION*/}
-              <div className='flex  justify-between items-center mt-2 pr-6' >
-                <div className='flex flex-col justify-between sm:flex-row gap-2 sm:gap-x-8 items-center w-full'>
-                  <h1 className='font-bold text-3xl sm:text-4xl text-gray-800 tracking-tight'>Product History</h1>
-                  <div className='flex items-center w-full sm:w-auto mt-2 sm:mt-0 mr-12'>
-                       <div className="flex items-center gap-2 w-full">
 
-                        <input 
-                          type="text" 
-                          className='h-9 flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm ' 
-                          placeholder="Search product name..."
-                          onChange={handleSearch} 
-                          value={search}
-                        />
+        <div className="relative flex flex-col border border-gray-600/40 bg-white h-[80vh] sm:h-[85vh] lg:h-[90vh] w-[96vw] sm:w-[95vw] max-h-none sm:max-h-[600px] max-w-none sm:max-w-[1000px] rounded-xl p-3 sm:p-4 lg:p-7 pb-4 sm:pb-8 border-gray-300 animate-popup mx-auto my-auto">
+          <button type='button' className="absolute top-4 right-3 sm:top-4 w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
+            onClick={() => { onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([]) }}>✕</button>
 
-                         <select
-                            className="h-9 w-40 border border-gray-300 rounded-md px-2 text-sm"
-                            value={selectedCategory}
-                            onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
-                          >
-                            <option value="">All Categories</option>
-                            {listCategories && listCategories.map(cat => (
-                              <option key={cat.category_id} value={cat.category_id}>{cat.category_name}</option>
-                            ))}
-                          </select>
+          {/*TITLE AND FILTER SECTION*/}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-2  gap-4 sm:gap-0">
+            {/* LEFT SIDE */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 w-full">
+              {/* TITLE */}
+              <h1 className="font-bold text-3xl sm:text-4xl text-gray-800 tracking-tight">
+                Product History
+              </h1>
 
-                       </div>
+              {/* SEARCH + CATEGORY */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center w-full sm:w-auto gap-2 sm:gap-3">
+                <input
+                  type="text"
+                  className="h-9 w-full sm:w-64 border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-2 focus:border-green-500 focus:ring-green-500 outline-none"
+                  placeholder="Search Item Name..."
+                  onChange={handleSearch}
+                  value={search}
+                />
 
-                  </div>
-
+                <div className='relative h-11 w-full'>
+                  <DropdownCustom
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    options={[
+                      { value: '', label: 'All Categories' },
+                      ...(listCategories ? listCategories.map(cat => ({
+                        value: cat.category_id,
+                        label: cat.category_name
+                      })) : [])
+                    ]}
+                  />
                 </div>
-                
-                <div className='relative'>
 
-                  {/*FILTER POPUP */}
-                  <dialog className='absolute bg-transparent rounded-md flex-col z-50 bg-white top-[80%] left-[-700%]' open={openFilter}>
-                    <div className=' w-[160px] h-[210px]  border rounded-md px-3 py-4 shadow-md text-xs'>
-                     <h1 className='font-bold text-md'>Filter</h1>
+                {/* RIGHT SIDE - FILTER BUTTON & POPUP */}
+                <div className='relative mt-2 sm:mt-0 w-full lg:w-auto'>
+                  <dialog className=' absolute bg-transparent rounded-lg flex-col z-50 top-[110%] lg:top-[100%] lg:left-[-410%] sm:left-0' open={openFilter}>
+                    <div className='w-[360px] lg:w-[160px] h-[210px] border rounded-md px-3 py-4 shadow-lg text-xs bg-white'>
+                      <h1 className='font-bold text-md'>Filter</h1>
 
-                     <div className='w-full mt-3'>
-                      <h2 className='font-semibold'>Start date</h2>
-                      <input 
-                        type="date"  
-                        value={startDate}
-                        className='border mt-1 p-1 w-full rounded-sm'
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
+                      <div className='w-full mt-3'>
+                        <h2 className='font-semibold'>Start date</h2>
+                        <input
+                          type="date"
+                          value={startDate}
+                          className='border mt-1 p-1 w-full rounded-lg'
+                          onChange={(e) => setStartDate(e.target.value)}
+                        />
+                      </div>
 
-                     </div>
+                      <div className='w-full mt-3'>
+                        <h2 className='font-semibold'>End date</h2>
+                        <input
+                          type="date"
+                          value={endDate}
+                          className='border mt-1 p-1 w-full rounded-lg'
+                          onChange={(e) => setEndDate(e.target.value)}
+                        />
+                      </div>
 
-                     <div className='w-full mt-3'>
-                      <h2 className='font-semibold'>End date</h2>
-                      <input 
-                        type="date" 
-                        value={endDate}
-                        className='border mt-1 p-1 w-full rounded-sm' 
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
-
-                     </div>
-
-                     <div className='w-full mt-4 text-center'>
-                      <button className='bg-gray-800 py-1 px-4 text-white hover:bg-gray-700 border rounded-md' onClick={applyFilter}>Apply</button>
-                     </div>
-                  </div>
+                      <div className='w-full mt-4 text-center'>
+                        <button className='bg-gray-800 py-1 px-4 text-white hover:bg-gray-700 border rounded-md' onClick={applyFilter}>Apply</button>
+                      </div>
+                    </div>
                   </dialog>
-                  
 
-                  <button className='' onClick={() => {openFilter ? closeFilterValue() : setOpenFilter(true)}}>
-                     <BsFunnelFill className='w-6 h-7 hover:text-gray-800'/> 
+                  <button
+                    className={`h-9 w-full sm:w-9 flex items-center justify-center border border-gray-300 rounded-md 
+                      hover:bg-gray-100 transition-colors flex-shrink-0 outline-none
+                      ${openFilter ? 'ring-2 ring-green-500 border-green-500 bg-gray-50' : 'focus:ring-2 focus:ring-green-500 focus:border-green-500'}`}
+                    onClick={() => { openFilter ? closeFilterValue() : setOpenFilter(true) }}
+                  >
+                    <BsFunnelFill className='w-4 h-4 text-gray-700' />
+                    <span className='ml-2 sm:hidden text-sm'>Filter</span>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+
+          {/*HISTORY TABLE SECTION*/}
+          <div className='overflow-x-auto overflow-y-auto w-full flex-1 mt-4 rounded-lg shadow-sm border border-gray-200 hide-scrollbar'>
+            <table className='w-full min-w-[640px]'>
+              <thead className='sticky top-0 h-10 z-40'>
+                <tr className='bg-gray-200'>
+                  <th className='px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Date</th>
+                  <th className='px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Item Name</th>
+                  <th className='px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Category</th>
+                  <th className='px-2 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Unit Cost</th>
+                  <th className='px-2 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Quantity</th>
+                  <th className='px-2 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Value</th>
+                </tr>
+              </thead>
+              <tbody className='bg-white relative'>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6}>
+                      <ChartLoading message="Loading product history..." />
+                    </td>
+                  </tr>
+                ) :
+                  (filteredHistoryData.length === 0 ?
+                    (
+                      <NoInfoFound col={6} />
+                    ) :
+
+                    (
+                      currentData.map((history, histoindx) => (
+                        <tr key={histoindx} className='hover:bg-gray-100 transition-colors border-b border-gray-100'>
+                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.formated_date_added}</td>
+                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900'>{history.product_name}</td>
+                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.category_name}</td>
+                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{currencyFormat(history.h_unit_cost)}</td>
+                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{history.quantity_added.toLocaleString()}</td>
+                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{currencyFormat(history.value)}</td>
+                        </tr>
+                      ))
+                    )
+                  )
+                }
+              </tbody>
+            </table>
+          </div>
+
+          {/* PAGINATION CONTROLS + EXPORT */}
+          <div className='mt-3 px-1 sm:px-3'>
+            {/* Mobile Layout */}
+            <div className='flex flex-col sm:hidden gap-2'>
+              {/* Showing Stats + Pagination */}
+              <div className='flex items-center justify-between gap-2'>
+                {/* Showing Stats - Left */}
+                {totalItems > 0 && (
+                  <div className='text-xs text-gray-600 flex-shrink-0'>
+                    Showing {displayStart}-{displayEnd} of {totalItems}
+                  </div>
+                )}
+
+                {/* Pagination Controls - Right */}
+                <div className='flex items-center gap-1 flex-shrink-0'>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className='px-2 py-1 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
+                  >
+                    Previous
+                  </button>
+                  <span className='text-xs text-gray-600 whitespace-nowrap px-1'>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className='px-2 py-1 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
+                  >
+                    Next
                   </button>
                 </div>
               </div>
 
-              {/*HISTORY TABLE SECTION*/}
-              <div className='overflow-x-auto overflow-y-auto w-full h-[77%] mt-8 rounded-lg shadow-sm border border-gray-200  hide-scrollbar '> 
-                <table className='w-full h-full' >
-                  <thead className='sticky top-0 h-10 z-40'>
-                    <tr className='bg-gray-200'>
-                      <th className='px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider'>Date</th>
-                      <th className='px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider'>Item Name</th>
-                      <th className='px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider'>Category</th>
-                      <th className='px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider'>Unit Cost</th>
-                      <th className='px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider'>Quantity</th>
-                      <th className='px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider'>Value</th>
-                    </tr>
-                  </thead>
-                  <tbody className='bg-white relative'>
-                    { loading ? (
-                        <tr>
-                          <td colSpan={6}>
-                            <ChartLoading message="Loading product history..." />
-                          </td>
-                        </tr>
-                      ) : 
-                      (filteredHistoryData.length === 0 ?
-                        (
-                          <NoInfoFound col={6}/>
-                        ) :
+              {/* Export Button */}
+              <div className='flex justify-center'>
+                <div className="relative group w-full max-w-xs">
+                  <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md transition-all flex items-center justify-center gap-2 text-sm w-full'>
+                    <TbFileExport className='text-base' />
+                    <span>Export History</span>
+                  </button>
+                  {/* Centered Dropdown for Mobile */}
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 w-full">
+                    <button
+                      onClick={() => handleExportHistory('csv')}
+                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                    >
+                      Export as CSV
+                    </button>
+                    <button
+                      onClick={() => handleExportHistory('pdf')}
+                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                    >
+                      Export as PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                        (
-                                  currentData.map((history, histoindx) => (
-                                    <tr key={histoindx} className='hover:bg-gray-100 transition-colors'>
-                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.formated_date_added}</td>
-                              <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'>{history.product_name}</td>
-                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>{history.category_name}</td>
-                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'> {currencyFormat(history.h_unit_cost)}</td>
-                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{history.quantity_added.toLocaleString()}</td>
-                              <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right'>{currencyFormat(history.value)}</td>
-                            </tr>
-                          ))
-                        )
-                      )
-                    }
-                   
-                  </tbody>
-                </table>
+            {/* Desktop Layout */}
+            <div className='hidden sm:flex items-center justify-between  gap-4 w-full'>
+              {/* Showing + Pagination */}
+              <div className='flex items-center gap-4'>
+                {totalItems > 0 && (
+                  <div className='text-sm text-gray-600 flex-shrink-0'>
+                    Showing {displayStart}-{displayEnd} of {totalItems}
+                  </div>
+                )}
               </div>
 
-              {/* PAGINATION CONTROLS + EXPORT (LEFT | CENTER | RIGHT) */}
-              {totalItems > 0 ? (
-                <div className='flex items-center mt-3 px-3'>
-                  <div className='flex-1 text-sm text-gray-600'>
-                    Showing {displayStart} to {displayEnd} of {totalItems} items
-                  </div>
+              <div className='flex-1 flex justify-center items-center space-x-2'>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className='px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
+                >
+                  Previous
+                </button>
+                <span className='text-sm text-gray-600 whitespace-nowrap px-1'>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className='px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
+                >
+                  Next
+                </button>
+              </div>
 
-                  <div className='flex-1 flex justify-center items-center space-x-2'>
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                      className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
-                    >
-                      Previous
-                    </button>
-                    <span className='text-sm text-gray-600'>Page {currentPage} of {totalPages}</span>
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                      className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
-                    >
-                      Next
-                    </button>
-                  </div>
-
-                  <div className='flex-1 flex justify-end'>
-                    <div className="relative group">
-                      <button className='bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
-                        <TbFileExport />Export History
-                      </button>
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                        <button 
-                          onClick={() => handleExportHistory('csv')}
-                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-                        >
-                          Export as CSV
-                        </button>
-                        <button 
-                          onClick={() => handleExportHistory('pdf')}
-                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-                        >
-                          Export as PDF
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+              {/* Export Button */}
+              <div className="relative group">
+                <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md transition-all flex items-center justify-center gap-2 text-sm'>
+                  <TbFileExport className='text-base' />
+                  <span>Export History</span>
+                </button>
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 min-w-full">
+                  <button
+                    onClick={() => handleExportHistory('csv')}
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                  >
+                    Export as CSV
+                  </button>
+                  <button
+                    onClick={() => handleExportHistory('pdf')}
+                    className="block w-full rounded-lg text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                  >
+                    Export as PDF
+                  </button>
                 </div>
-              ) : (
-                <div className='flex items-center mt-3 px-3'>
-                  <div className='flex-1' />
-                  <div className='flex-1' />
-                  <div className='flex-1 flex justify-end'>
-                    <div className="relative group">
-                      <button className='bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-md transition-all flex items-center gap-2'>
-                        <TbFileExport />Export History
-                      </button>
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                        <button 
-                          onClick={() => handleExportHistory('csv')}
-                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-                        >
-                          Export as CSV
-                        </button>
-                        <button 
-                          onClick={() => handleExportHistory('pdf')}
-                          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-                        >
-                          Export as PDF
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-
+              </div>
+            </div>
           </div>
 
-            
+
+        </div>
+
       </dialog>
     </div>
+
   )
 }
 
