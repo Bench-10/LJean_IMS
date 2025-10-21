@@ -1,8 +1,13 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import itemRoutes from './Routes/itemRoutes.js';
 import userRoutes from './Routes/userRoutes.js';
 import saleRoutes from './Routes/saleRoutes.js';
@@ -13,31 +18,107 @@ import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 import { loadUnitConversionCache } from './Services/Services_Utils/unitConversion.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
+//FOR MONITORING .ENV ORDER
+const envName = (process.env.NODE_ENV || 'development').trim();
+const envCandidates = [
+  path.resolve(__dirname, `.env.${envName}`),
+  path.resolve(__dirname, `../.env.${envName}`),
+  path.resolve(__dirname, '.env'),
+  path.resolve(__dirname, '../.env')
+];
+
+for (const candidate of envCandidates) {
+  const result = dotenv.config({ path: candidate, override: false });
+  if (result.error === undefined) {
+    console.log('dotenv loaded:', candidate);
+  }
+}
+console.log('NODE_ENV=', process.env.NODE_ENV);
+console.log('PORT=', process.env.PORT);
+console.log('CORS_ORIGIN=', process.env.CORS_ORIGIN);
+
 const app  = express();
+
+const isProduction = process.env.NODE_ENV === 'production';
+const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://192.168.1.28:5173'];
+const allowedOrigins = (process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+  : DEFAULT_DEV_ORIGINS)
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // Allow same-origin or server-to-server requests
+  if (allowedOrigins.length === 0) return true;
+  return allowedOrigins.includes(origin);
+};
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Disposition']
+};
 
 //CONNECTS THE SERVER TO THE FRONTEND
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", //CHANGE THIS WHEN ITS TIME FOR HOSTING
-    methods: ["GET", "POST"]
+    ...corsOptions,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'), false);
+    },
+    methods: ['GET', 'POST']
   }
 });
 
-dotenv.config();
+// Only trust proxy when running in production behind a reverse proxy (nginx, load balancer).
+// This avoids express-rate-limit validation error during local development.
+if (process.env.NODE_ENV === 'production') {
+ app.enable('trust proxy');
+} else {
+ app.disable('trust proxy');
+}
 
-app.use(cors({
-  origin: "*", 
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  credentials: true
+app.disable('x-powered-by');
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
+app.use(compression());
+app.use(cors(corsOptions));
 
-app.use(express.json());
+const requestBodyLimit = process.env.REQUEST_PAYLOAD_LIMIT || '100kb';
+app.use(express.json({ limit: requestBodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: requestBodyLimit }));
 
-const PORT = process.env.PORT;
+const rateLimitWindowMinutes = parseInt(process.env.RATE_LIMIT_WINDOW_MINUTES || '15', 10);
+const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX || '300', 10);
+const apiLimiter = rateLimit({
+  windowMs: rateLimitWindowMinutes * 60 * 1000,
+  max: rateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests, please try again later.'
+});
 
+// Rate limiting defends the API surface against brute-force or flood attacks.
+app.use('/api', apiLimiter);
 
-
+const PORT = process.env.PORT || 5000;
 
 
 //FOR PRODUCT-RELATED DATA
