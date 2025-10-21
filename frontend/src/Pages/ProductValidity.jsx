@@ -345,7 +345,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
               key={index}
               className={`rounded-lg p-4 border-l-4 shadow-sm ${
                 validity.expy
-                  ? 'bg-[#ad1c1c] text-white border-red-700'
+                  ? 'bg-[#FF3131] text-white border-red-700'
                   : validity.near_expy
                   ? 'bg-[#FFF3C1] border-yellow-500'
                   : 'bg-white border-gray-300'
@@ -364,22 +364,22 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 <div className="font-bold text-base">{validity.product_name}</div>
                
                 <div className="flex justify-between">
-                  <span className="text-white-600">Category:</span>
+                  <span className="text-gray-600">Category:</span>
                   <span className="font-medium">{validity.category_name}</span>
                 </div>
                
                 <div className="flex justify-between">
-                  <span className="text-white-600">Date Purchased:</span>
+                  <span className="text-gray-600">Date Purchased:</span>
                   <span className="font-medium">{validity.formated_date_added}</span>
                 </div>
                
                 <div className="flex justify-between">
-                  <span className="text-white-600">Expiry Date:</span>
+                  <span className="text-gray-600">Expiry Date:</span>
                   <span className="font-medium">{validity.formated_product_validity}</span>
                 </div>
                
                 <div className="flex justify-between">
-                  <span className="text-white-600">Quantity:</span>
+                  <span className="text-gray-600">Quantity:</span>
                   <span className="font-bold text-base">{validity.quantity_left}</span>
                 </div>
               </div>
