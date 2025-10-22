@@ -337,7 +337,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           </div>
         ) : currentPageData.length === 0 ? (
           <div className='h-96 flex items-center justify-center'>
-            <NoInfoFound />
+            <NoInfoFound isTable={false} />
           </div>
         ) : (
           currentPageData.map((validity, index) => (

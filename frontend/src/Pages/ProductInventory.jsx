@@ -392,7 +392,7 @@ function ProductInventory({
               options={[
                 ...(user && user.role && user.role.some(role => ['Owner'].includes(role))
                   ? [{ value: '', label: 'All Branch' }]
-                  : []),
+                  : branches.length !== 0 ? [] : [{ value: '', label: `${user.branch_name} (Your Branch)`}]),
                 ...branches.map(branch => ({
                   value: branch.branch_id,
                   label: `${branch.branch_name}${branch.branch_id === user.branch_id ? ' (Your Branch)' : ''}`
