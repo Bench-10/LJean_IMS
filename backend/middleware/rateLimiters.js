@@ -59,10 +59,17 @@ export const passwordResetLimiter = rateLimit({
 
 export const accountCreationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, 
+  max: 10,
   message: 'Too many account creation attempts. Please try again later.',
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const identifier = (req.body?.email || req.body?.username || '')
+      .toString()
+      .toLowerCase()
+      .trim();
+    return identifier ? `create:${identifier}:${req.ip}` : `ip:${req.ip}`;
+  }
 });
 
 
@@ -73,5 +80,12 @@ export const writeOperationLimiter = rateLimit({
   message: 'Too many write operations. Please slow down.',
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.method === 'GET'
+  skip: (req) => req.method === 'GET',
+  keyGenerator: (req) => {
+    const userId = req.user?.user_id || req.user?.id || req.user?.userId;
+    if (userId) return `user:${String(userId)}`;
+    return `ip:${req.ip}`;
+  }
 });
+
+
