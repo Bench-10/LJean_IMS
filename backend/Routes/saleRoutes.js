@@ -1,5 +1,6 @@
 import express from 'express';
 import * as saleControllers from '../Controllers/saleControllers.js';
+import { writeOperationLimiter } from '../middleware/rateLimiters.js';
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ router.get("/sale_items", saleControllers.getAllSaleItems);
 
 
 //ADDING A SALE
-router.post("/sale", saleControllers.addSaleInformation);
+router.post("/sale", writeOperationLimiter, saleControllers.addSaleInformation);
 
 
 

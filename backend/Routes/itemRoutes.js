@@ -1,26 +1,26 @@
 import express from 'express';
 import * as itemControllers from '../Controllers/itemControllers.js';
-
+import { writeOperationLimiter } from '../middleware/rateLimiters.js';
 
 const router = express.Router();
 
 
 //INVENTORY CRUD
 router.get("/items", itemControllers.getAllItems);
-router.post("/items", itemControllers.addItem);
-router.put("/items/:id", itemControllers.updateItem);
+router.post("/items", writeOperationLimiter, itemControllers.addItem);
+router.put("/items/:id", writeOperationLimiter, itemControllers.updateItem);
 router.get("/items/search", itemControllers.searchItem);
 router.get("/items/unique", itemControllers.getAllUniqueProducts);
 router.get("/items/pending", itemControllers.getPendingInventoryRequests);
-router.patch("/items/pending/:id/approve", itemControllers.approvePendingInventoryRequest);
-router.patch("/items/pending/:id/reject", itemControllers.rejectPendingInventoryRequest);
+router.patch("/items/pending/:id/approve", writeOperationLimiter, itemControllers.approvePendingInventoryRequest);
+router.patch("/items/pending/:id/reject", writeOperationLimiter, itemControllers.rejectPendingInventoryRequest);
 
 
 
 //CATEGORY ROUTES
 router.get("/categories", itemControllers.getAllCategories);
-router.post("/categories", itemControllers.addCAtegory);
-router.put("/categories/:id", itemControllers.updateCategory);
+router.post("/categories", writeOperationLimiter, itemControllers.addCAtegory);
+router.put("/categories/:id", writeOperationLimiter, itemControllers.updateCategory);
 
 
 

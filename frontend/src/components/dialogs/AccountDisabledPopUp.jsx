@@ -23,7 +23,7 @@ function AccountDisabledPopUp({ open, type, onAction, onClose, user}) {
       return {
         icon: <MdDesktopAccessDisabled className="text-4xl text-red-600" />,
         title: "Account Disabled", 
-        message: "Your account has been disabled by the administrator. You have no access to your account this moment.",
+        message: !user ? "Your account is currently disabled due to many failed login attempts." : "Your account has been disabled by the administrator. You have no access to your account this moment.",
         buttonText: "Logout",
         bgColor: "bg-red-100"
       };

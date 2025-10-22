@@ -3,11 +3,12 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import zlib from 'zlib';
+import { speedLimiter, createApiLimiter } from './middleware/rateLimiters.js';
 import itemRoutes from './Routes/itemRoutes.js';
 import userRoutes from './Routes/userRoutes.js';
 import saleRoutes from './Routes/saleRoutes.js';
@@ -52,7 +53,7 @@ const allowedOrigins = (process.env.CORS_ORIGIN
   .filter(Boolean);
 
 const isOriginAllowed = (origin) => {
-  if (!origin) return true; // Allow same-origin or server-to-server requests
+  if (!origin) return true;
   if (allowedOrigins.length === 0) return true;
   return allowedOrigins.includes(origin);
 };
@@ -85,8 +86,7 @@ const io = new Server(server, {
   }
 });
 
-// Only trust proxy when running in production behind a reverse proxy (nginx, load balancer).
-// This avoids express-rate-limit validation error during local development.
+
 if (process.env.NODE_ENV === 'production') {
  app.enable('trust proxy');
 } else {
@@ -98,25 +98,33 @@ app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
-app.use(compression());
+
+//DATA COMPRESSION
+app.use(compression({
+  level: zlib.constants.Z_BEST_SPEED,
+  threshold: 1024, // compress responses > 1KB
+  filter: (req, res) => {
+    const contentType = String(res.getHeader('Content-Type') || '');
+    // Skip compression for binary content, images, videos, and already-compressed formats
+    if (/image|video|audio|zip|pdf|gz|octet-stream/.test(contentType)) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
 app.use(cors(corsOptions));
 
 const requestBodyLimit = process.env.REQUEST_PAYLOAD_LIMIT || '100kb';
 app.use(express.json({ limit: requestBodyLimit }));
 app.use(express.urlencoded({ extended: true, limit: requestBodyLimit }));
 
+
+// Apply rate limiting and throttling (imported from middleware/rateLimiters.js)
 const rateLimitWindowMinutes = parseInt(process.env.RATE_LIMIT_WINDOW_MINUTES || '15', 10);
 const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX || '300', 10);
-const apiLimiter = rateLimit({
-  windowMs: rateLimitWindowMinutes * 60 * 1000,
-  max: rateLimitMax,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many requests, please try again later.'
-});
-
-// Rate limiting defends the API surface against brute-force or flood attacks.
-app.use('/api', apiLimiter);
+const apiLimiter = createApiLimiter(rateLimitWindowMinutes, rateLimitMax);
+app.use('/api', speedLimiter, apiLimiter);
 
 const PORT = process.env.PORT || 5000;
 

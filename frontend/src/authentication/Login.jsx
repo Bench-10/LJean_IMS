@@ -153,6 +153,7 @@ function Login() {
 
       }  else {
         // Generic error - show on both fields
+        setDisabledDialog(true);
         setAuthErrors({
           username: 'Authentication failed.',
           password: 'Please check your credentials.'

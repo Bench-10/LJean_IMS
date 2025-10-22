@@ -1,5 +1,6 @@
 import express from 'express';
 import * as userControllers from '../Controllers/userControllers.js';
+import { loginLimiter, accountCreationLimiter } from '../middleware/rateLimiters.js';
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ router.get("/users", userControllers.getUsers);
 
 
 //USER AUTHENTICATION
-router.post("/authentication", userControllers.userCredentials);
+router.post("/authentication", loginLimiter, userControllers.userCredentials);
 
 
 //USER LOGOUT
@@ -25,7 +26,7 @@ router.get("/existing_account", userControllers.checkExistingAccount);
 
 
 //USER CREATION
-router.post("/create_account", userControllers.userCreationAccount);
+router.post("/create_account", accountCreationLimiter, userControllers.userCreationAccount);
 
 
 //USER ACCOUNT UPDATE
