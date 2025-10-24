@@ -508,3 +508,15 @@ DROP CONSTRAINT fk_users_approved_by
 ALTER TABLE Users
 ALTER COLUMN approved_by TYPE VARCHAR(255)
 USING approved_by::VARCHAR;
+
+
+
+
+
+analytics faster analytics
+
+-- Critical indexes for analytics performance
+CREATE INDEX IF NOT EXISTS idx_sales_date_branch ON Sales_Information(date, branch_id);
+CREATE INDEX IF NOT EXISTS idx_sales_items_product ON Sales_Items(product_id, sales_information_id);
+CREATE INDEX IF NOT EXISTS idx_add_stocks_date ON Add_Stocks(date_added, product_id, branch_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_product_branch ON Inventory_Product(branch_id, category_id);

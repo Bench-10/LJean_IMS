@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
@@ -50,7 +50,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const { user } = useAuth();
 
   // ROLE CHECK: ONLY OWNER SHOULD SEE BRANCH PERFORMANCE OPTION
-  const isOwner = user?.role?.some(role => ['Owner'].includes(role));
+  const isOwner = useMemo(() => {
+    if (!user) return false;
+    const roles = Array.isArray(user.role) ? user.role : user?.role ? [user.role] : [];
+    return roles.includes('Owner');
+  }, [user]);
 
   // REFS FOR EXPORT
   const salesChartRef = useRef(null);
@@ -60,6 +64,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const revenueDistributionRef = useRef(null);
   const branchTimelineRef = useRef(null);
   const kpiRef = useRef(null);
+  const fetchTimerRef = useRef(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   const [salesPerformance, setSalesPerformance] = useState({ history: [], forecast: [], series: [] });
@@ -73,7 +78,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [loadingTopProducts, setLoadingTopProducts] = useState(false);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [loadingKPIs, setLoadingKPIs] = useState(false);
-  const [loadingBranchPerformance, setLoadingBranchPerformance] = useState(false);
   
   // Graph intervals (separate from KPI/Top Products)
   const [salesInterval, setSalesInterval] = useState('monthly');
@@ -151,130 +155,283 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       return "sale";
     }
   });
-
-
-  useEffect(()=>{ fetchAll();  console.log(salesPerformance);}, [branchId, salesInterval, restockInterval, categoryFilter, preset, rangeMode, startDate, endDate, deliveryInterval, deliveryStatus, productIdFilter]);
-  const [allBranches, setAllBranches] = useState([]);
-  useEffect(()=>{ if(canSelectBranch || (!branchId && isOwner)) loadBranches(); }, [canSelectBranch, branchId, isOwner]);
-  async function loadBranches(){
-    try { const res = await api.get(`/api/analytics/branches`); setAllBranches(res.data); } catch(e){ console.error(e);} }
-
-  async function fetchAll(){
-    const base = `/api/analytics`;
-    
-    // Set loading states
-    setLoadingSalesPerformance(true);
-    setLoadingTopProducts(true);
-    setLoadingDelivery(true);
-    setLoadingKPIs(true);
-    if (!branchId && isOwner) setLoadingBranchPerformance(true);
-    
-    let start_date = startDate;
-    let end_date = endDate;
-    if(rangeMode === 'preset') {
+  const resolvedRange = useMemo(() => {
+    if (rangeMode === 'preset') {
       const today = dayjs().startOf('day');
-      let s = today;
+      let start = today;
       if (preset === 'current_day') {
-        s = today;
+        start = today;
       } else if (preset === 'current_week') {
-       
-        s = today.isoWeekday(1).startOf('day');
+        start = today.isoWeekday(1).startOf('day');
       } else if (preset === 'current_month') {
-        s = today.startOf('month');
+        start = today.startOf('month');
       } else if (preset === 'current_year') {
-        s = today.startOf('year');
+        start = today.startOf('year');
       }
-      start_date = s.format('YYYY-MM-DD');
-      end_date = today.format('YYYY-MM-DD');
+      return {
+        start_date: start.format('YYYY-MM-DD'),
+        end_date: today.format('YYYY-MM-DD'),
+        presetKey: preset
+      };
     }
 
-    // Sales performance uses salesInterval
-  const paramsSales = { interval: salesInterval };
-    if (branchId) paramsSales.branch_id = branchId;
-    if (categoryFilter) paramsSales.category_id = categoryFilter;
-    if (productIdFilter) paramsSales.product_id = productIdFilter;
+    return {
+      start_date: startDate,
+      end_date: endDate,
+      presetKey: 'custom'
+    };
+  }, [rangeMode, preset, startDate, endDate]);
 
-    // Restock trends uses restockInterval  
-    const paramsRestock = { interval: restockInterval };
-    if (branchId) paramsRestock.branch_id = branchId;
+  const [allBranches, setAllBranches] = useState([]);
 
-    // Inventory levels don't need interval
-    const paramsLevels = {};
-    if (branchId) paramsLevels.branch_id = branchId;
+  const shouldLoadBranches = useMemo(
+    () => canSelectBranch || (!branchId && isOwner),
+    [canSelectBranch, branchId, isOwner]
+  );
+
+  const loadBranches = useCallback(async (signal) => {
+    if (!shouldLoadBranches) {
+      setAllBranches([]);
+      return;
+    }
+    try {
+      const res = await api.get(`/api/analytics/branches`, { signal });
+      setAllBranches(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      if (e?.code === 'ERR_CANCELED') return;
+      console.error('Branches fetch error', e);
+    }
+  }, [shouldLoadBranches]);
+
+  const resetAnalyticsState = useCallback(() => {
+    setSalesPerformance({ history: [], forecast: [], series: [] });
+    setRestockTrends([]);
+    setInventoryLevels([]);
+    setTopProducts([]);
+    setCategoryDist([]);
+    setKpis({
+      total_sales: 0,
+      total_investment: 0,
+      total_profit: 0,
+      prev_total_sales: 0,
+      prev_total_investment: 0,
+      prev_total_profit: 0,
+      inventory_count: 0
+    });
+    setDeliveryData([]);
+    setLoadingSalesPerformance(false);
+    setLoadingTopProducts(false);
+    setLoadingDelivery(false);
+    setLoadingKPIs(false);
+  }, []);
+
+  const fetchSalesPerformance = useCallback(async (signal) => {
+    if (!user) return;
+
+    const params = { interval: salesInterval };
+    if (branchId) params.branch_id = branchId;
+    if (categoryFilter) params.category_id = categoryFilter;
+    if (productIdFilter) params.product_id = productIdFilter;
+
+    setLoadingSalesPerformance(true);
+    try {
+      const response = await api.get(`/api/analytics/sales-performance`, { params, signal });
+      const normalized = Array.isArray(response.data)
+        ? {
+            history: response.data,
+            forecast: [],
+            series: response.data
+          }
+        : {
+            history: response.data?.history ?? [],
+            forecast: response.data?.forecast ?? [],
+            series: response.data?.series ?? response.data?.history ?? []
+          };
+      setSalesPerformance(normalized);
+    } catch (e) {
+      if (e?.code !== 'ERR_CANCELED') {
+        console.error('Sales performance fetch error', e);
+      }
+    } finally {
+      setLoadingSalesPerformance(false);
+    }
+  }, [branchId, categoryFilter, productIdFilter, salesInterval, user]);
+
+  const fetchTopProductsData = useCallback(async (signal) => {
+    if (!user) return;
 
     const paramsTop = {
-      branch_id: branchId,
+      branch_id: branchId || undefined,
       category_id: categoryFilter || undefined,
-      start_date,
-      end_date,
+      start_date: resolvedRange.start_date,
+      end_date: resolvedRange.end_date,
       limit: 50,
       interval: salesInterval,
       include_forecast: true
     };
 
-    const paramsKPI = { 
-      branch_id: branchId, 
-      category_id: categoryFilter || undefined, 
-      product_id: productIdFilter || undefined,
-      start_date, 
-      end_date,
-      preset: rangeMode === 'preset' ? preset : 'custom'
+    const paramsRestock = { interval: restockInterval };
+    if (branchId) paramsRestock.branch_id = branchId;
+
+    setLoadingTopProducts(true);
+    try {
+      const [topResult, restockResult] = await Promise.allSettled([
+        api.get(`/api/analytics/top-products`, { params: paramsTop, signal }),
+        api.get(`/api/analytics/restock-trends`, { params: paramsRestock, signal })
+      ]);
+
+      if (topResult.status === 'fulfilled') {
+        setTopProducts(Array.isArray(topResult.value.data) ? topResult.value.data : []);
+      } else if (topResult.reason?.code !== 'ERR_CANCELED') {
+        console.error('Top products fetch error', topResult.reason);
+        setTopProducts([]);
+      }
+
+      if (restockResult.status === 'fulfilled') {
+        setRestockTrends(Array.isArray(restockResult.value.data) ? restockResult.value.data : []);
+      } else if (restockResult.reason?.code !== 'ERR_CANCELED') {
+        console.error('Restock trends fetch error', restockResult.reason);
+        setRestockTrends([]);
+      }
+    } finally {
+      setLoadingTopProducts(false);
+    }
+  }, [branchId, categoryFilter, resolvedRange, restockInterval, salesInterval, user]);
+
+  const fetchInventoryLevels = useCallback(async (signal) => {
+    if (!user) return;
+
+    const params = {};
+    if (branchId) params.branch_id = branchId;
+
+    try {
+      const response = await api.get(`/api/analytics/inventory-levels`, { params, signal });
+      setInventoryLevels(Array.isArray(response.data) ? response.data : []);
+    } catch (e) {
+      if (e?.code !== 'ERR_CANCELED') {
+        console.error('Inventory levels fetch error', e);
+      }
+    }
+  }, [branchId, user]);
+
+  const fetchCategoryDistribution = useCallback(async (signal) => {
+    if (!user) return;
+
+    const params = branchId ? { branch_id: branchId } : {};
+    try {
+      const response = await api.get(`/api/analytics/category-distribution`, { params, signal });
+      setCategoryDist(Array.isArray(response.data) ? response.data : []);
+    } catch (e) {
+      if (e?.code !== 'ERR_CANCELED') {
+        console.error('Category distribution fetch error', e);
+      }
+    }
+  }, [branchId, user]);
+
+  const fetchKPIsData = useCallback(async (signal) => {
+    if (!user) return;
+
+    const params = {
+      start_date: resolvedRange.start_date,
+      end_date: resolvedRange.end_date,
+      preset: resolvedRange.presetKey
     };
-    
-    // Delivery uses its own interval only - no date range filtering
-    const paramsDelivery = { 
-      ...(branchId ? { branch_id: branchId } : {}), 
+    if (branchId) params.branch_id = branchId;
+    if (categoryFilter) params.category_id = categoryFilter;
+    if (productIdFilter) params.product_id = productIdFilter;
+
+    setLoadingKPIs(true);
+    try {
+      const response = await api.get(`/api/analytics/kpis`, { params, signal });
+      setKpis(response.data || {
+        total_sales: 0,
+        total_investment: 0,
+        total_profit: 0,
+        prev_total_sales: 0,
+        prev_total_investment: 0,
+        prev_total_profit: 0,
+        inventory_count: 0
+      });
+    } catch (e) {
+      if (e?.code !== 'ERR_CANCELED') {
+        console.error('KPIs fetch error', e);
+      }
+      setKpis({
+        total_sales: 0,
+        total_investment: 0,
+        total_profit: 0,
+        prev_total_sales: 0,
+        prev_total_investment: 0,
+        prev_total_profit: 0,
+        inventory_count: 0
+      });
+    } finally {
+      setLoadingKPIs(false);
+    }
+  }, [branchId, categoryFilter, productIdFilter, resolvedRange, user]);
+
+  const fetchDeliveryData = useCallback(async (signal) => {
+    if (!user) return;
+
+    const params = {
       format: deliveryInterval,
       status: deliveryStatus
     };
+    if (branchId) params.branch_id = branchId;
 
+    setLoadingDelivery(true);
     try {
-      const [sales, restock, levels, top, cat, kpi, delivery] = await Promise.all([
-        api.get(`${base}/sales-performance`, { params: paramsSales }),
-        api.get(`${base}/restock-trends`, { params: paramsRestock }),
-        api.get(`${base}/inventory-levels`, { params: paramsLevels }),
-        api.get(`${base}/top-products`, { params: paramsTop }),
-        api.get(`${base}/category-distribution`, { params: { branch_id: branchId } }),
-        api.get(`${base}/kpis`, { params: paramsKPI }),
-        api.get(`${base}/delivery`, { params: paramsDelivery })
-      ]);
-
-      const normalizedSales = Array.isArray(sales.data)
-        ? {
-            history: sales.data,
-            forecast: [],
-            series: sales.data
-          }
-        : {
-            history: sales.data?.history ?? [],
-            forecast: sales.data?.forecast ?? [],
-            series: sales.data?.series ?? sales.data?.history ?? []
-          };
-
-      setSalesPerformance(normalizedSales);
-      setRestockTrends(restock.data);
-      setInventoryLevels(levels.data);
-      setTopProducts(top.data);
-      setCategoryDist(cat.data);
-      setKpis(kpi.data);
-
-      // Ensure counts are numbers for the chart
-      setDeliveryData(delivery.data.map(d => ({ ...d, number_of_deliveries: Number(d.number_of_deliveries) })));
-      
-      if (cat.data && cat.data.length && categories.length === 0) {
-        
+      const response = await api.get(`/api/analytics/delivery`, { params, signal });
+      const rows = Array.isArray(response.data)
+        ? response.data.map(d => ({ ...d, number_of_deliveries: Number(d.number_of_deliveries) }))
+        : [];
+      setDeliveryData(rows);
+    } catch (e) {
+      if (e?.code !== 'ERR_CANCELED') {
+        console.error('Delivery analytics fetch error', e);
       }
-    } catch(e){
-      console.error('Analytics fetch error', e);
+      setDeliveryData([]);
     } finally {
-      // Clear loading states
-      setLoadingSalesPerformance(false);
-      setLoadingTopProducts(false);
       setLoadingDelivery(false);
-      setLoadingKPIs(false);
-      setLoadingBranchPerformance(false);
     }
-  }
+  }, [branchId, deliveryInterval, deliveryStatus, user]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    if (fetchTimerRef.current) {
+      clearTimeout(fetchTimerRef.current);
+      fetchTimerRef.current = null;
+    }
+
+    if (!user) {
+      resetAnalyticsState();
+      return () => controller.abort();
+    }
+
+    fetchTimerRef.current = setTimeout(() => {
+      fetchSalesPerformance(controller.signal);
+      fetchTopProductsData(controller.signal);
+      fetchInventoryLevels(controller.signal);
+      fetchCategoryDistribution(controller.signal);
+      fetchKPIsData(controller.signal);
+      fetchDeliveryData(controller.signal);
+    }, 150);
+
+    return () => {
+      controller.abort();
+      if (fetchTimerRef.current) {
+        clearTimeout(fetchTimerRef.current);
+        fetchTimerRef.current = null;
+      }
+    };
+  }, [fetchCategoryDistribution, fetchDeliveryData, fetchInventoryLevels, fetchKPIsData, fetchSalesPerformance, fetchTopProductsData, resetAnalyticsState, user]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadBranches(controller.signal);
+    return () => controller.abort();
+  }, [loadBranches]);
 
   const formatPeriod = (raw) => {
     if(raw == null) return '';
@@ -673,13 +830,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
           <>
             <BranchPerformance
               Card={Card}
-              rangeMode={rangeMode}
-              preset={preset}
               startDate={startDate}
               endDate={endDate}
-              todayISO={todayISO}
               categoryFilter={categoryFilter}
-              loadingBranchPerformance={loadingBranchPerformance}
               branchPerformanceRef={branchPerformanceRef}
               revenueDistributionRef={revenueDistributionRef}
             />
@@ -688,7 +841,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
               Card={Card}
               categoryFilter={categoryFilter}
               allBranches={allBranches}
-              loadingBranchTimeline={loadingBranchPerformance}
               branchTimelineRef={branchTimelineRef}
             />
           </>

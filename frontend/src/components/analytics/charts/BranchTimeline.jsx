@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
@@ -6,7 +6,7 @@ import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 import api from '../../../utils/api.js';
 
-function BranchTimeline({ Card, categoryFilter, allBranches, loadingBranchTimeline, branchTimelineRef }) {
+function BranchTimeline({ Card, categoryFilter, allBranches, branchTimelineRef }) {
   const { user } = useAuth();
   const [branchTimelineData, setBranchTimelineData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -15,73 +15,82 @@ function BranchTimeline({ Card, categoryFilter, allBranches, loadingBranchTimeli
   const [timelineInterval, setTimelineInterval] = useState('monthly');
   
   // ROLE CHECK: ONLY OWNER SHOULD SEE BRANCH TIMELINE
-  const isOwner = user?.role?.some(role => ['Owner'].includes(role));  // DEBUG: Log props to check data flow
-  console.log('🔍 BranchTimeline props:', {
-    allBranches: allBranches?.length || 0,
-    categoryFilter,
-    isOwner,
-    selectedBranch
-  });
+  const isOwner = useMemo(() => {
+    if (!user) return false;
+    const roles = Array.isArray(user.role) ? user.role : user?.role ? [user.role] : [];
+    return roles.includes('Owner');
+  }, [user]);
 
   // FETCH BRANCH TIMELINE DATA WHEN COMPONENT MOUNTS OR PARAMETERS CHANGE
-  useEffect(() => {
-    // ONLY FETCH WHEN OWNER AND BRANCH IS SELECTED
+  const fetchBranchTimelineData = useCallback(async (signal) => {
     if (!isOwner || !selectedBranch) {
       setBranchTimelineData([]);
+      setLoading(false);
       return;
     }
-    
-    const fetchBranchTimelineData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const params = {
-          branch_id: selectedBranch,
-          interval: timelineInterval
-        };
 
-        // ADD CATEGORY FILTER IF SELECTED
-        if (categoryFilter) {
-          params.category_id = categoryFilter;
-        }
+    try {
+      setLoading(true);
+      setError(null);
 
-        // USE DEFAULT RANGE FOR TIMELINE
-        params.range = '3m';
-        
-        console.log('📊 Fetching branch timeline with params:', params);
-        
-        const response = await api.get(`/api/analytics/branch-timeline`, { 
-          params 
-        });
-        
-        const timelineData = response.data || [];
-        console.log('📊 Branch timeline data received:', timelineData);
-        setBranchTimelineData(timelineData);
-      } catch (e) {
-        console.error('Branch timeline fetch error:', e);
-        setError('Failed to load branch timeline data');
-      } finally {
-        setLoading(false);
+      const params = {
+        branch_id: selectedBranch,
+        interval: timelineInterval,
+        range: '3m'
+      };
+
+      if (categoryFilter) {
+        params.category_id = categoryFilter;
       }
-    };
 
-    fetchBranchTimelineData();
-  }, [isOwner, selectedBranch, timelineInterval, categoryFilter]);
+      const response = await api.get(`/api/analytics/branch-timeline`, {
+        params,
+        signal
+      });
+
+      const timelineData = Array.isArray(response.data) ? response.data : [];
+      setBranchTimelineData(timelineData);
+    } catch (e) {
+      if (e?.code === 'ERR_CANCELED') return;
+      console.error('Branch timeline fetch error:', e);
+      setError('Failed to load branch timeline data');
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryFilter, isOwner, selectedBranch, timelineInterval]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchBranchTimelineData(controller.signal);
+    return () => controller.abort();
+  }, [fetchBranchTimelineData]);
 
   // IF NOT OWNER, RETURN NULL (COMPONENT WON'T RENDER)
   if (!isOwner) return null;
 
-  const selectedBranchName = selectedBranch 
-    ? allBranches.find(b => String(b.branch_id) === String(selectedBranch))?.branch_name || 'Selected Branch'
-    : 'Select Branch';
+  const selectedBranchName = useMemo(() => {
+    if (!selectedBranch) return 'Select Branch';
+    const match = allBranches?.find(
+      (b) => String(b.branch_id) === String(selectedBranch)
+    );
+    return match?.branch_name || 'Selected Branch';
+  }, [allBranches, selectedBranch]);
+
+  const hasTimelineData = branchTimelineData.length > 0;
+  const shouldShowChart = selectedBranch && hasTimelineData && !loading && !error;
 
   return (
     <>
       {/* BRANCH TIMELINE CHART */}
       <Card title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`} className="col-span-full h-[220px] md:h-[260px] lg:h-[280px]" exportRef={branchTimelineRef}>
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
-          {(loading || loadingBranchTimeline) && <ChartLoading message="Loading branch timeline..." />}
+          {loading && <ChartLoading message="Loading branch timeline..." />}
+          {error && !loading && (
+            <ChartNoData
+              message={error}
+              hint="Please try selecting a different branch or refresh the page."
+            />
+          )}
           
           {/* CONTROLS */}
           <div data-export-exclude className="flex items-center gap-3 justify-end mb-4 flex-wrap">
@@ -122,9 +131,6 @@ function BranchTimeline({ Card, categoryFilter, allBranches, loadingBranchTimeli
           </div>
 
           {/* CHART AREA */}
-          {loading && <div className="text-sm text-gray-500">Loading branch timeline...</div>}
-          {error && <div className="text-sm text-red-600">{error}</div>}
-          
           {!selectedBranch && !loading && !error && (
             <ChartNoData
               message="Please select a branch to view timeline."
@@ -132,14 +138,14 @@ function BranchTimeline({ Card, categoryFilter, allBranches, loadingBranchTimeli
             />
           )}
           
-          {selectedBranch && !loading && !error && branchTimelineData.length === 0 && (
+          {selectedBranch && !loading && !error && !hasTimelineData && (
             <ChartNoData
               message="No sales timeline data for the selected branch and filters."
               hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY FILTER."
             />
           )}
 
-          {selectedBranch && !loading && !error && branchTimelineData.length > 0 && (
+          {shouldShowChart && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="branch-timeline">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart

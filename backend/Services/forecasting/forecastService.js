@@ -19,6 +19,37 @@ const INTERVAL_CONFIG = {
   yearly: { periods: 3, frequency: 'Y' }
 };
 
+const CACHE_MAX_ENTRIES = 50;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const forecastCache = new Map();
+
+function makeCacheKey(interval, history) {
+  // History can be large, but stringify keeps the cache simple here.
+  return `${interval}::${JSON.stringify(history)}`;
+}
+
+function getCachedForecast(key) {
+  const entry = forecastCache.get(key);
+  if (!entry) {
+    return null;
+  }
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    forecastCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function setCachedForecast(key, value) {
+  if (forecastCache.size >= CACHE_MAX_ENTRIES) {
+    const [oldestKey] = forecastCache.keys();
+    forecastCache.delete(oldestKey);
+  }
+  forecastCache.set(key, { value, timestamp: Date.now() });
+}
+
+const inFlight = new Map();
+
 function pickPythonExecutable() {
   return DEFAULT_PYTHON_CANDIDATES[0] || 'python';
 }
@@ -26,6 +57,16 @@ function pickPythonExecutable() {
 export async function runDemandForecast({ history, interval = 'monthly' }) {
   if (!Array.isArray(history) || history.length < 2) {
     return [];
+  }
+
+  const cacheKey = makeCacheKey(interval, history);
+  const cached = getCachedForecast(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  if (inFlight.has(cacheKey)) {
+    return inFlight.get(cacheKey);
   }
 
   const config = INTERVAL_CONFIG[interval] || INTERVAL_CONFIG.monthly;
@@ -38,7 +79,7 @@ export async function runDemandForecast({ history, interval = 'monthly' }) {
   const pythonExec = pickPythonExecutable();
   const scriptPath = path.join(__dirname, 'prophetForecast.py');
 
-  return new Promise((resolve) => {
+  const forecastPromise = new Promise((resolve) => {
     const child = spawn(pythonExec, [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'] });
 
     let stdout = '';
@@ -79,4 +120,14 @@ export async function runDemandForecast({ history, interval = 'monthly' }) {
     child.stdin.write(payload);
     child.stdin.end();
   });
+
+  inFlight.set(cacheKey, forecastPromise);
+
+  try {
+    const result = await forecastPromise;
+    setCachedForecast(cacheKey, result);
+    return result;
+  } finally {
+    inFlight.delete(cacheKey);
+  }
 }

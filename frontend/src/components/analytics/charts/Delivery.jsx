@@ -1,9 +1,15 @@
-import React from 'react';
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend, Cell } from 'recharts';
+import React, { useMemo } from 'react';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar } from 'recharts';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 
 function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval, deliveryStatus, setDeliveryStatus, loadingDelivery, deliveryChartRef}) {
+  const normalizedData = useMemo(
+    () => (Array.isArray(deliveryData) ? deliveryData : []),
+    [deliveryData]
+  );
+  const hasData = normalizedData.length > 0;
+
   return (
     <>
       <Card title={"Delivery Analytics"} className="col-span-full h-[500px]" exportRef={deliveryChartRef}>
@@ -37,7 +43,7 @@ function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval, de
 
             {/* Chart */}
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="delivery">
-              {(!deliveryData || deliveryData.length === 0) ? (
+              {!hasData ? (
                 <ChartNoData
                   message="No data for the selected filters."
                   hint="TRY CHANGING STATUS OR INTERVAL."
@@ -46,14 +52,14 @@ function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval, de
                 <ResponsiveContainer width="100%" height="100%">
                   
                   <BarChart
-                    data={deliveryData}
+                    data={normalizedData}
                     margin={{ top: 10, right: 5, left: 5, bottom: 25 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval={0}  textAnchor="end" />
 
                     {(() => {
-                      const max = deliveryData.reduce((m,p) => Math.max(m, Number(p.number_of_deliveries)|| 0 ), 0);
+                      const max = normalizedData.reduce((m,p) => Math.max(m, Number(p.number_of_deliveries)|| 0 ), 0);
 
                       if (max === 0 ) return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
 

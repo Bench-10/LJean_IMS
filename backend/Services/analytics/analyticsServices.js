@@ -4,6 +4,56 @@ import dayjs from 'dayjs';
 import { runDemandForecast } from '../forecasting/forecastService.js';
 
 
+const RESTORED_SALES_FILTER = `NOT EXISTS (
+    SELECT 1 FROM Sales_Stock_Usage ssu 
+    WHERE ssu.sales_information_id = s.sales_information_id 
+    AND ssu.is_restored = true
+  )`;
+
+const ANALYTICS_CACHE_TTL_MS = 2 * 60 * 1000;
+const ANALYTICS_CACHE_MAX_ENTRIES = 128;
+const analyticsCache = new Map();
+
+function makeAnalyticsCacheKey(name, payload) {
+  return `${name}::${JSON.stringify(payload)}`;
+}
+
+function getAnalyticsCache(key) {
+  const entry = analyticsCache.get(key);
+  if (!entry) {
+    return null;
+  }
+  if (Date.now() - entry.timestamp > ANALYTICS_CACHE_TTL_MS) {
+    analyticsCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function setAnalyticsCache(key, value) {
+  if (analyticsCache.size >= ANALYTICS_CACHE_MAX_ENTRIES) {
+    const [oldestKey] = analyticsCache.keys();
+    analyticsCache.delete(oldestKey);
+  }
+  analyticsCache.set(key, { value, timestamp: Date.now() });
+}
+
+function buildSalesFilters({ start, end, branch_id, category_id }) {
+  const filters = ['s.date BETWEEN $1 AND $2', RESTORED_SALES_FILTER];
+  const params = [start, end];
+  let nextIdx = 3;
+  if (branch_id) {
+    filters.push(`s.branch_id = $${nextIdx++}`);
+    params.push(branch_id);
+  }
+  if (category_id) {
+    filters.push(`ip.category_id = $${nextIdx++}`);
+    params.push(category_id);
+  }
+  return { filters, params, nextIdx };
+}
+
+
 function buildDateRange(range){
 
   if(typeof range !== 'string' || !/^[0-9]+[ymd]$/.test(range)) range = '6m';
@@ -24,6 +74,12 @@ function buildDateRange(range){
 export async function fetchInventoryLevels({ branch_id, range }) {
   const { start, end } = buildDateRange(range);
  
+  const cacheKey = makeAnalyticsCacheKey('fetchInventoryLevels', { branch_id, range: `${start}_${end}` });
+  const cached = getAnalyticsCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const branchFilter = branch_id ? 'AND ip.branch_id = $3' : '';
   const params = [start, end];
   if(branch_id) params.push(branch_id);
@@ -56,6 +112,7 @@ export async function fetchInventoryLevels({ branch_id, range }) {
     SELECT d as date, product_id, product_name, branch_id, stock_level
     FROM cumulative
     ORDER BY product_id, branch_id, d;`, params);
+  setAnalyticsCache(cacheKey, rows);
   return rows;
 }
 
@@ -74,21 +131,22 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     ({ start, end } = buildDateRange(range));
   }
   const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
-  const conditions = ['s.date BETWEEN $1 AND $2'];
-  const params = [start, end];
-  let idx = 3;
-  
-  // Since stock is now always deducted when sale is placed, we include all sales
-  // The delivery status is just for tracking - stock impact is immediate
-  // Only exclude sales where stock has been restored due to cancellation/undelivered
-  conditions.push(`NOT EXISTS (
-    SELECT 1 FROM Sales_Stock_Usage ssu 
-    WHERE ssu.sales_information_id = s.sales_information_id 
-    AND ssu.is_restored = true
-  )`);
-  
-  if (branch_id) { conditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
-  if (category_id) { conditions.push(`ip.category_id = $${idx++}`); params.push(category_id); }
+  const cacheKey = makeAnalyticsCacheKey('fetchSalesPerformance', {
+    branch_id,
+    category_id,
+    product_id,
+    interval,
+    start,
+    end
+  });
+  const cached = getAnalyticsCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const { filters, params, nextIdx } = buildSalesFilters({ start, end, branch_id, category_id });
+  const conditions = [...filters];
+  let idx = nextIdx;
   if (product_id) { conditions.push(`si.product_id = $${idx++}`); params.push(product_id); }
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const { rows } = await SQLquery(`
@@ -135,11 +193,13 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     ...forecastSeries
   ];
 
-  return {
+  const result = {
     history,
     forecast: forecastSeries,
     series: combinedSeries
   };
+  setAnalyticsCache(cacheKey, result);
+  return result;
 }
 
 
@@ -152,6 +212,13 @@ export async function fetchRestockTrends({ branch_id, interval, range }) {
   const branchFilter = branch_id ? 'AND ip.branch_id = $3' : '';
   const params = [start, end];
   if(branch_id) params.push(branch_id);
+
+  const cacheKey = makeAnalyticsCacheKey('fetchRestockTrends', { branch_id, interval, start, end });
+  const cached = getAnalyticsCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const { rows } = await SQLquery(`
     SELECT date_trunc('${dateTrunc}', a.date_added)::date AS period,
       SUM(a.quantity_added_display) AS total_added
@@ -162,10 +229,12 @@ export async function fetchRestockTrends({ branch_id, interval, range }) {
     ORDER BY 1;`, params);
   
   // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
-  return rows.map(row => ({
+  const result = rows.map(row => ({
     ...row,
     period: dayjs(row.period).format('YYYY-MM-DD')
   }));
+  setAnalyticsCache(cacheKey, result);
+  return result;
 }
 
 
@@ -181,20 +250,23 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
   } else {
     ({ start, end } = buildDateRange(range));
   }
-  const conditions = ['s.date BETWEEN $1 AND $2'];
-  const params = [start, end];
-  let idx = 3;
-  
-  // Include all sales except those where stock has been restored (canceled/undelivered)
-  conditions.push(`NOT EXISTS (
-    SELECT 1 FROM Sales_Stock_Usage ssu 
-    WHERE ssu.sales_information_id = s.sales_information_id 
-    AND ssu.is_restored = true
-  )`);
-  
-  if (branch_id) { conditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
-  if (category_id) { conditions.push(`ip.category_id = $${idx++}`); params.push(category_id); }
-  const where = 'WHERE ' + conditions.join(' AND ');
+  const cacheKey = makeAnalyticsCacheKey('fetchTopProducts', {
+    branch_id,
+    category_id,
+    limit,
+    interval,
+    include_forecast,
+    start,
+    end
+  });
+  const cached = getAnalyticsCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const { filters, params, nextIdx } = buildSalesFilters({ start, end, branch_id, category_id });
+  const where = 'WHERE ' + filters.join(' AND ');
+  const safeLimit = Number.isFinite(Number.parseInt(limit, 10)) ? Number.parseInt(limit, 10) : 10;
   const { rows } = await SQLquery(`
     SELECT
       si.product_id,
@@ -210,84 +282,81 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     ${where}
     GROUP BY 1,2
     ORDER BY sales_amount DESC
-    LIMIT ${parseInt(limit)};`, params);
+    LIMIT ${safeLimit};`, params);
   if (!include_forecast || rows.length === 0) {
+    setAnalyticsCache(cacheKey, rows);
     return rows;
   }
 
   const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
   const MAX_FORECAST_PRODUCTS = 10;
-  const enriched = [];
+  const topProductIds = rows.slice(0, MAX_FORECAST_PRODUCTS).map((product) => product.product_id);
+  if (topProductIds.length === 0) {
+    setAnalyticsCache(cacheKey, rows);
+    return rows;
+  }
 
-  for (let i = 0; i < rows.length; i += 1) {
-    const product = rows[i];
+  const productArrayParamIndex = nextIdx;
+  const historyFilters = [...filters, `si.product_id = ANY($${productArrayParamIndex}::int[])`];
+  const historyParams = [...params, topProductIds];
+  const historyWhere = 'WHERE ' + historyFilters.join(' AND ');
 
-    if (i >= MAX_FORECAST_PRODUCTS) {
-      enriched.push({ ...product, history: [], forecast: [] });
-      continue;
-    }
-
-    const historyConditions = [
-      'si.product_id = $1',
-      's.date BETWEEN $2 AND $3',
-      `NOT EXISTS (
-        SELECT 1 FROM Sales_Stock_Usage ssu
-        WHERE ssu.sales_information_id = s.sales_information_id
-          AND ssu.is_restored = true
-      )`
-    ];
-    const historyParams = [product.product_id, start, end];
-    let hIdx = 4;
-    if (branch_id) {
-      historyConditions.push(`s.branch_id = $${hIdx++}`);
-      historyParams.push(branch_id);
-    }
-    if (category_id) {
-      historyConditions.push(`ip.category_id = $${hIdx++}`);
-      historyParams.push(category_id);
-    }
-
-    const { rows: historyRows } = await SQLquery(`
-      SELECT date_trunc('${dateTrunc}', s.date)::date AS period,
+  const { rows: historyRows } = await SQLquery(`
+      SELECT si.product_id,
+             date_trunc('${dateTrunc}', s.date)::date AS period,
              SUM(si.quantity_display) AS units_sold,
              SUM(si.amount) AS sales_amount
       FROM Sales_Items si
       JOIN Sales_Information s USING(sales_information_id)
       JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
-      WHERE ${historyConditions.join(' AND ')}
-      GROUP BY 1
-      ORDER BY 1;`, historyParams);
+      ${historyWhere}
+      GROUP BY si.product_id, date_trunc('${dateTrunc}', s.date)
+      ORDER BY si.product_id, date_trunc('${dateTrunc}', s.date);`, historyParams);
 
-    const historySeries = historyRows.map(row => ({
+  const historyMap = new Map();
+  for (const row of historyRows) {
+    if (!historyMap.has(row.product_id)) {
+      historyMap.set(row.product_id, []);
+    }
+    historyMap.get(row.product_id).push({
       period: dayjs(row.period).format('YYYY-MM-DD'),
       units_sold: Number(row.units_sold || 0),
       sales_amount: Number(row.sales_amount || 0)
-    }));
-
-    let forecastSeries = [];
-    if (historySeries.length >= 2) {
-      try {
-        const forecastInput = historySeries.map(item => ({ period: item.period, value: item.units_sold }));
-        const forecast = await runDemandForecast({ history: forecastInput, interval });
-        forecastSeries = forecast.map(point => ({
-          period: point.period,
-          forecast_units: Number(point.forecast || 0),
-          forecast_lower: point.forecast_lower != null ? Number(point.forecast_lower) : null,
-          forecast_upper: point.forecast_upper != null ? Number(point.forecast_upper) : null
-        }));
-      } catch (err) {
-        console.error('Top product forecast error', err);
-        forecastSeries = [];
-      }
-    }
-
-    enriched.push({
-      ...product,
-      history: historySeries,
-      forecast: forecastSeries
     });
   }
 
+  const enriched = await Promise.all(rows.map(async (product, index) => {
+    const historySeries = historyMap.get(product.product_id) || [];
+    if (index >= MAX_FORECAST_PRODUCTS || historySeries.length < 2) {
+      return { ...product, history: historySeries, forecast: [] };
+    }
+
+    try {
+      const forecastInput = historySeries.map(item => ({ period: item.period, value: item.units_sold }));
+      const forecast = await runDemandForecast({ history: forecastInput, interval });
+      const forecastSeries = forecast.map(point => ({
+        period: point.period,
+        forecast_units: Number(point.forecast || 0),
+        forecast_lower: point.forecast_lower != null ? Number(point.forecast_lower) : null,
+        forecast_upper: point.forecast_upper != null ? Number(point.forecast_upper) : null
+      }));
+
+      return {
+        ...product,
+        history: historySeries,
+        forecast: forecastSeries
+      };
+    } catch (err) {
+      console.error('Top product forecast error', err);
+      return {
+        ...product,
+        history: historySeries,
+        forecast: []
+      };
+    }
+  }));
+
+  setAnalyticsCache(cacheKey, enriched);
   return enriched;
 }
 
@@ -298,6 +367,13 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
 export async function fetchCategoryDistribution({ branch_id }) {
   const branchFilter = branch_id ? 'WHERE ip.branch_id = $1' : '';
   const params = branch_id ? [branch_id] : [];
+
+  const cacheKey = makeAnalyticsCacheKey('fetchCategoryDistribution', { branch_id });
+  const cached = getAnalyticsCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const { rows } = await SQLquery(`
     SELECT c.category_name, SUM(ip.quantity * ip.unit_price) AS inventory_value
     FROM Inventory_Product ip
@@ -305,6 +381,7 @@ export async function fetchCategoryDistribution({ branch_id }) {
     ${branchFilter}
     GROUP BY 1
     ORDER BY inventory_value DESC;`, params);
+  setAnalyticsCache(cacheKey, rows);
   return rows;
 }
 
@@ -320,6 +397,19 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     end = end_date;
   } else {
     ({ start, end } = buildDateRange(range));
+  }
+
+  const cacheKey = makeAnalyticsCacheKey('fetchKPIs', {
+    branch_id,
+    category_id,
+    product_id,
+    range,
+    start,
+    end
+  });
+  const cached = getAnalyticsCache(cacheKey);
+  if (cached) {
+    return cached;
   }
 
 
@@ -339,12 +429,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   
   // Helper function to add delivery filter conditions
   const addDeliveryFilter = (conditions) => {
-    // Include all sales except those where stock has been restored (canceled/undelivered)
-    conditions.push(`NOT EXISTS (
-      SELECT 1 FROM Sales_Stock_Usage ssu 
-      WHERE ssu.sales_information_id = s.sales_information_id 
-      AND ssu.is_restored = true
-    )`);
+    conditions.push(RESTORED_SALES_FILTER);
   };
   
   if (category_id) {
@@ -524,7 +609,9 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
 
   const inventory_count = Number(invCountRows?.[0]?.inventory_count || 0);
 
-  return { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit, inventory_count, range: { start, end }};
+  const result = { total_sales, total_investment, total_profit, prev_total_sales, prev_total_investment, prev_total_profit, inventory_count, range: { start, end }};
+  setAnalyticsCache(cacheKey, result);
+  return result;
 
 }
 
@@ -548,6 +635,18 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
     end = end_date;
   } else {
     ({ start, end } = buildDateRange(range));
+  }
+
+  const cacheKey = makeAnalyticsCacheKey('fetchBranchTimeline', {
+    branch_id,
+    category_id,
+    interval,
+    start,
+    end
+  });
+  const cached = getAnalyticsCache(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   // Determine date truncation based on interval
@@ -598,10 +697,12 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
     ORDER BY period;`, params);
     
   // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
-  return rows.map(row => ({
+  const result = rows.map(row => ({
     ...row,
     period: dayjs(row.period).format('YYYY-MM-DD')
   }));
+  setAnalyticsCache(cacheKey, result);
+  return result;
 }
 
 
@@ -616,6 +717,16 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
     end = end_date;
   } else {
     ({ start, end } = buildDateRange(range));
+  }
+
+  const cacheKey = makeAnalyticsCacheKey('fetchBranchSalesSummary', {
+    start,
+    end,
+    category_id
+  });
+  const cached = getAnalyticsCache(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   // BUILD CATEGORY FILTER IF PROVIDED
@@ -658,5 +769,6 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
     GROUP BY b.branch_id, b.branch_name
     ORDER BY total_amount_due DESC, b.branch_name ASC;`, params);
 
+  setAnalyticsCache(cacheKey, rows);
   return rows;
 }

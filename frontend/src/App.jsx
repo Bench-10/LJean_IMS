@@ -1,5 +1,5 @@
 import api from "./utils/api.js";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { io } from "socket.io-client";
 import ModalForm from "./components/ModalForm";
 import ProductInventory from "./Pages/ProductInventory";
@@ -91,6 +91,20 @@ function App() {
 
   const {user, logout} = useAuth();
   const navigate = useNavigate();
+
+  const userRoles = useMemo(() => {
+    if (!user) return [];
+    if (Array.isArray(user.role)) return user.role;
+    return user.role ? [user.role] : [];
+  }, [user]);
+
+  const isOwner = useMemo(() => userRoles.includes('Owner'), [userRoles]);
+  const isBranchManager = useMemo(() => userRoles.includes('Branch Manager'), [userRoles]);
+  const isSalesAssociate = useMemo(() => userRoles.includes('Sales Associate'), [userRoles]);
+  const shouldFetchNotifications = useMemo(
+    () => userRoles.some(role => ['Branch Manager', 'Inventory Staff', 'Owner'].includes(role)),
+    [userRoles]
+  );
   
 
   //PREVENTS SCRIPTS ATTACKS ON INPUT FIELDS
@@ -673,47 +687,51 @@ function App() {
     };
   }, [user]);
 
-  
+
 
   //DISPLAY THE INVENTORY TABLE
-  const fetchProductsData = async () =>{
-      try {
-        setInventoryLoading(true);
-        let response;
-        if (!user || !user.role || !user.role.some(role => ['Branch Manager', 'Owner'].includes(role))){
-          response = await api.get(`/api/items?branch_id=${user.branch_id}`);
-        } else {
-          response = await api.get(`/api/items/`);
-        }
-        setProductsData(response.data);
-      } catch (error) {
-        console.log(error.message);
-        
-      } finally {
-        setInventoryLoading(false)
-      }
-  };
+  const fetchProductsData = useCallback(async () => {
+    if (!user) {
+      setProductsData([]);
+      return;
+    }
+
+    try {
+      setInventoryLoading(true);
+      const endpoint = isOwner || isBranchManager
+        ? '/api/items/'
+        : `/api/items?branch_id=${user.branch_id}`;
+      const response = await api.get(endpoint);
+      setProductsData(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, [user, isOwner, isBranchManager]);
 
 
-  const fetchPendingInventoryRequests = async () => {
-    if (!user || !user.role || !user.role.some(role => ['Branch Manager'].includes(role))) {
+  const fetchPendingInventoryRequests = useCallback(async () => {
+    if (!user || !isBranchManager) {
+      setPendingInventoryRequests([]);
       return;
     }
 
     try {
       setPendingInventoryLoading(true);
       const response = await api.get(`/api/items/pending?branch_id=${user.branch_id}`);
-  setPendingInventoryRequests(response.data);
+      setPendingInventoryRequests(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching pending inventory requests:', error);
     } finally {
       setPendingInventoryLoading(false);
     }
-  };
+  }, [user, isBranchManager]);
 
 
-  const fetchAdminPendingInventoryRequests = async () => {
-    if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
+  const fetchAdminPendingInventoryRequests = useCallback(async () => {
+    if (!user || !isOwner) {
+      setAdminInventoryRequests([]);
       return;
     }
 
@@ -727,7 +745,7 @@ function App() {
     } finally {
       setAdminInventoryLoading(false);
     }
-  };
+  }, [user, isOwner]);
 
 
   const handleApprovePendingInventory = async (pendingId) => {
@@ -853,32 +871,17 @@ function App() {
 
   //RENDERS THE TABLE
   useEffect(() =>{
-
-    if (!user) return;
-
     fetchProductsData();
-  }, [listCategories, user]);
+  }, [fetchProductsData]);
 
 
   useEffect(() => {
-    if (!user) {
-      setPendingInventoryRequests([]);
-      setAdminInventoryRequests([]);
-      return;
-    }
+    fetchPendingInventoryRequests();
+  }, [fetchPendingInventoryRequests]);
 
-    if (user.role && user.role.some(role => ['Branch Manager'].includes(role))) {
-      fetchPendingInventoryRequests();
-    } else {
-      setPendingInventoryRequests([]);
-    }
-
-    if (user.role && user.role.some(role => ['Owner'].includes(role))) {
-      fetchAdminPendingInventoryRequests();
-    } else {
-      setAdminInventoryRequests([]);
-    }
-  }, [user]);
+  useEffect(() => {
+    fetchAdminPendingInventoryRequests();
+  }, [fetchAdminPendingInventoryRequests]);
 
 
   //HANDLES OPENING ADD OR EDIT MODAL
@@ -947,25 +950,35 @@ function App() {
 
 
 
-  const fetchSaleRecords = async() =>{
+  const fetchSaleRecords = useCallback(async () => {
+    if (!user || !isSalesAssociate) {
+      setSaleHeader([]);
+      return;
+    }
+
     try {
       setSalesLoading(true);
       const saleHeader = await api.get(`/api/sale?branch_id=${user.branch_id}`);
-      setSaleHeader(saleHeader.data);
+      setSaleHeader(Array.isArray(saleHeader.data) ? saleHeader.data : []);
     } catch (error) {
       console.log(error);
-    } finally{
+    } finally {
       setSalesLoading(false);
     }
-  };
+  }, [user, isSalesAssociate]);
 
 
 
-  const getDeliveries = async () => {
+  const getDeliveries = useCallback(async () => {
+    if (!user || !isSalesAssociate) {
+      setDeliveryData([]);
+      return;
+    }
+
     try {
       setDeliveryLoading(true);
       const data = await api.get(`/api/delivery?branch_id=${user.branch_id}`);
-      setDeliveryData(data.data);
+      setDeliveryData(Array.isArray(data.data) ? data.data : []);
 
     } catch (error) {
       console.log(error);
@@ -974,38 +987,27 @@ function App() {
     }
     
 
-  }
+  }, [user, isSalesAssociate]);
 
 
   useEffect(() =>{
-
-    if (!user) return;
-    if (!user || !user.role || !user.role.some(role => ['Sales Associate'].includes(role))) return;
-
     fetchSaleRecords();
     getDeliveries();
-  },[user]);
+  },[fetchSaleRecords, getDeliveries]);
 
 
 
   //FOR NOTIFICATION DATA
-  const getTime = async () =>{
+  const getTime = useCallback(async () =>{
     try {
-      if (!user) {
+      if (!user || userRoles.length === 0) {
         setNotify([]);
         return;
       }
 
-      const roles = Array.isArray(user.role)
-        ? user.role
-        : user.role
-          ? [user.role]
-          : [];
-
-      const isOwner = roles.includes('Owner');
       const params = new URLSearchParams();
 
-      roles.forEach((role) => {
+      userRoles.forEach((role) => {
         if (role) {
           params.append('role', role);
         }
@@ -1033,28 +1035,15 @@ function App() {
     } catch (error) {
       console.log(error.message);
     } 
-  };
+  }, [user, userRoles, isOwner]);
 
 
 
   //BEST FOR NOW
   useEffect(() => {
 
-    if (!user) {
-      // RESET NOTIFICATION STATE WHEN USER LOGS OUT
+    if (!user || !shouldFetchNotifications) {
       setNotify([]);
-      return;
-    }
-
-    const roles = Array.isArray(user.role)
-      ? user.role
-      : user.role
-        ? [user.role]
-        : [];
-
-    const shouldFetchNotifications = roles.some((role) => ['Branch Manager', 'Inventory Staff', 'Owner'].includes(role));
-
-    if (!shouldFetchNotifications) {
       return;
     }
 
@@ -1067,7 +1056,7 @@ function App() {
 
     return () => clearInterval(intervalId);
 
-  }, [user]);
+  }, [user, shouldFetchNotifications, getTime]);
 
 
 
@@ -1080,50 +1069,56 @@ function App() {
 
 
   //FETCHING THE BRANCH GLOBALLY
-  const fetchBranch = async() =>{
+  const fetchBranch = useCallback(async() =>{
+    if (!user) {
+        setBranches([]);
+        return;
+    }
     try {
         const branch = await api.get(`/api/branches`);
-        setBranches(branch.data);
+        setBranches(Array.isArray(branch.data) ? branch.data : []);
     } catch (error) {
         console.log(error)
     }
-  };
+  }, [user]);
 
 
   //FOR ADDING USER
-  const fetchUsersinfo = async() =>{
+  const fetchUsersinfo = useCallback(async () =>{
+
+    if (!user || (!isBranchManager && !isOwner)) {
+      setUsers([]);
+      return;
+    }
 
     try {
        setUsersLoading(true);
 
-       if (user && user.branch_id && user.role && user.role.some(role => ['Branch Manager'].includes(role))){
-          const response = await api.get(`/api/users?branch_id=${user.branch_id}&user_id=${user.user_id}`);
-          setUsers(response.data)
-       } else if (user && user.role && user.role.some(role => ['Owner'].includes(role))){
-          const response = await api.get(`/api/users`);
-          setUsers(response.data)
+       let response;
+       if (isBranchManager) {
+          response = await api.get(`/api/users?branch_id=${user.branch_id}&user_id=${user.user_id}`);
+       } else {
+          response = await api.get(`/api/users`);
        }
 
-       
+       setUsers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.log(error);
     } finally {
       setUsersLoading(false);
     }
 
-   
-
-  };
+  }, [user, isBranchManager, isOwner]);
 
 
   //IMPROVE THIS IN THE FUTURE(IMPORTANT)
   useEffect(() => {
-
-    if (!user) return;
-
     fetchUsersinfo();
+  }, [fetchUsersinfo]);
+
+  useEffect(() => {
     fetchBranch();
-  }, [user])
+  }, [fetchBranch]);
 
 
 

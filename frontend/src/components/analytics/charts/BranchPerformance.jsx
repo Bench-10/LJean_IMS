@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
@@ -6,7 +6,7 @@ import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 import api from '../../../utils/api.js';
 
-function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, categoryFilter, loadingBranchPerformance, branchPerformanceRef, revenueDistributionRef }) {
+function BranchPerformance({ Card, startDate, endDate, categoryFilter, branchPerformanceRef, revenueDistributionRef }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]); 
   const [loading, setLoading] = useState(false);
@@ -17,36 +17,14 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
   });
 
   // ROLE CHECK: ONLY OWNER SHOULD SEE BRANCH PERFORMANCE CHARTS
-  const isOwner = user?.role?.some(role => ['Owner'].includes(role));
+  const isOwner = useMemo(() => {
+    if (!user) return false;
+    const roles = Array.isArray(user.role) ? user.role : user?.role ? [user.role] : [];
+    return roles.includes('Owner');
+  }, [user]);
 
   // COLORS FOR PIE CHART SEGMENTS
   const PIE_COLORS = ['#22c55e','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16','#f97316'];
-
-  // RESPONSIVE SIZING CALCULATIONS
-  const calculateResponsiveSizes = () => {
-    const { width, height } = screenDimensions;
-    
-    // BASE SIZES ON SCREEN DIMENSIONS - REDUCED FOR SMALLER PIE CHART
-    const baseRadius = Math.min(width * 0.05, height * 0.08);
-    const outerRadius = Math.max(40, Math.min(baseRadius, 120)); 
-    
-    // ADJUST FONT SIZES BASED ON SCREEN SIZE
-    const legendFontSize = width < 768 ? 10 : width < 1024 ? 11 : 12;
-    const tooltipFontSize = width < 768 ? 12 : 14;
-    
-    // RESPONSIVE POSITIONING
-    const centerY = height < 600 ? '40%' : '45%';
-    
-    return {
-      outerRadius,
-      legendFontSize,
-      tooltipFontSize,
-      centerY,
-      isMobile: width < 768,
-      isTablet: width >= 768 && width < 1024,
-      isDesktop: width >= 1024
-    };
-  };
 
   // UPDATE SCREEN DIMENSIONS ON RESIZE
   useEffect(() => {
@@ -62,98 +40,132 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
   }, []);
 
   
-  const resolveDateRange = () => {
-    const start_date = startDate;
-    const end_date = endDate;
-    return { start_date, end_date };
-  };
+  const resolvedRange = useMemo(() => ({
+    start_date: startDate,
+    end_date: endDate
+  }), [startDate, endDate]);
+
+  const responsiveSizes = useMemo(() => {
+    const { width, height } = screenDimensions;
+    const baseRadius = Math.min(width * 0.05, height * 0.08);
+    const outerRadius = Math.max(40, Math.min(baseRadius, 120));
+    const legendFontSize = width < 768 ? 10 : width < 1024 ? 11 : 12;
+    const tooltipFontSize = width < 768 ? 12 : 14;
+    const centerY = height < 600 ? '40%' : '45%';
+
+    return {
+      outerRadius,
+      legendFontSize,
+      tooltipFontSize,
+      centerY,
+      isMobile: width < 768
+    };
+  }, [screenDimensions]);
 
   // FETCH BRANCH TOTALS WHEN COMPONENT MOUNTS OR DATE RANGE CHANGES
-  useEffect(() => {
-    // ONLY FETCH WHEN OWNER
-    if (!isOwner) return;
-    
-    const fetchBranchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const { start_date, end_date } = resolveDateRange();
-        
-        const params = { start_date, end_date };
-        
-        // ADD CATEGORY FILTER IF SELECTED
-        if (categoryFilter) {
-          params.category_id = categoryFilter;
-        }
-        
-        console.log('📊 Fetching branch performance with params:', params);
-        
-        // USE EFFICIENT BACKEND ENDPOINT FOR BRANCH SUMMARY
-        const branchSummaryRes = await api.get(`/api/analytics/branches-summary`, { 
-          params
-        });
-        const branchData = branchSummaryRes.data || [];
-        
-        setBranchTotals(branchData);
-      } catch (e) {
-        console.error('Branch performance fetch error:', e);
-        setError('Failed to load branch performance data');
-      } finally {
-        setLoading(false);
+  const fetchBranchData = useCallback(async (signal) => {
+    if (!isOwner) {
+      setBranchTotals([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const params = { ...resolvedRange };
+
+      if (categoryFilter) {
+        params.category_id = categoryFilter;
       }
-    };
 
-    fetchBranchData();
-  }, [isOwner, rangeMode, preset, startDate, endDate, categoryFilter]);
+      const branchSummaryRes = await api.get(`/api/analytics/branches-summary`, {
+        params,
+        signal
+      });
+      const branchData = Array.isArray(branchSummaryRes.data) ? branchSummaryRes.data : [];
 
-  // IF NOT OWNER, RETURN NULL (COMPONENT WON'T RENDER)
-  if (!isOwner) return null;
+      setBranchTotals(branchData);
+    } catch (e) {
+      if (e?.code === 'ERR_CANCELED') return;
+      console.error('Branch performance fetch error:', e);
+      setError('Failed to load branch performance data');
+    } finally {
+      setLoading(false);
+    }
+  }, [isOwner, resolvedRange, categoryFilter]);
 
-  // FILTER OUT BRANCHES WITH ZERO SALES FOR PIE CHART
-  const pieChartData = branchTotals.filter(item => item.total_amount_due > 0);
-  
-  // CALCULATE TOTAL REVENUE FOR PERCENTAGE CALCULATION
-  const totalRevenue = pieChartData.reduce((sum, item) => sum + Number(item.total_amount_due), 0);
-  
-  // ENSURE DATA HAS NUMERIC VALUES AND ADD PERCENTAGE
-  const processedPieData = pieChartData.map(item => {
-    const amount = Number(item.total_amount_due);
-    const percentage = totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0;
-    
-    return {
-      ...item,
-      total_amount_due: amount,
-      percentage: Number(percentage.toFixed(1))
-    };
-  });
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchBranchData(controller.signal);
+    return () => controller.abort();
+  }, [fetchBranchData]);
 
-  // CHECK IF ANY BRANCH HAS A POSITIVE TOTAL FOR BAR CHART
-  const hasPositiveBarValues = branchTotals.some(item => Number(item.total_amount_due) > 0);
+  // NOTE: avoid an early return here to keep hook invocation order stable across renders.
+  // Rendering is controlled by parent, but when this component mounts we simply
+  // render nothing for non-owners to avoid accidental hook-order mismatches.
 
-  // TRUNCATE BRANCH NAMES FOR DISPLAY
-  const truncateBranchName = (name, maxLength = 8) => {
+  const pieChartData = useMemo(
+    () => branchTotals.filter(item => Number(item.total_amount_due) > 0),
+    [branchTotals]
+  );
+
+  const totalRevenue = useMemo(
+    () => pieChartData.reduce((sum, item) => sum + Number(item.total_amount_due), 0),
+    [pieChartData]
+  );
+
+  const processedPieData = useMemo(
+    () => pieChartData.map(item => {
+      const amount = Number(item.total_amount_due);
+      const percentage = totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0;
+      return {
+        ...item,
+        total_amount_due: amount,
+        percentage: Number(percentage.toFixed(1))
+      };
+    }),
+    [pieChartData, totalRevenue]
+  );
+
+  const hasPositiveBarValues = useMemo(
+    () => branchTotals.some(item => Number(item.total_amount_due) > 0),
+    [branchTotals]
+  );
+
+  const truncateBranchName = useCallback((name, maxLength = 8) => {
     if (!name) return '';
     if (name.length <= maxLength) return name;
-    return name.substring(0, maxLength) + '...';
-  };
+    return `${name.substring(0, maxLength)}...`;
+  }, []);
 
-  // PROCESS DATA WITH TRUNCATED NAMES FOR BAR CHART
-  const processedBarData = branchTotals.map(item => ({
-    ...item,
-    display_name: truncateBranchName(item.branch_name, 8),
-    original_name: item.branch_name
-  }));
+  const processedBarData = useMemo(
+    () => branchTotals.map(item => ({
+      ...item,
+      display_name: truncateBranchName(item.branch_name, 8),
+      original_name: item.branch_name
+    })),
+    [branchTotals, truncateBranchName]
+  );
 
-  // GET RESPONSIVE SIZES FOR CURRENT SCREEN
-  const responsiveSizes = calculateResponsiveSizes();
+  const showBarChart = !loading && !error && branchTotals.length > 0 && hasPositiveBarValues;
+  const showPieChart = !loading && !error && processedPieData.length > 0;
   return (
     <>
-      {/* BRANCH PERFORMANCE COMPARISON */}
-      <Card title={"BRANCH SALES PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]" exportRef={branchPerformanceRef}>
+      {!isOwner ? null : (
+        <>
+          {/* BRANCH PERFORMANCE COMPARISON */}
+          <Card title={"BRANCH SALES PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]" exportRef={branchPerformanceRef}>
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
-          {(loading || loadingBranchPerformance) && <ChartLoading message="Loading branch performance..." />}
+          {loading && <ChartLoading message="Loading branch performance..." />}
+          {error && !loading && (
+            <ChartNoData
+              message={error}
+              hint="Please try refreshing the analytics page."
+            />
+          )}
           
-          {!loading && !loadingBranchPerformance && !error && branchTotals.length > 0 && hasPositiveBarValues && (
+          {showBarChart && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="branch-performance">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -199,7 +211,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
               </ResponsiveContainer>
             </div>
           )}
-          {!loading && (!error || error) && (branchTotals.length === 0 || !hasPositiveBarValues) && (
+          {!loading && !error && !showBarChart && (
             <ChartNoData
               message="No branch performance data for the selected range."
               hint="TRY EXPANDING THE DATE RANGE."
@@ -208,12 +220,18 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
         </div>
       </Card>
 
-      {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
-      <Card title={"REVENUE DISTRIBUTION (%)"} className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]" exportRef={revenueDistributionRef}>
+  {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
+  <Card title={"REVENUE DISTRIBUTION (%)"} className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]" exportRef={revenueDistributionRef}>
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
-          {(loading || loadingBranchPerformance) && <ChartLoading message="Loading distribution..." />}
+          {loading && <ChartLoading message="Loading distribution..." />}
+          {error && !loading && (
+            <ChartNoData
+              message={error}
+              hint="Please try refreshing the analytics page."
+            />
+          )}
           
-          {!loading && !loadingBranchPerformance && !error && processedPieData.length > 0 && (
+          {showPieChart && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="revenue-distribution">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -258,7 +276,7 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
             </div>
           )}
           
-          {!loading && (!error || error) && processedPieData.length === 0 && (
+          {!loading && !error && !showPieChart && (
             <ChartNoData
               message="No revenue distribution data available."
               hint="TRY A DIFFERENT DATE RANGE."
@@ -266,6 +284,8 @@ function BranchPerformance({ Card, rangeMode, preset, startDate, endDate, catego
           )}
         </div>
       </Card>
+        </>
+      )}
     </>
   );
 }
