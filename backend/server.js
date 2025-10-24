@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
@@ -114,6 +115,7 @@ app.use(compression({
 }));
 
 app.use(cors(corsOptions));
+app.use(cookieParser());
 
 const requestBodyLimit = process.env.REQUEST_PAYLOAD_LIMIT || '100kb';
 app.use(express.json({ limit: requestBodyLimit }));

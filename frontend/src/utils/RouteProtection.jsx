@@ -4,8 +4,18 @@ import { useAuth } from '../authentication/Authentication'
 import { RiErrorWarningLine } from "react-icons/ri";
 
 function RouteProtection({allowedRoles = [], children}) {
-  const {user} = useAuth();
+  const {user, loading} = useAuth();
 
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className='flex justify-center items-center h-screen'>
+        <div className='flex flex-col justify-center items-center text-gray-500'>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   //ALWAYS ROUTE TO THE LOGIN PART IF THERE IS NO USER
   if (!user) return <Navigate to="/" replace />;

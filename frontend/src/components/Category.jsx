@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import api from '../utils/api';
+import { useAuth } from '../authentication/Authentication';
+function Category({ isCategoryOpen, onClose, setListCategories, listCategories, fetchProductsData, sanitizeInput}) {
 
-function Category({ isCategoryOpen, onClose, setListCategories, listCategories, fetchProductsData, sanitizeInput }) {
+  const {user} = useAuth();
 
   const [category_name, setCategoryName] = useState('');
   const [editCategory_name, setEditcategoryName] = useState('')
   const [openEdit, setOpenEdit] = useState(false);
   const [selectEditCategory, setSelectEditCategory] = useState({});
+
+
 
 
   useEffect(() => {
@@ -26,9 +30,11 @@ function Category({ isCategoryOpen, onClose, setListCategories, listCategories, 
   };
 
   useEffect(() => {
+
+    if (!user || user.length === 0) return
     generateCategories();
 
-  }, [])
+  }, [user])
 
 
   const submitCategory = async (type) => {

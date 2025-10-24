@@ -3,6 +3,49 @@ import * as userAuthentication from '../Services/users/userAuthentication.js';
 import * as userCreation from '../Services/users/userCreation.js';
 import * as disableEnableAccount from '../Services/users/disableEnableAccount.js';
 import { SQLquery } from '../db.js';
+import { generateToken } from '../utils/jwt.js';
+import { getTokenCookieName, getTokenCookieOptions } from '../utils/authCookies.js';
+
+
+// GET CURRENT USER FROM JWT (CANNOT BE FAKED - READS FROM DATABASE)
+export const getCurrentUser = async (req, res) => {
+    try {
+        // req.user is populated by authenticate middleware
+        // Fetch full user details with branch info to match login response structure
+        if (req.user.user_type === 'admin') {
+            // Admin user - return basic info
+            return res.status(200).json({
+                admin_id: req.user.admin_id,
+                user_id: req.user.admin_id,
+                role: req.user.role,
+                first_name: req.user.first_name,
+                last_name: req.user.last_name,
+                full_name: `${req.user.first_name} ${req.user.last_name}`,
+                user_type: 'admin'
+            });
+        }
+
+        // Regular user - fetch complete details with branch info
+        const userData = await SQLquery(
+            `SELECT u.user_id, u.branch_id, b.branch_name, b.address, u.role, 
+                    u.first_name || ' ' || u.last_name AS full_name, 
+                    u.cell_number, u.hire_date, b.telephone_num, b.cellphone_num, b.branch_email
+             FROM Users u
+             JOIN Branch b ON u.branch_id = b.branch_id
+             WHERE u.user_id = $1`,
+            [req.user.user_id]
+        );
+
+        if (!userData.rows.length) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.status(200).json(userData.rows[0]);
+    } catch (error) {
+        console.error('Error fetching current user:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
 
 
 export const getBranches = async (req, res) =>{
@@ -43,7 +86,18 @@ export const userCredentials = async (req, res) =>{
         
         // Check if user data was returned
         if (result && result.length > 0) {
-            return res.status(200).json(result);
+            const user = result[0];
+            
+            const token = generateToken(user);
+            const cookieName = getTokenCookieName();
+            const cookieOptions = getTokenCookieOptions();
+
+            res.cookie(cookieName, token, cookieOptions);
+
+            return res.status(200).json({
+                user,
+                expiresInMs: cookieOptions.maxAge
+            });
         }
         
         // Handle edge case where no error or user data is returned
@@ -62,6 +116,8 @@ export const userLogout = async (req, res) =>{
         const userId = req.params.id
         const activity = req.body;
         const result = await userAuthentication.userLastLogout(userId, activity);
+        const cookieName = getTokenCookieName();
+        res.clearCookie(cookieName, getTokenCookieOptions());
         res.status(200).json(result);
     } catch (error) {
         console.error('Error during user logout: ', error);

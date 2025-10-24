@@ -1095,15 +1095,16 @@ function App() {
 
     try {
        setUsersLoading(true);
-       let response;
 
        if (user && user.branch_id && user.role && user.role.some(role => ['Branch Manager'].includes(role))){
-          response = await api.get(`/api/users?branch_id=${user.branch_id}&user_id=${user.user_id}`);
-       } else {
-          response = await api.get(`/api/users`);
+          const response = await api.get(`/api/users?branch_id=${user.branch_id}&user_id=${user.user_id}`);
+          setUsers(response.data)
+       } else if (user && user.role && user.role.some(role => ['Owner'].includes(role))){
+          const response = await api.get(`/api/users`);
+          setUsers(response.data)
        }
 
-       setUsers(response.data)
+       
     } catch (error) {
       console.log(error);
     } finally {

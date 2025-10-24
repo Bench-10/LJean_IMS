@@ -200,8 +200,6 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       if (!String(min_threshold).trim()) isEmptyField.min_threshold = true;
       if (!String(max_threshold).trim()) isEmptyField.max_threshold = true;
       if (!String(unit_price).trim()) isEmptyField.unit_price = true;
-      if (!String(date_added).trim()) isEmptyField.date_added = true;  // ✅ Add this
-      if (!String(product_validity).trim()) isEmptyField.product_validity = true;  // ✅ Add this
     }
 
     // CHECK IF INPUT IS NOT A NUMBER
@@ -602,6 +600,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                       {errorflag('unit', 'unit')}
                     </div>
                   }
+                  
 
                   {!(mode === 'edit' && editChoice === 'addStocks') &&
                     <div className='relative grid grid-cols-2 gap-3 '>

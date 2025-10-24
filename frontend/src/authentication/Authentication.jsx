@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import api from '../utils/api';
 
 
@@ -7,19 +7,44 @@ const AuthContext = createContext();
 
 function Authentication ({ children }) {
 
-    const [user, setUser] = useState(() => {
-      const storedUser = localStorage.getItem('userInfo');
-      return storedUser ? JSON.parse(storedUser) : null;
-    });
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const hasAttemptedAuth = useRef(false);
+
+    // Fetch current user from backend on mount (using JWT cookie)
+    useEffect(() => {
+        // Only attempt once per app load
+        if (hasAttemptedAuth.current) return;
+        hasAttemptedAuth.current = true;
+
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await api.get('/api/me');
+                setUser(response.data);
+            } catch (error) {
+                // No valid session - user needs to login
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCurrentUser();
+    }, []);
 
 
 
     const loginAuthentication = async (username, password) => {
       try {
         const response = await api.post(`/api/authentication`, { username, password });
-        const userData = response.data[0];
+        const userData = response.data?.user;
+
+        if (!userData) {
+          throw new Error('Invalid authentication response');
+        }
+
+        // Store user in state (data comes from backend, not localStorage)
         setUser(userData);
-        localStorage.setItem('userInfo', JSON.stringify(userData));
         return userData.role ? userData.role : false;
       } catch (error) {
         // Handle specific authentication errors
@@ -45,13 +70,12 @@ function Authentication ({ children }) {
       }
 
       setUser(null);
-      localStorage.removeItem('userInfo');
     };
 
 
 
     return (
-      <AuthContext.Provider value={{user, loginAuthentication,  logout}}>
+      <AuthContext.Provider value={{user, loginAuthentication, logout, loading}}>
         {children}
       </AuthContext.Provider>
     )
