@@ -6,7 +6,7 @@ import ChartLoading from '../../common/ChartLoading.jsx';
 import RestockSuggestionsDialog from '../../dialogs/RestockSuggestionsDialog.jsx';
 import { FaLightbulb, FaBoxOpen } from 'react-icons/fa';
 
-function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts, dateRangeDisplay, topProductsRef, salesChartRef }) {
+function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName, salesInterval, setSalesInterval, restockInterval, setRestockInterval, setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts, loadingRestockSuggestions, restockSuggestions, dateRangeDisplay, topProductsRef, salesChartRef }) {
 
   const [showRestockDialog, setShowRestockDialog] = useState(false);
   
@@ -406,10 +406,11 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
           onClose={() => setShowRestockDialog(false)}
           forecastData={forecastChartData}
           actualData={actualSeries}
-          topProducts={topProducts}
+          topProducts={Array.isArray(restockSuggestions) && restockSuggestions.length > 0 ? restockSuggestions : topProducts}
           salesInterval={salesInterval}
           categoryName={categoryName}
           selectedProductName={selectedProductName}
+          loading={loadingRestockSuggestions}
         />
     
     </>

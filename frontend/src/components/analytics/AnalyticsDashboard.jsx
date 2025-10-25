@@ -17,6 +17,8 @@ import { AiFillProduct } from "react-icons/ai";
 import { useAuth } from '../../authentication/Authentication.jsx';
 import ChartLoading from '../common/ChartLoading.jsx';
 
+const FETCH_DEBOUNCE_MS = 150;
+
 
 
 const Card = ({ title, children, className = '', exportRef, bodyClassName = '' }) => {
@@ -64,7 +66,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const revenueDistributionRef = useRef(null);
   const branchTimelineRef = useRef(null);
   const kpiRef = useRef(null);
-  const fetchTimerRef = useRef(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   const [salesPerformance, setSalesPerformance] = useState({ history: [], forecast: [], series: [] });
@@ -72,6 +73,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [inventoryLevels, setInventoryLevels] = useState([]);
   const [categoryDist, setCategoryDist] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
+  const [branchTotals, setBranchTotals] = useState([]);
+  const [branchError, setBranchError] = useState(null);
+  const [loadingBranchPerformance, setLoadingBranchPerformance] = useState(false);
+  const [restockSuggestions, setRestockSuggestions] = useState([]);
+  const [loadingRestockSuggestions, setLoadingRestockSuggestions] = useState(false);
   
   // Loading states for each chart
   const [loadingSalesPerformance, setLoadingSalesPerformance] = useState(false);
@@ -223,7 +229,17 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     setLoadingTopProducts(false);
     setLoadingDelivery(false);
     setLoadingKPIs(false);
+    setBranchTotals([]);
+    setBranchError(null);
+    setLoadingBranchPerformance(false);
+    setRestockSuggestions([]);
+    setLoadingRestockSuggestions(false);
   }, []);
+
+  useEffect(() => {
+    if (user) return;
+    resetAnalyticsState();
+  }, [resetAnalyticsState, user]);
 
   const fetchSalesPerformance = useCallback(async (signal) => {
     if (!user) return;
@@ -266,8 +282,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       start_date: resolvedRange.start_date,
       end_date: resolvedRange.end_date,
       limit: 50,
-      interval: salesInterval,
-      include_forecast: true
+      interval: 'monthly',
+      include_forecast: false
     };
 
     const paramsRestock = { interval: restockInterval };
@@ -296,7 +312,34 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     } finally {
       setLoadingTopProducts(false);
     }
-  }, [branchId, categoryFilter, resolvedRange, restockInterval, salesInterval, user]);
+  }, [branchId, categoryFilter, resolvedRange, restockInterval, user]);
+
+  const fetchRestockSuggestionsData = useCallback(async (signal) => {
+    if (!user) return;
+
+    const params = {
+      branch_id: branchId || undefined,
+      category_id: categoryFilter || undefined,
+      start_date: resolvedRange.start_date,
+      end_date: resolvedRange.end_date,
+      limit: 50,
+      interval: salesInterval,
+      include_forecast: true
+    };
+
+    setLoadingRestockSuggestions(true);
+    try {
+      const response = await api.get(`/api/analytics/top-products`, { params, signal });
+      setRestockSuggestions(Array.isArray(response.data) ? response.data : []);
+    } catch (e) {
+      if (e?.code !== 'ERR_CANCELED') {
+        console.error('Restock suggestions fetch error', e);
+      }
+      setRestockSuggestions([]);
+    } finally {
+      setLoadingRestockSuggestions(false);
+    }
+  }, [branchId, categoryFilter, resolvedRange, salesInterval, user]);
 
   const fetchInventoryLevels = useCallback(async (signal) => {
     if (!user) return;
@@ -396,36 +439,132 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     }
   }, [branchId, deliveryInterval, deliveryStatus, user]);
 
+  const fetchBranchPerformance = useCallback(async (signal) => {
+    if (!user || !isOwner || branchId) {
+      setBranchTotals([]);
+      setBranchError(null);
+      setLoadingBranchPerformance(false);
+      return;
+    }
+
+    setLoadingBranchPerformance(true);
+    setBranchError(null);
+
+    try {
+      const params = {
+        start_date: resolvedRange.start_date,
+        end_date: resolvedRange.end_date
+      };
+      if (categoryFilter) params.category_id = categoryFilter;
+
+      const response = await api.get(`/api/analytics/branches-summary`, { params, signal });
+      const data = Array.isArray(response.data) ? response.data : [];
+      setBranchTotals(data);
+    } catch (e) {
+      if (e?.code === 'ERR_CANCELED') return;
+      console.error('Branch performance fetch error', e);
+      setBranchTotals([]);
+      setBranchError('Failed to load branch performance data');
+    } finally {
+      setLoadingBranchPerformance(false);
+    }
+  }, [user, isOwner, branchId, resolvedRange, categoryFilter]);
+
   useEffect(() => {
+    if (!user) return;
     const controller = new AbortController();
-
-    if (fetchTimerRef.current) {
-      clearTimeout(fetchTimerRef.current);
-      fetchTimerRef.current = null;
-    }
-
-    if (!user) {
-      resetAnalyticsState();
-      return () => controller.abort();
-    }
-
-    fetchTimerRef.current = setTimeout(() => {
+    const timer = setTimeout(() => {
       fetchSalesPerformance(controller.signal);
-      fetchTopProductsData(controller.signal);
-      fetchInventoryLevels(controller.signal);
-      fetchCategoryDistribution(controller.signal);
-      fetchKPIsData(controller.signal);
-      fetchDeliveryData(controller.signal);
-    }, 150);
-
+    }, FETCH_DEBOUNCE_MS);
     return () => {
       controller.abort();
-      if (fetchTimerRef.current) {
-        clearTimeout(fetchTimerRef.current);
-        fetchTimerRef.current = null;
-      }
+      clearTimeout(timer);
     };
-  }, [fetchCategoryDistribution, fetchDeliveryData, fetchInventoryLevels, fetchKPIsData, fetchSalesPerformance, fetchTopProductsData, resetAnalyticsState, user]);
+  }, [fetchSalesPerformance, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchTopProductsData(controller.signal);
+    }, FETCH_DEBOUNCE_MS);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [fetchTopProductsData, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchRestockSuggestionsData(controller.signal);
+    }, FETCH_DEBOUNCE_MS);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [fetchRestockSuggestionsData, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchKPIsData(controller.signal);
+    }, FETCH_DEBOUNCE_MS);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [fetchKPIsData, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchInventoryLevels(controller.signal);
+    }, FETCH_DEBOUNCE_MS);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [fetchInventoryLevels, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchCategoryDistribution(controller.signal);
+    }, FETCH_DEBOUNCE_MS);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [fetchCategoryDistribution, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchDeliveryData(controller.signal);
+    }, FETCH_DEBOUNCE_MS);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [fetchDeliveryData, user]);
+
+  useEffect(() => {
+    if (!user || branchId || !isOwner) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchBranchPerformance(controller.signal);
+    }, FETCH_DEBOUNCE_MS);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [branchId, fetchBranchPerformance, isOwner, user]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -798,6 +937,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
             loadingSalesPerformance={loadingSalesPerformance}
             loadingTopProducts={loadingTopProducts}
             dateRangeDisplay={dateRangeDisplay}
+            restockSuggestions={restockSuggestions}
+            loadingRestockSuggestions={loadingRestockSuggestions}
             salesChartRef={salesChartRef}
             topProductsRef={topProductsRef}
           />
@@ -830,9 +971,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
           <>
             <BranchPerformance
               Card={Card}
-              startDate={startDate}
-              endDate={endDate}
-              categoryFilter={categoryFilter}
+                branchTotals={branchTotals}
+                loading={loadingBranchPerformance}
+                error={branchError}
               branchPerformanceRef={branchPerformanceRef}
               revenueDistributionRef={revenueDistributionRef}
             />

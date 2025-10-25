@@ -22,7 +22,8 @@ const RestockSuggestionsDialog = ({
   topProducts,
   salesInterval,
   categoryName,
-  selectedProductName
+  selectedProductName,
+  loading = false
 }) => {
   const coverageMultiplier = getIntervalMultiplier(salesInterval);
   const intervalLabel = intervalLabelMap[salesInterval] || 'period';
@@ -188,7 +189,13 @@ const RestockSuggestionsDialog = ({
 
         <style>{hideScrollbarStyles}</style>
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] hide-scrollbar">
-          {!hasData ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <FaInfoCircle className="text-4xl text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 mb-2">Generating restock insights…</p>
+              <p className="text-sm text-gray-500">We are refreshing Prophet forecasts to match the selected interval.</p>
+            </div>
+          ) : !hasData ? (
             <div className="text-center py-12">
               <FaInfoCircle className="text-4xl text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-2">No restocking insights available yet</p>

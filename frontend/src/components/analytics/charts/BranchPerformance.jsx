@@ -4,13 +4,9 @@ import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
-import api from '../../../utils/api.js';
 
-function BranchPerformance({ Card, startDate, endDate, categoryFilter, branchPerformanceRef, revenueDistributionRef }) {
+function BranchPerformance({ Card, branchTotals, loading, error, branchPerformanceRef, revenueDistributionRef }) {
   const { user } = useAuth();
-  const [branchTotals, setBranchTotals] = useState([]); 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [screenDimensions, setScreenDimensions] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -40,11 +36,6 @@ function BranchPerformance({ Card, startDate, endDate, categoryFilter, branchPer
   }, []);
 
   
-  const resolvedRange = useMemo(() => ({
-    start_date: startDate,
-    end_date: endDate
-  }), [startDate, endDate]);
-
   const responsiveSizes = useMemo(() => {
     const { width, height } = screenDimensions;
     const baseRadius = Math.min(width * 0.05, height * 0.08);
@@ -61,49 +52,6 @@ function BranchPerformance({ Card, startDate, endDate, categoryFilter, branchPer
       isMobile: width < 768
     };
   }, [screenDimensions]);
-
-  // FETCH BRANCH TOTALS WHEN COMPONENT MOUNTS OR DATE RANGE CHANGES
-  const fetchBranchData = useCallback(async (signal) => {
-    if (!isOwner) {
-      setBranchTotals([]);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      const params = { ...resolvedRange };
-
-      if (categoryFilter) {
-        params.category_id = categoryFilter;
-      }
-
-      const branchSummaryRes = await api.get(`/api/analytics/branches-summary`, {
-        params,
-        signal
-      });
-      const branchData = Array.isArray(branchSummaryRes.data) ? branchSummaryRes.data : [];
-
-      setBranchTotals(branchData);
-    } catch (e) {
-      if (e?.code === 'ERR_CANCELED') return;
-      console.error('Branch performance fetch error:', e);
-      setError('Failed to load branch performance data');
-    } finally {
-      setLoading(false);
-    }
-  }, [isOwner, resolvedRange, categoryFilter]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchBranchData(controller.signal);
-    return () => controller.abort();
-  }, [fetchBranchData]);
-
-  // NOTE: avoid an early return here to keep hook invocation order stable across renders.
-  // Rendering is controlled by parent, but when this component mounts we simply
-  // render nothing for non-owners to avoid accidental hook-order mismatches.
 
   const pieChartData = useMemo(
     () => branchTotals.filter(item => Number(item.total_amount_due) > 0),
@@ -150,12 +98,16 @@ function BranchPerformance({ Card, startDate, endDate, categoryFilter, branchPer
 
   const showBarChart = !loading && !error && branchTotals.length > 0 && hasPositiveBarValues;
   const showPieChart = !loading && !error && processedPieData.length > 0;
+  if (!isOwner) return null;
+
   return (
     <>
-      {!isOwner ? null : (
-        <>
-          {/* BRANCH PERFORMANCE COMPARISON */}
-          <Card title={"BRANCH SALES PERFORMANCE COMPARISON"} className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]" exportRef={branchPerformanceRef}>
+      {/* BRANCH PERFORMANCE COMPARISON */}
+      <Card
+        title={"BRANCH SALES PERFORMANCE COMPARISON"}
+        className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]"
+        exportRef={branchPerformanceRef}
+      >
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {loading && <ChartLoading message="Loading branch performance..." />}
           {error && !loading && (
@@ -220,8 +172,12 @@ function BranchPerformance({ Card, startDate, endDate, categoryFilter, branchPer
         </div>
       </Card>
 
-  {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
-  <Card title={"REVENUE DISTRIBUTION (%)"} className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]" exportRef={revenueDistributionRef}>
+      {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
+      <Card
+        title={"REVENUE DISTRIBUTION (%)"}
+        className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]"
+        exportRef={revenueDistributionRef}
+      >
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {loading && <ChartLoading message="Loading distribution..." />}
           {error && !loading && (
@@ -284,8 +240,6 @@ function BranchPerformance({ Card, startDate, endDate, categoryFilter, branchPer
           )}
         </div>
       </Card>
-        </>
-      )}
     </>
   );
 }
