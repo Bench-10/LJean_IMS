@@ -128,7 +128,7 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
 
 //MARKS THE NOTIFICATION AS READ IN THE DATABASE
 export const markAsRead = async (userAndAlertID) =>{
-  const { alert_id, user_id, user_type = 'user', admin_id = null } = userAndAlertID;
+  const { alert_id, user_id = null, user_type = 'user', admin_id = null } = userAndAlertID;
 
   if (user_type === 'admin' && admin_id) {
     await SQLquery(

@@ -7,6 +7,7 @@ import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp
 function Notification({ openNotif, notify, setNotify, unreadCount, onClose }) {
 
   const { user } = useAuth();
+  
 
   const [visibleCount, setVisibleCount] = useState(15);
   const [showPopup, setShowPopup] = useState(false);
@@ -107,15 +108,33 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose }) {
       n.alert_id === alert_id ? { ...n, is_read: true } : n
     ));
 
+    let payload;
+
+    if (isAdminUser){
+      payload = { alert_id: alert_id, user_type: 'admin',  admin_id: principalId }
+    } else {
+      payload = { alert_id: alert_id, user_type: 'user',  user_id: principalId }
+    }
+
+
     //UPDATES THE BACKEND
-    await api.post(`/api/notifications`, { alert_id: alert_id, user_id: user.user_id });
+    await api.post(`/api/notifications`, payload);
   };
 
   //FUNCTION THAT MARKS ALL NOTIFICATIONS AS READ
   const markAllAsRead = async () => {
     try {
+
+      let payload;
+
+      if (isAdminUser){
+        payload = { user_type: 'admin',  admin_id: principalId }
+      } else {
+        payload = { user_type: 'user',  user_id: principalId }
+      }
+
       await api.post(`/api/notifications/mark-all-read`, {
-        user_id: user.user_id,
+        payload,
         branch_id: user.branch_id,
         hire_date: user.hire_date
       });
