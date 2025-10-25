@@ -12,8 +12,9 @@ export const getProductHistory = async(dates, branchId) => {
 
         if (startDate === '' && endDate === '') {
             const {rows} = await SQLquery(`
-                SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value
+                SELECT ${correctDateFormat('date_added')}, Add_Stocks.add_id, Add_Stocks.product_id, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value, iahl.alert_timestamp, iahl.history_timestamp
                 FROM Add_Stocks
+                LEFT JOIN inventory_alert_history_links iahl ON iahl.add_id = Add_Stocks.add_id
                 LEFT JOIN Inventory_product USING(product_id, branch_id)
                 LEFT JOIN Category USING(category_id)
                 ORDER BY date_added DESC, add_id DESC
@@ -25,8 +26,9 @@ export const getProductHistory = async(dates, branchId) => {
 
         if (startDate !== '' && endDate !== '') {
             const {rows} = await SQLquery(`
-                SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value
+                SELECT ${correctDateFormat('date_added')}, Add_Stocks.add_id, Add_Stocks.product_id, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value, iahl.alert_timestamp, iahl.history_timestamp
                 FROM Add_Stocks
+                LEFT JOIN inventory_alert_history_links iahl ON iahl.add_id = Add_Stocks.add_id
                 LEFT JOIN Inventory_product USING(product_id, branch_id)
                 LEFT JOIN Category USING(category_id)
                 WHERE date_added BETWEEN $1 AND $2
@@ -40,8 +42,9 @@ export const getProductHistory = async(dates, branchId) => {
 
         if (endDate === ''){
             const {rows} = await SQLquery(`
-                SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value
+                SELECT ${correctDateFormat('date_added')}, Add_Stocks.add_id, Add_Stocks.product_id, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value, iahl.alert_timestamp, iahl.history_timestamp
                 FROM Add_Stocks
+                LEFT JOIN inventory_alert_history_links iahl ON iahl.add_id = Add_Stocks.add_id
                 LEFT JOIN Inventory_product USING(product_id, branch_id)
                 LEFT JOIN Category USING(category_id)
                 WHERE date_added >= $1
@@ -54,8 +57,9 @@ export const getProductHistory = async(dates, branchId) => {
 
         if (startDate === '') {
             const {rows} = await SQLquery(`
-                SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value
+                SELECT ${correctDateFormat('date_added')}, Add_Stocks.add_id, Add_Stocks.product_id, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value, iahl.alert_timestamp, iahl.history_timestamp
                 FROM Add_Stocks
+                LEFT JOIN inventory_alert_history_links iahl ON iahl.add_id = Add_Stocks.add_id
                 LEFT JOIN Inventory_product USING(product_id, branch_id)
                 LEFT JOIN Category USING(category_id)
                 WHERE date_added <= $1
@@ -73,8 +77,9 @@ export const getProductHistory = async(dates, branchId) => {
 
     if ((startDate === '' && endDate === '')  || (!startDate && !endDate)) {
         const {rows} = await SQLquery(`
-            SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value
+            SELECT ${correctDateFormat('date_added')}, Add_Stocks.add_id, Add_Stocks.product_id, Inventory_product.product_name, Category.category_id, Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value, iahl.alert_timestamp, iahl.history_timestamp
             FROM Add_Stocks
+            LEFT JOIN inventory_alert_history_links iahl ON iahl.add_id = Add_Stocks.add_id
             LEFT JOIN Inventory_product USING(product_id, branch_id)
             LEFT JOIN Category USING(category_id)
             WHERE branch_id = $1
@@ -87,8 +92,9 @@ export const getProductHistory = async(dates, branchId) => {
 
     if (startDate !== '' && endDate !== '') {
         const {rows} = await SQLquery(`
-            SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_id,Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value
-            FROM Add_Stocks
+    SELECT ${correctDateFormat('date_added')}, Add_Stocks.add_id, Add_Stocks.product_id, Inventory_product.product_name, Category.category_id,Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value, iahl.alert_timestamp, iahl.history_timestamp
+        FROM Add_Stocks
+        LEFT JOIN inventory_alert_history_links iahl ON iahl.add_id = Add_Stocks.add_id
             LEFT JOIN Inventory_product USING(product_id, branch_id)
             LEFT JOIN Category USING(category_id)
             WHERE (date_added BETWEEN $1 AND $2) AND branch_id = $3
@@ -102,8 +108,9 @@ export const getProductHistory = async(dates, branchId) => {
 
     if (endDate === ''){
         const {rows} = await SQLquery(`
-            SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_id,Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value
-            FROM Add_Stocks
+    SELECT ${correctDateFormat('date_added')}, Add_Stocks.add_id, Add_Stocks.product_id, Inventory_product.product_name, Category.category_id,Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value, iahl.alert_timestamp, iahl.history_timestamp
+        FROM Add_Stocks
+        LEFT JOIN inventory_alert_history_links iahl ON iahl.add_id = Add_Stocks.add_id
             LEFT JOIN Inventory_product USING(product_id, branch_id)
             LEFT JOIN Category USING(category_id)
             WHERE date_added >= $1 AND branch_id = $2
@@ -116,8 +123,9 @@ export const getProductHistory = async(dates, branchId) => {
 
     if (startDate === '') {
         const {rows} = await SQLquery(`
-            SELECT ${correctDateFormat('date_added')}, Inventory_product.product_name, Category.category_id,Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value
-            FROM Add_Stocks
+    SELECT ${correctDateFormat('date_added')}, Add_Stocks.add_id, Add_Stocks.product_id, Inventory_product.product_name, Category.category_id,Category.category_name, h_unit_cost, quantity_added_display as quantity_added, (h_unit_cost * quantity_added_display) AS value, iahl.alert_timestamp, iahl.history_timestamp
+        FROM Add_Stocks
+        LEFT JOIN inventory_alert_history_links iahl ON iahl.add_id = Add_Stocks.add_id
             LEFT JOIN Inventory_product USING(product_id, branch_id)
             LEFT JOIN Category USING(category_id)
             WHERE date_added <= $1 AND branch_id = $2

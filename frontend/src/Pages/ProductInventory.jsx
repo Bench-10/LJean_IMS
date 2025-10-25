@@ -40,6 +40,10 @@ function ProductInventory({
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [pendingRejectId, setPendingRejectId] = useState(null);
 
+  // Loading states for approve/reject actions (store pending_id while processing)
+  const [approveLoadingId, setApproveLoadingId] = useState(null);
+  const [rejectLoadingId, setRejectLoadingId] = useState(null);
+
   const displayPendingApprovals = user && user.role && user.role.some(role => ['Branch Manager'].includes(role));
 
   const formatDateTime = (value) => {
@@ -59,7 +63,16 @@ function ProductInventory({
 
   const handleApproveClick = (pendingId) => {
     if (typeof approvePendingRequest === 'function') {
-      approvePendingRequest(pendingId);
+      // set loading, await the provided function if it returns a promise
+      const run = async () => {
+        try {
+          setApproveLoadingId(pendingId);
+          await approvePendingRequest(pendingId);
+        } finally {
+          setApproveLoadingId(null);
+        }
+      };
+      run();
     }
   };
 
@@ -77,7 +90,15 @@ function ProductInventory({
 
   const handleRejectDialogConfirm = (reason) => {
     if (typeof rejectPendingRequest === 'function' && pendingRejectId !== null) {
-      rejectPendingRequest(pendingRejectId, reason);
+      const run = async () => {
+        try {
+          setRejectLoadingId(pendingRejectId);
+          await rejectPendingRequest(pendingRejectId, reason);
+        } finally {
+          setRejectLoadingId(null);
+        }
+      };
+      run();
     }
     setIsRejectDialogOpen(false);
     setPendingRejectId(null);
@@ -258,16 +279,33 @@ function ProductInventory({
                           <div className="flex-1 relative">
                             <div className="absolute top-0 right-0 flex gap-2">
                               <button
-                                className="px-4 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700"
+                                className={`px-4 py-2 rounded-md text-white text-sm font-medium ${approveLoadingId === request.pending_id || rejectLoadingId === request.pending_id ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                                 onClick={() => handleApproveClick(request.pending_id)}
+                                disabled={approveLoadingId === request.pending_id || rejectLoadingId === request.pending_id}
                               >
-                                Approve & Apply
+                                {approveLoadingId === request.pending_id ? (
+                                  <span className="inline-flex items-center">
+                                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                    Processing
+                                  </span>
+                                ) : (
+                                  'Approve'
+                                )}
                               </button>
+
                               <button
-                                className="px-4 py-2 rounded-md bg-red-500 text-white text-sm font-medium hover:bg-red-600"
+                                className={`px-4 py-2 rounded-md text-white text-sm font-medium ${rejectLoadingId === request.pending_id || approveLoadingId === request.pending_id ? 'bg-red-300 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'}`}
                                 onClick={() => handleRejectClick(request.pending_id)}
+                                disabled={rejectLoadingId === request.pending_id || approveLoadingId === request.pending_id}
                               >
-                                Reject
+                                {rejectLoadingId === request.pending_id ? (
+                                  <span className="inline-flex items-center">
+                                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                    Processing
+                                  </span>
+                                ) : (
+                                  'Reject'
+                                )}
                               </button>
                             </div>
                             <div className="flex items-center gap-2">

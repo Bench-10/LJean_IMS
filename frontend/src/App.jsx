@@ -39,6 +39,7 @@ function App() {
   const [userDetailes, setUserDetailes] = useState([]);
   const [isCategoryOpen, setIsCategory] = useState(false);
   const [isProductTransactOpen, setIsProductTransactOpen] = useState(false);
+  const [historyFocus, setHistoryFocus] = useState(null);
   const [modalMode, setModalMode] = useState('add');
   const [itemData, setItemData] = useState(null);
   const [productsData, setProductsData] = useState([])
@@ -178,6 +179,48 @@ function App() {
     setNotificationQueue([]);
     setIsProcessingQueue(false);
   };
+
+  const handleHistoryModalClose = useCallback(() => {
+    setIsProductTransactOpen(false);
+    setHistoryFocus(null);
+  }, []);
+
+  const handleNotificationNavigation = useCallback((notification) => {
+    if (!notification) return;
+
+    const rawProductId = notification.product_id;
+    const normalizedProductId = rawProductId !== undefined && rawProductId !== null ? Number(rawProductId) : NaN;
+    const alertType = (notification.alert_type || '').toLowerCase();
+    const message = (notification.message || '').toLowerCase();
+
+    if (Number.isNaN(normalizedProductId)) {
+      return;
+    }
+
+    const looksLikeHistoryUpdate = alertType === 'product update'
+      || message.includes('has been added')
+      || message.includes('has been updated')
+      || message.includes('additional');
+
+    const isLowStockAlert = message.includes('low stock');
+
+    if (looksLikeHistoryUpdate && !isLowStockAlert) {
+      setOpenNotif(false);
+      navigate('/inventory');
+
+      setHistoryFocus({
+        type: 'product-history',
+        addStockId: notification.add_stock_id ?? null,
+        dateAdded: notification.history_timestamp ?? null,
+        historyTimestamp: notification.history_timestamp ?? null,
+        alertId: notification.alert_id ?? null,
+        alertTimestamp: notification.alert_timestamp ?? notification.alert_date ?? null,
+        triggeredAt: Date.now()
+      });
+
+      setIsProductTransactOpen(true);
+    }
+  }, [navigate]);
 
   // Process queue when new notifications are added
   useEffect(() => {
@@ -1291,8 +1334,10 @@ function App() {
       <ProductTransactionHistory
         isProductTransactOpen={isProductTransactOpen}
         sanitizeInput={sanitizeInput}
-        onClose={() => setIsProductTransactOpen(false)}
+        onClose={handleHistoryModalClose}
         listCategories={listCategories}
+        focusEntry={historyFocus}
+        onClearFocus={() => setHistoryFocus(null)}
 
       />
 
@@ -1303,6 +1348,7 @@ function App() {
         unreadCount={unreadCount}
         setNotify={setNotify}
         onClose={() => setOpenNotif(false)}
+        onNotificationNavigate={handleNotificationNavigation}
       />
 
   

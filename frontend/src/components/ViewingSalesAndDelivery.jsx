@@ -126,26 +126,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                     ✕
                 </button>
 
-                <div className="flex justify-end pr-5 mb-2" data-export-exclude>
-                    <button
-                        type="button"
-                        onClick={handleExport}
-                        disabled={loading || exporting}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-700 hover:bg-green-800 rounded-md shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        {exporting ? (
-                            <>
-                                <svg className="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                </svg>
-                                <span>Exporting...</span>
-                            </>
-                        ) : (
-                            <span>Export PDF</span>
-                        )}
-                    </button>
-                </div>
+                
 
                 <div className="pb-4 pt-2 px-8 w-full flex-1 flex flex-col">
                     
@@ -346,6 +327,10 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                     {type && type === "sales" &&
                         <div className="border-t pt-4">
                             <div className="flex flex-row justify-between items-start">
+
+                                <div>
+                                    
+                                </div>
                     
                                 <div className="flex-1 pr-8">
                                     <h3 className="text-lg font-semibold text-gray-700 mb-2">Summary Details</h3>
@@ -358,7 +343,30 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                                             Please keep this record for your reference.
                                         </p>
                                     </div>
+
+                                    <div className="mt-3 flex" data-export-exclude>
+                                        <button
+                                            type="button"
+                                            onClick={handleExport}
+                                            disabled={loading || exporting}
+                                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-700 hover:bg-green-800 rounded-md shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                                        >
+                                            {exporting ? (
+                                                <>
+                                                    <svg className="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                                    </svg>
+                                                    <span>Exporting...</span>
+                                                </>
+                                            ) : (
+                                                <span>Export PDF</span>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
+
+                                
                                 
                                 <div className="w-[400px] bg-gray-50 p-4 rounded-lg border border-gray-200">
                                     <div className="space-y-3">

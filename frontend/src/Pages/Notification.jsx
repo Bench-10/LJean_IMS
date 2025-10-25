@@ -4,7 +4,7 @@ import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
 import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp';
 
-function Notification({ openNotif, notify, setNotify, unreadCount, onClose }) {
+function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNotificationNavigate }) {
 
   const { user } = useAuth();
   
@@ -115,6 +115,15 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose }) {
     await api.post(`/api/notifications`, body);
   };
 
+  const handleNotificationClick = (notification) => {
+    if (!notification) return;
+    markedAsRead(notification.alert_id);
+
+    if (typeof onNotificationNavigate === 'function') {
+      onNotificationNavigate(notification);
+    }
+  };
+
   //FUNCTION THAT MARKS ALL NOTIFICATIONS AS READ
   const markAllAsRead = async () => {
     try {
@@ -210,7 +219,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose }) {
                           <div
                             key={index}
                             className={`${!notification.is_read ? 'bg-blue-50 border-blue-200' : 'bg-white'} relative flex flex-col px-4 sm:px-6 py-3 sm:py-4 border border-gray-200 border-l-4 ${borderColorMap[notification.banner_color] || ''} rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
-                            onClick={() => markedAsRead(notification.alert_id)}
+                            onClick={() => handleNotificationClick(notification)}
                           >
                             <div className='mb-2 flex items-start sm:items-center justify-between gap-2'>
                               <h3 className='text-base sm:text-lg font-semibold text-gray-800 break-words'>
@@ -264,7 +273,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose }) {
                           <div
                             key={index}
                             className={`${!notification.is_read ? 'bg-blue-50 border-blue-200' : 'bg-white'} relative flex flex-col px-4 sm:px-6 py-3 sm:py-4 border border-gray-200 border-l-4 ${borderColorMap[notification.banner_color] || ''} rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
-                            onClick={() => markedAsRead(notification.alert_id)}
+                            onClick={() => handleNotificationClick(notification)}
                           >
                             <div className='mb-2 flex items-start sm:items-center justify-between gap-2'>
                               <h3 className='text-base sm:text-lg font-semibold text-gray-800 break-words'>

@@ -63,9 +63,14 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
         ia.banner_color,
         ia.user_full_name,
         ia.user_id,
+        ia.product_id,
         ia.branch_id,
+        iahl.add_id AS add_stock_id,
+        iahl.history_timestamp,
+        iahl.alert_timestamp,
         COALESCE(an.is_read, false) AS is_read
       FROM Inventory_Alerts ia
+      LEFT JOIN inventory_alert_history_links iahl ON ia.alert_id = iahl.alert_id
       LEFT JOIN admin_notification an
         ON ia.alert_id = an.alert_id AND an.admin_id = $1
       WHERE ia.alert_type IN ('User Approval Needed', 'Inventory Admin Approval Needed')
@@ -103,8 +108,14 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
       banner_color, 
       COALESCE(user_notification.is_read, false) AS is_read, 
       user_full_name, 
-      Inventory_Alerts.user_id
+      Inventory_Alerts.user_id,
+      Inventory_Alerts.product_id,
+      Inventory_Alerts.branch_id,
+      iahl.add_id AS add_stock_id,
+      iahl.history_timestamp,
+      iahl.alert_timestamp
     FROM Inventory_Alerts
+    LEFT JOIN inventory_alert_history_links iahl ON Inventory_Alerts.alert_id = iahl.alert_id
     LEFT JOIN user_notification
       ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1
     WHERE Inventory_Alerts.branch_id = $2

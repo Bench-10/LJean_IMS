@@ -218,6 +218,9 @@ const createPendingInventoryAction = async ({
                     user_id: alertResult.rows[0].user_id,
                     user_full_name: requesterName,
                     alert_date: alertResult.rows[0].alert_date,
+                    alert_timestamp: alertResult.rows[0].alert_date,
+                    add_stock_id: null,
+                    history_timestamp: null,
                     isDateToday: true,
                     alert_date_formatted: 'Just now',
                     target_roles: ['Branch Manager'],
@@ -507,13 +510,15 @@ export const addProductItem = async (productData, options = {}) => {
     // Calculate base units for storage - ensure quantity_added is a number
     const quantity_added_base = convertToBaseUnit(Number(quantity_added), unit);
     
-    await SQLquery(
+    const addStockInsert = await SQLquery(
         `INSERT INTO Add_Stocks 
         (product_id, h_unit_price, h_unit_cost, quantity_added_display, quantity_added_base, date_added, product_validity, quantity_left_display, quantity_left_base, branch_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *`,
         [product_id, unit_price, unit_cost, Number(quantity_added), quantity_added_base, date_added, product_validity, Number(quantity_added), quantity_added_base, branch_id]
     );
+
+    const addedStockRow = addStockInsert.rows?.[0] ?? null;
 
     const alertResult = await SQLquery(
         `INSERT INTO Inventory_Alerts 
@@ -523,7 +528,26 @@ export const addProductItem = async (productData, options = {}) => {
         [product_id, branch_id, productAddedNotifheader, notifMessage, color, userID, fullName]
     );
 
+    if (alertResult.rows[0] && addedStockRow?.add_id) {
+        await SQLquery(
+            `INSERT INTO inventory_alert_history_links (alert_id, add_id, alert_timestamp, history_timestamp)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (alert_id) DO UPDATE
+             SET add_id = EXCLUDED.add_id,
+                 alert_timestamp = EXCLUDED.alert_timestamp,
+                 history_timestamp = EXCLUDED.history_timestamp`,
+            [
+                alertResult.rows[0].alert_id,
+                addedStockRow.add_id,
+                alertResult.rows[0].alert_date,
+                addedStockRow.date_added
+            ]
+        );
+    }
+
     await SQLquery('COMMIT');
+
+    const alertTimestamp = alertResult.rows[0]?.alert_date ?? null;
 
     if (alertResult.rows[0]) {
         broadcastNotification(branch_id, {
@@ -534,6 +558,10 @@ export const addProductItem = async (productData, options = {}) => {
             user_id: alertResult.rows[0].user_id,
             user_full_name: fullName,
             alert_date: alertResult.rows[0].alert_date,
+            product_id: product_id,
+            add_stock_id: addedStockRow?.add_id ?? null,
+            history_timestamp: addedStockRow?.date_added ?? null,
+            alert_timestamp: alertTimestamp,
             isDateToday: true,
             alert_date_formatted: 'Just now'
         });
@@ -594,6 +622,9 @@ export const addProductItem = async (productData, options = {}) => {
     broadcastHistoryUpdate(branch_id, {
         action: 'add',
         historyEntry: {
+            add_id: addedStockRow?.add_id ?? null,
+            add_stock_id: addedStockRow?.add_id ?? null,
+            product_id: product_id,
             product_name: product_name,
             category_name: categoryName,
             h_unit_cost: unit_cost,
@@ -605,7 +636,9 @@ export const addProductItem = async (productData, options = {}) => {
                 day: 'numeric' 
             }),
             date_added: date_added,
-            branch_id: branch_id
+            branch_id: branch_id,
+            alert_timestamp: alertTimestamp,
+            history_timestamp: addedStockRow?.date_added ?? null
         },
         user_id: userID
     });
@@ -649,14 +682,16 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
     const addStocksQuery = async () => {
         // Calculate base units for storage - ensure quantity_added is a number
         const quantity_added_base = convertToBaseUnit(Number(quantity_added), unit);
-        
-        return await SQLquery(
+
+        const result = await SQLquery(
             `INSERT INTO Add_Stocks 
             (product_id, h_unit_price, h_unit_cost, quantity_added_display, quantity_added_base, date_added, product_validity, quantity_left_display, quantity_left_base, branch_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *`,
             [itemId, unit_price, unit_cost, Number(quantity_added), quantity_added_base, date_added, product_validity, Number(quantity_added), quantity_added_base, branch_id]
         );
+
+        return result.rows?.[0] ?? null;
     };
 
     const previousData = await SQLquery(
@@ -692,8 +727,10 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
     let alertResult = null;
     let finalMessage = '';
 
+    let addedStockRow = null;
+
     if (quantity_added !== 0) {
-        await addStocksQuery();
+        addedStockRow = await addStocksQuery();
     }
 
     if (returnPreviousPrice !== unit_price) {
@@ -724,6 +761,25 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
         );
 
         if (alertResult?.rows[0]) {
+            const alertTimestamp = alertResult.rows[0]?.alert_date ?? null;
+
+            if (addedStockRow?.add_id) {
+                await SQLquery(
+                    `INSERT INTO inventory_alert_history_links (alert_id, add_id, alert_timestamp, history_timestamp)
+                     VALUES ($1, $2, $3, $4)
+                     ON CONFLICT (alert_id) DO UPDATE
+                     SET add_id = EXCLUDED.add_id,
+                         alert_timestamp = EXCLUDED.alert_timestamp,
+                         history_timestamp = EXCLUDED.history_timestamp`,
+                    [
+                        alertResult.rows[0].alert_id,
+                        addedStockRow.add_id,
+                        alertResult.rows[0].alert_date,
+                        addedStockRow.date_added
+                    ]
+                );
+            }
+
             broadcastNotification(returnBranchId, {
                 alert_id: alertResult.rows[0].alert_id,
                 alert_type: productAddedNotifheader,
@@ -732,6 +788,10 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
                 user_id: alertResult.rows[0].user_id,
                 user_full_name: fullName,
                 alert_date: alertResult.rows[0].alert_date,
+                product_id: itemId,
+                add_stock_id: addedStockRow?.add_id ?? null,
+                history_timestamp: addedStockRow?.date_added ?? null,
+                alert_timestamp: alertTimestamp,
                 isDateToday: true,
                 alert_date_formatted: 'Just now'
             });
@@ -767,6 +827,10 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
                 user_id: infoAlertResult.rows[0].user_id,
                 user_full_name: fullName,
                 alert_date: infoAlertResult.rows[0].alert_date,
+                product_id: itemId,
+                add_stock_id: null,
+                history_timestamp: null,
+                alert_timestamp: infoAlertResult.rows[0].alert_date,
                 isDateToday: true,
                 alert_date_formatted: 'Just now'
             });
@@ -830,6 +894,9 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
         broadcastHistoryUpdate(branch_id, {
             action: 'update',
             historyEntry: {
+                add_id: addedStockRow?.add_id ?? null,
+                add_stock_id: addedStockRow?.add_id ?? null,
+                product_id: itemId,
                 product_name: product_name,
                 category_name: categoryName,
                 h_unit_cost: unit_cost,
@@ -841,7 +908,9 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
                     day: 'numeric' 
                 }),
                 date_added: date_added,
-                branch_id: branch_id
+                branch_id: branch_id,
+                alert_timestamp: (alertResult?.rows?.[0]?.alert_date) ?? null,
+                history_timestamp: addedStockRow?.date_added ?? null
             },
             user_id: userID
         });

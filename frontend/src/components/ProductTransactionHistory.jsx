@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../utils/api.js';
 import DropdownCustom from '../components/DropdownCustom';
 import { BsFunnelFill } from "react-icons/bs";
@@ -9,7 +9,7 @@ import { currencyFormat } from '../utils/formatCurrency.js';
 import ChartLoading from './common/ChartLoading.jsx';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 
-function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInput, listCategories }) {
+function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInput, listCategories, focusEntry, onClearFocus }) {
 
   const [openFilter, setOpenFilter] = useState(false);
   const [startDate, setStartDate] = useState('');
@@ -21,7 +21,90 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
   const [loading, setLoading] = useState(false)
 
+  const rowRefs = useRef({});
+  const pendingFocusRef = useRef(null);
+  const [pendingRowKey, setPendingRowKey] = useState(null);
+  const [highlightedRowKey, setHighlightedRowKey] = useState(null);
+
   const { user } = useAuth();
+
+  const matchesFocus = (entry, focus) => {
+    if (!entry || !focus) return false;
+
+    const timestampsEqual = (first, second) => {
+      if (!first || !second) return false;
+      const firstDate = new Date(first);
+      const secondDate = new Date(second);
+      return !Number.isNaN(firstDate.getTime())
+        && !Number.isNaN(secondDate.getTime())
+        && firstDate.getTime() === secondDate.getTime();
+    };
+
+    const entryAlertValue = entry.alert_timestamp || entry.alertTimestamp;
+    if (focus.alertTimestamp && timestampsEqual(entryAlertValue, focus.alertTimestamp)) {
+      return true;
+    }
+
+    const entryHistoryValue = entry.history_timestamp || entry.date_added;
+    if (focus.historyTimestamp && timestampsEqual(entryHistoryValue, focus.historyTimestamp)) {
+      return true;
+    }
+
+    if (focus.dateAdded && timestampsEqual(entry.date_added, focus.dateAdded)) {
+      return true;
+    }
+
+    const entryAddId = entry.add_id ?? entry.add_stock_id ?? entry.addStockId;
+    if (focus.addStockId && entryAddId !== undefined && entryAddId !== null) {
+      if (Number(entryAddId) === Number(focus.addStockId)) {
+        return true;
+      }
+    }
+
+    if (focus.productId && entry.product_id !== undefined && entry.product_id !== null) {
+      if (Number(entry.product_id) === Number(focus.productId)) {
+        return true;
+      }
+    }
+
+    if (focus.productName && entry.product_name) {
+      if (entry.product_name.toLowerCase() === focus.productName.toLowerCase()) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const getEntryKey = (entry, fallbackIndex = 0) => {
+    if (!entry) return `history-row-${fallbackIndex}`;
+
+    if (entry.alert_timestamp) {
+      const timestampKey = new Date(entry.alert_timestamp).getTime();
+      if (!Number.isNaN(timestampKey)) {
+        return `history-alert-${timestampKey}`;
+      }
+    }
+
+    if (entry.history_timestamp) {
+      const historyKey = new Date(entry.history_timestamp).getTime();
+      if (!Number.isNaN(historyKey)) {
+        return `history-history-${historyKey}`;
+      }
+    }
+
+    const entryAddId = entry.add_id ?? entry.add_stock_id ?? entry.addStockId;
+
+    if (entryAddId !== undefined && entryAddId !== null) {
+      return `history-add-${entryAddId}`;
+    }
+
+    if (entry.product_id !== undefined && entry.product_id !== null && entry.date_added) {
+      return `history-${entry.product_id}-${entry.date_added}`;
+    }
+
+    return `history-row-${fallbackIndex}`;
+  };
 
 
   //PAGINATION LOGIC
@@ -31,6 +114,27 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
   useEffect(() => {
     setCurrentPage(1);
   }, [search, startDate, endDate]);
+
+  useEffect(() => {
+    if (focusEntry) {
+      pendingFocusRef.current = focusEntry;
+
+      if (isProductTransactOpen) {
+        setSearch('');
+        setSelectedCategory('');
+        setStartDate('');
+        setEndDate('');
+      }
+    }
+  }, [focusEntry, isProductTransactOpen]);
+
+  useEffect(() => {
+    if (!isProductTransactOpen) {
+      setHighlightedRowKey(null);
+      setPendingRowKey(null);
+      pendingFocusRef.current = null;
+    }
+  }, [isProductTransactOpen]);
 
 
   const closeFilterValue = () => {
@@ -44,6 +148,9 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     setStartDate('');
     setEndDate('');
     setSelectedCategory('');
+    setHighlightedRowKey(null);
+    setPendingRowKey(null);
+    pendingFocusRef.current = null;
     onClose();
     setOpenFilter(false);
   };
@@ -74,7 +181,7 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
 
   const fetchProductHistory = async () => {
-    const dates = { startDate, endDate }
+    const dates = { startDate, endDate };
 
     try {
       setLoading(true);
@@ -124,6 +231,36 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     };
   }, []);
 
+  useEffect(() => {
+    if (!isProductTransactOpen || !pendingFocusRef.current || loading) return;
+    if (!Array.isArray(productHistory) || productHistory.length === 0) return;
+
+    const activeFocus = pendingFocusRef.current;
+    const matchIndex = productHistory.findIndex(entry => matchesFocus(entry, activeFocus));
+
+    if (matchIndex === -1) {
+      return;
+    }
+
+    const targetEntry = productHistory[matchIndex];
+    const targetKey = getEntryKey(targetEntry, matchIndex);
+
+    pendingFocusRef.current = null;
+
+    const targetPage = Math.floor(matchIndex / itemsPerPage) + 1;
+    setCurrentPage(targetPage);
+    setPendingRowKey(targetKey);
+
+    setSearch('');
+    setSelectedCategory('');
+    setStartDate('');
+    setEndDate('');
+
+    if (typeof onClearFocus === 'function') {
+      onClearFocus();
+    }
+  }, [productHistory, isProductTransactOpen, itemsPerPage, loading, onClearFocus]);
+
 
   const handleSearch = (event) => {
     setSearch(sanitizeInput(event.target.value));
@@ -148,6 +285,29 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
   const currentData = filteredHistoryData.slice(startIndex, startIndex + itemsPerPage);
 
+  useEffect(() => {
+    if (!pendingRowKey) return;
+
+    const targetRow = rowRefs.current[pendingRowKey];
+
+    if (!targetRow) {
+      return;
+    }
+
+    setHighlightedRowKey(pendingRowKey);
+    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    const timer = setTimeout(() => {
+      setHighlightedRowKey(null);
+    }, 6000);
+
+    setPendingRowKey(null);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [currentData, pendingRowKey]);
+
   // Friendly display bounds
   const displayStart = totalItems === 0 ? 0 : startIndex + 1;
   const displayEnd = endIndex;
@@ -170,6 +330,8 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
       });
     }
   };
+
+  rowRefs.current = {};
 
   return (
     <div>
@@ -294,16 +456,32 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                     ) :
 
                     (
-                      currentData.map((history, histoindx) => (
-                        <tr key={histoindx} className='hover:bg-gray-100 transition-colors border-b border-gray-100'>
-                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.formated_date_added}</td>
-                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900'>{history.product_name}</td>
-                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.category_name}</td>
-                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{currencyFormat(history.h_unit_cost)}</td>
-                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{history.quantity_added.toLocaleString()}</td>
-                          <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{currencyFormat(history.value)}</td>
-                        </tr>
-                      ))
+                      currentData.map((history, histoindx) => {
+                        const rowKey = getEntryKey(history, startIndex + histoindx);
+                        const isHighlighted = highlightedRowKey === rowKey;
+
+                        return (
+                          <tr
+                            key={rowKey}
+                            ref={el => {
+                              if (el) {
+                                rowRefs.current[rowKey] = el;
+                              } else {
+                                delete rowRefs.current[rowKey];
+                              }
+                            }}
+                            data-alert-timestamp={history.alert_timestamp ?? undefined}
+                            className={`transition-colors border-b border-gray-100 ${isHighlighted ? 'bg-green-100 border-l-4 border-green-500 ring-2 ring-green-300 shadow-inner' : 'hover:bg-gray-100'}`}
+                          >
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.formated_date_added}</td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900'>{history.product_name}</td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.category_name}</td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{currencyFormat(history.h_unit_cost)}</td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{history.quantity_added.toLocaleString()}</td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{currencyFormat(history.value)}</td>
+                          </tr>
+                        );
+                      })
                     )
                   )
                 }
