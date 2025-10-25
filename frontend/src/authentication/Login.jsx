@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AccountDisabledPopUp from '../components/dialogs/AccountDisabledPopUp';
-import { FaUser, FaLock, FaEye, FaExclamationCircle } from 'react-icons/fa';
+import { FaUser, FaLock, FaEye, FaExclamationCircle, FaSpinner } from 'react-icons/fa';
 import './login.css';
 import { useAuth } from './Authentication'; 
 import TooMuchAttempts from '../components/dialogs/TooMuchAttempts';
@@ -25,6 +25,7 @@ function Login() {
   const [disabledDialog, setDisabledDialog] = useState(false);
   const [showTooManyAttempts, setShowTooManyAttempts] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const trials = useRef(0);
 
@@ -114,6 +115,7 @@ function Login() {
 
     try {
       // METHOD FROM AUTHENTICATION COMPONENT
+      setIsLoggingIn(true);
       await loginAuthentication(username, password);
     } catch (error) {
       const errorMessage = error.message;
@@ -163,6 +165,8 @@ function Login() {
 
       trials.current = 0;
       setUsernameWithInvalidPass('');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -245,7 +249,21 @@ function Login() {
           )}
           
         
-          <button type='submit' className="login-btn">LOGIN</button>
+          <button
+            type='submit'
+            className="login-btn disabled:opacity-60 flex items-center justify-center gap-2"
+            disabled={isLoggingIn}
+            aria-busy={isLoggingIn}
+          >
+            {isLoggingIn ? (
+              <>
+                <FaSpinner className="animate-spin" />
+                <span>Logging in...</span>
+              </>
+            ) : (
+              'LOGIN'
+            )}
+          </button>
           
           {/* Forgot Password Link */}
           <div className="forgot-password-container">

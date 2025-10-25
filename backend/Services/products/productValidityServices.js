@@ -14,7 +14,7 @@ export const getProductValidity = async(branchId) =>{
         LEFT JOIN Inventory_product USING(product_id, branch_id)
         LEFT JOIN Category USING(category_id)
         WHERE product_validity >= CURRENT_DATE - 2 AND branch_id = $1
-        ORDER BY (product_validity <= CURRENT_DATE) DESC, ((product_validity > CURRENT_DATE AND (product_validity - CURRENT_DATE) <= 3)) DESC , date_added ASC , add_id DESC
+        ORDER BY (product_validity <= CURRENT_DATE) DESC, ((product_validity > CURRENT_DATE AND (product_validity - CURRENT_DATE) <= 3)) DESC , date_added DESC , add_id DESC
     `,[branchId]);
 
     return rows;

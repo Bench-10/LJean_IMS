@@ -202,20 +202,6 @@ function ProductInventory({
         </h1>
 
 
-        {displayPendingApprovals && (
-          <div className="mb-4 flex justify-end items-center gap-3">
-            <button
-              className="relative flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-amber-600 text-white hover:bg-amber-700"
-              onClick={() => setIsPendingDialogOpen(true)}
-            >
-              Pending Inventory
-              <span className="inline-flex items-center justify-center min-w-[1.75rem] h-7 text-xs font-semibold bg-white text-amber-700 rounded-full px-2">
-                {pendingRequests?.length ?? 0}
-              </span>
-            </button>
-          </div>
-        )}
-
       </div>
 
       <hr className="mt-3 mb-6 border-t-4 border-green-800 rounded-lg" />
@@ -355,7 +341,7 @@ function ProductInventory({
 
       {/*SEARCH AND ADD*/}
       <div className='w-full space-y-4 lg:space-y-0 lg:flex lg:items-center lg:justify-between flex-shrink-0'>
-        <div className='flex flex-col lg:flex-row gap-4 lg:gap-9 w-full lg:w-auto items-center lg:items-start'>
+        <div className='flex flex-col lg:flex-row gap-2 lg:gap-7 w-full lg:w-auto items-center lg:items-start'>
           {/*SEARCH */}
           <div className='w-full lg:w-[400px] text-sm lg:text-base '>
 
@@ -405,14 +391,31 @@ function ProductInventory({
 
         </div>
 
+        
+
 
         {/*EXPORT AND CATEGORIES AND ADD ITEM */}
-        <div className="ml-auto flex gap-4">
+        <div className="ml-auto flex items-center gap-4">
+
+          {/* Pending approvals button (keeps same height as other controls) */}
+          {displayPendingApprovals && (
+            <button
+              className="relative flex items-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700"
+              onClick={() => setIsPendingDialogOpen(true)}
+              aria-label="Open pending inventory requests"
+            >
+              <span className="whitespace-nowrap">Pendings</span>
+              <span className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold bg-white text-amber-700 rounded-full">
+                {pendingRequests?.length ?? 0}
+              </span>
+            </button>
+          )}
 
           {/*EXPORT DROPDOWN*/}
           <div className="relative group">
-            <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 py-2 rounded-lg transition-all flex items-center gap-2'>
-              <TbFileExport />EXPORT
+            <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center gap-2'>
+              <TbFileExport />
+              <span className="leading-none">EXPORT</span>
             </button>
             <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
               <button
@@ -434,10 +437,10 @@ function ProductInventory({
           {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) && (
             <>
               {/*CATEGORIES BTN*/}
-              <button className='bg-[#007278] text-white font-medium hover:bg-[#009097] px-5 rounded-lg transition-all' onClick={() => setIsCategory(true)}>CATEGORIES</button>
+              <button className='bg-[#007278] text-white font-medium hover:bg-[#009097] px-5 h-10 rounded-lg transition-all flex items-center justify-center' onClick={() => setIsCategory(true)}>CATEGORIES</button>
 
               {/*ADD ITEM BTN*/}
-              <button className='bg-[#119200] text-white font-medium hover:bg-[#56be48] text-sm lg:text-base px-5 rounded-lg transition-all' onClick={() => handleOpen('add')}>ADD ITEMS</button>
+              <button className='bg-[#119200] text-white font-medium hover:bg-[#56be48] text-sm lg:text-base px-5 h-10 rounded-lg transition-all flex items-center justify-center' onClick={() => handleOpen('add')}>ADD ITEMS</button>
             </>
           )}
 

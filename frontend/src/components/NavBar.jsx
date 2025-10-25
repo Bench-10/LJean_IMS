@@ -17,6 +17,7 @@ function NavBar({ setOpenNotif, unreadCount }) {
   // Separate state for mobile menu and logout dialog
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const toggleMenu = () => {
     setShowMobileMenu(!showMobileMenu);
@@ -227,14 +228,14 @@ function NavBar({ setOpenNotif, unreadCount }) {
           {/*BOTTOM HALF - Logout Button */}
           <div className='mb-3 lg:mb-0'>
             <button  
-              className='w-full bg-green-600 py-2 px-2 rounded-md flex items-center justify-center gap-2 hover:bg-green-700 transition-colors'
-              onClick={() => {
-                setShowLogoutDialog(true);
-                setShowMobileMenu(false); // Close mobile menu when logout dialog opens
-              }}
-            >
-              <MdOutlineLogout /> Logout
-            </button>
+                className='w-full bg-green-600 py-2 px-2 rounded-md flex items-center justify-center gap-2 hover:bg-green-700 transition-colors'
+                onClick={() => {
+                  setShowLogoutDialog(true);
+                  setShowMobileMenu(false); // Close mobile menu when logout dialog opens
+                }}
+              >
+                <MdOutlineLogout /> Logout
+              </button>
           </div>
         </div>
 
@@ -242,7 +243,18 @@ function NavBar({ setOpenNotif, unreadCount }) {
         {showLogoutDialog && (
           <LogoutDialog 
             onClose={() => setShowLogoutDialog(false)} 
-            logout={() => logout()} 
+            logout={async () => {
+              try {
+                setIsLoggingOut(true);
+                await logout();
+                setShowLogoutDialog(false);
+              } catch (e) {
+                console.error('Logout failed', e);
+              } finally {
+                setIsLoggingOut(false);
+              }
+            }}
+            loading={isLoggingOut}
           />
         )}
       </nav>

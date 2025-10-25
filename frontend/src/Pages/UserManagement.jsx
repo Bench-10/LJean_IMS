@@ -1,6 +1,7 @@
 import { MdGroupAdd } from "react-icons/md";
 import NoInfoFound from "../components/common/NoInfoFound";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import DropdownCustom from "../components/DropdownCustom";
 import { useNavigate } from "react-router-dom";
 import { MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
 import EnableDisableAccountDialog from "../components/dialogs/EnableDisableAccountDialog";
@@ -13,14 +14,19 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
 
   const [searchItem, setSearchItem] = useState('');
 
+  // Branch filter (visible to Owner or Admin)
+  const [selectedBranch, setSelectedBranch] = useState('');
+
 
   const [openAccountStatusDialog, setOpenAccountStatusDialog] = useState(false);
   const [userStatus, setUserStatus] = useState(false);
   const [userInfo, setUserInfo] = useState({});
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const navigate = useNavigate();
 
   const isOwnerUser = user && user.role && user.role.some(role => ['Owner'].includes(role));
+  const isAdmin = user && user.role && user.role.some(role => ['Owner', 'Admin'].includes(role));
   
 
   const handleSearch = (event) =>{
@@ -30,10 +36,20 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
 
 
   const filteredUserData = users.filter((user) => 
-    user.full_name.toLowerCase().includes(searchItem.toLowerCase()) || 
-    user.branch.toLowerCase().includes(searchItem.toLowerCase()) ||
-    (user.status ? user.status.toLowerCase().includes(searchItem.toLowerCase()) : false)
+    (
+      user.full_name.toLowerCase().includes(searchItem.toLowerCase()) || 
+      user.branch.toLowerCase().includes(searchItem.toLowerCase()) ||
+      (user.status ? user.status.toLowerCase().includes(searchItem.toLowerCase()) : false)
+    )
+    && (selectedBranch === '' || (user.branch && user.branch.toLowerCase() === selectedBranch.toLowerCase()))
   );
+
+  // derive branch options from users list
+  const branchOptions = useMemo(() => {
+    const branches = Array.from(new Set(users.filter(u => u && u.branch).map(u => u.branch)));
+    const opts = [{ value: '', label: 'All Branches' }, ...branches.map(b => ({ value: b, label: b }))];
+    return opts;
+  }, [users]);
 
 
   const getStatusBadge = (row) => {
@@ -72,7 +88,18 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
           <EnableDisableAccountDialog
               onClose={() => setOpenAccountStatusDialog(false)}
               status={userStatus}
-              action={()=> {disableEnableAccount(userInfo)}}
+              action={async () => {
+                try {
+                  setIsProcessing(true);
+                  await disableEnableAccount(userInfo);
+                  setOpenAccountStatusDialog(false);
+                } catch (err) {
+                  console.error('Enable/Disable action failed', err);
+                } finally {
+                  setIsProcessing(false);
+                }
+              }}
+              loading={isProcessing}
           />
         }
 
@@ -86,19 +113,34 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
 
 
         {/*SEARCH AND ADD*/}
-        <div className='flex w-full'>
-          {/*SEARCH */}
-          <div className='w-[400px]'>
-            
-            <input
-              type="text"
-              placeholder="Search Employee Name or Role"
-              className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
-              onChange={handleSearch}
+        <div className='flex w-full '>
+          <div className="flex gap-x-4 items-center ">
+            {/*SEARCH */}
+            <div className='w-[400px]'>
               
-            />
+              <input
+                type="text"
+                placeholder="Search Employee Name or Role"
+                className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
+                onChange={handleSearch}
+                
+              />
+
+            </div>  
+
+            {isAdmin && (
+              <div className='w-[220px] '>
+                <DropdownCustom
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  options={branchOptions}
+                  variant="simple"
+                />
+              </div>
+            )}
 
           </div>
+          
           
           <div  className="ml-auto flex gap-3">
 

@@ -34,12 +34,12 @@ const DropdownCustom = ({ value, onChange, options, label, variant = 'default', 
   // Get button className based on variant and error state
   const getButtonClassName = () => {
     if (variant === 'simple' || variant === 'default') {
-return `w-full h-[36px] flex items-center justify-center lg:justify-between px-3 text-sm leading-none bg-white 
-transition-all duration-200 border rounded-md text-gray-900 
-${error 
-  ? 'border-red-500 ring-1 ring-red-50 focus:ring-red-500' 
-  : 'border-gray-300 hover:border-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500'
-}`;
+      return `w-full h-[36px] flex items-center justify-center lg:justify-between px-3 text-sm leading-none bg-white 
+      transition-all duration-200 border rounded-md text-gray-900 
+      ${error 
+        ? 'border-red-500 ring-1 ring-red-50 focus:ring-red-500' 
+        : 'border-gray-300 hover:border-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500'
+      }`;
     }
     
     if (variant === 'floating') {

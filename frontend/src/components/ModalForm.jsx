@@ -334,52 +334,63 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       }
 
       {/* When editing, prompt the user to choose action before showing edit fields */}
-{isModalOpen && mode === 'edit' && !editChoice && (
-  <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
-    <div className="bg-white rounded-xl p-6 shadow-2xl w-full max-w-md sm:max-w-lg">
-      <h4 className="font-semibold text-xl sm:text-2xl mb-6 text-center">Choose an action</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <button type="button" onClick={() => setEditChoice('edit')} className="p-4 border border-gray-100 rounded-lg hover:shadow-md text-left transition">
-          <div className="flex items-center gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0z" />
-            </svg>
-            <span className="font-medium">Edit Product Data</span>
+      {isModalOpen && mode === 'edit' && !editChoice && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
+          <div className="bg-white rounded-xl p-6 shadow-2xl w-full max-w-md sm:max-w-lg">
+            <h4 className="font-semibold text-xl sm:text-2xl mb-6 text-center">Choose an action</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button type="button" onClick={() => setEditChoice('edit')} className="p-4 border border-gray-100 rounded-lg hover:shadow-md text-left transition">
+                <div className="flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0z" />
+                  </svg>
+                  <span className="font-medium">Edit Product Data</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Change product attributes such as unit, price, thresholds and description.</p>
+              </button>
+              <button type="button" onClick={() => setEditChoice('addStocks')} className="p-4 border border-gray-100 rounded-lg hover:shadow-md text-left transition">
+                <div className="flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  <span className="font-medium">Add Stocks</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Quickly add stock quantity and cost without changing other product details.</p>
+              </button>
+            </div>
+            <div className="mt-8 text-center">
+              <button type="button" onClick={() => { onClose(); setEditChoice(null); setShowExistingProducts(false); setMaxQuant(false); }} className="text-sm text-gray-500 px-5 py-2  rounded-md border hover:bg-gray-50 ">Cancel</button>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Change product attributes such as unit, price, thresholds and description.</p>
-        </button>
-        <button type="button" onClick={() => setEditChoice('addStocks')} className="p-4 border border-gray-100 rounded-lg hover:shadow-md text-left transition">
-          <div className="flex items-center gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            <span className="font-medium">Add Stocks</span>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">Quickly add stock quantity and cost without changing other product details.</p>
-        </button>
-      </div>
-      <div className="mt-6 text-center">
-        <button type="button" onClick={() => { onClose(); setEditChoice(null); setShowExistingProducts(false); setMaxQuant(false); }} className="text-sm text-gray-500 hover:underline">Cancel</button>
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
 
       {isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) && (
         <div
-          className="fixed inset-0 bg-black/50 z-[9998] backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm transition-opacity"
           style={{ pointerEvents: 'auto' }}
           onClick={() => { onClose(); setMaxQuant(false); }}
         />
       )}
 
-      <dialog className="bg-transparent fixed inset-0 z-[9999]" open={mode === 'edit' ? isModalOpen && user && user.role && editChoice && user.role.some(role => ['Inventory Staff'].includes(role)) : isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
+      <dialog className="bg-transparent fixed inset-0 z-[200]" open={mode === 'edit' ? isModalOpen && user && user.role && editChoice && user.role.some(role => ['Inventory Staff'].includes(role)) : isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
         <div className="relative bg-white h-[75vh] lg:h-[600px] w-[95vw] max-w-[700px] overflow-y-auto rounded-xl p-6 lg:py-10 lg:px-[53px] shadow-2xl border border-gray-100 animate-popup hide-scrollbar">
           <div className="mb-6">
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl font-bold">{mode === 'edit' ? 'EDIT ITEM' : 'ADD NEW ITEM'}</h3>
-                <p className="text-sm opacity-90">{mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}</p>
+              <div className="flex items-center gap-3">
+                {mode === 'edit' && editChoice && (
+                  <button
+                    type="button"
+                    onClick={() => { setEditChoice(null); setShowExistingProducts(false); }}
+                    className="text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded-md border border-gray-100 hover:bg-gray-50"
+                  >
+                    ← Back
+                  </button>
+                )}
+                <div>
+                  <h3 className="text-2xl font-bold">{mode === 'edit' ? 'EDIT ITEM' : 'ADD NEW ITEM'}</h3>
+                  <p className="text-sm opacity-90">{mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}</p>
+                </div>
               </div>
               <button type='button' className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
                 onClick={() => {

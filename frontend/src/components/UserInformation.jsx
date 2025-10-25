@@ -123,23 +123,23 @@ function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen,
 
                     </div>
 
-                                        <div className='p-5 bg-gray-100 rounded-md'>
-                                                <h1 className='mb-1 font-semibold text-xs'>ACCOUNT STATUS</h1>
-                                                {(() => {
-                                                    const badge = getStatusBadge();
-                                                    return (
-                                                        <span className={`text-lg font-semibold py-1 px-4 rounded-full inline-block ${badge.className}`}>
-                                                            {badge.label}
-                                                        </span>
-                                                    );
-                                                })()}
-                                                {userDetailes.status === 'pending' && (
-                                                    <p className='text-xs font-semibold text-amber-600 mt-2'>Awaiting owner approval before activation.</p>
-                                                )}
-                                                {userDetailes.status === 'active' && formatDateTime(userDetailes.approved_at) && (
-                                                    <p className='text-xs text-gray-500 mt-2'>Approved on {formatDateTime(userDetailes.approved_at)}</p>
-                                                )}
-                                        </div>
+                        <div className='p-5 bg-gray-100 rounded-md'>
+                                <h1 className='mb-1 font-semibold text-xs'>ACCOUNT STATUS</h1>
+                                {(() => {
+                                    const badge = getStatusBadge();
+                                    return (
+                                        <span className={`text-lg font-semibold py-1 px-4 rounded-full inline-block ${badge.className}`}>
+                                            {badge.label}
+                                        </span>
+                                    );
+                                })()}
+                                {userDetailes.status === 'pending' && (
+                                    <p className='text-xs font-semibold text-amber-600 mt-2'>Awaiting owner approval before activation.</p>
+                                )}
+                                {userDetailes.status === 'active' && formatDateTime(userDetailes.approved_at) && (
+                                    <p className='text-xs text-gray-500 mt-2'>Approved on {formatDateTime(userDetailes.approved_at)}</p>
+                                )}
+                        </div>
 
                     <div className='p-5 bg-gray-100 rounded-md'>
                         <h1 className='mb-1 font-semibold text-xs'>PERMISSIONS</h1>

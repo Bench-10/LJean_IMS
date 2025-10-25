@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { RxCross2 } from "react-icons/rx";
+import { FaSpinner } from 'react-icons/fa';
 import api from '../utils/api';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
@@ -30,6 +31,7 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
 
   // LOADING STATE
   const [loading, setLoading] = useState(false);
+  const [buttonLoading, setButtonLoading] = useState(false);
 
  
   //USER ROLES
@@ -187,14 +189,17 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
     }
 
  
-    if (Object.keys(isEmptyField).length > 0) return; 
+    if (Object.keys(isEmptyField).length > 0) {
+        return; 
+
+    }
 
 
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!(re.test(username.trim()))){
 
-        setInvalidEmail(true); 
+        setInvalidEmail(true);
         
         return;
     } 
@@ -226,6 +231,7 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
     
 
     setDialog(true);
+    setButtonLoading(true);
     
   };
 
@@ -322,8 +328,8 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
             <ConfirmationDialog
                 mode={mode}
                 message={message}
-                submitFunction={() => {submitUserConfirmation(); setOpenUsers(false);}}
-                onClose={() => {setDialog(false);}}
+                submitFunction={async () => { await submitUserConfirmation(); setOpenUsers(false); }}
+                onClose={() => {setDialog(false); setButtonLoading(false);}}
 
             />
         
@@ -599,8 +605,19 @@ function UserModalForm({branches, openUserModal, onClose, mode, fetchUsersinfo, 
 
                     {/*REGISTER BUTTON*/}
                         <div className='mb-2 mt-12 w-full text-center'>
-                            <button type='submit' className='py-2 px-6 bg-green-700 rounded-md text-white'>
-                                {mode === 'add' ? 'Register User':'Update User'}
+                            <button
+                                type='submit'
+                                className='py-2 px-6 bg-green-700 rounded-md text-white flex items-center justify-center gap-2 disabled:opacity-60'
+                                disabled={buttonLoading}
+                            >
+                                {buttonLoading ? (
+                                    <>
+                                        <FaSpinner className="animate-spin" />
+                                        <span>{mode === 'add' ? 'Creating...' : 'Updating...'}</span>
+                                    </>
+                                ) : (
+                                    <span>{mode === 'add' ? 'Register User' : 'Update User'}</span>
+                                )}
                             </button>
                         </div>
                     </form>

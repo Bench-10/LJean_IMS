@@ -519,3 +519,69 @@ export const exportChartsAsPDF = async (chartRefs = [], filename = 'analytics-re
 
   pdf.save(filename);
 };
+
+const PX_TO_MM = 0.264583;
+
+export const exportElementAsPDF = async (element, filename = 'record.pdf') => {
+  if (!element) {
+    console.warn('exportElementAsPDF: No element provided');
+    return;
+  }
+
+  const excludedElements = Array.from(element.querySelectorAll('[data-export-exclude]'));
+  const previousDisplays = excludedElements.map(el => el.style.display);
+
+  const restoreExcluded = () => {
+    excludedElements.forEach((el, index) => {
+      const prev = previousDisplays[index];
+      if (prev) {
+        el.style.display = prev;
+      } else {
+        el.style.removeProperty('display');
+      }
+    });
+  };
+
+  try {
+    excludedElements.forEach(el => {
+      el.style.setProperty('display', 'none', 'important');
+    });
+
+    const canvas = await html2canvas(element, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      logging: false,
+      useCORS: true
+    });
+
+    const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+    const pdf = new jsPDF({
+      orientation,
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const imgWidthMm = canvas.width * PX_TO_MM;
+    const imgHeightMm = canvas.height * PX_TO_MM;
+    const maxWidth = pageWidth - 20; // 10mm margin either side
+    const maxHeight = pageHeight - 20; // 10mm top/bottom margin
+    const scale = Math.min(maxWidth / imgWidthMm, maxHeight / imgHeightMm, 1);
+
+    const renderWidth = imgWidthMm * scale;
+    const renderHeight = imgHeightMm * scale;
+    const x = (pageWidth - renderWidth) / 2;
+    const y = 10;
+
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, renderWidth, renderHeight);
+    const safeFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+    pdf.save(safeFilename);
+  } catch (error) {
+    console.error('Error exporting element as PDF:', error);
+    alert('Unable to export the document. Please try again.');
+  } finally {
+    restoreExcluded();
+  }
+};

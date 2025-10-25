@@ -1,17 +1,17 @@
 import React from 'react';
 import { MdOutlineLogout } from "react-icons/md";
+import { FaSpinner } from 'react-icons/fa';
 import ReactDOM from 'react-dom';
 
 
-function LogoutDialog({onClose, logout }) {
+function LogoutDialog({onClose, logout, loading = false }) {
 
- 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-44">
       {/* Overlay */}
       <div 
         className="fixed inset-0 bg-black/35 bg-opacity-50 z-100 backdrop-blur-sm" 
-        onClick={onClose}
+        onClick={() => { if (!loading) onClose(); }}
       />  
       
       {/* Dialog */}
@@ -31,9 +31,10 @@ function LogoutDialog({onClose, logout }) {
             </h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => { if (!loading) onClose(); }}
             aria-label="Close"
             className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={loading}
           >
             ✕
           </button>
@@ -48,16 +49,20 @@ function LogoutDialog({onClose, logout }) {
           {/* Action buttons */}
           <div className="flex gap-3 justify-end">
             <button
-              onClick={onClose}
+              onClick={() => { if (!loading) onClose(); }}
               className="px-4 py-2 text-gray-700 font-medium bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              disabled={loading}
             >
               Cancel
             </button>
             <button
               onClick={logout}
-              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2 min-w-[100px] justify-center font-medium"
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2 min-w-[100px] justify-center font-medium disabled:opacity-60"
+              disabled={loading}
+              aria-busy={loading}
             >
-              Logout
+              {loading ? <FaSpinner className="animate-spin" /> : <MdOutlineLogout />}
+              {loading ? 'Logging out...' : 'Logout'}
             </button>
 
           </div>

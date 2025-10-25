@@ -108,39 +108,28 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose }) {
       n.alert_id === alert_id ? { ...n, is_read: true } : n
     ));
 
-    let payload;
-
-    if (isAdminUser){
-      payload = { alert_id: alert_id, user_type: 'admin',  admin_id: principalId }
-    } else {
-      payload = { alert_id: alert_id, user_type: 'user',  user_id: principalId }
-    }
+    const body = isAdminUser ? { alert_id: alert_id, user_type: 'admin',  admin_id: principalId } : { alert_id: alert_id, user_type: 'user',  user_id: principalId }
 
 
     //UPDATES THE BACKEND
-    await api.post(`/api/notifications`, payload);
+    await api.post(`/api/notifications`, body);
   };
 
   //FUNCTION THAT MARKS ALL NOTIFICATIONS AS READ
   const markAllAsRead = async () => {
     try {
 
-      let payload;
-
-      if (isAdminUser){
-        payload = { user_type: 'admin',  admin_id: principalId }
-      } else {
-        payload = { user_type: 'user',  user_id: principalId }
-      }
-
-      await api.post(`/api/notifications/mark-all-read`, {
-        payload,
-        branch_id: user.branch_id,
-        hire_date: user.hire_date
-      });
-
       //UPDATES THE UI
       setNotify(notify => notify.map(n => ({ ...n, is_read: true })));
+
+      // Build top-level body fields expected by the server
+      const body = isAdminUser
+        ? { user_type: 'admin', admin_id: principalId }
+        : { user_type: 'user', user_id: principalId, branch_id: user.branch_id, hire_date: user.hire_date };
+
+      await api.post(`/api/notifications/mark-all-read`, body);
+
+      
     } catch (error) {
       console.error('Error:', error);
     }

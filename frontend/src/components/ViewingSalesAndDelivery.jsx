@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import NoInfoFound from './common/NoInfoFound';
 import api from '../utils/api';
 import { currencyFormat } from '../utils/formatCurrency';
@@ -6,11 +6,15 @@ import { BsTelephoneFill } from "react-icons/bs";
 import { RiCellphoneFill } from "react-icons/ri";
 import { MdEmail, MdOutlineCorporateFare } from "react-icons/md";
 import ChartLoading from './common/ChartLoading';
+import { exportElementAsPDF } from '../utils/exportUtils';
 
 function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInformation, sale_id}) {
 
     const [soldItems, setSoldItems] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [exporting, setExporting] = useState(false);
+
+    const contentRef = useRef(null);
 
     const statusDetails = useMemo(() => {
         if (!headerInformation) return null;
@@ -79,6 +83,22 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
         }
         
     }
+
+    const handleExport = async () => {
+        if (!contentRef.current || !headerInformation) return;
+
+        try {
+            setExporting(true);
+            const baseFilename = type === 'sales'
+                ? `sale-${headerInformation.sale_id || 'transaction'}`
+                : `delivery-${headerInformation.delivery_id || headerInformation.sale_id || 'transaction'}`;
+            await exportElementAsPDF(contentRef.current, baseFilename);
+        } catch (error) {
+            console.error('Failed to export transaction details:', error);
+        } finally {
+            setExporting(false);
+        }
+    };
     
   if (!user) return;
 
@@ -93,7 +113,7 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
         )}
 
         <dialog className="bg-transparent fixed top-0 bottom-0  z-50" open={openModal}>
-            <div className={`relative flex flex-col border border-gray-600/40 bg-white w-[1000px] rounded-md py-5 px-3 animate-popup`}> 
+            <div ref={contentRef} className={`relative flex flex-col border border-gray-600/40 bg-white w-[1000px] rounded-md py-5 px-3 animate-popup`}> 
                 
 
               
@@ -101,9 +121,31 @@ function ViewingSalesAndDelivery({openModal, closeModal, user, type, headerInfor
                     type='button' 
                     className="btn-sm btn-circle btn-ghost absolute right-2 top-2" 
                     onClick={closeModal}
+                    data-export-exclude
                 >
                     ✕
                 </button>
+
+                <div className="flex justify-end pr-5 mb-2" data-export-exclude>
+                    <button
+                        type="button"
+                        onClick={handleExport}
+                        disabled={loading || exporting}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-700 hover:bg-green-800 rounded-md shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {exporting ? (
+                            <>
+                                <svg className="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                <span>Exporting...</span>
+                            </>
+                        ) : (
+                            <span>Export PDF</span>
+                        )}
+                    </button>
+                </div>
 
                 <div className="pb-4 pt-2 px-8 w-full flex-1 flex flex-col">
                     
