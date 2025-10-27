@@ -898,11 +898,21 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
 
                           <td className="px-2">
-                            <input type="text" className="border w-full rounded-md px-2 py-1.5" value={row.unit} onChange={e => {
-                              const newRows = [...rows];
-                              newRows[idx].unit = e.target.value;
-                              setRows(newRows);
-                            }} readOnly />
+                              <select
+                                className="border w-full rounded-md px-2 py-1.5"
+                                value={row.unit || ''}
+                                onChange={e => handleUnitChange(idx, e.target.value)}
+                                disabled={!row.product_id}
+                              >
+                                <option value="" disabled>
+                                  {row.product_id ? 'Select unit' : 'Choose product first'}
+                                </option>
+                                {Array.isArray(row.sellingUnits) && row.sellingUnits.map(unitOption => (
+                                  <option key={unitOption.unit} value={unitOption.unit}>
+                                    {`${unitOption.unit} (${currencyFormat(toTwoDecimals(unitOption.unit_price))})`}
+                                  </option>
+                                ))}
+                              </select>
                           </td>
 
 
@@ -928,208 +938,13 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                             <button
                               type="button"
                               className="bg-green-600 py-2 px-4 text-white mb-6 rounded-sm"
-                              onClick={() =>
-                                {setRows(prevRows => {
-                                  const updatedRows = [...prevRows, createEmptySaleRow()];
-                                  preventEmptyQuantity(updatedRows);
-                                  return updatedRows;
-                                });}
-                              }
+                               onClick={() => {removeSaleRow(idx); preventEmptyQuantity()}}
+
                             >
                               Remove
                             </button>
 
-                            <div className="h-[200px] overflow-y-auto border border-gray-200">
-                              <table className="w-full divide-y divide-gray-200 text-sm">
-                                  <thead className="sticky top-0 bg-gray-100">
-                                      <tr>
-                                          <th className="px-4 py-2 text-center text-xs font-medium">
-                                          PRODUCT 
-                                          </th>
-
-                                          <th className="px-4 py-2 text-center text-xs font-medium">
-                                              QUANTITY
-                                          </th>
-                                          
-                                          <th className="px-4 py-2 text-center text-xs font-medium">
-                                              UNIT                              
-                                          </th>
-
-                                          <th className="px-4 py-2 text-center text-xs font-medium">
-                                              UNIT PRICE
-                                          </th>
-
-                                          <th className="px-4 py-2 text-center text-xs font-medium">
-                                              AMOUNT
-                                          </th>
-
-                                          <th className="px-4 py-2 text-center text-xs font-medium">
-                                              ACTION
-                                          </th>
-
-                                      </tr>
-
-                                  </thead>
-
-                                  <tbody>
-                                      {rows.map((row, idx) => (
-                                        <tr key={idx}>
-                                          <td className="px-2 py-3">
-
-                                            <div className='relative'>
-                                                <input 
-                                                  type="text" 
-                                                  className="border w-full "
-                                                  placeholder="Search products..."
-                                                  value={searchTerms[idx] || ''}
-                                                  onChange={(e) => handleSearchChange(idx, e.target.value)}
-                                                  onFocus={() => setShowDropdowns(prev => ({...prev, [idx]: true}))}
-                                                  onBlur={() => {
-                                                    
-                                                    setTimeout(() => {
-                                                      setShowDropdowns(prev => ({...prev, [idx]: false}));
-                                                    }, 150);
-                                                  }}
-                                                />
-
-                                                {showDropdowns[idx] && (
-                                                  <div className='absolute top-[100%] z-[200] bg-white w-[100%] border border-gray-300 max-h-40 overflow-y-auto shadow-lg'>
-                                                    {getFilteredProducts(idx).length > 0 ? (
-                                                      getFilteredProducts(idx).map((product) => (
-                                                        <div 
-                                                          key={product.product_id}
-                                                          className='p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100'
-                                                          onMouseDown={(e) => {
-                                                            e.preventDefault();
-                                                            selectProduct(idx, product);
-                                                          }}
-                                                        >
-                                                          <div className='font-medium text-sm'>{product.product_name}</div>
-                                                          <div className='font-light text-xs'> Quantity: {product.quantity}</div>
-                                                        </div>
-                                                      ))
-                                                    ) : (
-                                                      <div className='p-2 text-gray-500 text-sm'>No products found</div>
-                                                    )}
-                                                  </div>
-                                                )}
-                                            </div>
-
-                                          </td>
-
-
-                                          <td className="px-2 relative">
-                                            <div className="relative">
-                                              <input 
-                                                type="number" 
-                                                step={row.unit ? getQuantityStep(row.unit) : "0.001"}
-                                                min={row.unit ? getQuantityStep(row.unit) : "0.001"}
-                                                className="border w-full" 
-                                                value={row.quantity === '' ? '' : row.quantity}
-                                                onChange={e => {
-                                                  const { value } = e.target;
-                                                  if (value === '') {
-                                                    const updatedRows = [...rows];
-                                                    updatedRows[idx] = {
-                                                      ...updatedRows[idx],
-                                                      quantity: ''
-                                                    };
-                                                    createAnAmount(idx, updatedRows);
-                                                    return;
-                                                  }
-
-                                                  const numericValue = Number(value);
-                                                  if (Number.isNaN(numericValue)) {
-                                                    return;
-                                                  }
-
-                                                  if (row.unit && !allowsFractional(row.unit) && value.includes('.')) {
-                                                    return;
-                                                  }
-
-                                                  const updatedRows = [...rows];
-                                                  updatedRows[idx] = {
-                                                    ...updatedRows[idx],
-                                                    quantity: value
-                                                  };
-                                                  createAnAmount(idx, updatedRows);
-                                                }} 
-                                                placeholder={row.unit ? getQuantityPlaceholder(row.unit) : "0"}
-                                                disabled={!row.product_id}
-                                                required
-                                              />
-                                              {quantityValidationErrors[idx] && (
-                                                <div
-                                                  className="absolute left-0 w-full text-xs text-red-600 mt-1 z-10 bg-white pointer-events-none"
-                                                  style={{ bottom: '-3em' }}
-                                                >
-                                                  {quantityValidationErrors[idx]}
-                                                </div>
-                                              )}
-                                              {row.product_id && exceedQuanity.includes(String(row.product_id)) && (
-                                                <div
-                                                  className="absolute left-0 w-full text-xs text-red-600 mt-1 z-10 bg-white pointer-events-none"
-                                                  style={{ bottom: '-1.5em' }}
-                                                >
-                                                  *Not enough stock available
-                                                </div>
-                                              )}
-                                            </div>
-                                          </td>
-
-
-                                          <td className="px-2">
-                                            <select
-                                              className="border w-full"
-                                              value={row.unit || ''}
-                                              onChange={e => handleUnitChange(idx, e.target.value)}
-                                              disabled={!row.product_id}
-                                            >
-                                              <option value="" disabled>
-                                                {row.product_id ? 'Select unit' : 'Choose product first'}
-                                              </option>
-                                              {Array.isArray(row.sellingUnits) && row.sellingUnits.map(unitOption => (
-                                                <option key={unitOption.unit} value={unitOption.unit}>
-                                                  {`${unitOption.unit} (${currencyFormat(toTwoDecimals(unitOption.unit_price))})`}
-                                                </option>
-                                              ))}
-                                            </select>
-                                          </td>
-
-
-                                          <td className="px-2">
-                                            <input
-                                              type="text"
-                                              className="border w-full"
-                                              value={row.unitPrice ? toTwoDecimals(row.unitPrice) : ''}
-                                              readOnly
-                                            />
-                                          </td>
-
-
-                                          <td className="px-2">
-                                            <input
-                                              type="text"
-                                              className="border w-full"
-                                              value={row.amount ? toTwoDecimals(row.amount) : ''}
-                                              readOnly
-                                            />
-                                          </td>
-
-
-                                          <td>
-                                            <button type='button' onClick={() => {removeSaleRow(idx); preventEmptyQuantity()}}>Remove</button>
-
-                                          </td>
-
-                                        </tr>
-                                      ))}
-
-                                  </tbody>
-
-                              </table>
-                            </div>
-
+                          </td>
                         </tr>
                       ))}
 

@@ -238,7 +238,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         setDescription(itemData.description);
         setSellingUnits(initializeSellingUnits(itemData.selling_units, itemData.unit, itemData.unit_price));
         setSellingUnitErrors({ general: '', entries: {} });
-        setShowSellingUnitsEditor(Array.isArray(itemData.selling_units) && itemData.selling_units.some(entry => !entry?.is_base));
+        setShowSellingUnitsEditor(false);
       }
     }
   }, [isModalOpen, mode, itemData, user, initializeSellingUnits]);
@@ -687,7 +687,8 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         <div className="relative bg-white h-[75vh] lg:h-[600px] w-[100vw] max-w-[800px] overflow-y-auto rounded-xl p-6 lg:py-10 lg:px-[53px] shadow-2xl border border-gray-100 animate-popup hide-scrollbar">
           {showSellingUnitsEditor && (
             <div
-              className="absolute inset-0 z-[400] flex items-start justify-center bg-black/20 backdrop-blur-sm px-4 pt-6 pb-10"
+              className="fixed inset-0 z-[400] flex justify-center bg-black/20 backdrop-blur-sm
+              items-center"
               onClick={() => setShowSellingUnitsEditor(false)}
             >
               <div
@@ -709,19 +710,38 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                   </button>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <div className="text-xs sm:text-sm text-gray-500">
-                    <p><span className="font-semibold text-gray-700">Base unit:</span> {unit || 'N/A'}</p>
-                    <p><span className="font-semibold text-gray-700">Base price:</span> {baseUnitPriceDisplay}</p>
+                <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-600 ">Base unit</label>
+                    <div className="mt-1 flex items-center gap-3">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          className="w-full border rounded-sm px-2 py-1 bg-gray-50 text-gray-700 font-bold cursor-not-allowed"
+                          value={unit || ''}
+                          readOnly
+                        />
+                      </div>
+                      <div className="w-40 flex items-center gap-2">
+                        <div className="flex-1 text-sm text-gray-700 bg-gray-50 border rounded-sm px-3 py-1 font-bold cursor-not-allowed">{baseUnitPriceDisplay}</div>
+                       
+                      </div>
+                      <div className="border py-1 px-3 w-40 text-sm bg-gray-50 text-gray-600 font-bold cursor-not-allowed">Base qty: 1</div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Base unit follows the selected inventory unit and its price is the base price.</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddSellingUnitRow}
-                    className="px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-md border border-green-600 text-green-700 hover:bg-green-50 disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
-                    disabled={!unit || !unit.trim() || availableUnitsForNewRow.length === 0}
-                  >
-                    Add Selling Unit
-                  </button>
+                  <div className="sm:col-span-1 flex items-end justify-end">
+                    <button
+                      type="button"
+                      onClick={handleAddSellingUnitRow}
+                      className="px-3 py-2 w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!unit || !unit.trim() || availableUnitsForNewRow.length === 0}
+                      aria-disabled={!unit || !unit.trim() || availableUnitsForNewRow.length === 0}
+                    >
+                      <span className="text-lg leading-none">+</span>
+                      <span>Add Selling Unit</span>
+                    </button>
+                  </div>
                 </div>
 
                 {!unit || !unit.trim() ? (
@@ -742,48 +762,38 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                       </tr>
                     </thead>
                     <tbody>
-                      {sellingUnits.length === 0 ? (
+                      {sellingUnits.filter(s => !s.is_base).length === 0 ? (
                         <tr>
                           <td className="px-3 py-5 text-center text-gray-500" colSpan={5}>No selling units configured yet.</td>
                         </tr>
                       ) : (
                         sellingUnits.map((entry, index) => {
-                          const isBase = Boolean(entry.is_base);
+                          if (entry.is_base) return null;
+                          const isBase = false;
                           const entryErrors = sellingUnitErrors.entries[index] || [];
                           const unitsPerBase = computeUnitsPerBase(entry);
                           return (
-                            <tr key={`${entry.unit || 'unit'}-${index}`} className={isBase ? 'bg-green-50/70' : ''}>
+                            <tr key={`${entry.unit || 'unit'}-${index}`}>
                               <td className="px-3 py-2 align-top">
-                                {isBase ? (
-                                  <input
-                                    type="text"
-                                    className="w-full border rounded-sm px-2 py-1 bg-gray-100 text-gray-600 cursor-not-allowed"
-                                    value={entry.unit}
-                                    readOnly
-                                  />
-                                ) : (
-                                  <select
-                                    className="w-full border rounded-sm px-2 py-1 bg-white"
-                                    value={entry.unit}
-                                    onChange={(e) => handleSellingUnitFieldChange(index, 'unit', e.target.value)}
-                                  >
-                                    <option value="">Select unit</option>
-                                    {getAvailableUnitOptions(index).map(option => (
-                                      <option key={`${option.value}-${index}`} value={option.value}>{option.label}</option>
-                                    ))}
-                                  </select>
-                                )}
-                                {isBase && <p className="text-[10px] text-gray-500 mt-1">Base unit follows the selected inventory unit.</p>}
+                                <select
+                                  className="w-full border rounded-sm px-2 py-1 bg-white"
+                                  value={entry.unit}
+                                  onChange={(e) => handleSellingUnitFieldChange(index, 'unit', e.target.value)}
+                                >
+                                  <option value="">Select unit</option>
+                                  {getAvailableUnitOptions(index).map(option => (
+                                    <option key={`${option.value}-${index}`} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
                               </td>
                               <td className="px-3 py-2 align-top">
                                 <input
                                   type="number"
                                   min="0"
                                   step="0.01"
-                                  className={`w-full border rounded-sm px-2 py-1 ${isBase ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
-                                  value={isBase ? unit_price : entry.unit_price}
-                                  onChange={(e) => (isBase ? setPrice(e.target.value) : handleSellingUnitFieldChange(index, 'unit_price', e.target.value))}
-                                  disabled={isBase}
+                                  className="w-full border rounded-sm px-2 py-1"
+                                  value={entry.unit_price}
+                                  onChange={(e) => handleSellingUnitFieldChange(index, 'unit_price', e.target.value)}
                                 />
                               </td>
                               <td className="px-3 py-2 align-top">
@@ -791,10 +801,9 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                                   type="number"
                                   min="0"
                                   step="0.000001"
-                                  className={`w-full border rounded-sm px-2 py-1 ${isBase ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
-                                  value={isBase ? '1' : entry.base_quantity_per_sell_unit}
+                                  className="w-full border rounded-sm px-2 py-1"
+                                  value={entry.base_quantity_per_sell_unit}
                                   onChange={(e) => handleSellingUnitFieldChange(index, 'base_quantity_per_sell_unit', e.target.value)}
-                                  disabled={isBase}
                                 />
                                 <p className="text-[10px] text-gray-500 mt-1">Amount of base unit per {entry.unit || 'sell unit'}.</p>
                               </td>
@@ -802,23 +811,21 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                                 <input
                                   type="text"
                                   className="w-full border rounded-sm px-2 py-1 bg-gray-100 text-gray-600 cursor-not-allowed"
-                                  value={isBase ? '1' : unitsPerBase}
+                                  value={unitsPerBase}
                                   readOnly
                                 />
-                                <p className="text-[10px] text-gray-500 mt-1">Sell units per base unit.</p>
+                                <p className="text-[11px] text-gray-500 mt-1">Number of units per 
+                                  <span className='font-bold'> {unit}</span>.
+                                </p>
                               </td>
                               <td className="px-3 py-2 align-top text-center">
-                                {isBase ? (
-                                  <span className="text-[10px] text-gray-400">Base</span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="text-xs text-red-600 hover:text-red-700"
-                                    onClick={() => handleRemoveSellingUnitRow(index)}
-                                  >
-                                    Remove
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  className="text-xs text-red-600 hover:text-red-700"
+                                  onClick={() => handleRemoveSellingUnitRow(index)}
+                                >
+                                  Remove
+                                </button>
                               </td>
                             </tr>
                           );

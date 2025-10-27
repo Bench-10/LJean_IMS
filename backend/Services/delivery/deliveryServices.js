@@ -194,12 +194,13 @@ export const setToDelivered = async(saleID, update) => {
         else if (!wasDelivered && !wasPending && status.pending) {
 
             // UNDELIVERED → OUT FOR DELIVERY - RE-DEDUCT STOCK (REACTIVATING CANCELED ORDER)
-            const {rows: itemsToRededuct} = await SQLquery(`
-                SELECT 
-                    product_id,
-                    quantity_display AS quantity
-                FROM Sales_Items
-                WHERE sales_information_id = $1`,
+                const {rows: itemsToRededuct} = await SQLquery(`
+                    SELECT 
+                        product_id,
+                        quantity_display AS quantity,
+                        unit
+                    FROM Sales_Items
+                    WHERE sales_information_id = $1`,
                 [saleID]
             );
 
@@ -207,7 +208,7 @@ export const setToDelivered = async(saleID, update) => {
             const branchId = branchInfo[0]?.branch_id;
 
             for (const product of itemsToRededuct) {
-                await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID);
+                    await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
             }
             console.log(`Stock re-deducted for sale ID: ${saleID} due to reactivating delivery from undelivered to out for delivery`);
 
@@ -251,7 +252,8 @@ export const setToDelivered = async(saleID, update) => {
                 const {rows: itemsToDeduct} = await SQLquery(`
                     SELECT 
                         product_id,
-                        quantity_display AS quantity
+                        quantity_display AS quantity,
+                        unit
                     FROM Sales_Items
                     WHERE sales_information_id = $1`,
                     [saleID]
@@ -261,7 +263,7 @@ export const setToDelivered = async(saleID, update) => {
                 const branchId = branchInfo[0]?.branch_id;
 
                 for (const product of itemsToDeduct) {
-                    await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID);
+                    await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
                 }
                 console.log(`Stock re-deducted for sale ID: ${saleID} (was previously restored)`);
             } else {
