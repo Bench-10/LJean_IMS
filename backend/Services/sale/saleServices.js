@@ -5,6 +5,61 @@ import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, b
 import { convertToBaseUnit, convertToDisplayUnit } from "../Services_Utils/unitConversion.js";
 
 
+const getSaleUnitConfig = async (productId, branchId, sellUnit) => {
+    const { rows } = await SQLquery(
+        `SELECT 
+            ip.unit AS inventory_unit,
+            ip.conversion_factor,
+            sup.base_quantity_per_sell_unit,
+            sup.unit_price AS selling_unit_price,
+            sup.sell_unit,
+            ip.unit_price AS base_unit_price
+         FROM Inventory_Product ip
+         LEFT JOIN inventory_product_sell_units sup
+           ON sup.product_id = ip.product_id
+          AND sup.branch_id = ip.branch_id
+          AND sup.sell_unit = $3
+         WHERE ip.product_id = $1 AND ip.branch_id = $2`,
+        [productId, branchId, sellUnit]
+    );
+
+    if (rows.length === 0) {
+        throw new Error(`Product with ID ${productId} not found in inventory`);
+    }
+
+    const row = rows[0];
+    const inventoryUnit = row.inventory_unit;
+    const conversionFactor = Number(row.conversion_factor ?? 1) || 1;
+
+    let baseQuantityPerSellUnit = row.base_quantity_per_sell_unit !== null
+        ? Number(row.base_quantity_per_sell_unit)
+        : null;
+
+    let unitPrice = row.selling_unit_price !== null
+        ? Number(row.selling_unit_price)
+        : Number(row.base_unit_price);
+
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        throw new Error(`Selling unit price for '${sellUnit}' is not configured for product ID ${productId}`);
+    }
+
+    if (!Number.isFinite(baseQuantityPerSellUnit) || baseQuantityPerSellUnit <= 0) {
+        if (sellUnit === inventoryUnit) {
+            baseQuantityPerSellUnit = 1;
+        } else {
+            throw new Error(`Selling unit '${sellUnit}' is not configured for product ID ${productId}`);
+        }
+    }
+
+    return {
+        inventory_unit: inventoryUnit,
+        conversion_factor: conversionFactor,
+        base_quantity_per_sell_unit: baseQuantityPerSellUnit,
+        unit_price: unitPrice
+    };
+};
+
+
 
 // VIEW SALE
 export const viewSale = async (branchId) => {
@@ -58,6 +113,9 @@ export const addSale = async (headerAndProducts) => {
     const {chargeTo, tin, address, date, branch_id, seniorPw,  vat, amountNetVat, additionalDiscount,
         deliveryFee, totalAmountDue, transactionBy, isForDelivery } = headerInformationAndTotal;
 
+    const saleUnitConfigCache = new Map();
+    const preparedProducts = [];
+
    
     let sale_id;
     let isUnique = false;
@@ -70,37 +128,57 @@ export const addSale = async (headerAndProducts) => {
     try {
         await SQLquery('BEGIN');
 
-    // CHECK DATABASE AGAIN FOR IF AVAILABLE QUANTITY IS ENOUGH (INSIDE TRANSACTION)
         if (productRow && productRow.length > 0) {
             for (const product of productRow) {
-                // GET UNIT INFO FOR CONVERSION
-                const unitResult = await SQLquery(
-                    'SELECT unit, conversion_factor FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2',
-                    [product.product_id, branch_id]
-                );
-                
-                if (unitResult.rowCount === 0) {
-                    throw new Error(`Product with ID ${product.product_id} not found in inventory`);
+                const saleUnit = product.unit;
+                const quantityDisplay = Number(product.quantity);
+
+                if (!saleUnit) {
+                    throw new Error(`Selling unit is required for product ID ${product.product_id}.`);
                 }
-                
-                const { unit, conversion_factor } = unitResult.rows[0];
-                const quantity_base = convertToBaseUnit(product.quantity, unit, conversion_factor);
-                
-                // CHECK AVAILABLE QUANTITY WITHOUT FOR UPDATE ON AGGREGATE (using base units)
+
+                if (!Number.isFinite(quantityDisplay) || quantityDisplay <= 0) {
+                    throw new Error(`Invalid quantity for product ID ${product.product_id}. Quantity must be greater than 0.`);
+                }
+
+                const configKey = `${product.product_id}:${saleUnit}`;
+                let saleConfig = saleUnitConfigCache.get(configKey);
+
+                if (!saleConfig) {
+                    saleConfig = await getSaleUnitConfig(product.product_id, branch_id, saleUnit);
+                    saleUnitConfigCache.set(configKey, saleConfig);
+                }
+
+                const quantityInventoryUnit = quantityDisplay * saleConfig.base_quantity_per_sell_unit;
+                const quantityBase = convertToBaseUnit(quantityInventoryUnit, saleConfig.inventory_unit);
+
                 const inventoryCheck = await SQLquery(
                     'SELECT SUM(quantity_left_base) as available_quantity_base FROM Add_Stocks WHERE product_id = $1 AND branch_id = $2 AND quantity_left_base > 0',
                     [product.product_id, branch_id]
                 );
-                
-                if (inventoryCheck.rowCount === 0 || !inventoryCheck.rows[0].available_quantity_base) {
-                    throw new Error(`Product with ID ${product.product_id} not found in inventory`);
+
+                const availableQuantityBase = inventoryCheck.rowCount === 0 || !inventoryCheck.rows[0].available_quantity_base
+                    ? 0
+                    : Number(inventoryCheck.rows[0].available_quantity_base);
+
+                if (quantityBase > availableQuantityBase) {
+                    const availableInventoryDisplay = convertToDisplayUnit(availableQuantityBase, saleConfig.inventory_unit);
+                    const availableSaleDisplay = saleConfig.base_quantity_per_sell_unit > 0
+                        ? Number((availableInventoryDisplay / saleConfig.base_quantity_per_sell_unit).toFixed(6))
+                        : 0;
+                    throw new Error(`Insufficient inventory for product ID ${product.product_id}. Available: ${availableInventoryDisplay} ${saleConfig.inventory_unit} (~${availableSaleDisplay} ${saleUnit}), Requested: ${quantityDisplay} ${saleUnit}`);
                 }
-                
-                const availableQuantityBase = Number(inventoryCheck.rows[0].available_quantity_base);
-                if (quantity_base > availableQuantityBase) {
-                    const availableDisplay = convertToDisplayUnit(availableQuantityBase, unit, conversion_factor);
-                    throw new Error(`Insufficient inventory for product ID ${product.product_id}. Available: ${availableDisplay} ${unit}, Requested: ${product.quantity} ${unit}`);
-                }
+
+                preparedProducts.push({
+                    product_id: product.product_id,
+                    sale_unit: saleUnit,
+                    quantity_display: quantityDisplay,
+                    unit_price: saleConfig.unit_price,
+                    quantity_base: quantityBase,
+                    base_quantity_per_sell_unit: saleConfig.base_quantity_per_sell_unit,
+                    inventory_unit: saleConfig.inventory_unit,
+                    conversion_factor: saleConfig.conversion_factor
+                });
             }
         }
 
@@ -113,40 +191,44 @@ export const addSale = async (headerAndProducts) => {
 
 
     
-   
-        if (productRow && productRow.length > 0) {
-
-
+        if (preparedProducts.length > 0) {
             const values = [];
             const placeholders = [];
-            for (let i = 0; i < productRow.length; i++) {
-                const p = productRow[i];
-                
-                // GET CONVERSION FACTOR FOR THIS PRODUCT
-                const unitResult = await SQLquery(
-                    'SELECT unit, conversion_factor FROM Inventory_Product WHERE product_id = $1 AND branch_id = $2',
-                    [p.product_id, branch_id]
-                );
-                
-                const { unit, conversion_factor } = unitResult.rows[0];
-                const quantity_display = Number(p.quantity);
-                const quantity_base = convertToBaseUnit(quantity_display, unit, conversion_factor);
-                
-                const baseIndex = i * 9;
+
+            preparedProducts.forEach((item, index) => {
+                const baseIndex = index * 9;
+                const lineAmount = Number((item.unit_price * item.quantity_display).toFixed(2));
                 placeholders.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8}, $${baseIndex + 9})`);
-                values.push(sale_id, p.product_id, quantity_display, quantity_base, p.unit, p.unitPrice, p.amount, branch_id, conversion_factor);
+                values.push(
+                    sale_id,
+                    item.product_id,
+                    item.quantity_display,
+                    item.quantity_base,
+                    item.sale_unit,
+                    item.unit_price,
+                    lineAmount,
+                    branch_id,
+                    item.conversion_factor
+                );
+            });
+
+            if (placeholders.length > 0) {
+                const query = `INSERT INTO Sales_Items(sales_information_id, product_id, quantity_display, quantity_base, unit, unit_price, amount, branch_id, conversion_factor) VALUES ${placeholders.join(', ')}`;
+                await SQLquery(query, values);
             }
 
-            const query = `INSERT INTO Sales_Items(sales_information_id, product_id, quantity_display, quantity_base, unit, unit_price, amount, branch_id, conversion_factor) VALUES ${placeholders.join(', ')}`;
-            await SQLquery(query, values);
-
-        // FIFO STOCK DEDUCTION WITH DEADLOCK PREVENTION
-        // ALWAYS DEDUCT STOCK IMMEDIATELY WHEN SALE IS PLACED (REGARDLESS OF DELIVERY STATUS)
-        // THIS PREVENTS PHANTOM INVENTORY WHERE PENDING ORDERS DON'T REFLECT IN AVAILABLE STOCK
-            for (const product of productRow) {
-                await deductStockAndTrackUsage(sale_id, product.product_id, Number(product.quantity), branch_id, headerInformationAndTotal.userID);
+            for (const item of preparedProducts) {
+                await deductStockAndTrackUsage(
+                    sale_id,
+                    item.product_id,
+                    item.quantity_display,
+                    branch_id,
+                    headerInformationAndTotal.userID,
+                    item.sale_unit,
+                    item.base_quantity_per_sell_unit
+                );
             }
-        };
+        }
 
 
         await SQLquery('COMMIT');
@@ -279,7 +361,7 @@ export const addSale = async (headerAndProducts) => {
 
 // DEDUCT STOCK AND TRACK WHICH BATCHES WERE USED
 // THIS ALLOWS US TO RESTORE STOCK TO EXACT SAME BATCHES IF ORDER IS CANCELED
-export const deductStockAndTrackUsage = async (salesInformationId, productId, quantityToDeduct, branchId, userID = null) => {
+export const deductStockAndTrackUsage = async (salesInformationId, productId, quantityToDeduct, branchId, userID = null, sellUnit = null, baseQuantityPerSellUnitOverride = null) => {
     if (!branchId) {
         throw new Error('branchId is required for stock deduction');
     }
@@ -295,9 +377,32 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
     }
     
     const { unit, conversion_factor } = unitResult.rows[0];
+    const resolvedSellUnit = sellUnit ?? unit;
+    let baseQuantityPerSellUnit = baseQuantityPerSellUnitOverride;
+    
+    if (!Number.isFinite(baseQuantityPerSellUnit) || baseQuantityPerSellUnit <= 0) {
+        const sellUnitResult = await SQLquery(
+            'SELECT base_quantity_per_sell_unit FROM inventory_product_sell_units WHERE product_id = $1 AND branch_id = $2 AND sell_unit = $3',
+            [productId, branchId, resolvedSellUnit]
+        );
+
+        if (sellUnitResult.rowCount === 0) {
+            if (resolvedSellUnit !== unit) {
+                throw new Error(`Selling unit '${resolvedSellUnit}' not configured for product ID ${productId}`);
+            }
+            baseQuantityPerSellUnit = 1;
+        } else {
+            baseQuantityPerSellUnit = Number(sellUnitResult.rows[0].base_quantity_per_sell_unit);
+        }
+    }
+
+    if (!Number.isFinite(baseQuantityPerSellUnit) || baseQuantityPerSellUnit <= 0) {
+        baseQuantityPerSellUnit = 1;
+    }
     
     // CONVERT DISPLAY QUANTITY TO BASE UNITS FOR FIFO PROCESSING
-    const quantityToDeductBase = convertToBaseUnit(quantityToDeduct, unit, conversion_factor);
+    const quantityToDeductInventoryUnit = quantityToDeduct * baseQuantityPerSellUnit;
+    const quantityToDeductBase = convertToBaseUnit(quantityToDeductInventoryUnit, unit);
     let remainingToDeduct = quantityToDeductBase;
 
     // CHECK IF THERE ARE EXISTING RESTORED RECORDS FOR THIS SALE
@@ -366,9 +471,9 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
         const newQuantityLeftBase = batchQuantityBase - deductFromThisBatchBase;
         
         // ALSO UPDATE DISPLAY QUANTITY
-        const deductFromThisBatchDisplay = convertToDisplayUnit(deductFromThisBatchBase, unit, conversion_factor);
-        const batchQuantityDisplay = convertToDisplayUnit(batchQuantityBase, unit, conversion_factor);
-        const newQuantityLeftDisplay = convertToDisplayUnit(newQuantityLeftBase, unit, conversion_factor);
+    const deductFromThisBatchDisplay = convertToDisplayUnit(deductFromThisBatchBase, unit);
+    const batchQuantityDisplay = convertToDisplayUnit(batchQuantityBase, unit);
+    const newQuantityLeftDisplay = convertToDisplayUnit(newQuantityLeftBase, unit);
 
     // ATOMIC UPDATE WITH VERSION CHECK (UPDATE BOTH BASE AND DISPLAY)
         const updateResult = await SQLquery(
@@ -395,7 +500,7 @@ export const deductStockAndTrackUsage = async (salesInformationId, productId, qu
 
     // CHECK IF ALL QUANTITY WAS DEDUCTED
     if (remainingToDeduct > 0) {
-        const remainingDisplay = convertToDisplayUnit(remainingToDeduct, unit, conversion_factor);
+    const remainingDisplay = convertToDisplayUnit(remainingToDeduct, unit);
         throw new Error(`Unable to deduct full quantity for product ID ${productId}. Remaining: ${remainingDisplay} ${unit}`);
     }
 
