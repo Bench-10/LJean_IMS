@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../utils/api.js';
 import DropdownCustom from '../components/DropdownCustom';
+import DatePickerCustom from '../components/DatePickerCustom.jsx';
 import { BsFunnelFill } from "react-icons/bs";
 import { TbFileExport } from "react-icons/tb";
 import NoInfoFound from './common/NoInfoFound.jsx';
@@ -383,40 +384,73 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
                 {/* RIGHT SIDE - FILTER BUTTON & POPUP */}
                 <div className='relative mt-2 sm:mt-0 w-full lg:w-auto'>
-                  <dialog className=' absolute bg-transparent rounded-lg flex-col z-50 top-[110%] lg:top-[100%] lg:left-[-410%] sm:left-0' open={openFilter}>
-                    <div className='w-[360px] lg:w-[160px] h-[210px] border rounded-md px-3 py-4 shadow-lg text-xs bg-white'>
+                  <dialog className="absolute bg-transparent rounded-lg flex-col z-50 top-[110%] sm:top-[100%] right-0 sm:left-auto sm:right-0" open={openFilter}>
+                    <div className='w-[360px] lg:w-[360px] h-auto border rounded-md px-3 py-4 shadow-lg text-xs bg-white'>
                       <h1 className='font-bold text-md'>Filter</h1>
 
                       <div className='w-full mt-3'>
-                        <h2 className='font-semibold'>Start date</h2>
-                        <input
-                          type="date"
+                        <DatePickerCustom
+                          label="Start date"
                           value={startDate}
-                          className='border mt-1 p-1 w-full rounded-lg'
                           onChange={(e) => setStartDate(e.target.value)}
+                          placeholder="Select start date"
+                          id="start-date"
                         />
                       </div>
 
                       <div className='w-full mt-3'>
-                        <h2 className='font-semibold'>End date</h2>
-                        <input
-                          type="date"
+                        <DatePickerCustom
+                          label="End date"
                           value={endDate}
-                          className='border mt-1 p-1 w-full rounded-lg'
                           onChange={(e) => setEndDate(e.target.value)}
+                          placeholder="Select end date"
+                          id="end-date"
                         />
                       </div>
 
-                      <div className='w-full mt-4 text-center'>
-                        <button className='bg-gray-800 py-1 px-4 text-white hover:bg-gray-700 border rounded-md' onClick={applyFilter}>Apply</button>
+                      <div className='w-full mt-4 flex gap-2'>
+                        <button
+                          className='flex-1 bg-white py-1.5 px-4 text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md transition-colors font-medium'
+                          onClick={async () => {
+                            setEndDate('');
+                            setStartDate('');
+
+                            // Fetch with empty dates immediately
+                            try {
+                              setLoading(true);
+                              const dates = { startDate: '', endDate: '' };
+                              let response;
+                              if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
+                                response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
+                              } else {
+                                response = await api.post(`/api/product_history/`, dates);
+                              }
+                              setProductHistory(response.data);
+                            } catch (error) {
+                              setError(error.message);
+                            } finally {
+                              setLoading(false);
+                            }
+
+                            setOpenFilter(false);
+                          }}
+                        >
+                          Clear
+                        </button>
+                        <button
+                          className='flex-1 bg-gray-800 py-1.5 px-4 text-white hover:bg-gray-700 border border-gray-800 rounded-md transition-colors font-medium'
+                          onClick={applyFilter}
+                        >
+                          Apply
+                        </button>
                       </div>
                     </div>
                   </dialog>
 
                   <button
                     className={`h-9 w-full sm:w-9 flex items-center justify-center border border-gray-300 rounded-md 
-                      hover:bg-gray-100 transition-colors flex-shrink-0 outline-none
-                      ${openFilter ? 'ring-2 ring-green-500 border-green-500 bg-gray-50' : 'focus:ring-2 focus:ring-green-500 focus:border-green-500'}`}
+      hover:bg-gray-100 transition-colors flex-shrink-0 outline-none
+      ${openFilter ? 'ring-2 ring-blue-500 border-blue-500 bg-gray-50' : 'focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
                     onClick={() => { openFilter ? closeFilterValue() : setOpenFilter(true) }}
                   >
                     <BsFunnelFill className='w-4 h-4 text-gray-700' />
