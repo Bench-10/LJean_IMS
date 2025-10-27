@@ -43,7 +43,7 @@ const DropdownCustom = ({ value, onChange, options, label, variant = 'default', 
     }
     
     if (variant === 'floating') {
-      return `border-2 rounded-lg pl-4 pr-3 py-0 w-full h-9 leading-none align-middle text-sm font-semibold text-gray-700 bg-white cursor-pointer shadow-sm hover:shadow-md outline-none text-left flex items-center justify-between transition-all duration-200 ${
+      return `border-2 rounded-lg pl-4 pr-3 py-0 w-full min-w-[150px] h-[38px] leading-none align-middle text-sm font-semibold text-gray-700 bg-white cursor-pointer shadow-sm hover:shadow-md outline-none text-left flex items-center justify-between transition-all duration-200 ${
         error
           ? 'border-red-500 ring-2 ring-red-50 focus:ring-red-500 focus:border-red-500'
           : 'border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-200 hover:border-green-400'
