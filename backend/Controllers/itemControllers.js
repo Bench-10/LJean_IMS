@@ -34,6 +34,10 @@ export const addItem = async (req, res) =>{
     } catch (error) {
         await SQLquery('ROLLBACK');
 
+        if (error?.name === 'InventoryValidationError') {
+            return res.status(400).json({ message: error.message });
+        }
+
         if (error.message && error.message.includes('Product already exists')) {
             return res.status(409).json({
                 message: 'Product already exists in this branch',
@@ -65,6 +69,9 @@ export const updateItem = async (req, res) =>{
     } catch (error) {
         await SQLquery('ROLLBACK');
         console.error('Error fetching items: ', error);
+        if (error?.name === 'InventoryValidationError') {
+            return res.status(400).json({ message: error.message });
+        }
         res.status(500).json({message: 'Internal Server Error'});
         
     }

@@ -26,6 +26,9 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   const [product_validity, setExpirationDate] = useState('');
   const [maxQuant, setMaxQuant] = useState(false);
   const [description, setDescription] = useState('');
+  const [sellingUnits, setSellingUnits] = useState([]);
+  const [sellingUnitErrors, setSellingUnitErrors] = useState({ general: '', entries: {} });
+  const [showSellingUnitsEditor, setShowSellingUnitsEditor] = useState(false);
 
   const [editChoice, setEditChoice] = useState(null);
 
@@ -38,6 +41,124 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   const [visibleCount, setVisibleCount] = useState(20);
   const BATCH_SIZE = 20;
   const overlayRef = useRef(null);
+
+  const areSellingUnitsEqual = (first = [], second = []) => {
+    if (first.length !== second.length) return false;
+    for (let i = 0; i < first.length; i += 1) {
+      const a = first[i] || {};
+      const b = second[i] || {};
+      if (
+        a.unit !== b.unit ||
+        a.unit_price !== b.unit_price ||
+        a.base_quantity_per_sell_unit !== b.base_quantity_per_sell_unit ||
+        Boolean(a.is_base) !== Boolean(b.is_base)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const syncSellingUnitsWithBase = useCallback((currentUnits, baseUnitValue, basePriceValue) => {
+    const sanitizedBaseUnit = typeof baseUnitValue === 'string' ? baseUnitValue.trim() : '';
+    const basePriceString = basePriceValue === undefined || basePriceValue === null ? '' : String(basePriceValue);
+
+    const preparedUnits = Array.isArray(currentUnits)
+      ? currentUnits.map(entry => ({
+          unit: typeof entry?.unit === 'string' ? entry.unit : '',
+          unit_price: entry?.unit_price === undefined || entry?.unit_price === null ? '' : String(entry.unit_price),
+          base_quantity_per_sell_unit: entry?.base_quantity_per_sell_unit === undefined || entry?.base_quantity_per_sell_unit === null ? '' : String(entry.base_quantity_per_sell_unit),
+          is_base: Boolean(entry?.is_base)
+        }))
+      : [];
+
+    if (!sanitizedBaseUnit) {
+      return preparedUnits.filter(entry => !entry.is_base);
+    }
+
+    const blanks = [];
+    const nonBaseUnits = [];
+
+    preparedUnits.forEach(entry => {
+      if (!entry) return;
+      const identifier = typeof entry.unit === 'string' ? entry.unit.trim() : '';
+
+      if (!identifier) {
+        blanks.push({ ...entry, unit: '' });
+        return;
+      }
+
+      if (identifier === sanitizedBaseUnit) {
+        return;
+      }
+
+      const exists = nonBaseUnits.find(existing => existing.unit === identifier);
+      if (!exists) {
+        nonBaseUnits.push({
+          unit: identifier,
+          unit_price: entry.unit_price,
+          base_quantity_per_sell_unit: entry.base_quantity_per_sell_unit,
+          is_base: false
+        });
+      }
+    });
+
+    const result = [
+      {
+        unit: sanitizedBaseUnit,
+        unit_price: basePriceString,
+        base_quantity_per_sell_unit: '1',
+        is_base: true
+      }
+    ];
+
+    nonBaseUnits.forEach(entry => {
+      result.push({
+        unit: entry.unit,
+        unit_price: entry.unit_price,
+        base_quantity_per_sell_unit: entry.base_quantity_per_sell_unit,
+        is_base: false
+      });
+    });
+
+    blanks.forEach(entry => {
+      result.push({
+        unit: '',
+        unit_price: entry.unit_price,
+        base_quantity_per_sell_unit: entry.base_quantity_per_sell_unit,
+        is_base: false
+      });
+    });
+
+    return result;
+  }, []);
+
+  const initializeSellingUnits = useCallback((sourceUnits, baseUnitValue, basePriceValue) => {
+    const basePriceString = basePriceValue === undefined || basePriceValue === null ? '' : String(basePriceValue);
+
+    const prepared = Array.isArray(sourceUnits)
+      ? sourceUnits
+          .map(entry => ({
+            unit: typeof entry?.unit === 'string' ? entry.unit.trim() : typeof entry?.sell_unit === 'string' ? entry.sell_unit.trim() : '',
+            unit_price: entry?.unit_price === undefined || entry?.unit_price === null ? '' : String(entry.unit_price),
+            base_quantity_per_sell_unit: entry?.base_quantity_per_sell_unit === undefined || entry?.base_quantity_per_sell_unit === null ? '' : String(entry.base_quantity_per_sell_unit),
+            is_base: Boolean(entry?.is_base)
+          }))
+      : [];
+
+    return syncSellingUnitsWithBase(prepared, baseUnitValue, basePriceString);
+  }, [syncSellingUnitsWithBase]);
+
+  const computeUnitsPerBase = (entry) => {
+    const quantity = Number(entry?.base_quantity_per_sell_unit);
+    if (!Number.isFinite(quantity) || quantity <= 0) return '';
+    const computed = 1 / quantity;
+    if (!Number.isFinite(computed) || computed <= 0) return '';
+    if (Math.abs(computed - Math.round(computed)) < 1e-9) {
+      return String(Math.round(computed));
+    }
+    return computed.toFixed(6).replace(/\.0+$|0+$/,'').replace(/\.$/, '');
+  };
 
   // STATES FOR ERROR HANDLING
   const [emptyField, setEmptyField] = useState({});
@@ -93,6 +214,9 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         setMaxQuant(false);
         setForExceedQuantity('');
         setDescription('');
+        setSellingUnits([]);
+        setSellingUnitErrors({ general: '', entries: {} });
+        setShowSellingUnitsEditor(false);
 
         // FETCH EXISTING PRODUCTS FOR SELECTION
         fetchExistingProducts();
@@ -107,15 +231,41 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         setUnit(itemData.unit);
         setMinThreshold(itemData.min_threshold);
         setMaxThreshold(itemData.max_threshold);
-        setPrice(itemData.unit_price);
+        setPrice(itemData.unit_price ?? '');
         setForExceedQuantity(itemData.quantity);
         setDatePurchased('');
         setExpirationDate('');
         setDescription(itemData.description);
+        setSellingUnits(initializeSellingUnits(itemData.selling_units, itemData.unit, itemData.unit_price));
+        setSellingUnitErrors({ general: '', entries: {} });
+        setShowSellingUnitsEditor(Array.isArray(itemData.selling_units) && itemData.selling_units.some(entry => !entry?.is_base));
       }
     }
-  }, [isModalOpen, mode, itemData]);
+  }, [isModalOpen, mode, itemData, user, initializeSellingUnits]);
 
+  useEffect(() => {
+    setSellingUnits(prevUnits => {
+      const nextUnits = syncSellingUnitsWithBase(prevUnits, unit, unit_price);
+      return areSellingUnitsEqual(prevUnits, nextUnits) ? prevUnits : nextUnits;
+    });
+    if (!unit || !unit.trim()) {
+      setShowSellingUnitsEditor(false);
+    }
+  }, [unit, unit_price, syncSellingUnitsWithBase]);
+
+   useEffect(() => {
+     if (!showSellingUnitsEditor) return undefined;
+     const handleKeyDown = (event) => {
+       if (event.key === 'Escape') {
+         setShowSellingUnitsEditor(false);
+       }
+     };
+     document.addEventListener('keydown', handleKeyDown);
+     return () => {
+       document.removeEventListener('keydown', handleKeyDown);
+     };
+   }, [showSellingUnitsEditor]);
+ 
   const constructionUnits = ["pcs", "ltr", "gal", "bag", "pairs", "roll", "set", "sheet", "kg", "m", "cu.m", "btl", "can", "bd.ft", "meter", "pail"];
 
   // HANDLE SELECTING AN EXISTING PRODUCT
@@ -126,12 +276,65 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     setCategory(product.category_id);
     setShowExistingProducts(false);
     setDescription(product.description);
+    setPrice(product.unit_price !== undefined && product.unit_price !== null ? String(product.unit_price) : '');
+    setSellingUnits(initializeSellingUnits(product.selling_units, product.unit, product.unit_price));
+    setSellingUnitErrors({ general: '', entries: {} });
+    setShowSellingUnitsEditor(Array.isArray(product.selling_units) && product.selling_units.some(entry => !entry?.is_base));
   };
 
   // FILTER EXISTING PRODUCTS BASED ON SEARCH TERM
   const filteredExistingProducts = existingProducts.filter(product =>
     product.product_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const nonBaseSellingUnitCount = sellingUnits.filter(entry => !entry.is_base).length;
+  const hasSellingUnitIssues = Boolean(sellingUnitErrors.general) || Object.keys(sellingUnitErrors.entries || {}).length > 0;
+  const sellingUnitToggleButtonClass = (() => {
+    if (!unit || !unit.trim()) return 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed';
+    if (hasSellingUnitIssues) return 'border-red-500 text-red-600 hover:bg-red-50';
+    return 'border-green-600 text-green-700 hover:bg-green-50';
+  })();
+  const baseUnitPriceDisplay = (() => {
+    const parsed = Number(unit_price);
+    if (!Number.isFinite(parsed) || parsed <= 0) return '—';
+    return `₱${parsed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  })();
+  const getAvailableUnitOptions = useCallback((rowIndex) => {
+    const normalizedBaseUnit = typeof unit === 'string' ? unit.trim().toLowerCase() : '';
+    const currentEntry = sellingUnits[rowIndex] || {};
+    const currentValue = typeof currentEntry.unit === 'string' ? currentEntry.unit.trim() : '';
+    const normalizedCurrentValue = currentValue.toLowerCase();
+
+    const usedUnits = new Set();
+    sellingUnits.forEach((entry, idx) => {
+      if (idx === rowIndex) return;
+      if (entry?.is_base) return;
+      const identifier = typeof entry?.unit === 'string' ? entry.unit.trim() : '';
+      if (!identifier) return;
+      usedUnits.add(identifier.toLowerCase());
+    });
+
+    const dedupe = new Set();
+    const options = [];
+
+    if (currentValue && !constructionUnits.some(opt => opt.toLowerCase() === normalizedCurrentValue)) {
+      options.push({ value: currentValue, label: currentValue });
+      dedupe.add(normalizedCurrentValue);
+    }
+
+    constructionUnits.forEach(option => {
+      const normalizedOption = option.trim().toLowerCase();
+      if (normalizedOption === normalizedBaseUnit) return;
+      if (usedUnits.has(normalizedOption) && normalizedOption !== normalizedCurrentValue) return;
+      if (!dedupe.has(normalizedOption)) {
+        options.push({ value: option, label: option });
+        dedupe.add(normalizedOption);
+      }
+    });
+
+    return options;
+  }, [constructionUnits, sellingUnits, unit]);
+  const availableUnitsForNewRow = getAvailableUnitOptions(sellingUnits.length);
 
   // TOGGLE EXISTING PRODUCTS PANEL
   const toggleExistingProductsPanel = () => {
@@ -168,6 +371,52 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     }
   };
 
+  const handleAddSellingUnitRow = () => {
+    setSellingUnits(prev => ([
+      ...prev,
+      {
+        unit: '',
+        unit_price: '',
+        base_quantity_per_sell_unit: '',
+        is_base: false
+      }
+    ]));
+
+    setSellingUnitErrors(prev => ({ ...prev, general: '' }));
+  };
+
+  const handleSellingUnitFieldChange = (index, field, rawValue) => {
+    setSellingUnits(prev => prev.map((entry, idx) => {
+      if (idx !== index) return entry;
+
+      const updated = { ...entry };
+      let value = rawValue;
+
+      if (field === 'unit') {
+        value = typeof value === 'string' ? sanitizeInput(value) : '';
+      }
+
+      if (field === 'unit_price' || field === 'base_quantity_per_sell_unit') {
+        value = value === '' ? '' : value;
+      }
+
+      updated[field] = value;
+      return updated;
+    }));
+
+    setSellingUnitErrors(prev => {
+      if (!prev.entries || !prev.entries[index]) return prev;
+      const nextEntries = { ...prev.entries };
+      delete nextEntries[index];
+      return { ...prev, entries: nextEntries };
+    });
+  };
+
+  const handleRemoveSellingUnitRow = (index) => {
+    setSellingUnits(prev => prev.filter((_, idx) => idx !== index));
+    setSellingUnitErrors({ general: '', entries: {} });
+  };
+
   // HANDLE SCROLL TO LOAD MORE (FOR PERFORMANCE)
   const handleOverlayScroll = useCallback((e) => {
     const target = e.target;
@@ -184,6 +433,8 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     const isnotANumber = {};
     const invalidNumberValue = {};
     const unitValidationErrors = {};
+    const sellingEntryErrors = {};
+    let sellingGeneralError = '';
 
     // CHECK IF INPUT IS EMPTY
     if (mode === 'edit' && editChoice === 'addStocks') {
@@ -242,17 +493,69 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       }
     }
 
+    if (!(mode === 'edit' && editChoice === 'addStocks')) {
+      const trimmedUnit = typeof unit === 'string' ? unit.trim() : '';
+      const hasBaseUnit = sellingUnits.some(entry => entry.is_base && entry.unit === trimmedUnit);
+      const baseUnitPriceValue = Number(unit_price);
+
+      if (!trimmedUnit) {
+        sellingGeneralError = 'Select a base unit before configuring selling units.';
+      } else if (!hasBaseUnit) {
+        sellingGeneralError = 'Base unit entry is required in selling units.';
+      } else if (!Number.isFinite(baseUnitPriceValue) || baseUnitPriceValue <= 0) {
+        sellingGeneralError = 'Enter a valid price for the base unit.';
+      }
+
+      sellingUnits.forEach((entry, index) => {
+        const entryErrors = [];
+        const identifier = typeof entry.unit === 'string' ? entry.unit.trim() : '';
+        const priceNumeric = Number(entry.unit_price);
+        const baseQuantityNumeric = Number(entry.base_quantity_per_sell_unit);
+
+        if (!identifier) {
+          entryErrors.push('Unit name is required.');
+        }
+
+        if (!Number.isFinite(priceNumeric) || priceNumeric <= 0) {
+          entryErrors.push('Price must be greater than 0.');
+        }
+
+        if (!Number.isFinite(baseQuantityNumeric) || baseQuantityNumeric <= 0) {
+          entryErrors.push('Conversion value must be greater than 0.');
+        }
+
+        if (entry.is_base && identifier !== trimmedUnit) {
+          entryErrors.push('Base unit entry must match the selected inventory unit.');
+        }
+
+        if (!entry.is_base && identifier === trimmedUnit) {
+          entryErrors.push('Non-base entry cannot use the base unit.');
+        }
+
+        if (entryErrors.length > 0) {
+          sellingEntryErrors[index] = entryErrors;
+        }
+      });
+
+      if (!sellingGeneralError && Object.keys(sellingEntryErrors).length > 0) {
+        sellingGeneralError = 'Fix the selling unit errors before submitting.';
+      }
+    }
+
     // SET THE VALUES TO THE STATE VARIABLE
     setEmptyField(isEmptyField);
     setNotANumber(isnotANumber);
     setInvalidNumber(invalidNumberValue);
     setUnitValidationError(unitValidationErrors);
+    setSellingUnitErrors({ general: sellingGeneralError, entries: sellingEntryErrors });
 
     // STOP SUBMISSION IF INPUT IS INVALID
     if (Object.keys(isEmptyField).length > 0) return;
     if (Object.keys(isnotANumber).length > 0) return;
     if (Object.keys(invalidNumberValue).length > 0) return;
     if (Object.keys(unitValidationErrors).length > 0) return;
+    if (sellingGeneralError) return;
+    if (Object.keys(sellingEntryErrors).length > 0) return;
     if (isExpiryEarly) return;
 
     setDialog(true);
@@ -281,6 +584,12 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         requestor_roles: user.role,
         existing_product_id: selectedExistingProduct?.product_id || null,
         description,
+        selling_units: sellingUnits.map(entry => ({
+          unit: typeof entry.unit === 'string' ? entry.unit.trim() : '',
+          unit_price: Number(entry.unit_price),
+          base_quantity_per_sell_unit: Number(entry.base_quantity_per_sell_unit),
+          is_base: Boolean(entry.is_base)
+        }))
       };
 
       // SENDS THE DATA TO App.jsx TO BE SENT TO DATABASE
@@ -360,7 +669,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
               </button>
             </div>
             <div className="mt-8 text-center">
-              <button type="button" onClick={() => { onClose(); setEditChoice(null); setShowExistingProducts(false); setMaxQuant(false); }} className="text-sm text-gray-500 px-5 py-2  rounded-md border hover:bg-gray-50 ">Cancel</button>
+              <button type="button" onClick={() => { onClose(); setEditChoice(null); setShowExistingProducts(false); setMaxQuant(false); setShowSellingUnitsEditor(false); }} className="text-sm text-gray-500 px-5 py-2  rounded-md border hover:bg-gray-50 ">Cancel</button>
             </div>
           </div>
         </div>
@@ -370,54 +679,196 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         <div
           className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm transition-opacity"
           style={{ pointerEvents: 'auto' }}
-          onClick={() => { onClose(); setMaxQuant(false); }}
+          onClick={() => { onClose(); setMaxQuant(false); setShowSellingUnitsEditor(false); }}
         />
       )}
 
       <dialog className="bg-transparent fixed inset-0 z-[200]" open={mode === 'edit' ? isModalOpen && user && user.role && editChoice && user.role.some(role => ['Inventory Staff'].includes(role)) : isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
-        <div className="relative bg-white h-[75vh] lg:h-[600px] w-[95vw] max-w-[700px] overflow-y-auto rounded-xl p-6 lg:py-10 lg:px-[53px] shadow-2xl border border-gray-100 animate-popup hide-scrollbar">
+        <div className="relative bg-white h-[75vh] lg:h-[600px] w-[100vw] max-w-[800px] overflow-y-auto rounded-xl p-6 lg:py-10 lg:px-[53px] shadow-2xl border border-gray-100 animate-popup hide-scrollbar">
+          {showSellingUnitsEditor && (
+            <div
+              className="absolute inset-0 z-[400] flex items-start justify-center bg-black/20 backdrop-blur-sm px-4 pt-6 pb-10"
+              onClick={() => setShowSellingUnitsEditor(false)}
+            >
+              <div
+                className="relative w-full max-w-3xl bg-white border border-gray-200 rounded-xl shadow-xl p-5 sm:p-6 lg:p-7 overflow-y-auto max-h-[85vh]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4 mb-5">
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800">Selling Units &amp; Pricing</h4>
+                    <p className="text-sm text-gray-600 max-w-xl">Configure alternate selling units, their prices, and conversions relative to the base inventory unit.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                    onClick={() => setShowSellingUnitsEditor(false)}
+                    aria-label="Close selling units editor"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div className="text-xs sm:text-sm text-gray-500">
+                    <p><span className="font-semibold text-gray-700">Base unit:</span> {unit || 'N/A'}</p>
+                    <p><span className="font-semibold text-gray-700">Base price:</span> {baseUnitPriceDisplay}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddSellingUnitRow}
+                    className="px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-md border border-green-600 text-green-700 hover:bg-green-50 disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
+                    disabled={!unit || !unit.trim() || availableUnitsForNewRow.length === 0}
+                  >
+                    Add Selling Unit
+                  </button>
+                </div>
+
+                {!unit || !unit.trim() ? (
+                  <div className="text-sm text-gray-500 italic mb-4">Select the product&apos;s base unit first to manage alternate selling units.</div>
+                ) : availableUnitsForNewRow.length === 0 ? (
+                  <div className="text-sm text-gray-500 italic mb-4">All available units from the list are already configured.</div>
+                ) : null}
+
+                <div className="border border-gray-200 rounded-md overflow-hidden">
+                  <table className="w-full text-xs sm:text-sm">
+                    <thead className="bg-gray-100 text-gray-600">
+                      <tr>
+                        <th className="px-3 py-2 text-left w-[24%]">Unit</th>
+                        <th className="px-3 py-2 text-left w-[18%]">Unit Price</th>
+                        <th className="px-3 py-2 text-left w-[20%]">Base Qty</th>
+                        <th className="px-3 py-2 text-left w-[22%]">Units per Base</th>
+                        <th className="px-3 py-2 text-left w-[16%]">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sellingUnits.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-5 text-center text-gray-500" colSpan={5}>No selling units configured yet.</td>
+                        </tr>
+                      ) : (
+                        sellingUnits.map((entry, index) => {
+                          const isBase = Boolean(entry.is_base);
+                          const entryErrors = sellingUnitErrors.entries[index] || [];
+                          const unitsPerBase = computeUnitsPerBase(entry);
+                          return (
+                            <tr key={`${entry.unit || 'unit'}-${index}`} className={isBase ? 'bg-green-50/70' : ''}>
+                              <td className="px-3 py-2 align-top">
+                                {isBase ? (
+                                  <input
+                                    type="text"
+                                    className="w-full border rounded-sm px-2 py-1 bg-gray-100 text-gray-600 cursor-not-allowed"
+                                    value={entry.unit}
+                                    readOnly
+                                  />
+                                ) : (
+                                  <select
+                                    className="w-full border rounded-sm px-2 py-1 bg-white"
+                                    value={entry.unit}
+                                    onChange={(e) => handleSellingUnitFieldChange(index, 'unit', e.target.value)}
+                                  >
+                                    <option value="">Select unit</option>
+                                    {getAvailableUnitOptions(index).map(option => (
+                                      <option key={`${option.value}-${index}`} value={option.value}>{option.label}</option>
+                                    ))}
+                                  </select>
+                                )}
+                                {isBase && <p className="text-[10px] text-gray-500 mt-1">Base unit follows the selected inventory unit.</p>}
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className={`w-full border rounded-sm px-2 py-1 ${isBase ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
+                                  value={isBase ? unit_price : entry.unit_price}
+                                  onChange={(e) => (isBase ? setPrice(e.target.value) : handleSellingUnitFieldChange(index, 'unit_price', e.target.value))}
+                                  disabled={isBase}
+                                />
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.000001"
+                                  className={`w-full border rounded-sm px-2 py-1 ${isBase ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
+                                  value={isBase ? '1' : entry.base_quantity_per_sell_unit}
+                                  onChange={(e) => handleSellingUnitFieldChange(index, 'base_quantity_per_sell_unit', e.target.value)}
+                                  disabled={isBase}
+                                />
+                                <p className="text-[10px] text-gray-500 mt-1">Amount of base unit per {entry.unit || 'sell unit'}.</p>
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  type="text"
+                                  className="w-full border rounded-sm px-2 py-1 bg-gray-100 text-gray-600 cursor-not-allowed"
+                                  value={isBase ? '1' : unitsPerBase}
+                                  readOnly
+                                />
+                                <p className="text-[10px] text-gray-500 mt-1">Sell units per base unit.</p>
+                              </td>
+                              <td className="px-3 py-2 align-top text-center">
+                                {isBase ? (
+                                  <span className="text-[10px] text-gray-400">Base</span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="text-xs text-red-600 hover:text-red-700"
+                                    onClick={() => handleRemoveSellingUnitRow(index)}
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {sellingUnitErrors.general && (
+                  <p className="mt-3 text-xs text-red-600">{sellingUnitErrors.general}</p>
+                )}
+
+                {sellingUnits.map((_, index) => (
+                  sellingUnitErrors.entries[index]?.length ? (
+                    <ul key={`selling-unit-errors-${index}`} className="mt-1 text-[11px] text-red-600 list-disc list-inside">
+                      {sellingUnitErrors.entries[index].map((message, idx) => (
+                        <li key={`entry-${index}-error-${idx}`}>{message}</li>
+                      ))}
+                    </ul>
+                  ) : null
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mb-6">
-            <div className="relative flex items-center justify-between w-full px-4 py-3">
-  {/* Back button - top left */}
-  {mode === 'edit' && editChoice && (
-    <button
-      type="button"
-      onClick={() => { 
-        setEditChoice(null); 
-        setShowExistingProducts(false); 
-      }}
-      className="absolute top-2 left-2 text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded-md border-2 border-gray-200 hover:bg-gray-50"
-    >
-      ← Back
-    </button>
-  )}
-
-  {/* Title and subtitle */}
-  <div className="flex flex-col mx-auto text-center mt-10 sm:mt-0">
-    <h1 className="text-3xl font-bold">
-      {mode === 'edit' ? 'EDIT ITEM' : 'ADD NEW ITEM'}
-    </h1>
-    <p className="text-sm opacity-90">
-      {mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}
-    </p>
-  </div>
-
-
-</div>
-
-  {/* Close button - top right */}
-  <button 
-    type='button' 
-    className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
-    onClick={() => {
-      onClose();
-      setShowExistingProducts(false);
-      setMaxQuant(false);
-    }}
-  >
-    ✕
-  </button>
-
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {mode === 'edit' && editChoice && (
+                  <button
+                    type="button"
+                    onClick={() => { setEditChoice(null); setShowExistingProducts(false); }}
+                    className="text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded-md border border-gray-100 hover:bg-gray-50"
+                  >
+                    ← Back
+                  </button>
+                )}
+                <div>
+                  <h3 className="text-2xl font-bold">{mode === 'edit' ? 'EDIT ITEM' : 'ADD NEW ITEM'}</h3>
+                  <p className="text-sm opacity-90">{mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}</p>
+                </div>
+              </div>
+              <button type='button' className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
+                onClick={() => {
+                  onClose();
+                  setShowExistingProducts(false);
+                  setMaxQuant(false);
+                  setShowSellingUnitsEditor(false);
+                }}>✕</button>
+            </div>
           </div>
 
           <div className="pt-2">
@@ -618,25 +1069,43 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                 {/* Right column inputs */}
                 <div className="flex flex-col gap-6">
                   {/* If addStocks was chosen, hide product-edit-only fields on the right side */}
-                  {!(mode === 'edit' && editChoice === 'addStocks') &&
-                    <div className='relative'>
-                      <DropdownCustom
-                        value={unit}
-                        onChange={(e) => setUnit(sanitizeInput(e.target.value))}
-                        label="Unit"
-                        error={emptyField.unit}
-                        options={[
-                          { value: '', label: 'Select Unit' },
-                          ...constructionUnits.map(option => ({
-                            value: option,
-                            label: option
-                          }))
-                        ]}
-                      />
+                  {!(mode === 'edit' && editChoice === 'addStocks') && (
+                    <div className="relative">
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1">
+                          <DropdownCustom
+                            value={unit}
+                            onChange={(e) => setUnit(sanitizeInput(e.target.value))}
+                            label="Unit"
+                            error={emptyField.unit}
+                            options={[
+                              { value: '', label: 'Select Unit' },
+                              ...constructionUnits.map(option => ({
+                                value: option,
+                                label: option
+                              }))
+                            ]}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!unit || !unit.trim()) return;
+                            setShowSellingUnitsEditor(prev => !prev);
+                          }}
+                          disabled={!unit || !unit.trim()}
+                          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-md border transition ${sellingUnitToggleButtonClass}`}
+                        >
+                          <span>Selling Units &amp; Pricing{nonBaseSellingUnitCount > 0 ? ` (${nonBaseSellingUnitCount})` : ''}</span>
+                        </button>
+                      </div>
                       {errorflag('unit', 'unit')}
+                      {sellingUnitErrors.general && !showSellingUnitsEditor && (
+                        <p className="mt-1 text-xs text-red-600">{sellingUnitErrors.general}</p>
+                      )}
                     </div>
-                  }
-
+                  )}
+                  
                   {!(mode === 'edit' && editChoice === 'edit') &&
                     <div className='relative '>
                       <label className={label('quantity_added')}>Quantity</label>
@@ -674,6 +1143,8 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                       {errorflag('unit_price', 'value')}
                     </div>
                   }
+
+                  {/* Selling units editor rendered as overlay when toggled */}
 
                   {!(mode === 'edit' && editChoice === 'edit') &&
                     <div className='relative'>
