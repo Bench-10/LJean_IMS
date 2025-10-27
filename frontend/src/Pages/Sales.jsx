@@ -5,7 +5,7 @@ import ChartLoading from '../components/common/ChartLoading.jsx';
 import {currencyFormat} from '../utils/formatCurrency.js';
 import ViewingSalesAndDelivery from '../components/ViewingSalesAndDelivery.jsx';
 import { FaCashRegister } from "react-icons/fa6";
-
+import DropdownCustom from '../components/DropdownCustom';
 
 function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
@@ -14,7 +14,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   //THIS IS TO OPEN THE DETAILED INFORMATION FOR SALES
   const [openItems, setOpenSoldItems] = useState(false);
   const [modalType, setModalType] = useState("");
-
 
   const [searchSale, setSearchSale] = useState('');
   const [saleFilter, setSaleFilter] = useState('all');
@@ -45,7 +44,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
     isDelivered: false,
     isPending: false
   });
-
 
   //VIEW THE PRUDUCTS UNDER SALE ID
   const openSoldItems = async (sailInfo) =>{
@@ -93,7 +91,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   isPending: false
     });
 
-
   };
 
   //SEARCH SALE INFORMATION
@@ -133,7 +130,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   const currentPageData = filteredData.slice(startIndex, endIndex);
 
   return (
-    <div className='pt-20 lg:pt-8 px-4 lg:px-8 pb-6 h-screen'>
+    <div className='pt-20 lg:pt-8 px-4 lg:px-8 h-screen'>
 
       <ViewingSalesAndDelivery 
         openModal={openItems}
@@ -147,57 +144,56 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
       />
         
 
-
         <h1 className=' text-4xl font-bold text-green-900'>
           SALES TRANSACTIONS
         </h1>
 
-        <hr className="mt-3 mb-6 border-t-4 border-green-800"/>
-
+        <hr className="mt-3 mb-6 border-t-4 border-green-800 rounded-lg"/>
 
         {/*SEARCH AND ADD*/}
-        <div className='flex w-full items-center'>
+        <div className='lg:flex gap-4 lg:gap-9 ' >
           {/*SEARCH */}
-          <div className='w-[400px]'>
+          <div className='w-full lg:w-[400px] text-sm lg:text-base pb-4 lg:pb-0'>
             <input
               type="text"
               placeholder="Search"
-              className="border outline outline-1 outline-gray-400 focus:outline-green-700 focus:py-2 transition-all px-3 py-2 rounded w-full h-9"
+              className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:py-2 transition-all px-3 py-2 rounded-lg w-full h-9"
               onChange={handleSaleSearch}
             />
           </div>
 
           {/* DROPDOWN FILTER */}
-          <div className='ml-4'>
-            <select
-              value={saleFilter}
-              onChange={e => setSaleFilter(e.target.value)}
-              className="border outline outline-1 outline-gray-400 focus:outline-green-700 px-3 py-2 rounded h-9"
-            >
-              <option value="all">All Sales</option>
-              <option value="normal">Normal Sales</option>
-              <option value="delivered">Delivered Sales</option>
-              <option value="undelivered">Undelivered Sales</option>
-              <option value="out_for_delivery">Out for Delivery Sales</option>
-            </select>
-          </div>
+<DropdownCustom
+  value={saleFilter}
+  onChange={e => setSaleFilter(e.target.value)}
+  label="Sale Type"
+  variant="floating"
+  options={[
+    { value: 'all', label: 'All Sales' },
+    { value: 'normal', label: 'Normal Sales' },
+    { value: 'for_delivery', label: 'For Delivery Sales' },
+    { value: 'delivered', label: 'Delivered Sales' },
+    { value: 'undelivered', label: 'Undelivered Sales' },
+    { value: 'out_for_delivery', label: 'Out for Delivery Sales' }
+  ]}
+/>
 
           {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
           {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) &&
-            <div className="ml-auto flex gap-4 h-9">
+            <div className="lg:pt-0 pt-3 ml-auto flex gap-4">
               {/*ADD SALE BTN*/}
-              <button className='flex items-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#63FF4F] px-5 rounded-md transition-all'  onClick={() => setOpenSaleModal(true)}> 
+              <button className='flex items-center justify-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#56be48] w-full lg:w-auto px-5 py-2 rounded-lg transition-all'  onClick={() => setOpenSaleModal(true)}> 
                 <FaCashRegister /> ADD SALE
               </button>
             </div>
           }
         </div>
 
-        <hr className="border-t-2 my-4 w-full border-gray-500"/>
+        <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg"/>
 
-        <div className="overflow-x-auto  overflow-y-auto h-[560px] border-b-2 border-gray-500 bg-red rounded-sm hide-scrollbar">
-          <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200  text-sm`}>
-            <thead className="sticky top-0 bg-gray-100 z-10">
+      <div className="overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+        <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
+          <thead className="sticky top-0 z-10">
               <tr>
                 
                   <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-24">
@@ -269,40 +265,41 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
         </div>
 
         {/*PAGINATION AND CONTROLS */}
-        <div className='flex justify-between items-center mt-4 px-3'>
-          {/* LEFT: ITEM COUNT */}
-          <div className='text-sm text-gray-600 flex-1'>
+        <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
+          {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
+        <div className='flex justify-between items-center gap-2 sm:hidden'>
+          {/* LEFT: ITEM COUNT (MOBILE) */}
+          <div className='text-xs text-gray-600 flex-shrink-0'>
             {filteredData.length > 0 ? (
-              <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
+              <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length}</>
             ) : (
               <span></span>
             )}
           </div>
-          
-          {/* CENTER: PAGINATION CONTROLS */}
-          <div className='flex justify-center flex-1'>
-            {filteredData.length > 0 && (
-              <div className='flex items-center space-x-2'>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
-                >
-                  Previous
-                </button>
-                <span className='text-sm text-gray-600'>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
+
+          {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
+          {filteredData.length > 0 && (
+            <div className='flex items-center gap-1'>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+              >
+                Previous
+              </button>
+              <span className='text-xs text-gray-600 whitespace-nowrap'>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
           
           {/* RIGHT: PLACEHOLDER FOR CONSISTENCY */}
           <div className='flex justify-end flex-1'>
