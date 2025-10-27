@@ -5,6 +5,7 @@ import FormLoading from './common/FormLoading';
 import api from '../utils/api';
 import { getQuantityStep, validateQuantity, getQuantityPlaceholder, allowsFractional } from '../utils/unitConversion';
 import DropdownCustom from './DropdownCustom';
+import DatePickerCustom from './DatePickerCustom';
 
 function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput }) {
   // GET USER INFORMATION
@@ -624,7 +625,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     return null;
   };
 
- return (
+  return (
     <div>
       {/* Loading overlay */}
       {loading && (
@@ -1050,16 +1051,17 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                   }
                   {!(mode === 'edit' && editChoice === 'edit') &&
                     <div className='relative'>
-                      <label htmlFor="date_added" className={label('date_added')}>Enter Date Added</label>
-                      <input
+                      <DatePickerCustom
                         id="date_added"
-                        type="date"
-                        placeholder="Date Purchased"
-                        className={`${inputClass('date_added')} focus:border-2 focus:border-green-500`}
                         value={date_added}
                         onChange={(e) => setDatePurchased(e.target.value)}
+                        label="Enter Date Added"
+                        error={emptyField.date_added}
+                        placeholder="mm/dd/yyyy"
+                        errorMessage={
+                          emptyField.date_added ? "Please enter a date!" : null
+                        }
                       />
-                      {errorflag('date_added', 'date')}
                     </div>
                   }
                 </div>
@@ -1146,18 +1148,24 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
 
                   {!(mode === 'edit' && editChoice === 'edit') &&
                     <div className='relative'>
-                      <label htmlFor="product_validity" className={label('product_validity')}>Enter Product Validity</label>
-                      <input
+                      <DatePickerCustom
                         id="product_validity"
-                        type="date"
-                        placeholder="Expiration Date"
-                        className={`${inputClass('product_validity')} focus:border-2 focus:border-green-500`}
                         value={product_validity}
                         onChange={(e) => setExpirationDate(e.target.value)}
+                        label="Enter Product Validity"
+                        error={emptyField.product_validity || isExpiredEarly}
+                        placeholder="mm/dd/yyyy"
+                        errorMessage={
+                          emptyField.product_validity
+                            ? "Please enter a date!"
+                            : isExpiredEarly
+                              ? "Expiry date must be after purchase date!"
+                              : null
+                        }
                       />
-                      {errorflag('product_validity', 'date')}
                     </div>
                   }
+
                 </div>
               </div>
 
