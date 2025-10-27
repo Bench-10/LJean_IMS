@@ -5,6 +5,7 @@ import FormLoading from './common/FormLoading';
 import api from '../utils/api';
 import { getQuantityStep, validateQuantity, getQuantityPlaceholder, allowsFractional } from '../utils/unitConversion';
 import DropdownCustom from './DropdownCustom';
+import DatePickerCustom from './DatePickerCustom';
 
 function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput }) {
   // GET USER INFORMATION
@@ -315,7 +316,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     return null;
   };
 
- return (
+  return (
     <div>
       {/* Loading overlay */}
       {loading && (
@@ -376,29 +377,47 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       <dialog className="bg-transparent fixed inset-0 z-[200]" open={mode === 'edit' ? isModalOpen && user && user.role && editChoice && user.role.some(role => ['Inventory Staff'].includes(role)) : isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
         <div className="relative bg-white h-[75vh] lg:h-[600px] w-[95vw] max-w-[700px] overflow-y-auto rounded-xl p-6 lg:py-10 lg:px-[53px] shadow-2xl border border-gray-100 animate-popup hide-scrollbar">
           <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {mode === 'edit' && editChoice && (
-                  <button
-                    type="button"
-                    onClick={() => { setEditChoice(null); setShowExistingProducts(false); }}
-                    className="text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded-md border border-gray-100 hover:bg-gray-50"
-                  >
-                    ← Back
-                  </button>
-                )}
-                <div>
-                  <h3 className="text-2xl font-bold">{mode === 'edit' ? 'EDIT ITEM' : 'ADD NEW ITEM'}</h3>
-                  <p className="text-sm opacity-90">{mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}</p>
-                </div>
-              </div>
-              <button type='button' className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
-                onClick={() => {
-                  onClose();
-                  setShowExistingProducts(false);
-                  setMaxQuant(false);
-                }}>✕</button>
-            </div>
+            <div className="relative flex items-center justify-between w-full px-4 py-3">
+  {/* Back button - top left */}
+  {mode === 'edit' && editChoice && (
+    <button
+      type="button"
+      onClick={() => { 
+        setEditChoice(null); 
+        setShowExistingProducts(false); 
+      }}
+      className="absolute top-2 left-2 text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded-md border-2 border-gray-200 hover:bg-gray-50"
+    >
+      ← Back
+    </button>
+  )}
+
+  {/* Title and subtitle */}
+  <div className="flex flex-col mx-auto text-center mt-10 sm:mt-0">
+    <h1 className="text-3xl font-bold">
+      {mode === 'edit' ? 'EDIT ITEM' : 'ADD NEW ITEM'}
+    </h1>
+    <p className="text-sm opacity-90">
+      {mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}
+    </p>
+  </div>
+
+
+</div>
+
+  {/* Close button - top right */}
+  <button 
+    type='button' 
+    className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
+    onClick={() => {
+      onClose();
+      setShowExistingProducts(false);
+      setMaxQuant(false);
+    }}
+  >
+    ✕
+  </button>
+
           </div>
 
           <div className="pt-2">
@@ -538,81 +557,6 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                     </div>
                   }
 
-                  {!(mode === 'edit' && editChoice === 'edit') &&
-                    <div className='relative '>
-                      <label className={label('quantity_added')}>Quantity</label>
-                      <input
-                        type="number"
-                        step={unit ? getQuantityStep(unit) : "0.001"}
-                        min={unit ? getQuantityStep(unit) : "0.001"}
-                        placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity' : 'Add Quantity or Enter 0'}`}
-                        className={`${inputClass('quantity_added')} focus:border-2 focus:border-green-500`}
-                        value={quantity_added}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setQuantity(value);
-                          handleThreshold(value, max_threshold);
-                        }}
-                      />
-                      {errorflag('quantity_added', 'value')}
-                      {unitValidationError.quantity_added && (
-                        <p className="text-red-600 text-xs mt-1">{unitValidationError.quantity_added}</p>
-                      )}
-                      {maxQuant && <p className='mt-1 text-xs italic text-red-600'>Quantity exceeds the max threshold!</p>}
-                    </div>
-                  }
-
-                  {!(mode === 'edit' && editChoice === 'edit') &&
-                    <div className='relative'>
-                      <label className={label('unit_cost')}>Unit cost</label>
-                      <input
-                        placeholder="Cost"
-                        className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
-                        value={unit_cost}
-                        onChange={(e) => setPurchasedPrice(e.target.value)}
-                      />
-                      {errorflag('unit_cost', 'value')}
-                    </div>
-                  }
-                  {!(mode === 'edit' && editChoice === 'edit') &&
-                    <div className='relative'>
-                      <label htmlFor="date_added" className={label('date_added')}>Enter Date Added</label>
-                      <input
-                        id="date_added"
-                        type="date"
-                        placeholder="Date Purchased"
-                        className={`${inputClass('date_added')} focus:border-2 focus:border-green-500`}
-                        value={date_added}
-                        onChange={(e) => setDatePurchased(e.target.value)}
-                      />
-                      {errorflag('date_added', 'date')}
-                    </div>
-                  }
-                </div>
-
-                {/* Right column inputs */}
-                <div className="flex flex-col gap-6">
-                  {/* If addStocks was chosen, hide product-edit-only fields on the right side */}
-                  {!(mode === 'edit' && editChoice === 'addStocks') &&
-                    <div className='relative'>
-                      <DropdownCustom
-                        value={unit}
-                        onChange={(e) => setUnit(sanitizeInput(e.target.value))}
-                        label="Unit"
-                        error={emptyField.unit}
-                        options={[
-                          { value: '', label: 'Select Unit' },
-                          ...constructionUnits.map(option => ({
-                            value: option,
-                            label: option
-                          }))
-                        ]}
-                      />
-                      {errorflag('unit', 'unit')}
-                    </div>
-                  }
-                  
-
                   {!(mode === 'edit' && editChoice === 'addStocks') &&
                     <div className='relative grid grid-cols-2 gap-3 '>
                       <div>
@@ -642,6 +586,82 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                     </div>
                   }
 
+                  {!(mode === 'edit' && editChoice === 'edit') &&
+                    <div className='relative'>
+                      <label className={label('unit_cost')}>Unit cost</label>
+                      <input
+                        placeholder="Cost"
+                        className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
+                        value={unit_cost}
+                        onChange={(e) => setPurchasedPrice(e.target.value)}
+                      />
+                      {errorflag('unit_cost', 'value')}
+                    </div>
+                  }
+                  {!(mode === 'edit' && editChoice === 'edit') &&
+                    <div className='relative'>
+                      <DatePickerCustom
+                        id="date_added"
+                        value={date_added}
+                        onChange={(e) => setDatePurchased(e.target.value)}
+                        label="Enter Date Added"
+                        error={emptyField.date_added}
+                        placeholder="mm/dd/yyyy"
+                        errorMessage={
+                          emptyField.date_added ? "Please enter a date!" : null
+                        }
+                      />
+                    </div>
+                  }
+                </div>
+
+                {/* Right column inputs */}
+                <div className="flex flex-col gap-6">
+                  {/* If addStocks was chosen, hide product-edit-only fields on the right side */}
+                  {!(mode === 'edit' && editChoice === 'addStocks') &&
+                    <div className='relative'>
+                      <DropdownCustom
+                        value={unit}
+                        onChange={(e) => setUnit(sanitizeInput(e.target.value))}
+                        label="Unit"
+                        error={emptyField.unit}
+                        options={[
+                          { value: '', label: 'Select Unit' },
+                          ...constructionUnits.map(option => ({
+                            value: option,
+                            label: option
+                          }))
+                        ]}
+                      />
+                      {errorflag('unit', 'unit')}
+                    </div>
+                  }
+
+                  {!(mode === 'edit' && editChoice === 'edit') &&
+                    <div className='relative '>
+                      <label className={label('quantity_added')}>Quantity</label>
+                      <input
+                        type="number"
+                        step={unit ? getQuantityStep(unit) : "0.001"}
+                        min={unit ? getQuantityStep(unit) : "0.001"}
+                        placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity' : 'Add Quantity or Enter 0'}`}
+                        className={`${inputClass('quantity_added')} focus:border-2 focus:border-green-500`}
+                        value={quantity_added}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setQuantity(value);
+                          handleThreshold(value, max_threshold);
+                        }}
+                      />
+                      {errorflag('quantity_added', 'value')}
+                      {unitValidationError.quantity_added && (
+                        <p className="text-red-600 text-xs mt-1">{unitValidationError.quantity_added}</p>
+                      )}
+                      {maxQuant && <p className='mt-1 text-xs italic text-red-600'>Quantity exceeds the max threshold!</p>}
+                    </div>
+                  }
+
+
                   {!(mode === 'edit' && editChoice === 'addStocks') &&
                     <div className='relative'>
                       <label className={label('unit_price')}>Price</label>
@@ -657,18 +677,24 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
 
                   {!(mode === 'edit' && editChoice === 'edit') &&
                     <div className='relative'>
-                      <label htmlFor="product_validity" className={label('product_validity')}>Enter Product Validity</label>
-                      <input
+                      <DatePickerCustom
                         id="product_validity"
-                        type="date"
-                        placeholder="Expiration Date"
-                        className={`${inputClass('product_validity')} focus:border-2 focus:border-green-500`}
                         value={product_validity}
                         onChange={(e) => setExpirationDate(e.target.value)}
+                        label="Enter Product Validity"
+                        error={emptyField.product_validity || isExpiredEarly}
+                        placeholder="mm/dd/yyyy"
+                        errorMessage={
+                          emptyField.product_validity
+                            ? "Please enter a date!"
+                            : isExpiredEarly
+                              ? "Expiry date must be after purchase date!"
+                              : null
+                        }
                       />
-                      {errorflag('product_validity', 'date')}
                     </div>
                   }
+
                 </div>
               </div>
 
