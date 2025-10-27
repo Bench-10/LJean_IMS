@@ -1007,27 +1007,32 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                     </div>
                   }
 
-                  {!(mode === 'edit' && editChoice === 'edit') &&
-                    <div className='relative '>
-                      <label className={label('quantity_added')}>Quantity</label>
-                      <input
-                        type="number"
-                        step={unit ? getQuantityStep(unit) : "0.001"}
-                        min={unit ? getQuantityStep(unit) : "0.001"}
-                        placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity' : 'Add Quantity or Enter 0'}`}
-                        className={`${inputClass('quantity_added')} focus:border-2 focus:border-green-500`}
-                        value={quantity_added}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setQuantity(value);
-                          handleThreshold(value, max_threshold);
-                        }}
-                      />
-                      {errorflag('quantity_added', 'value')}
-                      {unitValidationError.quantity_added && (
-                        <p className="text-red-600 text-xs mt-1">{unitValidationError.quantity_added}</p>
-                      )}
-                      {maxQuant && <p className='mt-1 text-xs italic text-red-600'>Quantity exceeds the max threshold!</p>}
+                  {!(mode === 'edit' && editChoice === 'addStocks') &&
+                    <div className='relative grid grid-cols-2 gap-3 '>
+                      <div>
+                        <label className={`${label('min_threshold')}`}>Min threshold</label>
+                        <input
+                          placeholder="Min Threshold"
+                          className={`${inputClass('min_threshold')} focus:border-2 focus:border-green-500`}
+                          value={min_threshold}
+                          onChange={(e) => setMinThreshold(e.target.value)}
+                        />
+                        {errorflag('min_threshold', 'value')}
+                      </div>
+                      <div>
+                        <label className={label('max_threshold')}>Max threshold</label>
+                        <input
+                          placeholder="Max Threshold"
+                          className={`${inputClass('max_threshold')} focus:border-2 focus:border-green-500`}
+                          value={max_threshold}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setMaxThreshold(value);
+                            handleThreshold(quantity_added, value);
+                          }}
+                        />
+                        {errorflag('max_threshold', 'value')}
+                      </div>
                     </div>
                   }
 
@@ -1099,35 +1104,30 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                     </div>
                   )}
                   
-
-                  {!(mode === 'edit' && editChoice === 'addStocks') &&
-                    <div className='relative grid grid-cols-2 gap-3 '>
-                      <div>
-                        <label className={`${label('min_threshold')}`}>Min threshold</label>
-                        <input
-                          placeholder="Min Threshold"
-                          className={`${inputClass('min_threshold')} focus:border-2 focus:border-green-500`}
-                          value={min_threshold}
-                          onChange={(e) => setMinThreshold(e.target.value)}
-                        />
-                        {errorflag('min_threshold', 'value')}
-                      </div>
-                      <div>
-                        <label className={label('max_threshold')}>Max threshold</label>
-                        <input
-                          placeholder="Max Threshold"
-                          className={`${inputClass('max_threshold')} focus:border-2 focus:border-green-500`}
-                          value={max_threshold}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setMaxThreshold(value);
-                            handleThreshold(quantity_added, value);
-                          }}
-                        />
-                        {errorflag('max_threshold', 'value')}
-                      </div>
+                  {!(mode === 'edit' && editChoice === 'edit') &&
+                    <div className='relative '>
+                      <label className={label('quantity_added')}>Quantity</label>
+                      <input
+                        type="number"
+                        step={unit ? getQuantityStep(unit) : "0.001"}
+                        min={unit ? getQuantityStep(unit) : "0.001"}
+                        placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity' : 'Add Quantity or Enter 0'}`}
+                        className={`${inputClass('quantity_added')} focus:border-2 focus:border-green-500`}
+                        value={quantity_added}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setQuantity(value);
+                          handleThreshold(value, max_threshold);
+                        }}
+                      />
+                      {errorflag('quantity_added', 'value')}
+                      {unitValidationError.quantity_added && (
+                        <p className="text-red-600 text-xs mt-1">{unitValidationError.quantity_added}</p>
+                      )}
+                      {maxQuant && <p className='mt-1 text-xs italic text-red-600'>Quantity exceeds the max threshold!</p>}
                     </div>
                   }
+
 
                   {!(mode === 'edit' && editChoice === 'addStocks') &&
                     <div className='relative'>
