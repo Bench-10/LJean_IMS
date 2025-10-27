@@ -60,11 +60,90 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   },[openSaleModal]);
 
 
+  const getSellingUnitsForProduct = (product) => {
+    if (!product) return [];
+
+    const parsedUnits = Array.isArray(product.selling_units)
+      ? product.selling_units.reduce((acc, entry) => {
+          const unitLabel = typeof entry?.unit === 'string' ? entry.unit.trim() : '';
+          if (!unitLabel) return acc;
+
+          const price = Number(entry.unit_price);
+          const baseQuantity = Number(entry.base_quantity_per_sell_unit);
+
+          if (!Number.isFinite(price) || price <= 0) return acc;
+          if (!Number.isFinite(baseQuantity) || baseQuantity <= 0) return acc;
+
+          acc.push({
+            unit: unitLabel,
+            unit_price: price,
+            base_quantity_per_sell_unit: baseQuantity,
+            units_per_base: Number(entry.units_per_base) || null,
+            is_base: Boolean(entry.is_base)
+          });
+          return acc;
+        }, [])
+      : [];
+
+    if (parsedUnits.length > 0) {
+      return parsedUnits.sort((a, b) => {
+        if (a.is_base === b.is_base) {
+          return a.unit.localeCompare(b.unit);
+        }
+        return a.is_base ? -1 : 1;
+      });
+    }
+
+    const fallbackUnit = typeof product.unit === 'string' ? product.unit.trim() : '';
+    const fallbackPrice = Number(product.unit_price);
+
+    if (!fallbackUnit || !Number.isFinite(fallbackPrice) || fallbackPrice <= 0) {
+      return [];
+    }
+
+    return [{
+      unit: fallbackUnit,
+      unit_price: fallbackPrice,
+      base_quantity_per_sell_unit: 1,
+      units_per_base: 1,
+      is_base: true
+    }];
+  };
+
+
+  const getSelectedUnitConfig = (row, product) => {
+    if (!row) return null;
+    const sellingUnits = Array.isArray(row.sellingUnits) && row.sellingUnits.length > 0
+      ? row.sellingUnits
+      : getSellingUnitsForProduct(product);
+
+    if (!sellingUnits || sellingUnits.length === 0) {
+      return null;
+    }
+
+    const matched = sellingUnits.find(entry => entry.unit === row.unit);
+    if (matched) {
+      return matched;
+    }
+
+    return sellingUnits.find(entry => entry.is_base) || sellingUnits[0];
+  };
+
+  const createEmptySaleRow = () => ({
+    product_id: '',
+    quantity: '',
+    unit: '',
+    unitPrice: 0,
+    amount: 0,
+    sellingUnits: [],
+    baseQuantityPerSellUnit: 1
+  });
+
 
   //PRODUCT INPUT INFORMATION
   const [productSelected, setProductSelected] = useState([]);
   const [rows, setRows] = React.useState([
-    { product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0 }
+    createEmptySaleRow()
   ]);
 
 
@@ -98,7 +177,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   const closeModal = () =>{
     setOpenSaleModal(false);
 
-    setRows([{product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0}]);
+    setRows([createEmptySaleRow()]);
     setProductSelected([]);
     setAmount(0);
     setTotalAmountDue(0);
@@ -107,12 +186,12 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
     setAddress('');
     setDate('');
     setVat(0);
-    setProductSelected([]);
     setSearchTerms({});
     setShowDropdowns({});
     setEmptyQuantiy(false);
     setSomeEmpty(false);
     setExceedQuanity([]);
+    setQuantityValidationErrors({});
     setAdditionalDiscount(0);
     setDeliveryFee(0);
     setIsForDelivery(false);
@@ -122,62 +201,89 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
 
   
   //MULTIPLY THE AMOUNT BY THE PRODUCT'S UNIT PRICE
-  const createAnAmount = (index) =>{
+  const createAnAmount = (index, sourceRows = rows) =>{
 
-    const currentId = rows[index].product_id;
-    
+    const currentRows = Array.isArray(sourceRows) ? [...sourceRows] : [...rows];
+    const currentRow = { ...currentRows[index] };
+    const currentId = currentRow.product_id;
+    const currentKey = currentId !== undefined && currentId !== null ? String(currentId) : null;
+
     const product = productsToSell.find(p => p.product_id === currentId);
+    if (!product) {
+      currentRows[index] = currentRow;
+      preventEmptyQuantity(currentRows);
+      totalAmount(currentRows);
+      setRows(currentRows);
+      return;
+    }
 
-    const availableQuantity = product ? Number(product.quantity) : 0;
+    const selectedUnitConfig = getSelectedUnitConfig(currentRow, product);
+    if (!currentRow.unit && selectedUnitConfig?.unit) {
+      currentRow.unit = selectedUnitConfig.unit;
+    }
+    const resolvedUnitPrice = Number(selectedUnitConfig?.unit_price ?? currentRow.unitPrice ?? 0);
+    const resolvedBaseQuantity = Number(selectedUnitConfig?.base_quantity_per_sell_unit ?? currentRow.baseQuantityPerSellUnit ?? 1);
 
-    const currentQuantity = Number(rows[index].quantity) || 0;
-    const unit = rows[index].unit;
+    currentRow.sellingUnits = Array.isArray(currentRow.sellingUnits) && currentRow.sellingUnits.length > 0
+      ? currentRow.sellingUnits
+      : getSellingUnitsForProduct(product);
+    currentRow.unitPrice = Number.isFinite(resolvedUnitPrice) && resolvedUnitPrice > 0 ? resolvedUnitPrice : 0;
+    currentRow.baseQuantityPerSellUnit = Number.isFinite(resolvedBaseQuantity) && resolvedBaseQuantity > 0 ? resolvedBaseQuantity : 1;
+
+    const currentQuantity = Number(currentRow.quantity) || 0;
+    const unit = currentRow.unit;
 
     // Validate quantity for unit
     if (unit && currentQuantity > 0) {
       const validation = validateQuantity(currentQuantity, unit);
       if (!validation.valid) {
-        // Show validation error
         setQuantityValidationErrors(prev => ({
           ...prev,
           [index]: validation.error
         }));
+
+        currentRow.amount = 0;
+        currentRows[index] = currentRow;
+        preventEmptyQuantity(currentRows);
+        totalAmount(currentRows);
+        setRows(currentRows);
         return;
       } else {
-        // Clear validation error
         setQuantityValidationErrors(prev => {
-          const newErrors = {...prev};
+          const newErrors = { ...prev };
           delete newErrors[index];
           return newErrors;
         });
       }
+    } else {
+      setQuantityValidationErrors(prev => {
+        if (!prev[index]) return prev;
+        const newErrors = { ...prev };
+        delete newErrors[index];
+        return newErrors;
+      });
     }
 
-    if (currentId && currentQuantity > availableQuantity){
+    const availableInventoryDisplay = Number(product.quantity) || 0;
+    const availableSaleQuantity = currentRow.baseQuantityPerSellUnit > 0
+      ? availableInventoryDisplay / currentRow.baseQuantityPerSellUnit
+      : availableInventoryDisplay;
+    const tolerance = 1e-9;
 
-      setExceedQuanity([...exceedQuanity, currentId]);
+    if (currentKey && currentQuantity > 0 && currentQuantity - availableSaleQuantity > tolerance) {
+      setExceedQuanity(prev => prev.includes(currentKey) ? prev : [...prev, currentKey]);
+    } else if (currentKey) {
+      setExceedQuanity(prev => prev.includes(currentKey) ? prev.filter(q => q !== currentKey) : prev);
+    }
 
-      return;
-                                  
+    const productAmount = Number((currentQuantity * currentRow.unitPrice).toFixed(2));
+    currentRow.amount = Number.isFinite(productAmount) ? productAmount : 0;
 
+    currentRows[index] = currentRow;
 
-    } else if(exceedQuanity.includes(currentId) && currentQuantity <= availableQuantity){
-      const updatedQuantityExceedingList = exceedQuanity.filter(q => q !== currentId)
-
-      setExceedQuanity(updatedQuantityExceedingList);
-    } 
-
-   
-    const productAmount = rows[index].quantity * rows[index].unitPrice
-    const newRows = [...rows];
-    newRows[index].amount = productAmount;
-
-    preventEmptyQuantity(newRows);
-    setRows(newRows);
-    console.log(newRows);
-
-    
-    totalAmount(newRows);
+    preventEmptyQuantity(currentRows);
+    totalAmount(currentRows);
+    setRows(currentRows);
 
   };
 
@@ -244,6 +350,9 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
   //REMOVES THE SPECIFIC ROW
   const removeSaleRow = (index) =>{
 
+    const removedRow = rows[index];
+  const removedProductId = removedRow?.product_id;
+  const removedProductKey = removedProductId !== undefined && removedProductId !== null ? String(removedProductId) : null;
     const newRows = rows.filter((_, i) => i !== index);
     
     
@@ -275,10 +384,27 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
     });
 
 
+    const newValidationErrors = {};
+    Object.keys(quantityValidationErrors).forEach(key => {
+      const keyIndex = parseInt(key);
+      if (keyIndex < index) {
+        newValidationErrors[keyIndex] = quantityValidationErrors[keyIndex];
+      } else if (keyIndex > index) {
+        newValidationErrors[keyIndex - 1] = quantityValidationErrors[keyIndex];
+      }
+    });
+
+
     setProductSelected(newProductSelected);
     setSearchTerms(newSearchTerms);
+    setQuantityValidationErrors(newValidationErrors);
     setRows(newRows);
     totalAmount(newRows);
+    preventEmptyQuantity(newRows);
+
+    if (removedProductKey) {
+      setExceedQuanity(prev => prev.filter(id => id !== removedProductKey));
+    }
 
   };
 
@@ -313,13 +439,27 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
 
   //HANDLES PRODUCT SELECTION FROM DROPDOWN
   const selectProduct = (index, product) => {
-    const newRows = [...rows];
-    newRows[index].product_id = product.product_id;
-    newRows[index].unitPrice = product.unit_price || '';
-    newRows[index].unit = product.unit || '';
-    setRows(newRows);
+    const sellingUnits = getSellingUnitsForProduct(product);
+    const defaultUnitConfig = sellingUnits.find(entry => entry.is_base) || sellingUnits[0] || null;
+    const defaultUnit = defaultUnitConfig?.unit || '';
+    const defaultPrice = Number(defaultUnitConfig?.unit_price ?? product.unit_price ?? 0);
+    const defaultBaseQty = Number(defaultUnitConfig?.base_quantity_per_sell_unit ?? 1) || 1;
 
-    createAnAmount(index);
+    const newRows = [...rows];
+    newRows[index] = {
+      ...newRows[index],
+      product_id: product.product_id,
+      quantity: '',
+      unit: defaultUnit,
+      unitPrice: Number.isFinite(defaultPrice) ? defaultPrice : 0,
+      amount: 0,
+      sellingUnits,
+      baseQuantityPerSellUnit: defaultBaseQty
+    };
+
+    preventEmptyQuantity(newRows);
+    totalAmount(newRows);
+    setRows(newRows);
     
     setProductSelected(prev => ({
       ...prev,
@@ -335,6 +475,41 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
       ...prev,
       [index]: false
     }));
+
+  const productKey = String(product.product_id);
+  setExceedQuanity(prev => prev.filter(id => id !== productKey));
+    setQuantityValidationErrors(prev => {
+      if (!prev[index]) return prev;
+      const newErrors = { ...prev };
+      delete newErrors[index];
+      return newErrors;
+    });
+  };
+
+
+  const handleUnitChange = (index, unitValue) => {
+    const currentRow = rows[index];
+    if (!currentRow) return;
+
+    const product = productsToSell.find(p => p.product_id === currentRow.product_id);
+    const sellingUnits = Array.isArray(currentRow.sellingUnits) && currentRow.sellingUnits.length > 0
+      ? currentRow.sellingUnits
+      : getSellingUnitsForProduct(product);
+
+    const unitConfig = sellingUnits.find(entry => entry.unit === unitValue) || null;
+    const resolvedPrice = Number(unitConfig?.unit_price ?? currentRow.unitPrice ?? 0);
+    const resolvedBaseQuantity = Number(unitConfig?.base_quantity_per_sell_unit ?? currentRow.baseQuantityPerSellUnit ?? 1);
+
+    const newRows = [...rows];
+    newRows[index] = {
+      ...currentRow,
+      unit: unitValue,
+      unitPrice: Number.isFinite(resolvedPrice) && resolvedPrice > 0 ? resolvedPrice : 0,
+      baseQuantityPerSellUnit: Number.isFinite(resolvedBaseQuantity) && resolvedBaseQuantity > 0 ? resolvedBaseQuantity : 1,
+      sellingUnits
+    };
+
+    createAnAmount(index, newRows);
   };
 
 
@@ -376,6 +551,14 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
       const saleData = {
         headerInformationAndTotal,
         productRow: rows
+          .filter(row => row.product_id && Number(row.quantity) > 0)
+          .map(row => ({
+            product_id: row.product_id,
+            quantity: Number(row.quantity),
+            unit: row.unit,
+            unitPrice: Number(row.unitPrice),
+            amount: Number(row.amount)
+          }))
       };
 
       const data = await api.post(`/api/sale`, saleData);
@@ -518,8 +701,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                               className="bg-green-600 py-2 px-4 text-white mb-6 rounded-sm"
                               onClick={() =>
                                 {setRows(prevRows => {
-                                  const updatedRows = [...prevRows, { product_id: '', quantity: 0, unit: '', unitPrice: 0, amount: 0 }];
-                                  
+                                  const updatedRows = [...prevRows, createEmptySaleRow()];
                                   preventEmptyQuantity(updatedRows);
                                   return updatedRows;
                                 });}
@@ -614,14 +796,37 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                                 step={row.unit ? getQuantityStep(row.unit) : "0.001"}
                                                 min={row.unit ? getQuantityStep(row.unit) : "0.001"}
                                                 className="border w-full" 
-                                                value={row.quantity} 
+                                                value={row.quantity === '' ? '' : row.quantity}
                                                 onChange={e => {
-                                                  const newRows = [...rows];
-                                                  newRows[idx].quantity = e.target.value;
-                                                  setRows(newRows);
+                                                  const { value } = e.target;
+                                                  if (value === '') {
+                                                    const updatedRows = [...rows];
+                                                    updatedRows[idx] = {
+                                                      ...updatedRows[idx],
+                                                      quantity: ''
+                                                    };
+                                                    createAnAmount(idx, updatedRows);
+                                                    return;
+                                                  }
+
+                                                  const numericValue = Number(value);
+                                                  if (Number.isNaN(numericValue)) {
+                                                    return;
+                                                  }
+
+                                                  if (row.unit && !allowsFractional(row.unit) && value.includes('.')) {
+                                                    return;
+                                                  }
+
+                                                  const updatedRows = [...rows];
+                                                  updatedRows[idx] = {
+                                                    ...updatedRows[idx],
+                                                    quantity: value
+                                                  };
+                                                  createAnAmount(idx, updatedRows);
                                                 }} 
-                                                onKeyUp={() => createAnAmount(idx)}
                                                 placeholder={row.unit ? getQuantityPlaceholder(row.unit) : "0"}
+                                                disabled={!row.product_id}
                                                 required
                                               />
                                               {quantityValidationErrors[idx] && (
@@ -632,7 +837,7 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
                                                   {quantityValidationErrors[idx]}
                                                 </div>
                                               )}
-                                              {exceedQuanity.includes(row.product_id) && (
+                                              {row.product_id && exceedQuanity.includes(String(row.product_id)) && (
                                                 <div
                                                   className="absolute left-0 w-full text-xs text-red-600 mt-1 z-10 bg-white pointer-events-none"
                                                   style={{ bottom: '-1.5em' }}
@@ -645,29 +850,41 @@ function AddSaleModalForm({openSaleModal, setOpenSaleModal, productsData, setSal
 
 
                                           <td className="px-2">
-                                            <input type="text" className="border w-full" value={row.unit} onChange={e => {
-                                              const newRows = [...rows];
-                                              newRows[idx].unit = e.target.value;
-                                              setRows(newRows);
-                                            }} />
+                                            <select
+                                              className="border w-full"
+                                              value={row.unit || ''}
+                                              onChange={e => handleUnitChange(idx, e.target.value)}
+                                              disabled={!row.product_id}
+                                            >
+                                              <option value="" disabled>
+                                                {row.product_id ? 'Select unit' : 'Choose product first'}
+                                              </option>
+                                              {Array.isArray(row.sellingUnits) && row.sellingUnits.map(unitOption => (
+                                                <option key={unitOption.unit} value={unitOption.unit}>
+                                                  {`${unitOption.unit} (${currencyFormat(toTwoDecimals(unitOption.unit_price))})`}
+                                                </option>
+                                              ))}
+                                            </select>
                                           </td>
 
 
                                           <td className="px-2">
-                                            <input type="text" className="border w-full" value={row.unitPrice} onChange={e => {
-                                              const newRows = [...rows];
-                                              newRows[idx].unitPrice = e.target.value;
-                                              setRows(newRows);
-                                            }} readOnly />
+                                            <input
+                                              type="text"
+                                              className="border w-full"
+                                              value={row.unitPrice ? toTwoDecimals(row.unitPrice) : ''}
+                                              readOnly
+                                            />
                                           </td>
 
 
                                           <td className="px-2">
-                                            <input type="text" className="border w-full" value={row.amount} onChange={e => {
-                                              const newRows = [...rows];
-                                              newRows[idx].amount = e.target.value;
-                                              setRows(newRows);
-                                            }} onKeyUp={(e) => setAmount(e.target.value)} readOnly />
+                                            <input
+                                              type="text"
+                                              className="border w-full"
+                                              value={row.amount ? toTwoDecimals(row.amount) : ''}
+                                              readOnly
+                                            />
                                           </td>
 
 
