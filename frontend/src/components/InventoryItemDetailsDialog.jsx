@@ -81,10 +81,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
                   <div className="p-2 bg-gray-50 border rounded-lg text-sm text-right">{currencyFormat(item.unit_cost)}</div>
                 </div>
               )}
-              <div>
-                <label className="text-xs font-bold text-gray-600">QUANTITY</label>
-                <div className="p-2 bg-gray-50 border rounded-lg text-sm text-right">{Number(item.quantity).toLocaleString()}</div>
-              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold text-gray-600">MIN THRESHOLD</label>
@@ -94,6 +91,11 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
                   <label className="text-xs font-bold text-gray-600">MAX THRESHOLD</label>
                   <div className="p-2 bg-gray-50 border rounded-lg text-right text-sm whitespace-nowrap overflow-hidden text-ellipsis">{Number(item.max_threshold).toLocaleString()}</div>
                 </div>
+              </div>
+
+                            <div>
+                <label className="text-xs font-bold text-gray-600">QUANTITY</label>
+                <div className="p-2 bg-gray-50 border rounded-lg text-sm text-right">{Number(item.quantity).toLocaleString()}</div>
               </div>
               
             </div>
