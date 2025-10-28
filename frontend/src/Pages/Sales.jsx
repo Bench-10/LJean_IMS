@@ -198,6 +198,11 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
       const detail = event.detail || {};
       if (!detail.saleId) return;
 
+      try {
+        // remove any persisted pending navigation for sale since we're handling it now
+        sessionStorage.removeItem('pendingNavigateToSale');
+      } catch (e) { /* ignore non-browser env */ }
+
       navigationTargetRef.current = {
         saleId: Number(detail.saleId),
         highlightContext: detail.highlightContext ?? null
@@ -218,6 +223,26 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
     };
 
     window.addEventListener('navigate-to-sale-row', handleNavigateToSaleRow);
+
+    // If a navigation event fired before this component mounted, consume any pending navigation stored in sessionStorage
+    try {
+      const pending = sessionStorage.getItem('pendingNavigateToSale');
+      if (pending) {
+        const parsed = JSON.parse(pending);
+        if (parsed && parsed.saleId) {
+          navigationTargetRef.current = {
+            saleId: Number(parsed.saleId),
+            highlightContext: parsed.highlightContext ?? null
+          };
+
+          // Clear stored pending navigation now that we're consuming it
+          sessionStorage.removeItem('pendingNavigateToSale');
+
+          // Attempt to focus/navigation; attemptNavigationFocus will handle pagination readiness
+          attemptNavigationFocus();
+        }
+      }
+    } catch (e) { /* ignore non-browser env */ }
 
     return () => {
       window.removeEventListener('navigate-to-sale-row', handleNavigateToSaleRow);

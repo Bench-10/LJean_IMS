@@ -629,9 +629,31 @@ function ProductInventory({
 
                       <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
                       <td className="px-4 py-2 text-center w-36"  >
-                        <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.min_threshold ? 'bg-[#f05959] text-red-900' : row.quantity >= row.max_threshold ? 'bg-[#1e5e1b] text-white' : 'bg-[#61E85C] text-green-700'} font-medium`}>
-                          {row.quantity <= row.min_threshold ? 'Low Stock' : row.quantity >= row.max_threshold ? 'Max Stock' : 'In Stock'}
-                        </div>
+                        {(() => {
+                          const qty = Number(row.quantity);
+                          const min = Number(row.min_threshold ?? 0);
+                          const max = Number(row.max_threshold ?? Infinity);
+                          let statusClass = 'bg-[#61E85C] text-green-700';
+                          let statusText = 'In Stock';
+
+                          
+                          if (!Number.isFinite(qty) || qty <= 0) {
+                            statusClass = 'bg-red-800 text-white';
+                            statusText = 'No Stock';
+                          } else if (qty <= min) {
+                            statusClass = 'bg-[#f05959] text-red-900';
+                            statusText = 'Low Stock';
+                          } else if (qty >= max) {
+                            statusClass = 'bg-[#1e5e1b] text-white';
+                            statusText = 'Max Stock';
+                          }
+
+                          return (
+                            <div className={`rounded-full px-5 py-1 font-medium ${statusClass}`} aria-live="polite">
+                              {statusText}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}

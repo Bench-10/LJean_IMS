@@ -517,13 +517,18 @@ function App() {
       navigate('/delivery');
 
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('navigate-to-delivery-row', {
-          detail: {
-            saleId: saleId ? Number(saleId) : null,
-            deliveryId: deliveryId ? Number(deliveryId) : null,
-            highlightContext: highlightContext ?? null
-          }
-        }));
+        const detail = {
+          saleId: saleId ? Number(saleId) : null,
+          deliveryId: deliveryId ? Number(deliveryId) : null,
+          highlightContext: highlightContext ?? null
+        };
+
+        // Persist pending navigation so the target page can consume it if it's not mounted yet
+        try {
+          sessionStorage.setItem('pendingNavigateToDelivery', JSON.stringify(detail));
+        } catch (e) { /* ignore non-browser env */ }
+
+        window.dispatchEvent(new CustomEvent('navigate-to-delivery-row', { detail }));
       }, 150);
 
       return;
@@ -534,12 +539,17 @@ function App() {
       navigate('/sales');
 
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('navigate-to-sale-row', {
-          detail: {
-            saleId: Number(saleId),
-            highlightContext: highlightContext ?? null
-          }
-        }));
+        const detail = {
+          saleId: Number(saleId),
+          highlightContext: highlightContext ?? null
+        };
+
+        // Persist pending navigation so the target page can consume it if it's not mounted yet
+        try {
+          sessionStorage.setItem('pendingNavigateToSale', JSON.stringify(detail));
+        } catch (e) { /* ignore non-browser env */ }
+
+        window.dispatchEvent(new CustomEvent('navigate-to-sale-row', { detail }));
       }, 150);
 
       return;
