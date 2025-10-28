@@ -155,16 +155,16 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                         const padded = max === 0 ? 1 : Math.ceil((max * 1.1)/100)*100; 
                         return <XAxis type="number" domain={[0, padded]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
                     })()}
-                    <YAxis 
-                        dataKey="product_name" 
-                        type="category" 
-                        tick={{ fontSize: 14 }} 
-                        width={110} 
-                        axisLine={false} 
-                        tickLine={false}
-                        interval={0}
-                        tickMargin={5}
-                    />
+          <YAxis 
+            dataKey="product_name" 
+            type="category" 
+            tick={{ fontSize: 12 }} 
+            width={90} 
+            axisLine={false} 
+            tickLine={false}
+            interval={0}
+            tickMargin={4}
+          />
 
                     
                     <Tooltip 
@@ -207,20 +207,38 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
             </Card>
 
-      <Card title={selectedProductName ? `Sales Performance - ${selectedProductName}` : "Sales Performance"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]" exportRef={salesChartRef}>
-      <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
+  <Card title={selectedProductName ? `Sales Performance - ${selectedProductName}` : "Sales Performance"} className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]" exportRef={salesChartRef}>
+  <div className="flex flex-col h-full gap-4 max-h-full overflow-hidden relative">
                 {loadingSalesPerformance && <ChartLoading message="Loading sales performance..." />}
-                {/* Sales Performance Filter */}
-        <div data-export-exclude className="flex justify-end">
+                {/* Sales Performance Filter and restock suggestions (inline) */}
+        <div data-export-exclude className="flex justify-end items-center space-x-2">
                     <select value={salesInterval} onChange={e=>setSalesInterval(e.target.value)} className="text-xs border rounded px-2 py-1 bg-white">
                         <option value="daily">Daily</option>
                         <option value="weekly">Weekly</option>
                         <option value="monthly">Monthly</option>
                         <option value="yearly">Yearly</option>
                     </select>
+
+                    {(hasActualData || hasForecastData) && (
+                      <div className="relative group">
+                        <button
+                          data-export-exclude
+                          title="Get restocking suggestions"
+                          aria-label="Get restocking suggestions"
+                          onClick={() => setShowRestockDialog(true)}
+                          className="p-2 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-sm flex items-center justify-center"
+                        >
+                          <FaLightbulb />
+                        </button>
+                        {/* tooltip */}
+                        <span className="pointer-events-none absolute -top-8 right-1/2 translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                          Get restocking suggestions
+                        </span>
+                      </div>
+                    )}
                 </div>
 
-        <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="sales-performance">
+  <div className="flex-1 min-h-0 overflow-hidden" data-chart-container="sales-performance">
 
           {(!hasActualData) ? (
             <ChartNoData
@@ -270,7 +288,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
         </div>
 
-            <div>
+      <div className="flex flex-col flex-1 min-h-0">
                 {/* Demand Forecasting Filter */}
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase">
@@ -280,12 +298,14 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
                 </div>
 
         {(!hasActualData && !hasForecastData) ? (
-            <ChartNoData
-              message={selectedProductName ? `No units sold data for ${selectedProductName}.` : "No units sold data for the selected filters."}
-              hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY."
-            />
-        ) : (
-        <div className="h-52 max-h-52 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden flex items-center justify-center">
+              <ChartNoData
+                message={selectedProductName ? `No units sold data for ${selectedProductName}.` : "No units sold data for the selected filters."}
+                hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY."
+              />
+            </div>
+  ) : (
+  <div className="flex-1 min-h-0 overflow-hidden">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={forecastChartData} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
             <defs>
@@ -383,18 +403,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
 
             </div>
 
-            {/* Restocking Suggestions Button */}
-            {(hasActualData || hasForecastData) && (
-              <div data-export-exclude className="mt-4 flex justify-center">
-                <button
-                  onClick={() => setShowRestockDialog(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
-                >
-                  <FaLightbulb />
-                  Get Restocking Suggestions
-                </button>
-              </div>
-            )}
+            {/* restock icon moved to the top-right; kept no bottom button to save space */}
 
             </div>
     
