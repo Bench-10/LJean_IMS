@@ -60,7 +60,9 @@ export const addDeliveryData = async(data) =>{
         await SQLquery('COMMIT');
 
         // BROADCAST NEW DELIVERY UPDATE TO ALL USERS IN THE BRANCH
-        if (newData[0]) {
+        const createdDelivery = newData[0];
+
+        if (createdDelivery) {
             // GET UPDATED SALE DATA WITH DELIVERY INFO
             const {rows: saleWithDelivery} = await SQLquery(`
                 SELECT 
@@ -91,7 +93,7 @@ export const addDeliveryData = async(data) =>{
                 broadcastSaleUpdate(currentBranch, {
                     action: 'delivery_added',
                     sale: saleWithDelivery[0],
-                    delivery: newData[0],
+                    delivery: createdDelivery,
                     user_id: userID || null
                 });
             }
@@ -104,7 +106,7 @@ export const addDeliveryData = async(data) =>{
                        is_delivered, is_pending
                 FROM Delivery 
                 WHERE delivery_id = $1`,   
-                [delivery_id]
+                [createdDelivery.delivery_id]
             );
 
             // BROADCAST DELIVERY ADDITION WITH PROPERLY FORMATTED DATE
@@ -118,7 +120,7 @@ export const addDeliveryData = async(data) =>{
 
             // CREATE NEW DELIVERY NOTIFICATION
             try {
-                await createNewDeliveryNotification(salesId, courierName, address, currentBranch, userID, userFullName);
+                await createNewDeliveryNotification(salesId, createdDelivery.delivery_id, courierName, address, currentBranch, userID, userFullName);
             } catch (alertError) {
                 console.error(`❌ Failed to create new delivery notification:`, alertError);
                 // Continue with operation even if notification fails
@@ -179,7 +181,7 @@ export const setToDelivered = async(saleID, update) => {
             
             // CREATE STOCK RESTORATION NOTIFICATION
             try {
-                await createDeliveryStockNotification(saleID, 'stock_restored', branchId, userID, userFullName);
+                await createDeliveryStockNotification(saleID, 'stock_restored', branchId, userID, userFullName, updateDelivery[0]?.delivery_id ?? null);
             } catch (error) {
                 console.error(`Failed to create stock restoration notification:`, error);
             }
@@ -312,7 +314,7 @@ export const setToDelivered = async(saleID, update) => {
             [saleID]
         );
 
-        if (saleData[0]) {
+            if (saleData[0]) {
             // BROADCAST SALE/DELIVERY UPDATE
             broadcastSaleUpdate(saleData[0].branch_id, {
                 action: 'delivery_status_change',
@@ -327,6 +329,22 @@ export const setToDelivered = async(saleID, update) => {
                 },
                 user_id: userID || null
             });
+
+            const deliveryIdentifier = updateDelivery[0]?.delivery_id ?? null;
+
+            try {
+                await createDeliveryStatusNotification(
+                    saleID,
+                    status,
+                    courierName,
+                    saleData[0].branch_id,
+                    userID,
+                    userFullName,
+                    deliveryIdentifier
+                );
+            } catch (error) {
+                console.error(`Failed to create delivery status notification:`, error);
+            }
 
             // BROADCAST INVENTORY UPDATES IF STOCK WAS AFFECTED
             if ((wasDelivered && !status.is_delivered && !status.pending) || 
@@ -399,13 +417,6 @@ export const setToDelivered = async(saleID, update) => {
                     user_id: userID || null
                 });
 
-                // CREATE DELIVERY STATUS CHANGE NOTIFICATION
-                try {
-                    await createDeliveryStatusNotification(saleID, status, courierName, saleData[0].branch_id, userID, userFullName);
-                } catch (alertError) {
-                    console.error(`❌ Failed to create delivery status notification:`, alertError);
-                    // Continue with operation even if notification fails
-                }
             }
         }
 

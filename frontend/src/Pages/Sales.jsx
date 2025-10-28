@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import ChartLoading from '../components/common/ChartLoading.jsx';
@@ -21,18 +21,51 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50); // SHOW 50 ITEMS PER PAGE
+  const rowRefs = useRef({});
+  const tableContainerRef = useRef(null);
+  const navigationTargetRef = useRef(null);
+  const ignoreFilterResetRef = useRef(false);
+  const highlightTimeoutRef = useRef(null);
 
-  // RESET PAGINATION WHEN FILTER CHANGES
+  const [highlightedSaleId, setHighlightedSaleId] = useState(null);
+  const [pendingHighlightSaleId, setPendingHighlightSaleId] = useState(null);
+
+  // RESET PAGINATION WHEN FILTER CHANGES (SKIP DURING PROGRAMMATIC NAVIGATION)
   useEffect(() => {
+    if (ignoreFilterResetRef.current) {
+      ignoreFilterResetRef.current = false;
+      return;
+    }
     setCurrentPage(1);
+
   }, [saleFilter]);
+
+  // Smoothly center the highlighted row within the virtualized table viewport
+  const scrollRowIntoView = useCallback((rowElement) => {
+    if (!rowElement) return;
+
+    const container = tableContainerRef.current;
+    if (!container) {
+      requestAnimationFrame(() => scrollRowIntoView(rowElement));
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = rowElement.getBoundingClientRect();
+    const offset = (rowRect.top - containerRect.top) - ((container.clientHeight - rowElement.clientHeight) / 2);
+    const targetScrollTop = container.scrollTop + offset;
+
+    container.scrollTo({
+      top: targetScrollTop,
+      behavior: 'smooth'
+    });
+  }, []);
 
   //HEADER AND TOTAL INFORMATION
   const [saleData, setSaleData ] = useState({
     sale_id: '',
     chargeTo: '',
     tin: '',
-    address: '',
     date: '',
     amountNet: '',
     vat: '',
@@ -99,8 +132,8 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
     setCurrentPage(1); // RESET TO FIRST PAGE WHEN SEARCHING
   };
 
-  //FILTER DROPDOWN SELECTION
-  let filteredSale = saleHeader;
+  // FILTER & PAGINATE SALES
+  let filteredSale = Array.isArray(saleHeader) ? saleHeader : [];
   if (saleFilter === 'normal') {
     filteredSale = filteredSale.filter(sale => !sale.is_for_delivery);
 
@@ -115,19 +148,106 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
   }
 
-  // Filter by search
   const filteredData = filteredSale.filter(sale => 
     sale.charge_to?.toLowerCase().includes(searchSale.toLowerCase()) ||
     sale.tin?.toLowerCase().includes(searchSale.toLowerCase()) ||
     sale.address?.toLowerCase().includes(searchSale.toLowerCase()) 
   );
 
-  // PAGINATION LOGIC
   const totalItems = filteredData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentPageData = filteredData.slice(startIndex, endIndex);
+
+  rowRefs.current = {};
+
+  const attemptNavigationFocus = useCallback(() => {
+    const target = navigationTargetRef.current;
+    if (!target || !target.saleId) return;
+
+    if (saleFilter !== 'all') return;
+    if (searchSale !== '') return;
+
+    const salesList = Array.isArray(saleHeader) ? saleHeader : [];
+    if (!salesList.length) return;
+
+    const saleIndex = salesList.findIndex(
+      (sale) => Number(sale.sales_information_id) === Number(target.saleId)
+    );
+
+    if (saleIndex === -1) return;
+
+    const targetPage = Math.floor(saleIndex / itemsPerPage) + 1;
+
+    if (currentPage !== targetPage) {
+      setCurrentPage(targetPage);
+      return;
+    }
+
+    setPendingHighlightSaleId(Number(target.saleId));
+    navigationTargetRef.current = null;
+  }, [saleHeader, saleFilter, searchSale, itemsPerPage, currentPage]);
+
+  useEffect(() => {
+    attemptNavigationFocus();
+  }, [attemptNavigationFocus, saleHeader, currentPage, saleFilter, searchSale]);
+
+  useEffect(() => {
+    const handleNavigateToSaleRow = (event) => {
+      const detail = event.detail || {};
+      if (!detail.saleId) return;
+
+      navigationTargetRef.current = {
+        saleId: Number(detail.saleId),
+        highlightContext: detail.highlightContext ?? null
+      };
+
+      setOpenSoldItems(false);
+      setModalType("");
+
+      setSearchSale((prev) => (prev === '' ? prev : ''));
+
+      setSaleFilter((prev) => {
+        if (prev === 'all') return prev;
+        ignoreFilterResetRef.current = true;
+        return 'all';
+      });
+
+      attemptNavigationFocus();
+    };
+
+    window.addEventListener('navigate-to-sale-row', handleNavigateToSaleRow);
+
+    return () => {
+      window.removeEventListener('navigate-to-sale-row', handleNavigateToSaleRow);
+    };
+  }, [attemptNavigationFocus]);
+
+  useEffect(() => () => {
+    if (highlightTimeoutRef.current) {
+      scrollRowIntoView(rowElement);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (pendingHighlightSaleId === null) return;
+
+    const rowElement = rowRefs.current[pendingHighlightSaleId];
+
+    if (!rowElement) return;
+
+    rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedSaleId(pendingHighlightSaleId);
+    setPendingHighlightSaleId(null);
+
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+    }
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedSaleId(null);
+    }, 6000);
+  }, [currentPageData, pendingHighlightSaleId, scrollRowIntoView]);
 
   return (
     <div className='pt-20 lg:pt-8 px-4 lg:px-8 h-screen'>
@@ -191,7 +311,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
         <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg"/>
 
-      <div className="overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+  <div ref={tableContainerRef} className="overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
         <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 z-10">
               <tr>
@@ -243,9 +363,24 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
                   ) : 
 
                   (
-                    currentPageData.map((row, rowIndex) => (
-                  
-                      <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => {openSoldItems(row); setModalType("sales")}}>
+                    currentPageData.map((row, rowIndex) => {
+                      const saleIdValue = Number(row.sales_information_id);
+                      const isHighlighted = highlightedSaleId === saleIdValue;
+
+                      return (
+                        <tr
+                          key={saleIdValue || rowIndex}
+                          ref={(el) => {
+                            if (!saleIdValue) return;
+                            if (el) {
+                              rowRefs.current[saleIdValue] = el;
+                            } else {
+                              delete rowRefs.current[saleIdValue];
+                            }
+                          }}
+                          className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} ${isHighlighted ? 'bg-green-100 border-l-4 border-green-500 ring-2 ring-green-300 shadow-inner' : ''}`}
+                          onClick={() => {openSoldItems(row); setModalType("sales")}}
+                        >
                         <td className="px-4 py-2 text-center"  >{row.sales_information_id}</td>
                         <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.charge_to}</td>
                         <td className="px-4 py-2 whitespace-nowrap"  >{row.tin}</td>
@@ -255,8 +390,9 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
                         <td className="px-4 py-2 text-right"  >{currencyFormat(row.vat)}</td>
                         <td className="px-5 py-2 text-right"  >{currencyFormat(row.total_amount_due)}</td>
 
-                      </tr>
-                    ))
+                        </tr>
+                      );
+                    })
                   ) 
               }
               

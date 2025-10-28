@@ -333,6 +333,19 @@ export const addSale = async (headerAndProducts) => {
         );
 
         if (alertResult.rows[0]) {
+            try {
+                await SQLquery(
+                    `INSERT INTO inventory_alert_sale_links (alert_id, sales_information_id, updated_at)
+                     VALUES ($1, $2, NOW())
+                     ON CONFLICT (alert_id) DO UPDATE
+                     SET sales_information_id = EXCLUDED.sales_information_id,
+                         updated_at = NOW()` ,
+                    [alertResult.rows[0].alert_id, sale_id]
+                );
+            } catch (linkError) {
+                console.error('Failed to link sale notification to sale record:', linkError.message);
+            }
+
             broadcastNotification(branch_id, {
                 alert_id: alertResult.rows[0].alert_id,
                 alert_type: 'New Sale',
@@ -343,6 +356,12 @@ export const addSale = async (headerAndProducts) => {
                 alert_date: alertResult.rows[0].alert_date,
                 isDateToday: true,
                 alert_date_formatted: 'Just now',
+                sales_information_id: sale_id,
+                category: 'sales',
+                highlight_context: {
+                    reason: 'new-sale',
+                    sale_id: sale_id
+                },
                 target_roles: ['Sales Associate', 'Branch Manager'], 
                 creator_id: headerInformationAndTotal.userID 
             }, { category: 'sales' });

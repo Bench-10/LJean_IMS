@@ -68,9 +68,12 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
         iahl.add_id AS add_stock_id,
         iahl.history_timestamp,
         iahl.alert_timestamp,
+        iasl.sales_information_id AS linked_sales_information_id,
+        iasl.delivery_id AS linked_delivery_id,
         COALESCE(an.is_read, false) AS is_read
       FROM Inventory_Alerts ia
       LEFT JOIN inventory_alert_history_links iahl ON ia.alert_id = iahl.alert_id
+      LEFT JOIN inventory_alert_sale_links iasl ON ia.alert_id = iasl.alert_id
       LEFT JOIN admin_notification an
         ON ia.alert_id = an.alert_id AND an.admin_id = $1
       WHERE ia.alert_type IN ('User Approval Needed', 'Inventory Admin Approval Needed')
@@ -78,11 +81,24 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
       LIMIT 100
     `, [adminId]);
 
-    return rows.map((row) => ({
-      ...row,
-      alert_date_formatted: formatTime(row.alert_date),
-      isDateToday: dayjs(row.alert_date).isToday()
-    }));
+    return rows.map((row) => {
+      const { linked_sales_information_id: saleId, linked_delivery_id: deliveryId, ...rest } = row;
+
+      const highlightContext = saleId || deliveryId ? {
+        context: 'admin-notification-link',
+        sale_id: saleId,
+        delivery_id: deliveryId
+      } : null;
+
+      return {
+        ...rest,
+        sales_information_id: saleId,
+        delivery_id: deliveryId,
+        highlight_context: highlightContext,
+        alert_date_formatted: formatTime(row.alert_date),
+        isDateToday: dayjs(row.alert_date).isToday()
+      };
+    });
   }
 
   const normalizedRoles = normalizeRoles(roles);
@@ -113,9 +129,12 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
       Inventory_Alerts.branch_id,
       iahl.add_id AS add_stock_id,
       iahl.history_timestamp,
-      iahl.alert_timestamp
+      iahl.alert_timestamp,
+      iasl.sales_information_id AS linked_sales_information_id,
+      iasl.delivery_id AS linked_delivery_id
     FROM Inventory_Alerts
     LEFT JOIN inventory_alert_history_links iahl ON Inventory_Alerts.alert_id = iahl.alert_id
+    LEFT JOIN inventory_alert_sale_links iasl ON Inventory_Alerts.alert_id = iasl.alert_id
     LEFT JOIN user_notification
       ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1
     WHERE Inventory_Alerts.branch_id = $2
@@ -128,11 +147,23 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
       : [userId, branchId, hireDate, userId]
   );
 
-  return rows.map((row) => ({
-    ...row,
-    alert_date_formatted: formatTime(row.alert_date),
-    isDateToday: dayjs(row.alert_date).isToday()
-  }));
+  return rows.map((row) => {
+    const { linked_sales_information_id: saleId, linked_delivery_id: deliveryId, ...rest } = row;
+    const highlightContext = saleId || deliveryId ? {
+      context: 'notification-link',
+      sale_id: saleId,
+      delivery_id: deliveryId
+    } : null;
+
+    return {
+      ...rest,
+      sales_information_id: saleId,
+      delivery_id: deliveryId,
+      highlight_context: highlightContext,
+      alert_date_formatted: formatTime(row.alert_date),
+      isDateToday: dayjs(row.alert_date).isToday()
+    };
+  });
 };
 
 

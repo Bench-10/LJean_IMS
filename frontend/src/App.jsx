@@ -434,10 +434,15 @@ function App() {
   const handleNotificationNavigation = useCallback((notification) => {
     if (!notification) return;
 
-    const rawProductId = notification.product_id;
-    const normalizedProductId = rawProductId !== undefined && rawProductId !== null ? Number(rawProductId) : NaN;
-    const alertType = (notification.alert_type || '').toLowerCase();
-    const message = (notification.message || '').toLowerCase();
+  const rawProductId = notification.product_id;
+  const normalizedProductId = rawProductId !== undefined && rawProductId !== null ? Number(rawProductId) : NaN;
+  const alertType = (notification.alert_type || '').toLowerCase();
+  const message = (notification.message || '').toLowerCase();
+
+  const category = (notification.category || notification.category_tag || notification.categoryType || '').toLowerCase();
+  const saleId = notification.sales_information_id ?? notification.sale_id ?? notification.sales_id ?? null;
+  const deliveryId = notification.delivery_id ?? null;
+  const highlightContext = notification.highlight_context || notification.highlightContext || null;
 
     const isValidityAlert = alertType === 'expired'
       || alertType === 'near expired'
@@ -471,10 +476,6 @@ function App() {
       return;
     }
 
-    if (Number.isNaN(normalizedProductId)) {
-      return;
-    }
-
     const looksLikeHistoryUpdate = alertType === 'product update'
       || message.includes('has been added')
       || message.includes('has been updated')
@@ -497,6 +498,55 @@ function App() {
       });
 
       setIsProductTransactOpen(true);
+    }
+
+    const looksLikeDeliveryNotification = category === 'delivery'
+      || deliveryId !== null
+      || alertType.includes('delivery')
+      || message.includes('delivery')
+      || message.includes('courier');
+
+    const looksLikeSalesNotification = !looksLikeDeliveryNotification && (
+      category === 'sales'
+        || (deliveryId === null && saleId !== null && message.includes('sale'))
+        || (deliveryId === null && alertType.includes('sale'))
+    );
+
+    if (looksLikeDeliveryNotification && (saleId || deliveryId)) {
+      setOpenNotif(false);
+      navigate('/delivery');
+
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('navigate-to-delivery-row', {
+          detail: {
+            saleId: saleId ? Number(saleId) : null,
+            deliveryId: deliveryId ? Number(deliveryId) : null,
+            highlightContext: highlightContext ?? null
+          }
+        }));
+      }, 150);
+
+      return;
+    }
+
+    if (looksLikeSalesNotification && saleId) {
+      setOpenNotif(false);
+      navigate('/sales');
+
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('navigate-to-sale-row', {
+          detail: {
+            saleId: Number(saleId),
+            highlightContext: highlightContext ?? null
+          }
+        }));
+      }, 150);
+
+      return;
+    }
+
+    if (Number.isNaN(normalizedProductId)) {
+      return;
     }
   }, [navigate]);
 

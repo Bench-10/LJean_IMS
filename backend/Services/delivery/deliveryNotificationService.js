@@ -15,8 +15,15 @@ export const createDeliveryNotification = async (notificationData) => {
         userId = null,
         userFullName = 'System',
         targetRoles = ['Sales Associate', 'Branch Manager', 'Delivery Personnel'],
-        creatorId = null
+        creatorId = null,
+        saleId = null,
+        deliveryId = null,
+        category = 'delivery',
+        highlightContext = null
     } = notificationData;
+
+    const normalizedSaleId = saleId !== null && saleId !== undefined ? Number(saleId) : null;
+    const normalizedDeliveryId = deliveryId !== null && deliveryId !== undefined ? Number(deliveryId) : null;
 
     try {
         // INSERT NOTIFICATION INTO DATABASE
@@ -30,6 +37,22 @@ export const createDeliveryNotification = async (notificationData) => {
 
         if (alertResult.rows[0]) {
             const alert = alertResult.rows[0];
+
+            if (normalizedSaleId !== null || normalizedDeliveryId !== null) {
+                try {
+                    await SQLquery(
+                        `INSERT INTO inventory_alert_sale_links (alert_id, sales_information_id, delivery_id, updated_at)
+                         VALUES ($1, $2, $3, NOW())
+                         ON CONFLICT (alert_id) DO UPDATE
+                         SET sales_information_id = EXCLUDED.sales_information_id,
+                             delivery_id = EXCLUDED.delivery_id,
+                             updated_at = NOW()` ,
+                        [alert.alert_id, normalizedSaleId, normalizedDeliveryId]
+                    );
+                } catch (linkError) {
+                    console.error('❌ Failed to link delivery notification:', linkError.message);
+                }
+            }
             
             console.log(`✅ Delivery notification saved to database:`, {
                 alert_id: alert.alert_id,
@@ -49,9 +72,17 @@ export const createDeliveryNotification = async (notificationData) => {
                 alert_date: alert.alert_date,
                 isDateToday: true,
                 alert_date_formatted: 'Just now',
+                sales_information_id: normalizedSaleId,
+                delivery_id: normalizedDeliveryId,
+                category,
+                highlight_context: highlightContext ?? {
+                    context: 'delivery-update',
+                    sale_id: normalizedSaleId,
+                    delivery_id: normalizedDeliveryId
+                },
                 target_roles: targetRoles,
                 creator_id: creatorId
-            }, { category: 'sales' });
+            }, { category });
 
             console.log(`📡 Delivery notification broadcast via WebSocket to branch ${branchId}`);
             
@@ -66,7 +97,7 @@ export const createDeliveryNotification = async (notificationData) => {
     }
 };
 
-export const createNewDeliveryNotification = async (saleId, courierName, address, branchId, userId, userFullName) => {
+export const createNewDeliveryNotification = async (saleId, deliveryId, courierName, address, branchId, userId, userFullName) => {
     return createDeliveryNotification({
         branchId,
         alertType: 'New Delivery',
@@ -74,11 +105,19 @@ export const createNewDeliveryNotification = async (saleId, courierName, address
         bannerColor: 'purple',
         userId,
         userFullName: userFullName || courierName,
-        creatorId: userId
+        creatorId: userId,
+        saleId,
+        deliveryId,
+        category: 'delivery',
+        highlightContext: {
+            context: 'delivery-created',
+            sale_id: saleId,
+            delivery_id: deliveryId
+        }
     });
 };
 
-export const createDeliveryStatusNotification = async (saleId, status, courierName, branchId, userId, userFullName) => {
+export const createDeliveryStatusNotification = async (saleId, status, courierName, branchId, userId, userFullName, deliveryId = null) => {
     const statusText = status.is_delivered ? 'Delivered' : status.pending ? 'Out for Delivery' : 'Undelivered';
     
     return createDeliveryNotification({
@@ -88,11 +127,20 @@ export const createDeliveryStatusNotification = async (saleId, status, courierNa
         bannerColor: status.is_delivered ? 'green' : status.pending ? 'orange' : 'red',
         userId,
         userFullName: userFullName || courierName || 'System',
-        creatorId: userId
+        creatorId: userId,
+        saleId,
+        deliveryId,
+        category: 'delivery',
+        highlightContext: {
+            context: 'delivery-status-update',
+            sale_id: saleId,
+            delivery_id: deliveryId,
+            status: statusText
+        }
     });
 };
 
-export const createDeliveryStockNotification = async (saleId, action, branchId, userId, userFullName) => {
+export const createDeliveryStockNotification = async (saleId, action, branchId, userId, userFullName, deliveryId = null) => {
     const messages = {
         'stock_restored': `Stock restored for sale ${saleId} due to delivery cancellation`,
         'stock_deducted': `Stock deducted for sale ${saleId} due to delivery activation`,
@@ -107,6 +155,15 @@ export const createDeliveryStockNotification = async (saleId, action, branchId, 
         userId,
         userFullName: userFullName || 'System',
         targetRoles: ['Sales Associate', 'Branch Manager', 'Inventory Manager'],
-        creatorId: userId
+        creatorId: userId,
+        saleId,
+        deliveryId,
+        category: 'delivery',
+        highlightContext: {
+            context: 'delivery-stock-change',
+            sale_id: saleId,
+            delivery_id: deliveryId,
+            action
+        }
     });
 };
