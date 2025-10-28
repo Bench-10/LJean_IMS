@@ -300,9 +300,8 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
     const timer = setTimeout(() => {
       setHighlightedRowKey(null);
-    }, 6000);
-
-    setPendingRowKey(null);
+      setPendingRowKey(null);
+    }, 2000);
 
     return () => {
       clearTimeout(timer);
@@ -505,7 +504,7 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                               }
                             }}
                             data-alert-timestamp={history.alert_timestamp ?? undefined}
-                            className={`transition-colors border-b border-gray-100 ${isHighlighted ? 'bg-green-100 border-l-4 border-green-500 ring-2 ring-green-300 shadow-inner' : 'hover:bg-gray-100'}`}
+                            className={`transition-colors duration-300 ease-in-out border-b border-gray-100 ${isHighlighted ? 'bg-green-200' : 'hover:bg-gray-100'}`}
                           >
                             <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.formated_date_added}</td>
                             <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900'>{history.product_name}</td>

@@ -224,10 +224,12 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
     };
   }, [attemptNavigationFocus]);
 
-  useEffect(() => () => {
-    if (highlightTimeoutRef.current) {
-      scrollRowIntoView(rowElement);
-    }
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -235,9 +237,11 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
     const rowElement = rowRefs.current[pendingHighlightSaleId];
 
-    if (!rowElement) return;
+  if (!rowElement) return;
 
-    rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Use the table container scroll helper so only the table scrolls —
+  // this prevents shifting the global page/banner when auto-scrolling.
+  scrollRowIntoView(rowElement);
     setHighlightedSaleId(pendingHighlightSaleId);
     setPendingHighlightSaleId(null);
 
@@ -246,7 +250,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
     }
     highlightTimeoutRef.current = setTimeout(() => {
       setHighlightedSaleId(null);
-    }, 6000);
+    }, 2000);
   }, [currentPageData, pendingHighlightSaleId, scrollRowIntoView]);
 
   return (
@@ -378,7 +382,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
                               delete rowRefs.current[saleIdValue];
                             }
                           }}
-                          className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} ${isHighlighted ? 'bg-green-100 border-l-4 border-green-500 ring-2 ring-green-300 shadow-inner' : ''}`}
+                          className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} transition-colors duration-300 ease-in-out ${isHighlighted ? 'bg-green-100' : ''}`}
                           onClick={() => {openSoldItems(row); setModalType("sales")}}
                         >
                         <td className="px-4 py-2 text-center"  >{row.sales_information_id}</td>

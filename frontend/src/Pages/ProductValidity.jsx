@@ -358,9 +358,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
     const highlightTimer = window.setTimeout(() => {
       setHighlightedRowKey(null);
-    }, 4000);
-
-    setPendingRowKey(null);
+      setPendingRowKey(null);
+    }, 2000);
 
     return () => {
       window.clearTimeout(highlightTimer);
@@ -530,9 +529,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
             const cardHighlightStyle = isHighlighted
               ? {
-                  outline: '3px solid #22C55E',
-                  outlineOffset: '4px',
-                  transition: 'outline 0.2s ease',
+                  boxShadow: '0 0 0 4px rgba(34,197,94,0.18)',
+                  transition: 'box-shadow 200ms ease, transform 200ms ease, background-color 200ms ease',
                   zIndex: 2
                 }
               : undefined;
@@ -546,14 +544,16 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                     card: el || null
                   };
                 }}
-                className={`rounded-lg p-4 border-l-4 shadow-sm transition-shadow duration-300 ${
-                  validity.expy
-                    ? 'bg-[#FF3131] text-white border-red-700'
-                    : validity.near_expy
-                    ? 'bg-[#FFF3C1] border-yellow-500'
-                    : 'bg-white border-gray-300'
+                className={`rounded-lg p-4 border-l-4 shadow-sm transition-colors duration-300 ease-in-out ${
+                  isHighlighted
+                    ? 'bg-green-200 text-gray-900 border-green-200'
+                    : validity.expy
+                      ? 'bg-[#FF3131] text-white border-red-700'
+                      : validity.near_expy
+                        ? 'bg-[#FFF3C1] border-yellow-500'
+                        : 'bg-white border-gray-300'
                 } ${isHighlighted ? 'relative' : ''}`}
-                style={cardHighlightStyle}
+                
               >
               {(validity.expy || validity.near_expy) && (
                 <div className="flex items-center gap-2 mb-2">
@@ -648,14 +648,13 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                     const rowKey = getRowKey(validity, startIndex + index);
                     const isHighlighted = highlightedRowKey === rowKey;
 
-                    const rowHighlightStyle = isHighlighted
-                      ? {
-                          outline: '3px solid #22C55E',
-                          outlineOffset: '-3px',
-                          transition: 'outline 0.2s ease',
-                          zIndex: 2
-                        }
-                      : undefined;
+                    const rowBgClass = isHighlighted
+                      ? 'bg-green-100 text-gray-900'
+                      : (validity.expy
+                          ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90'
+                          : validity.near_expy
+                            ? 'bg-[#FFF3C1] hover:bg-yellow-100'
+                            : 'hover:bg-gray-200/70');
 
                     return (
                       <tr
@@ -666,14 +665,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                             table: el || null
                           };
                         }}
-                        className={`${
-                          validity.expy
-                            ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90 h-14'
-                            : validity.near_expy
-                              ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
-                              : 'hover:bg-gray-200/70 h-14'
-                        } ${isHighlighted ? 'relative' : ''}`}
-                        style={rowHighlightStyle}
+                        className={`transition-colors duration-300 ease-in-out ${rowBgClass} h-14 ${isHighlighted ? 'relative' : ''}`}
                       >
                       {(validity.expy || validity.near_expy) ?
 
