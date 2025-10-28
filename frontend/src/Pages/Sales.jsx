@@ -430,11 +430,52 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
         </div>
 
         {/*PAGINATION AND CONTROLS */}
+<<<<<<< HEAD
       <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
         {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
         <div className='flex justify-between items-center gap-2 sm:hidden'>
           {/* LEFT: ITEM COUNT (MOBILE) */}
           <div className='text-xs text-gray-600 flex-shrink-0'>
+=======
+        <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
+          {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
+          <div className='flex justify-between items-center gap-2 sm:hidden'>
+            {/* LEFT: ITEM COUNT (MOBILE) */}
+            <div className='text-xs text-gray-600 flex-shrink-0'>
+              {filteredData.length > 0 ? (
+                <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length}</>
+              ) : (
+                <span></span>
+              )}
+            </div>
+
+            {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
+            {filteredData.length > 0 && (
+              <div className='flex items-center gap-1'>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                >
+                  Previous
+                </button>
+                <span className='text-xs text-gray-600 whitespace-nowrap'>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* DESKTOP & TABLET: Item count, centered pagination controls, and placeholder */}
+          <div className='text-sm text-gray-600 hidden sm:block flex-1'>
+>>>>>>> c2373cd (pagination in sales)
             {filteredData.length > 0 ? (
               <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length}</>
             ) : (
@@ -442,6 +483,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
             )}
           </div>
 
+<<<<<<< HEAD
           {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
           {filteredData.length > 0 && (
             <div className='flex items-center gap-1'>
@@ -505,6 +547,36 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
 
       </div>
+=======
+          <div className='flex justify-center flex-1'>
+            {filteredData.length > 0 && (
+              <div className='flex items-center space-x-2'>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                >
+                  Previous
+                </button>
+                <span className='text-sm text-gray-600'>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT: PLACEHOLDER FOR CONSISTENCY */}
+          <div className='flex justify-end flex-1'>
+          </div>
+        </div>
+>>>>>>> c2373cd (pagination in sales)
 
     </div>
   )
