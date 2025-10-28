@@ -1,4 +1,4 @@
-import { React, useState, useEffect } from 'react';
+import { React, useState, useEffect, useRef } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
 import { TbFileExport } from "react-icons/tb";
 import api from '../utils/api';
@@ -8,7 +8,7 @@ import ChartLoading from '../components/common/ChartLoading';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 import DropdownCustom from '../components/DropdownCustom';
 
-function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList }) {
+function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList, focusEntry, onClearFocus }) {
   const [productValidityList, setValidity] = useState(propValidityList || []);
   const [searchValidity, setSearchValidity] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,6 +16,10 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const [showExpired, setShowExpired] = useState(false);
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
+  const rowRefs = useRef({});
+  const pendingFocusRef = useRef(null);
+  const [pendingRowKey, setPendingRowKey] = useState(null);
+  const [highlightedRowKey, setHighlightedRowKey] = useState(null);
 
   // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
@@ -23,6 +27,92 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
   const { user } = useAuth();
   const cacheKey = `product_validity_branch_${user?.branch_id || 'unknown'}`;
+
+  useEffect(() => {
+    if (Array.isArray(propValidityList)) {
+      setValidity(propValidityList);
+    }
+  }, [propValidityList]);
+
+  const matchesFocus = (entry, focus) => {
+    if (!entry || !focus) return false;
+
+    const focusAddIdRaw = focus.addStockId ?? focus.add_id ?? focus.addId ?? null;
+    if (focusAddIdRaw !== null && focusAddIdRaw !== undefined) {
+      const focusAddId = String(focusAddIdRaw);
+      const entryAddIdRaw = entry.primary_add_id ?? entry.add_id ?? entry.add_stock_id ?? entry.addId ?? null;
+
+      if (entryAddIdRaw !== null && entryAddIdRaw !== undefined) {
+        const entryAddId = String(entryAddIdRaw);
+        if (entryAddId === focusAddId) {
+          return true;
+        }
+
+        // When an add-id is provided but this row has different id, treat as non-match.
+        return false;
+      }
+    }
+
+    if (focus.productId !== undefined && focus.productId !== null) {
+      if (entry.product_id === undefined || entry.product_id === null) {
+        return false;
+      }
+
+      if (Number(entry.product_id) !== Number(focus.productId)) {
+        return false;
+      }
+    }
+
+    if (focus.alertType) {
+      const type = focus.alertType.toLowerCase();
+      if (type.includes('expired') && !type.includes('near')) {
+        if (!entry.expy) {
+          return false;
+        }
+      }
+
+      if (type.includes('near') && !entry.near_expy) {
+        return false;
+      }
+    }
+
+    if (focus.productValidityDate) {
+      const focusDate = new Date(focus.productValidityDate);
+      if (!Number.isNaN(focusDate.getTime())) {
+        const entryDate = entry.product_validity ? new Date(entry.product_validity) : null;
+        if (!entryDate || Number.isNaN(entryDate.getTime())) {
+          return false;
+        }
+
+        if (focusDate.toISOString().slice(0, 10) !== entryDate.toISOString().slice(0, 10)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  const getRowKey = (entry, fallbackIndex = 0) => {
+    if (!entry) {
+      return `validity-row-${fallbackIndex}`;
+    }
+
+    const entryAddIdRaw = entry.primary_add_id ?? entry.add_id ?? entry.add_stock_id ?? entry.addId ?? null;
+    if (entryAddIdRaw !== null && entryAddIdRaw !== undefined) {
+      return `validity-add-${entryAddIdRaw}`;
+    }
+
+    if (entry.product_id !== undefined && entry.product_id !== null && entry.product_validity) {
+      return `validity-${entry.product_id}-${entry.product_validity}`;
+    }
+
+    if (entry.product_id !== undefined && entry.product_id !== null) {
+      return `validity-${entry.product_id}`;
+    }
+
+    return `validity-row-${fallbackIndex}`;
+  };
 
 
   const getProductInfo = async ({ force = false } = {}) => {
@@ -70,6 +160,12 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     // On mount: show cache if available, then refresh in background
     getProductInfo({ force: false });
   }, [user.branch_id]);
+
+  useEffect(() => {
+    if (focusEntry) {
+      getProductInfo({ force: true });
+    }
+  }, [focusEntry]);
 
   // LISTEN FOR REAL-TIME VALIDITY UPDATES
   useEffect(() => {
@@ -144,6 +240,42 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     };
   }, []);
 
+  useEffect(() => {
+    if (focusEntry) {
+      pendingFocusRef.current = focusEntry;
+      setSearchValidity('');
+      setShowNearExpiry(false);
+      setShowExpired(false);
+      setSelectedYear('');
+      setSelectedMonth('');
+    }
+  }, [focusEntry]);
+
+  useEffect(() => {
+    if (!pendingFocusRef.current) return;
+    if (!Array.isArray(productValidityList) || productValidityList.length === 0) return;
+
+    const focus = pendingFocusRef.current;
+    const matchIndex = productValidityList.findIndex(entry => matchesFocus(entry, focus));
+
+    if (matchIndex === -1) {
+      return;
+    }
+
+    const targetEntry = productValidityList[matchIndex];
+    const targetKey = getRowKey(targetEntry, matchIndex);
+
+    pendingFocusRef.current = null;
+
+    const targetPage = Math.floor(matchIndex / itemsPerPage) + 1;
+    setCurrentPage(targetPage);
+    setPendingRowKey(targetKey);
+
+    if (typeof onClearFocus === 'function') {
+      onClearFocus();
+    }
+  }, [productValidityList, itemsPerPage, onClearFocus]);
+
 
 
 
@@ -191,6 +323,56 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const endIndex = startIndex + itemsPerPage;
   const currentPageData = filteredValidityData.slice(startIndex, endIndex);
 
+  useEffect(() => {
+    if (!pendingRowKey) return;
+
+    const refEntry = rowRefs.current[pendingRowKey];
+    if (!refEntry) {
+      return;
+    }
+
+    const prefersDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+    const targetElement = prefersDesktop
+      ? (refEntry.table || refEntry.card)
+      : (refEntry.card || refEntry.table);
+
+    if (!targetElement) {
+      return;
+    }
+
+    setHighlightedRowKey(pendingRowKey);
+
+    const headerOffset = prefersDesktop ? 120 : 90;
+    const previousScrollMarginTop = targetElement.style.scrollMarginTop;
+    let marginResetTimer;
+
+    if (typeof targetElement.scrollIntoView === 'function') {
+      targetElement.style.scrollMarginTop = `${headerOffset}px`;
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      marginResetTimer = window.setTimeout(() => {
+        if (targetElement) {
+          targetElement.style.scrollMarginTop = previousScrollMarginTop;
+        }
+      }, 600);
+    }
+
+    const highlightTimer = window.setTimeout(() => {
+      setHighlightedRowKey(null);
+    }, 4000);
+
+    setPendingRowKey(null);
+
+    return () => {
+      window.clearTimeout(highlightTimer);
+      if (marginResetTimer) {
+        window.clearTimeout(marginResetTimer);
+        if (targetElement) {
+          targetElement.style.scrollMarginTop = previousScrollMarginTop;
+        }
+      }
+    };
+  }, [pendingRowKey, currentPageData]);
+
   // Export functionality
   const handleExportValidity = (format) => {
     const exportData = formatForExport(filteredValidityData, []);
@@ -212,6 +394,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
 
 
+
+  rowRefs.current = {};
 
   return (
     <div className="pt-20 lg:pt-8 px-4 lg:px-8 h-screen" >
@@ -340,17 +524,37 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
             <NoInfoFound isTable={false} />
           </div>
         ) : (
-          currentPageData.map((validity, index) => (
-            <div
-              key={index}
-              className={`rounded-lg p-4 border-l-4 shadow-sm ${
-                validity.expy
-                  ? 'bg-[#FF3131] text-white border-red-700'
-                  : validity.near_expy
-                  ? 'bg-[#FFF3C1] border-yellow-500'
-                  : 'bg-white border-gray-300'
-              }`}
-            >
+          currentPageData.map((validity, index) => {
+            const rowKey = getRowKey(validity, startIndex + index);
+            const isHighlighted = highlightedRowKey === rowKey;
+
+            const cardHighlightStyle = isHighlighted
+              ? {
+                  outline: '3px solid #22C55E',
+                  outlineOffset: '4px',
+                  transition: 'outline 0.2s ease',
+                  zIndex: 2
+                }
+              : undefined;
+
+            return (
+              <div
+                key={rowKey}
+                ref={el => {
+                  rowRefs.current[rowKey] = {
+                    ...(rowRefs.current[rowKey] || {}),
+                    card: el || null
+                  };
+                }}
+                className={`rounded-lg p-4 border-l-4 shadow-sm transition-shadow duration-300 ${
+                  validity.expy
+                    ? 'bg-[#FF3131] text-white border-red-700'
+                    : validity.near_expy
+                    ? 'bg-[#FFF3C1] border-yellow-500'
+                    : 'bg-white border-gray-300'
+                } ${isHighlighted ? 'relative' : ''}`}
+                style={cardHighlightStyle}
+              >
               {(validity.expy || validity.near_expy) && (
                 <div className="flex items-center gap-2 mb-2">
                   <RiErrorWarningLine className="text-xl" />
@@ -383,8 +587,9 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                   <span className="font-bold text-base">{validity.quantity_left}</span>
                 </div>
               </div>
-            </div>
-          ))
+              </div>
+            );
+          })
         )}
         
       </div>
@@ -439,20 +644,40 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 ) :
 
                 (
-                  currentPageData.map((validity, index) => (
-                    <tr
-                      key={index}
-                      className={
-                        validity.expy
-                          ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90 h-14'
-                          : validity.near_expy
-                            ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
-                            : 'hover:bg-gray-200/70 h-14'
-                      }
-                    >
+                  currentPageData.map((validity, index) => {
+                    const rowKey = getRowKey(validity, startIndex + index);
+                    const isHighlighted = highlightedRowKey === rowKey;
+
+                    const rowHighlightStyle = isHighlighted
+                      ? {
+                          outline: '3px solid #22C55E',
+                          outlineOffset: '-3px',
+                          transition: 'outline 0.2s ease',
+                          zIndex: 2
+                        }
+                      : undefined;
+
+                    return (
+                      <tr
+                        key={rowKey}
+                        ref={el => {
+                          rowRefs.current[rowKey] = {
+                            ...(rowRefs.current[rowKey] || {}),
+                            table: el || null
+                          };
+                        }}
+                        className={`${
+                          validity.expy
+                            ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90 h-14'
+                            : validity.near_expy
+                              ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
+                              : 'hover:bg-gray-200/70 h-14'
+                        } ${isHighlighted ? 'relative' : ''}`}
+                        style={rowHighlightStyle}
+                      >
                       {(validity.expy || validity.near_expy) ?
 
-                        (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
+                        (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]">
 
                           <div className='flex items-center'>
                             <RiErrorWarningLine className='h-[100%]' />
@@ -466,7 +691,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                         ) :
 
                         (
-                          <td className="px-4 py-2 text-center items-center "  >
+                          <td className="px-4 py-2 text-center items-center"  >
                             {validity.formated_date_added}
                           </td>
                         )
@@ -474,14 +699,15 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                       }
 
 
-                      <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
-                      <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
-                      <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
-                      <td className="px-4 py-2 text-center "  >{validity.quantity_left}</td>
+                      <td className="px-4 py-2 text-center font-medium whitespace-nowrap">{validity.formated_product_validity}</td>
+                      <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap">{validity.product_name}</td>
+                      <td className="px-4 py-2 text-center">{validity.category_name}</td>
+                      <td className="px-4 py-2 text-center">{validity.quantity_left}</td>
 
-                    </tr>
+                      </tr>
 
-                  ))
+                    );
+                  })
 
                 )
             }

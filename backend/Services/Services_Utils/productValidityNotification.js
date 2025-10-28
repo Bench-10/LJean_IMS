@@ -13,7 +13,8 @@ export const notifyProductShelfLife = async() =>{
                 a.product_id, 
                 ip.branch_id, 
                 a.product_validity,
-                SUM(a.quantity_left_display) AS total_quantity
+                SUM(a.quantity_left_display) AS total_quantity,
+                MIN(a.add_id) AS primary_add_id
             FROM Add_Stocks a
             LEFT JOIN Inventory_product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
             LEFT JOIN Category c USING(category_id)
@@ -64,6 +65,9 @@ export const notifyProductShelfLife = async() =>{
                         user_id: alertResult.rows[0].user_id,
                         user_full_name: 'System',
                         alert_date: alertResult.rows[0].alert_date,
+                        product_id: row.product_id,
+                        product_validity: row.product_validity,
+                        add_stock_id: row.primary_add_id,
                         isDateToday: true,
                         alert_date_formatted: 'Just now'
                     });
@@ -111,6 +115,9 @@ export const notifyProductShelfLife = async() =>{
                         user_id: alertResult.rows[0].user_id,
                         user_full_name: 'System',
                         alert_date: alertResult.rows[0].alert_date,
+                        product_id: row.product_id,
+                        product_validity: row.product_validity,
+                        add_stock_id: row.primary_add_id,
                         isDateToday: true,
                         alert_date_formatted: 'Just now'
                     });

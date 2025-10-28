@@ -45,6 +45,7 @@ function App() {
   const [isCategoryOpen, setIsCategory] = useState(false);
   const [isProductTransactOpen, setIsProductTransactOpen] = useState(false);
   const [historyFocus, setHistoryFocus] = useState(null);
+  const [validityFocus, setValidityFocus] = useState(null);
   const [modalMode, setModalMode] = useState('add');
   const [itemData, setItemData] = useState(null);
   const [productsData, setProductsData] = useState([])
@@ -437,6 +438,38 @@ function App() {
     const normalizedProductId = rawProductId !== undefined && rawProductId !== null ? Number(rawProductId) : NaN;
     const alertType = (notification.alert_type || '').toLowerCase();
     const message = (notification.message || '').toLowerCase();
+
+    const isValidityAlert = alertType === 'expired'
+      || alertType === 'near expired'
+      || message.includes('shelf life');
+
+    const addStockId = notification.add_stock_id
+      ?? notification.add_id
+      ?? notification.stock_entry_id
+      ?? null;
+
+    const productValidityDate = notification.product_validity
+      ?? notification.product_validity_date
+      ?? notification.expiry_date
+      ?? null;
+
+    if (isValidityAlert) {
+      setOpenNotif(false);
+      navigate('/product_validity');
+
+      if (!Number.isNaN(normalizedProductId) || addStockId || productValidityDate) {
+        setValidityFocus({
+          productId: Number.isNaN(normalizedProductId) ? null : normalizedProductId,
+          addStockId: addStockId != null ? String(addStockId) : null,
+          productValidityDate,
+          alertType: notification.alert_type ?? '',
+          alertId: notification.alert_id ?? null,
+          triggeredAt: Date.now()
+        });
+      }
+
+      return;
+    }
 
     if (Number.isNaN(normalizedProductId)) {
       return;
@@ -1675,6 +1708,8 @@ function App() {
                 sanitizeInput={sanitizeInput}
                 productValidityList={productValidityList}
                 setProductValidityList={setProductValidityList}
+                focusEntry={validityFocus}
+                onClearFocus={() => setValidityFocus(null)}
               
               />
 
