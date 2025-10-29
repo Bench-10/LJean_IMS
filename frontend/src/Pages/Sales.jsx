@@ -265,8 +265,8 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
         </div>
 
         {/*PAGINATION AND CONTROLS */}
-        <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
-          {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
+      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
+        {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
         <div className='flex justify-between items-center gap-2 sm:hidden'>
           {/* LEFT: ITEM COUNT (MOBILE) */}
           <div className='text-xs text-gray-600 flex-shrink-0'>
@@ -299,14 +299,48 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
               </button>
             </div>
           )}
-        </div>
-          
-          {/* RIGHT: PLACEHOLDER FOR CONSISTENCY */}
-          <div className='flex justify-end flex-1'>
-          </div>
-        </div>
+        </div>{/* END OF MOBILE VIEW*/}
 
-        
+        {/* DESKTOP LAYOUT: LEFT + CENTER PAGINATION */}
+<div className="hidden sm:relative sm:flex sm:items-center w-full mt-3 pb-6 px-3">
+
+  {/* LEFT: ITEM COUNT */}
+  <div className="text-sm text-gray-600">
+    {filteredData.length > 0 ? (
+      <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
+    ) : (
+      <span></span>
+    )}
+  </div>
+
+  {/* CENTER: PAGINATION CONTROLS */}
+  {filteredData.length > 0 && (
+    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+      <button
+        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+        disabled={currentPage === 1}
+        className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+      >
+        Previous
+      </button>
+      <span className="text-sm text-gray-600 whitespace-nowrap">
+        Page {currentPage} of {totalPages}
+      </span>
+      <button
+        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+        disabled={currentPage === totalPages}
+        className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+      >
+        Next
+      </button>
+    </div>
+  )}
+
+</div>
+
+
+      </div>
+
     </div>
   )
 }
