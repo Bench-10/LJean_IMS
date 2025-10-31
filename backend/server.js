@@ -46,7 +46,7 @@ console.log('CORS_ORIGIN=', process.env.CORS_ORIGIN);
 const app  = express();
 
 const isProduction = process.env.NODE_ENV === 'production';
-const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://192.168.1.28:5173'];
+const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://192.168.1.30:5173'];
 const allowedOrigins = (process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
   : DEFAULT_DEV_ORIGINS)
