@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Import all logo assets
-import ljeanLogo from '../assets/images/Ljean.png';
+import ljeanLogo from '../assets/images/ljean.png';
 import vinsethLogo from '../assets/images/vinseth.png';
 import marajeanLogo from '../assets/images/marajean.png';
 import eljeanLogo from '../assets/images/eljean.png';
