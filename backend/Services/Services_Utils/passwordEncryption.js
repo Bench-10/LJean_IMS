@@ -1,12 +1,7 @@
 import crypto from 'crypto';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 
-const secretKey = Buffer.from(process.env.SECRET_KEY, 'hex');
 const algorithm = 'aes-256-cbc';
-const iv = crypto.randomBytes(16);
 
 
 const getEncryptionKey = () => {
@@ -21,6 +16,7 @@ const getEncryptionKey = () => {
 //ENCRYPT PASSWORD
 export const encryptPassword = async (plainPassword) => {
     const key = getEncryptionKey();
+    const iv = crypto.randomBytes(16);
 
     const cipher = crypto.createCipheriv(algorithm, Buffer.from(key), iv);
     let encrypted = cipher.update(plainPassword);

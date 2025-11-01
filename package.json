@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon backend/server.js",
-    "production": "cross-env NODE_ENV=production nodemon backend/server.js"
+    "production": "cross-env NODE_ENV=production nodemon backend/server.js",
+    "start": "node backend/server.js"
   },
   "repository": {
     "type": "git",
