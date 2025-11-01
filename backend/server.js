@@ -1,13 +1,10 @@
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import zlib from 'zlib';
 import { speedLimiter, createApiLimiter } from './middleware/rateLimiters.js';
 import itemRoutes from './Routes/itemRoutes.js';
@@ -19,12 +16,14 @@ import passwordResetRoutes from './Routes/passwordResetRoutes.js';
 import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 import { loadUnitConversionCache } from './Services/Services_Utils/unitConversion.js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
-//FOR MONITORING .ENV ORDER
+// load environment before any other imports that may use process.env
 const envName = (process.env.NODE_ENV || 'development').trim();
 const envCandidates = [
   path.resolve(__dirname, `.env.${envName}`),
@@ -34,11 +33,16 @@ const envCandidates = [
 ];
 
 for (const candidate of envCandidates) {
-  const result = dotenv.config({ path: candidate, override: false });
-  if (result.error === undefined) {
-    console.log('dotenv loaded:', candidate);
+  const res = dotenv.config({ path: candidate, override: true });
+  if (!res.error) {
+    console.log(`✓ Loaded env from: ${candidate}`);
+    break;
   }
 }
+if (!process.env.SECRET_KEY) {
+  console.warn('SECRET_KEY is not set after loading env files');
+}
+
 console.log('NODE_ENV=', process.env.NODE_ENV);
 console.log('PORT=', process.env.PORT);
 console.log('CORS_ORIGIN=', process.env.CORS_ORIGIN);
