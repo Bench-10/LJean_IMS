@@ -1,231 +1,133 @@
-import React, { useState } from 'react'
-import { useAuth } from '../authentication/Authentication'
+import React, { useState } from 'react';
+import { useAuth } from '../authentication/Authentication';
 import { FiEdit } from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
 import { RxCross2 } from "react-icons/rx";
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
 
-function UserInformation({openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser, deleteLoading}) {
-
-  const {user} = useAuth();
-
-    const getStatusBadge = () => {
-        if (userDetailes.status === 'pending') {
-            return {
-                label: 'For Approval',
-                className: 'bg-amber-100 text-amber-700 border border-amber-300'
-            };
-        }
-
-        if (userDetailes.is_disabled) {
-            return {
-                label: 'Disabled',
-                className: 'bg-red-400 text-red-900'
-            };
-        }
-
-        if (userDetailes.is_active) {
-            return {
-                label: 'Active',
-                className: 'bg-green-500 text-green-900'
-            };
-        }
-
-        return {
-            label: 'Inactive',
-            className: 'bg-gray-200 text-gray-500'
-        };
-    };
-
-    const formatDateTime = (value) => {
-        if (!value) return null;
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return null;
-        return date.toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit'
-        });
-    };
-
-
-  //FOR DIALOG
+function UserInformation({ openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser, deleteLoading }) {
+  const { user } = useAuth();
   const [openDialog, setDialog] = useState(false);
-  const message = `Are you sure you wan to  delete the account for ${userDetailes.full_name} ?`;
+  const message = `Are you sure you want to delete the account for ${userDetailes.full_name}?`;
 
+  const getStatusBadge = () => {
+    if (userDetailes.status === 'pending')
+      return { label: 'For Approval', className: 'bg-amber-100 text-amber-700 border border-amber-300' };
+    if (userDetailes.is_disabled)
+      return { label: 'Disabled', className: 'bg-red-100 text-red-700 border border-red-300' };
+    if (userDetailes.is_active)
+      return { label: 'Active', className: 'bg-green-100 text-green-700 border border-green-300' };
+    return { label: 'Inactive', className: 'bg-gray-100 text-gray-600 border border-gray-300' };
+  };
+
+  const handleClose = () => onClose();
 
   return (
     <div>
+      {deleteLoading && <FormLoading message="Deleting user account..." />}
 
-      {deleteLoading && (
-        <FormLoading message="Deleting user account..." />
+      {openDialog && (
+        <ConfirmationDialog
+          mode="delete"
+          message={message}
+          submitFunction={() => { deleteUser(userDetailes.user_id); onClose(); }}
+          onClose={() => setDialog(false)}
+        />
       )}
 
-        {openDialog && 
-                  
-            <ConfirmationDialog
-                mode={"delete"}
-                message={message}
-                submitFunction={() => {deleteUser(userDetailes.user_id); onClose();}}
-                onClose={() => {setDialog(false);}}
+      {openUsers && (
+        <>
+          {/* Overlay Blur */}
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9997]"
+            onClick={handleClose}
+          />
 
-            />
-        
-        }
-
-
-        {openUsers && user && user.role && user.role.some(role => ['Owner', 'Branch Manager'].includes(role)) &&(
+          {/* Modal */}
+          <div className="fixed inset-0 flex items-center justify-center z-[9998] p-4 animate-popup ">
             <div
-            className="fixed inset-0 bg-black/35 bg-opacity-50 z-40 backdrop-blur-[1px]"
-            style={{ pointerEvents: 'auto' }}  onClick={onClose}
-            />
-        )}
-
-        <dialog className="bg-transparent fixed top-0 bottom-0  z-50 animate-popup" open={openUsers && user && user.role && user.role.some(role => ['Owner', 'Branch Manager'].includes(role))}>
-
-            <div className='bg-white rounded-lg w-[900px]'>
-              
-              {/*HEADER */}
-              <div className='bg-green-800 p-4 rounded-t-md flex justify-between items-center'>
-                  <h1 className='text-white font-bold text-2xl'>USER DETAILES {userDetailes.is_disabled ? '(Account currently disabled)': ''}</h1> 
-
-                  <div>
-                    <RxCross2 className='text-white text-lg cursor-pointer' onClick={onClose}/>
-                  </div>
-
+              className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[900px] max-h-[85vh] overflow-y-auto flex flex-col hide-scrollbar"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* HEADER */}
+              <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-center gap-3 sticky top-0 z-10">
+                <h1 className="text-white font-bold text-2xl">User Information</h1>
+                <button
+                  onClick={handleClose}
+                  className="text-white hover:bg-green-600 p-1.5 rounded-full transition-colors"
+                >
+                  <RxCross2 className="text-xl" />
+                </button>
               </div>
 
-
-              {/*BODY */}
-              <div className='p-6 flex w-full'>
-
-                {/*LEFT SIDE */}
-                <div className='w-full flex flex-col gap-y-5 mr-4'> 
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>FIRST NAME</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.first_name}</span>
-
+              {/* BODY */}
+              <div className="p-5 bg-green-50/30 rounded-b-2xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 auto-rows-fr">
+                  {[
+                    ['First Name', userDetailes.first_name],
+                    ['Last Name', userDetailes.last_name],
+                    ['Branch', userDetailes.branch],
+                    ['Role', Array.isArray(userDetailes.role) ? userDetailes.role.join(', ') : userDetailes.role],
+                    ['Cell Number', userDetailes.cell_number],
+                    ['Address', userDetailes.address],
+                    [
+                      'Permissions',
+                      Array.isArray(userDetailes.permissions)
+                        ? userDetailes.permissions.join(', ')
+                        : userDetailes.permissions || '',
+                    ],
+                    ['Hire Date', userDetailes.formated_hire_date],
+                    [
+                      'Account Status',
+                      (() => {
+                        const badge = getStatusBadge();
+                        return (
+                          <span
+                            className={`text-xs font-semibold py-1 px-3 rounded-full inline-block ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                        );
+                      })(),
+                    ],
+                    ['Last Login', userDetailes.last_login],
+                  ].map(([label, value], i) => (
+                    <div
+                      key={i}
+                      className="bg-white shadow-inner rounded-lg px-3 py-1 border border-gray-200 w-full h-full flex flex-col justify-center"
+                    >
+                      <h2 className="text-green-800 text-sm font-medium mb-1">{label}</h2>
+                      <p className="text-gray-800 text-base font-semibold break-words">{value}</p>
                     </div>
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>BRANCH</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.branch}</span>
-
-                    </div>
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>CELL NUMBER</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.cell_number}</span>
-
-                    </div>
-
-                        <div className='p-5 bg-gray-100 rounded-md'>
-                                <h1 className='mb-1 font-semibold text-xs'>ACCOUNT STATUS</h1>
-                                {(() => {
-                                    const badge = getStatusBadge();
-                                    return (
-                                        <span className={`text-lg font-semibold py-1 px-4 rounded-full inline-block ${badge.className}`}>
-                                            {badge.label}
-                                        </span>
-                                    );
-                                })()}
-                                {userDetailes.status === 'pending' && (
-                                    <p className='text-xs font-semibold text-amber-600 mt-2'>Awaiting owner approval before activation.</p>
-                                )}
-                                {userDetailes.status === 'active' && formatDateTime(userDetailes.approved_at) && (
-                                    <p className='text-xs text-gray-500 mt-2'>Approved on {formatDateTime(userDetailes.approved_at)}</p>
-                                )}
-                        </div>
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>PERMISSIONS</h1>
-                        <span className='text-xs font-semibold'>
-                          {Array.isArray(userDetailes.permissions)
-                            ? (userDetailes.permissions.length > 1
-                                ? userDetailes.permissions.join(", ")
-                                : userDetailes.permissions[0] || "")
-                            : userDetailes.permissions || ""}
-                        </span>
-
-                    </div>
-
+                  ))}
                 </div>
-
-                {/*RIGHT SIDE */}
-                <div className='w-full flex flex-col gap-y-5 mr-4'>
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>LAST NAME</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.last_name}</span>
-
-                    </div>
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>ROLE</h1>
-                        <span className='text-lg font-semibold'>
-                        {Array.isArray(userDetailes.role)
-                            ? (userDetailes.role.length > 1
-                                ? userDetailes.role.join(", ")
-                                : userDetailes.role[0] || "")
-                            : userDetailes.role || ""}
-                        </span>
-
-                    </div>
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>ADDRESS</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.address}</span>
-
-                    </div>
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>HIRE DATE</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.formated_hire_date}</span>
-
-                    </div>
-
-                    <div className='p-5 bg-gray-100 rounded-md'>
-                        <h1 className='mb-1 font-semibold text-xs'>LAST LOGIN</h1>
-                        <span className='text-lg font-semibold'>{userDetailes.last_login}</span>
-
-                    </div>
-
-                </div>
-
-
-
               </div>
 
-              {/*BUTTONS */}
-              <div className='flex justify-center mb-5 p-11 gap-x-10 text-white' >
-
-                <button className='py-2 px-3 bg-blue-600 w-44 rounded-md flex items-center justify-center gap-2 hover:bg-blue-500' onClick={() => handleUserModalOpen('edit')}>
-                    <FiEdit />Edit
+              {/* BUTTONS */}
+              <div className="flex flex-col sm:flex-row justify-center gap-4 p-5 bg-white border-t border-green-100 rounded-b-2xl shadow-inner">
+                <button
+                  className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium shadow-md transition-all"
+                  onClick={() => handleUserModalOpen('edit')}
+                >
+                  <FiEdit className="text-lg" />
+                  <span>Edit</span>
                 </button>
 
-
-                <button className='py-2 px-3 bg-red-600 w-44 rounded-md flex items-center justify-center gap-2 hover:bg-red-500' onClick={() => {setDialog(true)}}>
-                    <MdDelete />Delete
+                <button
+                  className="py-2.5 px-6 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium shadow-md transition-all"
+                  onClick={() => setDialog(true)}
+                >
+                  <MdDelete className="text-lg" />
+                  <span>Delete</span>
                 </button>
-
-
-
               </div>
-
             </div>
-
-
-        </dialog>
-
-
-
-
+          </div>
+        </>
+      )}
     </div>
-  )
+  );
 }
 
-export default UserInformation
+export default UserInformation;
