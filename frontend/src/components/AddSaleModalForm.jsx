@@ -909,7 +909,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                                 </option>
                                 {Array.isArray(row.sellingUnits) && row.sellingUnits.map(unitOption => (
                                   <option key={unitOption.unit} value={unitOption.unit}>
-                                    {`${unitOption.unit} (${currencyFormat(toTwoDecimals(unitOption.unit_price))})`}
+                                    {`${unitOption.unit}`}
                                   </option>
                                 ))}
                               </select>
@@ -917,20 +917,22 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
 
                           <td className="px-2">
-                            <input type="text" className="border w-full rounded-md px-2 py-1.5" value={row.unitPrice} onChange={e => {
-                              const newRows = [...rows];
-                              newRows[idx].unitPrice = e.target.value;
-                              setRows(newRows);
-                            }} readOnly />
+                            <input
+                              type="text"
+                              className="border w-full rounded-md px-2 py-1.5"
+                              value={toTwoDecimals(row.unitPrice)}
+                              readOnly
+                            />
                           </td>
 
 
                           <td className="px-2">
-                            <input type="text" className="border w-full rounded-md px-2 py-1.5" value={row.amount} onChange={e => {
-                              const newRows = [...rows];
-                              newRows[idx].amount = e.target.value;
-                              setRows(newRows);
-                            }} onKeyUp={(e) => setAmount(e.target.value)} readOnly />
+                            <input
+                              type="text"
+                              className="border w-full rounded-md px-2 py-1.5"
+                              value={toTwoDecimals(row.amount)}
+                              readOnly
+                            />
                           </td>
 
 
@@ -1061,7 +1063,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                           <input
                             type="text"
                             className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50"
-                            value={row.unitPrice}
+                            value={toTwoDecimals(row.unitPrice)}
                             readOnly
                           />
                         </div>
@@ -1071,7 +1073,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                           <input
                             type="text"
                             className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50 font-semibold"
-                            value={row.amount}
+                            value={toTwoDecimals(row.amount)}
                             readOnly
                           />
                         </div>

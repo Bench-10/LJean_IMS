@@ -1,8 +1,30 @@
 import axios from "axios";
 
+const rawBaseUrl = (import.meta.env.VITE_API_URL || "").trim();
+const normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, "");
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: normalizedBaseUrl || undefined,
   withCredentials: true,
+});
+
+api.interceptors.request.use((config) => {
+  const url = config.url || "";
+  if (!normalizedBaseUrl.endsWith("/api")) {
+    return config;
+  }
+
+  if (url === "/api") {
+    config.url = "/";
+    return config;
+  }
+
+  if (url.startsWith("/api/")) {
+    const stripped = url.replace(/^\/api/, "");
+    config.url = stripped || "/";
+  }
+
+  return config;
 });
 
 // Track if we've already redirected to prevent loops
