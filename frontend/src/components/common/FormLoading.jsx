@@ -2,7 +2,7 @@ import React from 'react';
 
 function FormLoading({ message = "Processing..." }) {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9998] backdrop-blur-sm">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[10000] backdrop-blur-sm">
       <div className="bg-white p-8 rounded-lg shadow-xl flex flex-col items-center min-w-[300px] z-[9999]">
         
          {/*BOUNCING DOTS */}
@@ -19,6 +19,7 @@ function FormLoading({ message = "Processing..." }) {
         
       </div>
     </div>
+    
   );
 }
 
