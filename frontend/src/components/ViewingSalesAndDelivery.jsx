@@ -263,6 +263,10 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
   const handlePrint = () => {
     if (!headerInformation) return;
     if (typeof window === 'undefined') return;
+
+    const printableMarkup = buildPrintableDocument();
+    if (!printableMarkup) return;
+
     try {
       setPrinting(true);
       const printWindow = window.open('', '_blank', 'width=900,height=700');
@@ -270,14 +274,38 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
         throw new Error('Unable to open print window. Check popup blockers.');
       }
 
-      printWindow.document.write(buildPrintableDocument());
+      printWindow.document.open();
+      printWindow.document.write(printableMarkup);
       printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
+
+      let hasPrinted = false;
+
+      const finalizePrint = () => {
+        if (hasPrinted) return;
+        hasPrinted = true;
+        try {
+          printWindow.focus();
+          printWindow.print();
+        } catch (err) {
+          console.error('Printing failed:', err);
+        } finally {
+          try {
+            printWindow.close();
+          } catch (closeErr) {
+            console.error('Unable to close print window:', closeErr);
+          }
+          setPrinting(false);
+        }
+      };
+
+      if (printWindow.document.readyState === 'complete') {
+        finalizePrint();
+      } else {
+        printWindow.addEventListener('load', finalizePrint, { once: true });
+        setTimeout(finalizePrint, 1000); // fallback in case load never fires
+      }
     } catch (error) {
       console.error('Failed to open printable invoice:', error);
-    } finally {
       setPrinting(false);
     }
   };
