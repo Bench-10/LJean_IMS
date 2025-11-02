@@ -19,7 +19,7 @@ export const sendPasswordResetEmail = async (email, resetToken, userType, firstN
     try {
         const transporter = createTransporter();
         
-        const resetUrl = `${'http://192.168.1.30:3000'}/reset-password?token=${resetToken}&type=${userType}`;
+        const resetUrl = `${process.env.CORS_ORIGIN}/reset-password?token=${resetToken}&type=${userType}`;
         
         const mailOptions = {
             from: {
