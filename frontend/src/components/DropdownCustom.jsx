@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 
-const DropdownCustom = ({ value, onChange, options, label, variant = 'default', error = false }) => {
+const DropdownCustom = ({ value, onChange, options, label, variant = 'default', error = false, labelClassName }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const dropdownRef = useRef(null);
@@ -21,9 +21,8 @@ const DropdownCustom = ({ value, onChange, options, label, variant = 'default', 
       const rect = buttonRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
-      const dropdownHeight = Math.min(240, options.length * 48); // Estimate dropdown height
+      const dropdownHeight = Math.min(240, options.length * 48);
       
-      // Open upward if not enough space below AND there's more space above
       setOpenUpward(spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
     }
     setIsOpen(!isOpen);
@@ -31,7 +30,6 @@ const DropdownCustom = ({ value, onChange, options, label, variant = 'default', 
 
   const selectedOption = options.find(opt => opt.value === value) || options[0];
 
-  // Get button className based on variant and error state
   const getButtonClassName = () => {
     if (variant === 'simple' || variant === 'default') {
       return `w-full h-[36px] flex items-center justify-center lg:justify-between px-3 text-sm leading-none bg-white 
@@ -51,11 +49,17 @@ const DropdownCustom = ({ value, onChange, options, label, variant = 'default', 
     }
   };
 
-  // Simple style with LABELS ON TOP
+  const getLabelClassName = () => {
+    if (labelClassName) {
+      return labelClassName;
+    }
+    return `block text-sm font-medium mb-1 ${error ? 'text-red-600' : 'text-gray-700'}`;
+  };
+
   if (variant === 'simple' || variant === 'default') {
     return (
       <div className="w-full" ref={dropdownRef}>
-        <label className={`block text-sm font-medium mb-1 ${error ? 'text-red-600' : 'text-gray-700'}`}>
+        <label className={getLabelClassName()}>
           {label}
         </label>
         <div className="relative">
@@ -103,7 +107,6 @@ const DropdownCustom = ({ value, onChange, options, label, variant = 'default', 
     );
   }
 
-  // Floating label style
   if (variant === 'floating') {
     return (
       <div className='flex gap-x-3 items-center h-9 w-full lg:w-auto'>
