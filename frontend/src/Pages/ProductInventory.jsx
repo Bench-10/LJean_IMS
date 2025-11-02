@@ -229,25 +229,29 @@ function ProductInventory({
 
 
       {displayPendingApprovals && isPendingDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="relative w-full max-w-4xl bg-white rounded-lg shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b  rounded-t-lg">
-              <div>
-                <h2 className="text-lg font-semibold">Pending Inventory Requests</h2>
-                <p className="text-sm">Review inventory additions or updates awaiting your approval.</p>
+        <div className="fixed inset-0 z-[100] backdrop-blur-sm transition-opacity flex items-center justify-center bg-black/50 p-4">
+          <div className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-lg md:text-xl font-semibold text-gray-800">
+                  Pending Inventory Requests
+                </h2>
+                <p className="text-xs md:text-sm text-gray-500">
+                  Review inventory additions or updates awaiting your approval.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 {typeof refreshPendingRequests === 'function' && (
                   <button
-                    className="px-3 py-1.5 text-sm border border-amber-500 text-amber-600 rounded-md hover:bg-amber-100"
+                    className="px-3 py-1.5 text-xs md:text-sm border border-amber-500 text-amber-600 rounded-md hover:bg-amber-100 transition"
                     onClick={refreshPendingRequests}
                   >
                     Refresh
                   </button>
                 )}
                 <button
-                  className="w-8 h-8 flex items-center justify-center text-2xl border-none bg-transparent p-0"
-                  style={{ boxShadow: 'none', outline: 'none', background: 'none', border: 'none' }}
+                  className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-full transition"
                   onClick={() => setIsPendingDialogOpen(false)}
                   aria-label="Close"
                 >
@@ -256,116 +260,179 @@ function ProductInventory({
               </div>
             </div>
 
-            <div className="min-h-40 max-h-[70vh] overflow-y-auto px-5 py-4">
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
               {pendingRequestsLoading ? (
                 <div className="py-10">
                   <ChartLoading message="Loading pending inventory approvals..." />
                 </div>
               ) : (pendingRequests?.length ?? 0) === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10">
-                  <FaBoxOpen className='text-5xl opacity-50' />
-                  <p className="text-sm italic text-center mt-2">No pending requests at the moment.</p>
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <FaBoxOpen className="text-5xl opacity-50 mb-2" />
+                  <p className="text-sm italic text-gray-600">
+                    No pending requests at the moment.
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {pendingRequests.map(request => {
+                <div className="space-y-4">
+                  {pendingRequests.map((request) => {
                     const { payload } = request;
                     const requestedProduct = payload?.productData || payload;
                     const currentState = payload?.currentState;
 
                     return (
-                      <div key={request.pending_id} className="border bg-white rounded-md p-4 shadow-sm">
-                        <div className="flex flex-col md:flex-row gap-4">
-                          <div className="flex-1 relative">
-                            <div className="absolute top-0 right-0 flex gap-2">
-                              <button
-                                className={`px-4 py-2 rounded-md text-white text-sm font-medium ${approveLoadingId === request.pending_id || rejectLoadingId === request.pending_id ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
-                                onClick={() => handleApproveClick(request.pending_id)}
-                                disabled={approveLoadingId === request.pending_id || rejectLoadingId === request.pending_id}
-                              >
-                                {approveLoadingId === request.pending_id ? (
-                                  <span className="inline-flex items-center">
-                                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                    Processing
-                                  </span>
-                                ) : (
-                                  'Approve'
-                                )}
-                              </button>
-
-                              <button
-                                className={`px-4 py-2 rounded-md text-white text-sm font-medium ${rejectLoadingId === request.pending_id || approveLoadingId === request.pending_id ? 'bg-red-300 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'}`}
-                                onClick={() => handleRejectClick(request.pending_id)}
-                                disabled={rejectLoadingId === request.pending_id || approveLoadingId === request.pending_id}
-                              >
-                                {rejectLoadingId === request.pending_id ? (
-                                  <span className="inline-flex items-center">
-                                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                    Processing
-                                  </span>
-                                ) : (
-                                  'Reject'
-                                )}
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="uppercase text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                                {request.action_type === 'update' ? 'Update' : 'Add'}
+                      <div
+                        key={request.pending_id}
+                        className="border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition"
+                      >
+                        {/* Header Info */}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="uppercase text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                              {request.action_type === 'update' ? 'Update' : 'Add'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Requested {formatDateTime(request.created_at)}
+                            </span>
+                            {request.requires_admin_review && (
+                              <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                                Owner approval required
                               </span>
-                              <span className="text-xs text-gray-500">Requested {formatDateTime(request.created_at)}</span>
-                              {request.requires_admin_review && (
-                                <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                                  Owner approval required
-                                </span>
-                              )}
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-800 mt-1">
-                              {requestedProduct?.product_name || 'Unnamed Product'}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              Submitted by {request.created_by_name || 'Inventory Staff'}
-                            </p>
-
-                            <div className="mt-3 flex flex-col md:flex-row gap-3 text-sm w-full">
-                              <div className="bg-amber-100/60 border border-amber-200 rounded-md p-3 w-full md:w-1/2">
-                                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Requested Update</p>
-                                <ul className="space-y-1 text-amber-900">
-                                  {requestedProduct?.quantity_added !== undefined && (
-                                    <li>
-                                      <span className="font-medium">Quantity:</span>{' '}
-                                      {currentState ? `${Number(currentState.quantity).toLocaleString()} + ` : ''}
-                                      <span className='font-bold'>{requestedProduct.quantity_added}</span>{' '}
-                                      {requestedProduct.unit ?? ''}
-                                    </li>
-                                  )}
-                                  {requestedProduct?.unit_price !== undefined && (
-                                    <li><span className="font-medium">Unit Price:</span> ₱ {Number(requestedProduct.unit_price).toLocaleString()}</li>
-                                  )}
-                                  {requestedProduct?.unit_cost !== undefined && (
-                                    <li><span className="font-medium">Unit Cost:</span> ₱ {Number(requestedProduct.unit_cost).toLocaleString()}</li>
-                                  )}
-                                  {requestedProduct?.min_threshold !== undefined && requestedProduct?.max_threshold !== undefined && (
-                                    <li><span className="font-medium">Threshold:</span> {requestedProduct.min_threshold} - {requestedProduct.max_threshold}</li>
-                                  )}
-                                  {requestedProduct?.product_validity && (
-                                    <li><span className="font-medium">Validity:</span> {requestedProduct.product_validity}</li>
-                                  )}
-                                </ul>
-                              </div>
-
-                              {currentState && (
-                                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 w-full md:w-1/2">
-                                  <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">Current Values</p>
-                                  <ul className="space-y-1 text-gray-700">
-                                    <li><span className="font-medium">Quantity:</span> {Number(currentState.quantity).toLocaleString()} {currentState.unit}</li>
-                                    <li><span className="font-medium">Unit Price:</span> ₱ {Number(currentState.unit_price).toLocaleString()}</li>
-                                    <li><span className="font-medium">Unit Cost:</span> ₱ {Number(currentState.unit_cost).toLocaleString()}</li>
-                                    <li><span className="font-medium">Threshold:</span> {currentState.min_threshold} - {currentState.max_threshold}</li>
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
+                            )}
                           </div>
+
+                          {/* Buttons (stack vertically on mobile) */}
+                          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                            <button
+                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${approveLoadingId === request.pending_id ||
+                                  rejectLoadingId === request.pending_id
+                                  ? 'bg-green-400 cursor-not-allowed'
+                                  : 'bg-green-600 hover:bg-green-700'
+                                }`}
+                              onClick={() => handleApproveClick(request.pending_id)}
+                              disabled={
+                                approveLoadingId === request.pending_id ||
+                                rejectLoadingId === request.pending_id
+                              }
+                            >
+                              {approveLoadingId === request.pending_id ? (
+                                <span className="inline-flex items-center">
+                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                  Processing
+                                </span>
+                              ) : (
+                                'Approve'
+                              )}
+                            </button>
+
+                            <button
+                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${rejectLoadingId === request.pending_id ||
+                                  approveLoadingId === request.pending_id
+                                  ? 'bg-red-300 cursor-not-allowed'
+                                  : 'bg-red-500 hover:bg-red-600'
+                                }`}
+                              onClick={() => handleRejectClick(request.pending_id)}
+                              disabled={
+                                rejectLoadingId === request.pending_id ||
+                                approveLoadingId === request.pending_id
+                              }
+                            >
+                              {rejectLoadingId === request.pending_id ? (
+                                <span className="inline-flex items-center">
+                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                  Processing
+                                </span>
+                              ) : (
+                                'Reject'
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Product Info */}
+                        <h3 className="text-base md:text-lg font-semibold text-gray-800">
+                          {requestedProduct?.product_name || 'Unnamed Product'}
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-3">
+                          Submitted by {request.created_by_name || 'Inventory Staff'}
+                        </p>
+
+                        <div className="flex flex-col md:flex-row gap-3 text-sm">
+                          {/* Requested Update */}
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 w-full md:w-1/2">
+                            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">
+                              Requested Update
+                            </p>
+                            <ul className="space-y-1 text-amber-900">
+                              {requestedProduct?.quantity_added !== undefined && (
+                                <li>
+                                  <span className="font-medium">Quantity:</span>{' '}
+                                  {currentState
+                                    ? `${Number(currentState.quantity).toLocaleString()} + `
+                                    : ''}
+                                  <span className="font-bold">
+                                    {requestedProduct.quantity_added}
+                                  </span>{' '}
+                                  {requestedProduct.unit ?? ''}
+                                </li>
+                              )}
+                              {requestedProduct?.unit_price !== undefined && (
+                                <li>
+                                  <span className="font-medium">Unit Price:</span> ₱{' '}
+                                  {Number(requestedProduct.unit_price).toLocaleString()}
+                                </li>
+                              )}
+                              {requestedProduct?.unit_cost !== undefined && (
+                                <li>
+                                  <span className="font-medium">Unit Cost:</span> ₱{' '}
+                                  {Number(requestedProduct.unit_cost).toLocaleString()}
+                                </li>
+                              )}
+                              {requestedProduct?.min_threshold !== undefined &&
+                                requestedProduct?.max_threshold !== undefined && (
+                                  <li>
+                                    <span className="font-medium">Threshold:</span>{' '}
+                                    {requestedProduct.min_threshold} -{' '}
+                                    {requestedProduct.max_threshold}
+                                  </li>
+                                )}
+                              {requestedProduct?.product_validity && (
+                                <li>
+                                  <span className="font-medium">Validity:</span>{' '}
+                                  {requestedProduct.product_validity}
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+
+                          {/* Current Values */}
+                          {currentState && (
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 w-full md:w-1/2">
+                              <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+                                Current Values
+                              </p>
+                              <ul className="space-y-1 text-gray-700">
+                                <li>
+                                  <span className="font-medium">Quantity:</span>{' '}
+                                  {Number(currentState.quantity).toLocaleString()}{' '}
+                                  {currentState.unit}
+                                </li>
+                                <li>
+                                  <span className="font-medium">Unit Price:</span> ₱{' '}
+                                  {Number(currentState.unit_price).toLocaleString()}
+                                </li>
+                                <li>
+                                  <span className="font-medium">Unit Cost:</span> ₱{' '}
+                                  {Number(currentState.unit_cost).toLocaleString()}
+                                </li>
+                                <li>
+                                  <span className="font-medium">Threshold:</span>{' '}
+                                  {currentState.min_threshold} -{' '}
+                                  {currentState.max_threshold}
+                                </li>
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -377,6 +444,7 @@ function ProductInventory({
         </div>
       )}
 
+
       {/*SEARCH AND ADD*/}
       <div className='w-full space-y-4 lg:space-y-0 lg:flex lg:items-center lg:justify-between flex-shrink-0'>
         <div className='flex flex-col lg:flex-row gap-2 lg:gap-7 w-full lg:w-auto items-center lg:items-start'>
@@ -386,50 +454,53 @@ function ProductInventory({
             <input
               type="text"
               placeholder="Search Item Name..."
-              className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all px-3 py-0 rounded-lg w-full h-9 leading-none align-middle"
+              className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all px-3 py-0 mb-4 lg:mb-0 rounded-lg w-full h-9 leading-none align-middle"
               onChange={handleSearch}
             />
 
           </div>
 
-          <DropdownCustom
-            value={selectedCategory}
-            onChange={e => setSelectedCategory(e.target.value)}
-            label="Filter by Category:"
-            variant="floating"
-            options={[
-              { value: '', label: 'All Categories' },
-              ...listCategories.map(cat => ({
-                value: cat.category_id,
-                label: cat.category_name
-              }))
-            ]}
-          />
-
-          {(user && user.role && user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) &&
-
-            // Branch dropdown
+          {/* CATEGORY DROPDOWN */}
+          <div className="w-full lg:w-auto mb-2 lg:mb-0">
             <DropdownCustom
-              value={selectedBranch}
-              onChange={e => setSelectedBranch(e.target.value)}
-              label="Filter by Branch:"
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              label="Filter by Category:"
               variant="floating"
               options={[
-                ...(user && user.role && user.role.some(role => ['Owner'].includes(role))
-                  ? [{ value: '', label: 'All Branch' }]
-                  : branches.length !== 0 ? [] : [{ value: '', label: `${user.branch_name} (Your Branch)`}]),
-                ...branches.map(branch => ({
-                  value: branch.branch_id,
-                  label: `${branch.branch_name}${branch.branch_id === user.branch_id ? ' (Your Branch)' : ''}`
+                { value: '', label: 'All Categories' },
+                ...listCategories.map(cat => ({
+                  value: cat.category_id,
+                  label: cat.category_name
                 }))
               ]}
             />
+          </div>
 
-          }
+          {/* BRANCH DROPDOWN */}
+          {(user && user.role && user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) && (
+            <div className="w-full lg:w-auto mt-1 lg:mt-0">
+              <DropdownCustom
+                value={selectedBranch}
+                onChange={e => setSelectedBranch(e.target.value)}
+                label="Filter by Branch:"
+                variant="floating"
+                options={[
+                  ...(user && user.role && user.role.some(role => ['Owner'].includes(role))
+                    ? [{ value: '', label: 'All Branch' }]
+                    : branches.length !== 0 ? [] : [{ value: '', label: `${user.branch_name} (Your Branch)` }]),
+                  ...branches.map(branch => ({
+                    value: branch.branch_id,
+                    label: `${branch.branch_name}${branch.branch_id === user.branch_id ? ' (Your Branch)' : ''}`
+                  }))
+                ]}
+              />
+            </div>
+          )}
 
         </div>
 
-        
+
 
 
         {/*EXPORT AND CATEGORIES AND ADD ITEM */}
@@ -438,12 +509,12 @@ function ProductInventory({
           {/* Pending approvals button (keeps same height as other controls) */}
           {displayPendingApprovals && (
             <button
-              className="relative flex items-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700"
+              className="relative flex items-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
               onClick={() => setIsPendingDialogOpen(true)}
               aria-label="Open pending inventory requests"
             >
               <span className="whitespace-nowrap">Pendings</span>
-              <span className="inline-flex items-center justify-center w-7 h-7 text-xs font-semibold bg-white text-amber-700 rounded-full">
+              <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-white text-amber-700 rounded-full">
                 {pendingRequests?.length ?? 0}
               </span>
             </button>
