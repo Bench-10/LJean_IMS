@@ -939,7 +939,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                           <td className="px-2 text-center">
                             <button
                               type="button"
-                              className="bg-green-600 py-2 px-4 text-white mb-6 rounded-sm"
+                              className="bg-green-600 hover:bg-green-500  text-white font-medium text-sm px-3 py-1 rounded"
                                onClick={() => {removeSaleRow(idx); preventEmptyQuantity()}}
 
                             >
@@ -1083,7 +1083,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                       <button
                         type='button'
                         onClick={() => { removeSaleRow(idx); preventEmptyQuantity() }}
-                        className="w-full bg-red-50 text-red-600 hover:bg-red-100 font-medium text-sm py-2 px-4 rounded-md transition-colors"
+                        className="w-full bg-green-600 hover:bg-green-500 text-white font-medium text-sm py-2 px-4 rounded-md transition-colors"
                       >
                         Remove Item
                       </button>
