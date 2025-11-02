@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BsTelephoneFill } from "react-icons/bs";
 import { RiCellphoneFill } from "react-icons/ri";
 import { MdEmail, MdOutlineCorporateFare } from "react-icons/md";
@@ -7,14 +7,22 @@ import NoInfoFound from './common/NoInfoFound';
 import api from '../utils/api';
 import { currencyFormat } from '../utils/formatCurrency';
 import ChartLoading from './common/ChartLoading';
-import { exportElementAsPDF } from '../utils/exportUtils';
+
+const escapeHtml = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
 
 function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInformation, sale_id }) {
   const [soldItems, setSoldItems] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
-  const contentRef = useRef(null);
 
   const statusDetails = useMemo(() => {
     if (!headerInformation) return null;
@@ -79,18 +87,198 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
     }
   };
 
-  const handleExport = async () => {
-    if (!contentRef.current || !headerInformation) return;
+  const buildPrintableDocument = () => {
+    if (!headerInformation || !user) return '';
+
+    const isSales = type === 'sales';
+    const statusLine = statusDetails
+      ? `${escapeHtml(statusDetails.label)}${statusDetails.description ? ` - ${escapeHtml(statusDetails.description)}` : ''}`
+      : '';
+
+    const itemsHeader = isSales
+      ? `<tr>
+            <th class="col-idx">#</th>
+            <th class="col-name">PRODUCT</th>
+            <th class="col-qty">QTY</th>
+            <th class="col-unit">UNIT</th>
+            <th class="col-price">UNIT PRICE</th>
+            <th class="col-amount">AMOUNT</th>
+          </tr>`
+      : `<tr>
+            <th class="col-idx">#</th>
+            <th class="col-name">PRODUCT</th>
+            <th class="col-qty">QTY</th>
+            <th class="col-unit">UNIT</th>
+          </tr>`;
+
+    const itemRows = soldItems && soldItems.length > 0
+      ? soldItems.map((item, index) => {
+          const qty = item.quantity != null ? Number(item.quantity).toLocaleString() : '';
+          const unitPrice = isSales ? currencyFormat(item.unit_price ?? 0) : '';
+          const amount = isSales ? currencyFormat(item.amount ?? 0) : '';
+
+          return `
+            <tr>
+              <td class="col-idx center">${index + 1}</td>
+              <td class="col-name">${escapeHtml(item.product_name ?? '')}</td>
+              <td class="col-qty right">${escapeHtml(qty)}</td>
+              <td class="col-unit center">${escapeHtml(item.unit ?? '')}</td>
+              ${isSales ? `
+                <td class="col-price right">${escapeHtml(unitPrice)}</td>
+                <td class="col-amount right">${escapeHtml(amount)}</td>
+              ` : ''}
+            </tr>
+          `;
+        }).join('')
+      : `<tr><td colspan="${isSales ? 6 : 4}" class="center">NO ITEMS FOUND</td></tr>`;
+
+    const hasDiscount = headerInformation.discount !== undefined && Number(headerInformation.discount) > 0;
+    const hasDeliveryFee = headerInformation.deliveryFee !== undefined && Number(headerInformation.deliveryFee) > 0;
+
+    const totalsMarkup = isSales ? `
+      <table class="summary-table">
+        <tbody>
+          <tr>
+            <td class="label">Amount Net VAT:</td>
+            <td class="value">${escapeHtml(currencyFormat(headerInformation.amountNet ?? 0))}</td>
+          </tr>
+          <tr>
+            <td class="label">VAT (10%):</td>
+            <td class="value">${escapeHtml(currencyFormat(headerInformation.vat ?? 0))}</td>
+          </tr>
+          ${hasDiscount ? `
+            <tr>
+              <td class="label">Discount:</td>
+              <td class="value">-${escapeHtml(currencyFormat(Number(headerInformation.discount) || 0))}</td>
+            </tr>
+          ` : ''}
+          ${hasDeliveryFee ? `
+            <tr>
+              <td class="label">Delivery Fee:</td>
+              <td class="value">${escapeHtml(currencyFormat(Number(headerInformation.deliveryFee) || 0))}</td>
+            </tr>
+          ` : ''}
+          <tr class="total-row">
+            <td class="label">TOTAL AMOUNT DUE:</td>
+            <td class="value">${escapeHtml(currencyFormat(headerInformation.total ?? 0))}</td>
+          </tr>
+        </tbody>
+      </table>
+    ` : '';
+
+    const metaLines = [
+      { label: 'Sale ID', value: headerInformation.sale_id },
+      { label: 'Date', value: headerInformation.date },
+      {
+        label: type === 'sales' ? 'Charge To' : 'Delivery ID',
+        value: type === 'sales' ? headerInformation.chargeTo : headerInformation.delivery_id
+      },
+      { label: type === 'sales' ? 'TIN' : 'Courier', value: type === 'sales' ? headerInformation.tin : headerInformation.courier_name },
+      { label: 'Address', value: headerInformation.address }
+    ];
+
+    const metaMarkup = metaLines
+      .filter(line => line.value)
+      .map(line => `
+        <tr>
+          <td class="meta-label">${escapeHtml(line.label)}:</td>
+          <td class="meta-value">${escapeHtml(line.value)}</td>
+        </tr>
+      `)
+      .join('');
+
+    return `
+      <html>
+        <head>
+          <title>${escapeHtml(type === 'sales' ? 'Charge Sales Invoice' : 'Delivery Details')}</title>
+          <style>
+            @page { margin: 10mm 8mm; }
+            body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; color: #000; }
+            .align-center { text-align: center; }
+            .header { text-align: center; margin-bottom: 8px; }
+            .header .title { font-size: 16px; font-weight: 700; letter-spacing: 1px; }
+            .header .subtitle { font-size: 12px; margin-top: 2px; }
+            .contacts { margin-top: 4px; font-size: 11px; }
+            .contacts span { display: inline-block; margin: 0 6px 2px 0; }
+            .section-label { margin: 10px 0 4px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 4px 2px; border-bottom: 1px solid #000; }
+            th { text-align: left; font-size: 11px; }
+            .col-idx { width: 32px; }
+            .col-qty { width: 80px; }
+            .col-unit { width: 70px; }
+            .col-price, .col-amount { width: 110px; }
+            .right { text-align: right; }
+            .center { text-align: center; }
+            .meta-table { width: 100%; margin-top: 6px; border-collapse: collapse; }
+            .meta-table td { border: none; padding: 2px 0; }
+            .meta-label { width: 120px; font-weight: 600; }
+            .summary-table { width: 360px; margin-left: auto; border-collapse: collapse; margin-top: 12px; }
+            .summary-table td { border: none; padding: 2px 0; }
+            .summary-table .label { font-weight: 600; }
+            .summary-table .value { text-align: right; font-weight: 600; }
+            .summary-table .total-row .value { font-size: 13px; }
+            .status-line { margin-top: 6px; font-weight: 600; }
+            .notes { margin-top: 12px; font-size: 11px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">${escapeHtml((user.branch_name || '').toUpperCase())}</div>
+            <div class="subtitle">${escapeHtml(user.address || '')}</div>
+            <div class="contacts">
+              ${user.telephone_num ? `<span>Tel: ${escapeHtml(user.telephone_num)}</span>` : ''}
+              ${user.cellphone_num ? `<span>Cell: ${escapeHtml(user.cellphone_num)}</span>` : ''}
+              ${user.branch_email ? `<span>Email: ${escapeHtml(user.branch_email)}</span>` : ''}
+            </div>
+            <div class="subtitle">VAT Reg. TIN 186-705-637-000</div>
+          </div>
+
+          <div class="section-label">${escapeHtml(type === 'sales' ? 'Charge Sales Invoice' : 'Delivery Details')}</div>
+          <div>Person In-charge: <strong>${escapeHtml(headerInformation.transactionBy || '')}</strong></div>
+          ${statusLine ? `<div class="status-line">${statusLine}</div>` : ''}
+
+          <table class="meta-table">
+            <tbody>
+              ${metaMarkup}
+            </tbody>
+          </table>
+
+          <div class="section-label">${escapeHtml(type === 'sales' ? 'Items Sold' : 'Products To Deliver')}</div>
+          <table>
+            <thead>${itemsHeader}</thead>
+            <tbody>${itemRows}</tbody>
+          </table>
+
+          ${totalsMarkup}
+
+          ${isSales ? `<div class="notes">
+            This transaction was completed successfully. Please retain this printed invoice for your records.
+          </div>` : ''}
+        </body>
+      </html>
+    `;
+  };
+
+  const handlePrint = () => {
+    if (!headerInformation) return;
+    if (typeof window === 'undefined') return;
     try {
-      setExporting(true);
-      const baseFilename = type === 'sales'
-        ? `sale-${headerInformation.sale_id || 'transaction'}`
-        : `delivery-${headerInformation.delivery_id || headerInformation.sale_id || 'transaction'}`;
-      await exportElementAsPDF(contentRef.current, baseFilename);
+      setPrinting(true);
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      if (!printWindow) {
+        throw new Error('Unable to open print window. Check popup blockers.');
+      }
+
+      printWindow.document.write(buildPrintableDocument());
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
     } catch (error) {
-      console.error('Failed to export transaction details:', error);
+      console.error('Failed to open printable invoice:', error);
     } finally {
-      setExporting(false);
+      setPrinting(false);
     }
   };
 
@@ -333,20 +521,20 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
                     <div className="mt-3 flex">
                       <button
                         type="button"
-                        onClick={handleExport}
-                        disabled={loading || exporting}
+                        onClick={handlePrint}
+                        disabled={loading || printing}
                         className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-800 hover:bg-blue-600 rounded-md shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {exporting ? (
+                        {printing ? (
                           <>
                             <svg className="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                             </svg>
-                            <span>Exporting...</span>
+                            <span>Preparing…</span>
                           </>
                         ) : (
-                          <span>Export PDF</span>
+                          <span>Print Invoice</span>
                         )}
                       </button>
                     </div>
