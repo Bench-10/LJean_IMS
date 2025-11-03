@@ -92,11 +92,8 @@ const io = new Server(server, {
 });
 
 
-if (process.env.NODE_ENV === 'production') {
- app.enable('trust proxy');
-} else {
- app.disable('trust proxy');
-}
+const isTrustedProxy = (ip) => ip === '127.0.0.1' || ip === '::1';
+app.set('trust proxy', isTrustedProxy);
 
 app.disable('x-powered-by');
 app.use(helmet({

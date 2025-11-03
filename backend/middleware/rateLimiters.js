@@ -1,29 +1,31 @@
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 
+const TRUSTED_PROXIES = ['127.0.0.1', '::1'];
+const isTrustedProxy = (ip) => ip === '127.0.0.1' || ip === '::1';
+
 
 
 export const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000, 
   delayAfter: 30, 
   delayMs: (hits) => hits * 100,
-  maxDelayMs: 5000
+  maxDelayMs: 5000,
+  trustProxy: isTrustedProxy
 });
 
 
 
-export const createApiLimiter = (windowMinutes, max) => {
-  return rateLimit({
-    windowMs: windowMinutes * 60 * 1000,
-    max: max,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: 'Too many requests from this IP, please try again later.',
-    skip: (req) => {
-      return req.method === 'GET' && req.path.includes('/api/public');
-    }
-  });
-};
+export const createApiLimiter = (windowMinutes = 15, max = 300) => rateLimit({
+  windowMs: Number(windowMinutes) * 60 * 1000 || 15 * 60 * 1000,
+  max: Number(max) || 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  trustProxy: isTrustedProxy,
+  message: 'Too many requests from this IP, please try again later.',
+  keyGenerator: (req) => req.ip,
+  skip: (req) => req.method === 'GET' && req.path.includes('/api/public')
+});
 
 
 
@@ -38,7 +40,8 @@ export const loginLimiter = rateLimit({
 
     const username = req.body?.username || req.body?.email || '';
     return `login:${username.toLowerCase()}:${req.ip}`;
-  }
+  },
+  trustProxy: isTrustedProxy
 });
 
 
@@ -52,7 +55,8 @@ export const passwordResetLimiter = rateLimit({
   keyGenerator: (req) => {
     const email = req.body?.email || '';
     return `reset:${email.toLowerCase()}:${req.ip}`;
-  }
+  },
+  trustProxy: isTrustedProxy
 });
 
 
@@ -69,7 +73,8 @@ export const accountCreationLimiter = rateLimit({
       .toLowerCase()
       .trim();
     return identifier ? `create:${identifier}:${req.ip}` : `ip:${req.ip}`;
-  }
+  },
+  trustProxy: isTrustedProxy
 });
 
 
@@ -85,7 +90,8 @@ export const writeOperationLimiter = rateLimit({
     const userId = req.user?.user_id || req.user?.id || req.user?.userId;
     if (userId) return `user:${String(userId)}`;
     return `ip:${req.ip}`;
-  }
+  },
+  trustProxy: isTrustedProxy
 });
 
 
