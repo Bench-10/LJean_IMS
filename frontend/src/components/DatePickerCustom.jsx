@@ -207,19 +207,35 @@ const formatDate = (dateString) => {
           </div>
           <div className="flex items-center gap-1">
             {selectedDate && !disabled && (
-              <button
-                type="button"
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label="Clear selected date"
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedDate('');
                   onChange({ target: { value: '' } });
+                  if (buttonRef.current) {
+                    buttonRef.current.focus();
+                  }
                 }}
-                className="p-1 hover:bg-red-50 rounded-lg transition group/clear"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedDate('');
+                    onChange({ target: { value: '' } });
+                    if (buttonRef.current) {
+                      buttonRef.current.focus();
+                    }
+                  }
+                }}
+                className="p-1 hover:bg-red-50 rounded-lg transition group/clear focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
               >
                 <svg className="h-4 w-4 text-gray-400 group-hover/clear:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
+              </span>
             )}
             <svg 
               className={`h-5 w-5 transition-all ${isOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`}

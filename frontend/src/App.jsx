@@ -25,9 +25,9 @@ import BranchKPI from "./Pages/BranchKPI.jsx";
 import AddDeliveryInformation from "./components/AddDeliveryInformation.jsx";
 import FormLoading from "./components/common/FormLoading";
 import AccountDisabledPopUp from "./components/dialogs/AccountDisabledPopUp";
-import InAppNotificationPopUp from "./components/dialogs/InAppNotificationPopUp";
 import ProductExistsDialog from "./components/dialogs/ProductExistsDialog";
 import Approvals from "./Pages/Approvals";
+import { Toaster, toast } from "react-hot-toast";
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 const TAB_HIDDEN_GRACE_MS = 20 * 1000;
@@ -54,9 +54,6 @@ function App() {
   const [saleHeader,setSaleHeader ] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
   const [openAddDelivery, setAddDelivery] = useState(false);
-  const [openInAppNotif, setOpenInAppNotif] = useState(false);
-  const [inAppNotifMessage, setInAppNotifMessage] = useState('');
-  const [currentNotificationType, setCurrentNotificationType] = useState('System Update');
   const [deliveryData, setDeliveryData] = useState([]);
   const [deliveryEditData, setDeliveryEdit] = useState([]);
   const [productValidityList, setProductValidityList] = useState([]);
@@ -68,9 +65,48 @@ function App() {
   const normalizePendingId = (value) => (value === null || value === undefined ? '' : String(value));
 
   // NOTIFICATION QUEUE SYSTEM
-  const [notificationQueue, setNotificationQueue] = useState([]);
-  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
-  const queueTimeoutRef = useRef(null);
+  const addToNotificationQueue = useCallback((message, options = {}) => {
+    let config = {
+      isLocal: false,
+      title: undefined,
+      dedupeKey: undefined,
+      duration: 2200,
+      tone: undefined
+    };
+
+    if (typeof options === 'boolean') {
+      config.isLocal = options;
+    } else if (options && typeof options === 'object') {
+      config = { ...config, ...options };
+    }
+
+    const { dedupeKey, duration, tone } = config;
+    const toastContent = (
+      <div className="flex flex-col">
+        {config.title ? (
+          <span className="font-semibold text-sm text-emerald-700">{config.title}</span>
+        ) : null}
+        <span className="text-sm text-gray-800">{message}</span>
+      </div>
+    );
+
+    const toastOptions = {
+      id: dedupeKey,
+      duration: typeof duration === 'number' && duration > 0 ? duration : 5200
+    };
+
+    if (tone === 'error') {
+      toast.error(toastContent, toastOptions);
+      return;
+    }
+
+    if (tone === 'success' || config.isLocal) {
+      toast.success(toastContent, toastOptions);
+      return;
+    }
+
+    toast(toastContent, toastOptions);
+  }, []);
   const handledInventoryActionsRef = useRef(new Set());
   const handledInventoryCleanupRef = useRef(new Map());
   const userActivityTimeoutRef = useRef(null);
@@ -372,71 +408,9 @@ function App() {
     clearHiddenActivityTimeout
   ]);
 
-  // NOTIFICATION QUEUE MANAGEMENT
-  const addToNotificationQueue = (message, options = {}) => {
-    let config = { isLocal: false, title: undefined, dedupeKey: undefined };
-
-    if (typeof options === 'boolean') {
-      config.isLocal = options;
-    } else if (options && typeof options === 'object') {
-      config = { ...config, ...options };
-    }
-
-    setNotificationQueue(prev => [...prev, { message, ...config }]);
-  };
-
-  const processNotificationQueue = () => {
-    if (isProcessingQueue || notificationQueue.length === 0 || openNotif) return;
-
-    setIsProcessingQueue(true);
-    const nextNotification = notificationQueue[0];
-    
-    // Show the notification
-    setInAppNotifMessage(nextNotification.message);
-    setCurrentNotificationType(
-      nextNotification.title
-        ? nextNotification.title
-        : nextNotification.isLocal
-          ? 'Success'
-          : 'System Update'
-    );
-    setOpenInAppNotif(true);
-    
-    // Remove from queue after showing
-    setNotificationQueue(prev => prev.slice(1));
-    
-    // Hide notification after 3 seconds and process next
-    queueTimeoutRef.current = setTimeout(() => {
-      setOpenInAppNotif(false);
-      setInAppNotifMessage('');
-      setCurrentNotificationType('System Update');
-      setIsProcessingQueue(false);
-      
-      // Process next notification if queue not empty and notification panel not open
-      setTimeout(() => {
-        if (notificationQueue.length > 1 && !openNotif) {
-          processNotificationQueue();
-        }
-      }, 500); // Small delay between notifications
-      
-    }, 3000);
-  };
-
-  // CLEAR NOTIFICATION QUEUE WHEN NOTIFICATION PANEL IS OPENED
   const handleNotificationPanelOpen = () => {
+    toast.dismiss();
     setOpenNotif(true);
-    
-    // Stop current notification and clear queue
-    if (queueTimeoutRef.current) {
-      clearTimeout(queueTimeoutRef.current);
-      queueTimeoutRef.current = null;
-    }
-    
-    setOpenInAppNotif(false);
-    setInAppNotifMessage('');
-    setCurrentNotificationType('System Update');
-    setNotificationQueue([]);
-    setIsProcessingQueue(false);
   };
 
   const handleHistoryModalClose = useCallback(() => {
@@ -481,26 +455,12 @@ function App() {
     }
   }, [navigate]);
 
-  // Process queue when new notifications are added
   useEffect(() => {
-    if (!isProcessingQueue && notificationQueue.length > 0 && !openNotif) {
-      processNotificationQueue();
+    if (!openNotif) {
+      return;
     }
-  }, [notificationQueue, isProcessingQueue, openNotif]);
 
-  // Clear queue and timeouts when notification panel opens
-  useEffect(() => {
-    if (openNotif) {
-      if (queueTimeoutRef.current) {
-        clearTimeout(queueTimeoutRef.current);
-        queueTimeoutRef.current = null;
-      }
-      setOpenInAppNotif(false);
-      setInAppNotifMessage('');
-      setCurrentNotificationType('System Update');
-      setNotificationQueue([]);
-      setIsProcessingQueue(false);
-    }
+    toast.dismiss();
   }, [openNotif]);
 
   // CHECK IF CURRENT USER IS DISABLED ON PAGE LOAD/REFRESH
@@ -679,7 +639,8 @@ function App() {
           // HANDLE INVENTORY CHANGES FROM SALES OR DELIVERY STATUS CHANGES
           setProductsData(prevData => 
             prevData.map(item => 
-              item.product_id === inventoryData.product.product_id 
+              item.product_id === inventoryData.product.product_id &&
+              item.branch_id === inventoryData.product.branch_id
                 ? inventoryData.product 
                 : item
             )
@@ -980,14 +941,9 @@ function App() {
 
     return () => {
       newSocket.close();
-      
-      // Cleanup notification queue timeout
-      if (queueTimeoutRef.current) {
-        clearTimeout(queueTimeoutRef.current);
-        queueTimeoutRef.current = null;
-      }
+      toast.dismiss();
     };
-  }, [user]);
+  }, [user, addToNotificationQueue]);
 
 
 
@@ -1505,13 +1461,46 @@ function App() {
         onClose={handleClosePopup}
       />
 
-      {/*GLOBAL IN-APP NOTIFICATION POPUP (QUEUE SYSTEM)*/}
-      {openInAppNotif && (
-        <InAppNotificationPopUp 
-          title={currentNotificationType}
-          message={inAppNotifMessage}
-        />
-      )}
+      <Toaster
+        position="top-right"
+        gutter={14}
+        toastOptions={{
+          duration: 5200,
+          style: {
+            background: '#ffffff',
+            color: '#14532d',
+            borderRadius: '1rem',
+            padding: '1rem 1.5rem',
+            fontSize: '0.95rem',
+            lineHeight: 1.4,
+            minWidth: '340px',
+            border: '1px solid rgba(187, 247, 208, 0.9)',
+            boxShadow: '0 20px 45px rgba(22, 101, 52, 0.16)'
+          },
+          success: {
+            iconTheme: {
+              primary: '#16a34a',
+              secondary: '#f0fdf4'
+            },
+            style: {
+              background: '#ffffff',
+              color: '#14532d',
+              border: '1px solid #86efac'
+            }
+          },
+          error: {
+            iconTheme: {
+              primary: '#dc2626',
+              secondary: '#fef2f2'
+            },
+            style: {
+              background: '#ffffff',
+              color: '#7f1d1d',
+              border: '1px solid #fecaca'
+            }
+          }
+        }}
+      />
 
       {/*PRODUCT EXISTS DIALOG*/}
       <ProductExistsDialog
@@ -1638,9 +1627,6 @@ function App() {
                     sanitizeInput={sanitizeInput}
                     listCategories={listCategories}
                     branches={branches}
-                    mode={modalMode}
-                    openInAppNotif={openInAppNotif}
-                    message={inAppNotifMessage}
                     invetoryLoading={invetoryLoading}
                     pendingRequests={pendingInventoryRequests}
                     pendingRequestsLoading={pendingInventoryLoading}

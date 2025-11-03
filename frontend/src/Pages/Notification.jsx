@@ -1,8 +1,8 @@
 import api from '../utils/api';
-import { useEffect, useState, React, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
-import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp';
+import { toast } from 'react-hot-toast';
 
 function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNotificationNavigate }) {
 
@@ -10,8 +10,6 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
   
 
   const [visibleCount, setVisibleCount] = useState(15);
-  const [showPopup, setShowPopup] = useState(false);
-  const [popupMessage, setPopupMessage] = useState('');
   const principalId = user?.user_id ?? user?.admin_id ?? null;
   const isAdminUser = Boolean(user?.admin_id);
   const prevLengthRef = useRef(notify.length);
@@ -23,7 +21,6 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
       // RESET REFERENCE TO CURRENT NOTIFICATION COUNT TO PREVENT FALSE POPUPS
       prevLengthRef.current = notify.length;
       currentUserRef.current = principalId;
-      setShowPopup(false);
     }
   }, [user, notify.length, principalId]);
 
@@ -42,11 +39,22 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
     if (notify.length > prevLengthRef.current) {
       const newNotification = notify[0];
       if (newNotification) {
-        const notifMessage = `${newNotification.user_full_name}: ${newNotification.message}`;
+        const toastId = `notification-${newNotification.alert_id ?? Date.now()}`;
+        const toastContent = (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+              {newNotification.alert_type || 'System Update'}
+            </span>
+            <span className="text-sm text-slate-800">
+              <strong className="text-emerald-800">{newNotification.user_full_name}:</strong> {newNotification.message}
+            </span>
+          </div>
+        );
 
-        // SHOW IN-APP NOTIFICATION
-        setPopupMessage(notifMessage);
-        setShowPopup(true);
+        toast(toastContent, {
+          id: toastId,
+          duration: 5200
+        });
 
         //  BROWSER NOTIFICATION
         if ('Notification' in window && window.Notification.permission === 'granted') {
@@ -58,10 +66,6 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
 
           setTimeout(() => notification.close(), 5000);
         }
-
-        setTimeout(() => {
-          setShowPopup(false);
-        }, 5000);
       }
     }
     prevLengthRef.current = notify.length;
@@ -146,13 +150,6 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
 
   return (
     <>
-      {showPopup && !openNotif && (
-        <InAppNotificationPopUp
-          title={'New Notification'}
-          message={popupMessage}
-        />
-      )}
-
       {openNotif && (
         <div className="fixed inset-0 bg-black/50 z-[998] backdrop-blur-[1px]" onClick={onClose} />
       )}

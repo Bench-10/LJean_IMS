@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
-import InAppNotificationPopUp from '../components/dialogs/InAppNotificationPopUp.jsx';
 import { TbFileExport } from "react-icons/tb";
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 import { useAuth } from '../authentication/Authentication';
@@ -20,9 +19,6 @@ function ProductInventory({
   setIsProductTransactOpen,
   sanitizeInput,
   listCategories,
-  openInAppNotif,
-  mode,
-  message,
   invetoryLoading,
   pendingRequests = [],
   pendingRequestsLoading = false,
@@ -186,15 +182,6 @@ function ProductInventory({
   return (
 
     <div className="pt-20 lg:pt-8 px-4 lg:px-8 pb-6 h-screen">
-
-      {openInAppNotif &&
-        <InAppNotificationPopUp
-          title={mode}
-          message={message}
-
-        />
-      }
-
 
       {/*REJECTION REASON */}
       <RejectionReasonDialog
