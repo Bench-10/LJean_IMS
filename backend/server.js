@@ -16,6 +16,7 @@ import passwordResetRoutes from './Routes/passwordResetRoutes.js';
 import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 import { loadUnitConversionCache } from './Services/Services_Utils/unitConversion.js';
+import { SQLquery } from './db.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -156,6 +157,90 @@ app.use('/api', passwordResetRoutes);
 // STORE CURRNTLY CONNECTED USERS
 const connectedUsers = new Map();
 
+const fetchUserActivityContext = async (userIdInt) => {
+  const { rows } = await SQLquery(
+    "SELECT user_id, branch_id, first_name || ' ' || last_name AS full_name FROM Users WHERE user_id = $1",
+    [userIdInt]
+  );
+
+  return rows[0] || null;
+};
+
+const getPrimaryBranchToken = (subscriber) => {
+  if (!subscriber) return null;
+
+  if (subscriber.branchId !== undefined && subscriber.branchId !== null && subscriber.branchId !== '') {
+    return String(subscriber.branchId);
+  }
+
+  if (Array.isArray(subscriber.branchIds) && subscriber.branchIds.length > 0) {
+    return String(subscriber.branchIds[0]);
+  }
+
+  return null;
+};
+
+const hasActiveSocketForUser = (userId, excludeSocketId = null) => {
+  const comparison = String(userId);
+
+  for (const [socketId, subscriber] of connectedUsers.entries()) {
+    if (excludeSocketId && socketId === excludeSocketId) {
+      continue;
+    }
+
+    if (subscriber.userType !== 'user') {
+      continue;
+    }
+
+    if (String(subscriber.userId) === comparison) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const updateUserActivityFromSocket = async ({ userId, fallbackBranchId = null, isActive, reason }) => {
+  const userIdInt = parseInt(userId, 10);
+
+  if (Number.isNaN(userIdInt)) {
+    return null;
+  }
+
+  try {
+    const context = await fetchUserActivityContext(userIdInt);
+
+    if (!context) {
+      return null;
+    }
+
+    await SQLquery("UPDATE Users SET is_active = $1 WHERE user_id = $2", [isActive, userIdInt]);
+
+    const parsedFallback = (fallbackBranchId !== null && fallbackBranchId !== undefined && fallbackBranchId !== '')
+      ? Number(fallbackBranchId)
+      : null;
+
+    const effectiveBranchId = context.branch_id ?? (parsedFallback !== null && !Number.isNaN(parsedFallback)
+      ? parsedFallback
+      : null);
+
+    if (effectiveBranchId !== null && effectiveBranchId !== undefined) {
+      broadcastUserStatusUpdate(effectiveBranchId, {
+        action: isActive ? 'login' : 'logout',
+        user_id: userIdInt,
+        full_name: context.full_name,
+        is_active: isActive,
+        reason
+      });
+    }
+
+    return context;
+  } catch (error) {
+    console.error(`Failed to update user ${userIdInt} activity from socket:`, error);
+    return null;
+  }
+};
+
 const normalizeRoles = (roles) => {
   if (!roles) return [];
   const arrayRoles = Array.isArray(roles) ? roles : [roles];
@@ -266,7 +351,7 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   // User joins with their branch and user information
-  socket.on('join-branch', (userData = {}) => {
+  socket.on('join-branch', async (userData = {}) => {
     const {
       userId,
       adminId,
@@ -278,7 +363,7 @@ io.on('connection', (socket) => {
     } = userData;
 
     const normalizedRoles = normalizeRoles(roles ?? role);
-    const normalizedBranchIds = normalizeBranchIds(branchId, branchIds);
+    let normalizedBranchIds = normalizeBranchIds(branchId, branchIds);
     const entityType = userType === 'admin' ? 'admin' : 'user';
     const entityId = entityType === 'admin' ? (adminId ?? userId) : userId;
 
@@ -287,32 +372,78 @@ io.on('connection', (socket) => {
       return;
     }
 
-    connectedUsers.set(socket.id, {
+    const subscriberData = {
       userId: entityId,
       userType: entityType,
       roles: normalizedRoles,
       branchIds: normalizedBranchIds,
       branchId: normalizedBranchIds[0] ?? (branchId !== null && branchId !== undefined ? String(branchId) : null),
       socketId: socket.id
-    });
+    };
 
-    if (normalizedBranchIds.length > 0) {
-      normalizedBranchIds.forEach(id => socket.join(`branch-${id}`));
-    } else if (branchId !== null && branchId !== undefined && branchId !== '') {
-      socket.join(`branch-${branchId}`);
+    if (entityType === 'user') {
+      try {
+        const context = await updateUserActivityFromSocket({
+          userId: entityId,
+          fallbackBranchId: subscriberData.branchId,
+          isActive: true,
+          reason: 'socket-connect'
+        });
+
+        if (context?.branch_id !== undefined && context.branch_id !== null) {
+          const branchToken = String(context.branch_id);
+          if (!normalizedBranchIds.includes(branchToken)) {
+            normalizedBranchIds = [branchToken];
+          }
+          subscriberData.branchIds = normalizedBranchIds;
+          subscriberData.branchId = branchToken;
+        }
+
+        if (context?.full_name) {
+          subscriberData.fullName = context.full_name;
+        }
+      } catch (error) {
+        console.error(`Socket connect activity update failed for user ${entityId}:`, error);
+      }
+    }
+
+    connectedUsers.set(socket.id, subscriberData);
+
+    if (subscriberData.branchIds.length > 0) {
+      subscriberData.branchIds.forEach(id => socket.join(`branch-${id}`));
+    } else if (subscriberData.branchId !== null && subscriberData.branchId !== undefined && subscriberData.branchId !== '') {
+      socket.join(`branch-${subscriberData.branchId}`);
     }
 
     if (normalizedRoles.includes('Owner')) {
       socket.join('owners');
     }
 
-    console.log(`User ${entityId} (${entityType}) connected with roles [${normalizedRoles.join(', ')}]${normalizedBranchIds.length ? ` on branches [${normalizedBranchIds.join(', ')}]` : ''}`);
+    console.log(`User ${entityId} (${entityType}) connected with roles [${normalizedRoles.join(', ')}]${subscriberData.branchIds.length ? ` on branches [${subscriberData.branchIds.join(', ')}]` : ''}`);
   });
 
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log('User disconnected:', socket.id);
+    const subscriber = connectedUsers.get(socket.id);
     connectedUsers.delete(socket.id);
+
+    if (!subscriber || subscriber.userType !== 'user') {
+      return;
+    }
+
+    const stillConnected = hasActiveSocketForUser(subscriber.userId);
+    if (stillConnected) {
+      return;
+    }
+
+    const fallbackBranchId = getPrimaryBranchToken(subscriber);
+    await updateUserActivityFromSocket({
+      userId: subscriber.userId,
+      fallbackBranchId,
+      isActive: false,
+      reason: 'socket-disconnect'
+    });
   });
 });
 

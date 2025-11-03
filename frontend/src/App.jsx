@@ -29,6 +29,10 @@ import InAppNotificationPopUp from "./components/dialogs/InAppNotificationPopUp"
 import ProductExistsDialog from "./components/dialogs/ProductExistsDialog";
 import Approvals from "./Pages/Approvals";
 
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+const TAB_HIDDEN_GRACE_MS = 20 * 1000;
+const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'touchmove'];
+
 
 
 function App() {
@@ -69,6 +73,9 @@ function App() {
   const queueTimeoutRef = useRef(null);
   const handledInventoryActionsRef = useRef(new Set());
   const handledInventoryCleanupRef = useRef(new Map());
+  const userActivityTimeoutRef = useRef(null);
+  const lastActivityStateRef = useRef(true);
+  const hiddenActivityTimeoutRef = useRef(null);
 
   // ACCOUNT STATUS STATES
   const [showAccountDisabledPopup, setShowAccountDisabledPopup] = useState(false);
@@ -112,6 +119,258 @@ function App() {
   function sanitizeInput(input) {
     return input.replace(/[<>="']/g, '');
   }
+
+  const resolveBeaconUrl = useCallback(() => {
+    if (!user || !user.user_id) return null;
+    if (typeof window === 'undefined') return null;
+
+    const suffix = `/users/${user.user_id}/activity/beacon`;
+    const base = api.defaults?.baseURL;
+
+    if (typeof base === 'string' && base.trim()) {
+      const trimmed = base.trim().replace(/\/+$/, '');
+
+      try {
+        const targetUrl = new URL(trimmed, window.location.origin);
+        targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, '')}${suffix}`;
+        targetUrl.search = '';
+        targetUrl.hash = '';
+        return targetUrl.toString();
+      } catch (error) {
+        if (/^https?:\/\//i.test(trimmed)) {
+          return `${trimmed}${suffix}`;
+        }
+      }
+    }
+
+    try {
+      const fallback = new URL(`/api${suffix}`, window.location.origin);
+      return fallback.toString();
+    } catch (error) {
+      return `/api${suffix}`;
+    }
+  }, [user]);
+
+
+  const sendActivityUpdate = useCallback(async (nextState, reason, options = {}) => {
+    if (!user || !user.user_id) return;
+
+    const previousState = lastActivityStateRef.current;
+    const { force = false, preferBeacon = false, skipFallback = false } = options;
+
+    if (!force && previousState === nextState) {
+      return;
+    }
+
+    lastActivityStateRef.current = nextState;
+
+    if (preferBeacon) {
+      const beaconUrl = resolveBeaconUrl();
+
+      if (beaconUrl) {
+        const payload = JSON.stringify({ isActive: nextState, reason });
+        let beaconSent = false;
+
+        if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+          try {
+            const blob = typeof Blob !== 'undefined' ? new Blob([payload], { type: 'application/json' }) : payload;
+            beaconSent = navigator.sendBeacon(beaconUrl, blob);
+          } catch (error) {
+            console.error('Beacon activity update failed:', error);
+          }
+        }
+
+        if (beaconSent) {
+          return;
+        }
+
+        if (skipFallback) {
+          try {
+            if (typeof fetch === 'function') {
+              fetch(beaconUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload,
+                keepalive: true,
+                credentials: 'include'
+              });
+            }
+          } catch (error) {
+            console.error('Keepalive activity update failed:', error);
+          }
+          return;
+        }
+      }
+    }
+
+    try {
+      await api.put(`/api/users/${user.user_id}/activity`, { isActive: nextState, reason });
+    } catch (error) {
+      lastActivityStateRef.current = previousState;
+      console.error('Failed to update user activity status:', error);
+    }
+  }, [user, resolveBeaconUrl]);
+
+
+  const scheduleInactivityCheck = useCallback(() => {
+    if (!user || !user.user_id) return;
+
+    if (userActivityTimeoutRef.current) {
+      clearTimeout(userActivityTimeoutRef.current);
+    }
+
+    userActivityTimeoutRef.current = setTimeout(() => {
+      sendActivityUpdate(false, 'timeout');
+    }, INACTIVITY_TIMEOUT_MS);
+  }, [user, sendActivityUpdate]);
+
+
+  const clearHiddenActivityTimeout = useCallback(() => {
+    if (hiddenActivityTimeoutRef.current) {
+      clearTimeout(hiddenActivityTimeoutRef.current);
+      hiddenActivityTimeoutRef.current = null;
+    }
+  }, []);
+
+
+  const handleUserInteraction = useCallback(() => {
+    if (!user || !user.user_id) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+
+    scheduleInactivityCheck();
+    clearHiddenActivityTimeout();
+    sendActivityUpdate(true, 'interaction');
+  }, [user, scheduleInactivityCheck, sendActivityUpdate, clearHiddenActivityTimeout]);
+
+
+  const handleVisibilityChange = useCallback(() => {
+    if (!user || !user.user_id) return;
+    if (typeof document === 'undefined') return;
+
+    if (document.hidden) {
+      if (userActivityTimeoutRef.current) {
+        clearTimeout(userActivityTimeoutRef.current);
+        userActivityTimeoutRef.current = null;
+      }
+      clearHiddenActivityTimeout();
+
+      hiddenActivityTimeoutRef.current = setTimeout(() => {
+        sendActivityUpdate(false, 'hidden', { preferBeacon: true, force: true });
+        hiddenActivityTimeoutRef.current = null;
+      }, TAB_HIDDEN_GRACE_MS);
+    } else {
+      clearHiddenActivityTimeout();
+      sendActivityUpdate(true, 'visible', { force: true });
+      scheduleInactivityCheck();
+    }
+  }, [user, sendActivityUpdate, scheduleInactivityCheck, clearHiddenActivityTimeout]);
+
+
+  const handleWindowBlur = useCallback(() => {
+    if (!user || !user.user_id) return;
+
+    clearHiddenActivityTimeout();
+    if (userActivityTimeoutRef.current) {
+      clearTimeout(userActivityTimeoutRef.current);
+      userActivityTimeoutRef.current = null;
+    }
+
+    hiddenActivityTimeoutRef.current = setTimeout(() => {
+      sendActivityUpdate(false, 'blur', { preferBeacon: true, force: true });
+      hiddenActivityTimeoutRef.current = null;
+    }, TAB_HIDDEN_GRACE_MS);
+  }, [user, sendActivityUpdate, clearHiddenActivityTimeout]);
+
+
+  const handleWindowFocus = useCallback(() => {
+    clearHiddenActivityTimeout();
+    handleUserInteraction();
+  }, [handleUserInteraction, clearHiddenActivityTimeout]);
+
+
+  const handlePageHide = useCallback((event) => {
+    if (!user || !user.user_id) return;
+    if (event?.persisted) return;
+
+    clearHiddenActivityTimeout();
+    if (userActivityTimeoutRef.current) {
+      clearTimeout(userActivityTimeoutRef.current);
+      userActivityTimeoutRef.current = null;
+    }
+
+    sendActivityUpdate(false, 'pagehide', { preferBeacon: true, force: true, skipFallback: true });
+  }, [user, sendActivityUpdate, clearHiddenActivityTimeout]);
+
+
+  const handleBeforeUnload = useCallback(() => {
+    if (!user || !user.user_id) return;
+
+    clearHiddenActivityTimeout();
+    if (userActivityTimeoutRef.current) {
+      clearTimeout(userActivityTimeoutRef.current);
+      userActivityTimeoutRef.current = null;
+    }
+
+    sendActivityUpdate(false, 'beforeunload', { preferBeacon: true, force: true, skipFallback: true });
+  }, [user, sendActivityUpdate, clearHiddenActivityTimeout]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    if (!user || !user.user_id) {
+      if (userActivityTimeoutRef.current) {
+        clearTimeout(userActivityTimeoutRef.current);
+        userActivityTimeoutRef.current = null;
+      }
+      clearHiddenActivityTimeout();
+      lastActivityStateRef.current = true;
+      return undefined;
+    }
+
+    lastActivityStateRef.current = true;
+    sendActivityUpdate(true, 'page-load', { force: true });
+    scheduleInactivityCheck();
+
+    ACTIVITY_EVENTS.forEach((eventName) => {
+      window.addEventListener(eventName, handleUserInteraction, { passive: true });
+    });
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      ACTIVITY_EVENTS.forEach((eventName) => {
+        window.removeEventListener(eventName, handleUserInteraction);
+      });
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('focus', handleWindowFocus);
+  window.removeEventListener('blur', handleWindowBlur);
+  window.removeEventListener('pagehide', handlePageHide);
+  window.removeEventListener('beforeunload', handleBeforeUnload);
+
+      if (userActivityTimeoutRef.current) {
+        clearTimeout(userActivityTimeoutRef.current);
+        userActivityTimeoutRef.current = null;
+      }
+      clearHiddenActivityTimeout();
+    };
+  }, [
+    user,
+    sendActivityUpdate,
+    scheduleInactivityCheck,
+    handleUserInteraction,
+    handleVisibilityChange,
+    handleWindowFocus,
+    handleWindowBlur,
+    handlePageHide,
+    handleBeforeUnload,
+    clearHiddenActivityTimeout
+  ]);
 
   // NOTIFICATION QUEUE MANAGEMENT
   const addToNotificationQueue = (message, options = {}) => {
