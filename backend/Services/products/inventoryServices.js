@@ -301,6 +301,167 @@ const mapPendingRequest = (row) => {
 };
 
 
+
+const safeNumber = (value) => {
+    if (value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+};
+
+const deriveRequestStatusDetail = (row) => {
+    if (!row) {
+        return {
+            code: 'unknown',
+            label: 'Unknown status',
+            tone: 'slate',
+            is_final: false,
+            stage: null
+        };
+    }
+
+    if (row.status === 'approved') {
+        return {
+            code: 'approved',
+            label: 'Approved',
+            tone: 'emerald',
+            is_final: true,
+            stage: row.current_stage
+        };
+    }
+
+    if (row.status === 'rejected') {
+        return {
+            code: 'rejected',
+            label: 'Rejected',
+            tone: 'rose',
+            is_final: true,
+            stage: row.current_stage
+        };
+    }
+
+    if (row.status === 'pending' && row.current_stage === 'admin_review') {
+        return {
+            code: 'pending_admin',
+            label: 'Awaiting owner approval',
+            tone: 'blue',
+            is_final: false,
+            stage: row.current_stage
+        };
+    }
+
+    if (row.status === 'pending') {
+        return {
+            code: 'pending_manager',
+            label: 'Awaiting branch manager approval',
+            tone: 'amber',
+            is_final: false,
+            stage: row.current_stage
+        };
+    }
+
+    const fallback = String(row.status || 'Unknown').replace(/_/g, ' ');
+
+    return {
+        code: String(row.status || 'unknown').toLowerCase(),
+        label: fallback.charAt(0).toUpperCase() + fallback.slice(1),
+        tone: 'slate',
+        is_final: false,
+        stage: row.current_stage
+    };
+};
+
+const buildRequestSummary = (row) => {
+    const payload = row?.payload || {};
+    const productData = payload?.productData || payload || {};
+    const currentState = payload?.currentState || null;
+
+    const categoryName = payload?.category_name
+        ?? productData?.category_name
+        ?? currentState?.category_name
+        ?? null;
+
+    return {
+        product_name: productData?.product_name || currentState?.product_name || 'Inventory item',
+        category_name: categoryName,
+        action_label: row?.action_type === 'update' ? 'Update existing item' : 'Add new item',
+        quantity_requested: safeNumber(productData?.quantity_added ?? productData?.quantity),
+        current_quantity: safeNumber(currentState?.quantity),
+        unit: productData?.unit || currentState?.unit || null,
+        unit_price: safeNumber(productData?.unit_price),
+        unit_cost: safeNumber(productData?.unit_cost)
+    };
+};
+
+const mapRequestStatusRow = (row, options = {}) => {
+    if (!row) return null;
+
+    const includePayload = Boolean(options.includePayload);
+    const statusDetail = deriveRequestStatusDetail(row);
+    const summary = buildRequestSummary(row);
+    const finalDecisionAt = row.status === 'pending'
+        ? null
+        : (row.admin_approved_at || row.approved_at || row.manager_approved_at || null);
+
+    const managerTimeline = {
+        status: row.manager_approved_at ? 'completed' : 'pending',
+        acted_at: row.manager_approved_at || null,
+        approver_id: row.manager_approver_id || null,
+        approver_name: row.manager_approver_name || null
+    };
+
+    const adminTimeline = row.requires_admin_review ? {
+        status: row.admin_approved_at ? 'completed' : (statusDetail.code === 'pending_admin' ? 'pending' : null),
+        acted_at: row.admin_approved_at || null,
+        approver_id: row.admin_approver_id || null,
+        approver_name: row.admin_approver_name || null
+    } : null;
+
+    const lastActivity = finalDecisionAt
+        || (adminTimeline?.acted_at ?? null)
+        || (managerTimeline.acted_at ?? null)
+        || row.created_at
+        || null;
+
+    return {
+        pending_id: row.pending_id,
+        branch_id: row.branch_id,
+        branch_name: row.branch_name,
+        product_id: row.product_id,
+        action_type: row.action_type,
+        status: row.status,
+        current_stage: row.current_stage,
+        requires_admin_review: row.requires_admin_review,
+        created_by: row.created_by,
+        created_by_name: row.created_by_name,
+        created_by_roles: normalizeRoles(row.created_by_roles),
+        manager_approver_id: row.manager_approver_id,
+        manager_approver_name: row.manager_approver_name,
+        manager_approved_at: row.manager_approved_at,
+        admin_approver_id: row.admin_approver_id,
+        admin_approver_name: row.admin_approver_name,
+        admin_approved_at: row.admin_approved_at,
+        approved_by: row.approved_by,
+        approved_at: row.approved_at,
+        rejection_reason: row.rejection_reason,
+        created_at: row.created_at,
+        last_activity_at: lastActivity,
+        status_detail: statusDetail,
+        summary,
+        timeline: {
+            submitted_at: row.created_at || null,
+            manager: managerTimeline,
+            admin: adminTimeline,
+            final: {
+                status: row.status,
+                acted_at: finalDecisionAt,
+                rejection_reason: row.rejection_reason || null
+            }
+        },
+        payload: includePayload ? row.payload : undefined
+    };
+};
+
+
 const getUserFullName = async (userId) => {
     if (!userId) return null;
     const { rows } = await SQLquery('SELECT first_name, last_name FROM Users WHERE user_id = $1', [userId]);
@@ -1299,6 +1460,76 @@ export const getAdminPendingInventoryRequests = async () => {
     );
 
     return rows.map(mapPendingRequest);
+};
+
+
+export const getInventoryRequestStatusFeed = async (options = {}) => {
+    const {
+        scope = 'user',
+        branchId = null,
+        requesterId = null,
+        statuses = null,
+        limit = 20,
+        offset = 0,
+        includePayload = false
+    } = options;
+
+    const filters = [];
+    const params = [];
+    let paramIndex = 1;
+
+    if (scope === 'user' && requesterId) {
+        filters.push(`ipa.created_by = $${paramIndex++}`);
+        params.push(requesterId);
+    } else if (scope === 'branch' && branchId) {
+        filters.push(`ipa.branch_id = $${paramIndex++}`);
+        params.push(branchId);
+    } else if (scope === 'admin' && branchId) {
+        filters.push(`ipa.branch_id = $${paramIndex++}`);
+        params.push(branchId);
+    }
+
+    if (Array.isArray(statuses) && statuses.length > 0) {
+        const normalized = statuses
+            .map(status => String(status || '').toLowerCase())
+            .filter(Boolean);
+
+        const hasPendingAdmin = normalized.includes('pending_admin');
+        const withoutPendingAdmin = normalized.filter(status => status !== 'pending_admin');
+
+        if (withoutPendingAdmin.length > 0) {
+            filters.push(`LOWER(ipa.status) = ANY($${paramIndex++})`);
+            params.push(withoutPendingAdmin);
+        }
+
+        if (hasPendingAdmin) {
+            filters.push(`(ipa.status = 'pending' AND ipa.current_stage = 'admin_review')`);
+        }
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+
+    const numericLimit = Math.max(1, Math.min(Number(limit) || 20, 200));
+    const numericOffset = Math.max(0, Number(offset) || 0);
+
+    const query = `
+        SELECT ipa.*,
+               b.branch_name,
+               (manager.first_name || ' ' || manager.last_name) AS manager_approver_name,
+               (admin.first_name || ' ' || admin.last_name) AS admin_approver_name
+        FROM Inventory_Pending_Actions ipa
+        LEFT JOIN Branch b ON ipa.branch_id = b.branch_id
+        LEFT JOIN Users manager ON manager.user_id = ipa.manager_approver_id
+        LEFT JOIN Administrator admin ON admin.admin_id = ipa.admin_approver_id
+        ${whereClause}
+        ORDER BY ipa.created_at DESC
+        LIMIT $${paramIndex++}
+        OFFSET $${paramIndex++}`;
+
+    params.push(numericLimit, numericOffset);
+
+    const { rows } = await SQLquery(query, params);
+    return rows.map(row => mapRequestStatusRow(row, { includePayload }));
 };
 
 

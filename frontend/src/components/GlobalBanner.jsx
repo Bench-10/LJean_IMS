@@ -1,8 +1,8 @@
-import React from 'react'
+import React, { useMemo, useCallback } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { IoMdNotifications } from "react-icons/io";
 
-function GlobalBanner({setOpenNotif, unreadCount}) {
+function GlobalBanner({setOpenNotif, unreadCount, onOpenRequestMonitor}) {
 
   const {user} = useAuth();
   
@@ -12,6 +12,27 @@ function GlobalBanner({setOpenNotif, unreadCount}) {
     if (hour < 18) return "Good afternoon";
     return "Good evening";
   };
+
+    const userRoles = useMemo(() => {
+        if (!user) return [];
+        if (Array.isArray(user.role)) return user.role;
+        return user.role ? [user.role] : [];
+    }, [user]);
+
+    const canOpenRequests = userRoles.some(role => ['Inventory Staff', 'Branch Manager'].includes(role));
+    const showNotifications = typeof setOpenNotif === 'function';
+
+    const handleNotificationClick = useCallback(() => {
+        if (typeof setOpenNotif === 'function') {
+            setOpenNotif();
+        }
+    }, [setOpenNotif]);
+
+    const handleRequestMonitorClick = useCallback(() => {
+        if (typeof onOpenRequestMonitor === 'function') {
+            onOpenRequestMonitor();
+        }
+    }, [onOpenRequestMonitor]);
 
   return (
     <div className='hidden lg:block lg:ml-[var(--sidebar-width)] pt-12 sm:pt-4 pb-4 px-8 bg-white/95 backdrop-blur-sm '>
@@ -42,18 +63,35 @@ function GlobalBanner({setOpenNotif, unreadCount}) {
             </div>
 
 
-                {(user && user.role && user.role.some(role => ['Inventory Staff', 'Branch Manager', 'Owner'].includes(role))) &&
-                    <div className='relative p-2 border-2 rounded-lg border-gray-600 hover:text-white hover:bg-gray-600 transition-all cursor-pointer' onClick={setOpenNotif}>
-                        <IoMdNotifications />
-                        {unreadCount > 0 && (
-                            <div className='absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium'>
-                            {unreadCount > 99 ? '99+' : unreadCount}
-                            </div>
-                        )}
-                        
-                    </div>
-               
-               }
+                                {(canOpenRequests || showNotifications) && (
+                                    <div className='flex items-center gap-3'>
+                                        {canOpenRequests && (
+                                            <button
+                                                type="button"
+                                                className='h-10 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white transition hover:bg-emerald-600'
+                                                onClick={handleRequestMonitorClick}
+                                            >
+                                                Request Status
+                                            </button>
+                                        )}
+								
+                                        {showNotifications && (
+                                            <button
+                                                type="button"
+                                                className='relative flex h-10 w-10 items-center justify-center rounded-lg border-2 border-gray-600 text-gray-700 transition hover:bg-gray-600 hover:text-white'
+                                                onClick={handleNotificationClick}
+                                                aria-label="Open notifications"
+                                            >
+                                                <IoMdNotifications />
+                                                {unreadCount > 0 && (
+                                                    <span className='absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-medium text-white'>
+                                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
 
         </div>
         

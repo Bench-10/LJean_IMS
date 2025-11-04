@@ -133,6 +133,103 @@ export const getPendingInventoryRequests = async (req, res) => {
 };
 
 
+export const getInventoryRequestStatusFeed = async (req, res) => {
+    try {
+        const rawRoles = req.user?.role;
+        const roles = Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : [];
+        const isOwner = roles.includes('Owner');
+        const isBranchManager = roles.includes('Branch Manager');
+        const isInventoryStaff = roles.includes('Inventory Staff');
+
+        if (!isOwner && !isBranchManager && !isInventoryStaff) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        const defaultScope = isOwner ? 'admin' : isBranchManager ? 'branch' : 'user';
+        const requestedScope = String(req.query.scope || '').toLowerCase();
+        const scope = ['user', 'branch', 'admin'].includes(requestedScope) ? requestedScope : defaultScope;
+
+        if (scope === 'admin' && !isOwner) {
+            return res.status(403).json({ message: 'Owner access required for admin scope' });
+        }
+
+        const parsedBranchId = req.query.branch_id !== undefined && req.query.branch_id !== null && req.query.branch_id !== ''
+            ? Number(req.query.branch_id)
+            : null;
+
+        if (parsedBranchId !== null && Number.isNaN(parsedBranchId)) {
+            return res.status(400).json({ message: 'branch_id must be numeric' });
+        }
+
+        let effectiveBranchId = parsedBranchId;
+
+        if (scope === 'branch') {
+            const fallbackBranchId = req.user?.branch_id !== undefined ? Number(req.user.branch_id) : null;
+            effectiveBranchId = parsedBranchId ?? fallbackBranchId;
+
+            if (!effectiveBranchId) {
+                return res.status(400).json({ message: 'branch_id is required for branch scope' });
+            }
+
+            if (!isOwner && String(effectiveBranchId) !== String(req.user.branch_id)) {
+                return res.status(403).json({ message: 'Cannot view other branches' });
+            }
+        }
+
+        const statuses = Array.isArray(req.query.status)
+            ? req.query.status
+            : typeof req.query.status === 'string' && req.query.status.trim().length > 0
+                ? req.query.status.split(',').map(status => status.trim()).filter(Boolean)
+                : null;
+
+        const includePayload = String(req.query.include_payload || '').toLowerCase() === 'true';
+
+        const limitParam = parseInt(req.query.limit, 10);
+        const offsetParam = parseInt(req.query.offset, 10);
+        const limit = Math.max(1, Math.min(Number.isNaN(limitParam) ? 20 : limitParam, 50));
+        const offset = Math.max(0, Number.isNaN(offsetParam) ? 0 : offsetParam);
+        const requesterId = req.user?.user_id ? Number(req.user.user_id) : null;
+
+        if (scope === 'user' && !requesterId) {
+            return res.status(400).json({ message: 'Unable to resolve requesting user' });
+        }
+
+        const rows = await inventoryServices.getInventoryRequestStatusFeed({
+            scope,
+            branchId: effectiveBranchId,
+            requesterId,
+            statuses,
+            limit: limit + 1,
+            offset,
+            includePayload
+        });
+
+        const hasMore = rows.length > limit;
+        const requests = hasMore ? rows.slice(0, limit) : rows;
+        const lastEntry = requests[requests.length - 1];
+
+        res.status(200).json({
+            scope,
+            filters: {
+                branch_id: effectiveBranchId,
+                statuses
+            },
+            meta: {
+                limit,
+                offset,
+                count: requests.length,
+                has_more: hasMore,
+                next_cursor: hasMore && lastEntry ? `${lastEntry.pending_id}:${lastEntry.created_at || ''}` : null
+            },
+            requests
+        });
+    } catch (error) {
+        console.error('Error fetching inventory request status feed:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
+
 export const approvePendingInventoryRequest = async (req, res) => {
     try {
         const pendingId = req.params.id;

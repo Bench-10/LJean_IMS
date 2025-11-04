@@ -12,6 +12,7 @@ router.post("/items", authenticate, requireRole('Inventory Staff', 'Branch Manag
 router.put("/items/:id", authenticate, requireRole('Inventory Staff', 'Branch Manager', 'Owner'), writeOperationLimiter, itemControllers.updateItem);
 router.get("/items/search", authenticate, itemControllers.searchItem);
 router.get("/items/unique", authenticate, itemControllers.getAllUniqueProducts);
+router.get("/items/request-status", authenticate, requireRole('Inventory Staff', 'Branch Manager', 'Owner'), itemControllers.getInventoryRequestStatusFeed);
 router.get("/items/pending", authenticate, requireRole('Branch Manager', 'Owner'), itemControllers.getPendingInventoryRequests);
 router.patch("/items/pending/:id/approve", authenticate, requireRole('Branch Manager', 'Owner'), writeOperationLimiter, itemControllers.approvePendingInventoryRequest);
 router.patch("/items/pending/:id/reject", authenticate, requireRole('Branch Manager', 'Owner'), writeOperationLimiter, itemControllers.rejectPendingInventoryRequest);

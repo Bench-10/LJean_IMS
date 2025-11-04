@@ -262,7 +262,7 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
         {usersLoading ? (
           <ChartLoading message="Loading users..."/>
         ) : filteredUserData.length === 0 ? (
-          <NoInfoFound col={1}/>
+          <NoInfoFound col={1} isTable={false} />
         ) : (
           filteredUserData.map((row, rowIndex) => {
             const statusBadge = getStatusBadge(row);

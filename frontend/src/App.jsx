@@ -28,6 +28,7 @@ import AccountDisabledPopUp from "./components/dialogs/AccountDisabledPopUp";
 import ProductExistsDialog from "./components/dialogs/ProductExistsDialog";
 import Approvals from "./Pages/Approvals";
 import { Toaster, toast } from "react-hot-toast";
+import InventoryRequestMonitorDialog from "./components/dialogs/InventoryRequestMonitorDialog.jsx";
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 const TAB_HIDDEN_GRACE_MS = 20 * 1000;
@@ -61,6 +62,7 @@ function App() {
   const [pendingInventoryLoading, setPendingInventoryLoading] = useState(false);
   const [adminInventoryRequests, setAdminInventoryRequests] = useState([]);
   const [adminInventoryLoading, setAdminInventoryLoading] = useState(false);
+  const [isRequestMonitorOpen, setIsRequestMonitorOpen] = useState(false);
 
   const normalizePendingId = (value) => (value === null || value === undefined ? '' : String(value));
 
@@ -149,7 +151,17 @@ function App() {
     () => userRoles.some(role => ['Branch Manager', 'Inventory Staff', 'Owner'].includes(role)),
     [userRoles]
   );
+  const canOpenRequestMonitor = useMemo(
+    () => userRoles.some(role => ['Inventory Staff', 'Branch Manager', 'Owner'].includes(role)),
+    [userRoles]
+  );
   
+  useEffect(() => {
+    if (!canOpenRequestMonitor && isRequestMonitorOpen) {
+      setIsRequestMonitorOpen(false);
+    }
+  }, [canOpenRequestMonitor, isRequestMonitorOpen]);
+
 
   //PREVENTS SCRIPTS ATTACKS ON INPUT FIELDS
   function sanitizeInput(input) {
@@ -519,6 +531,13 @@ function App() {
       setHasLoggedOutDueToStatus(false);
     }
   }, [user]);
+
+  const handleRequestMonitorOpen = useCallback(() => {
+    if (!canOpenRequestMonitor) {
+      return;
+    }
+    setIsRequestMonitorOpen(true);
+  }, [canOpenRequestMonitor]);
 
   // CHECK USER STATUS ON INITIAL LOAD OR USER CHANGE
   useEffect(() => {
@@ -1599,6 +1618,13 @@ function App() {
         onNotificationNavigate={handleNotificationNavigation}
       />
 
+      <InventoryRequestMonitorDialog
+        open={isRequestMonitorOpen && canOpenRequestMonitor}
+        onClose={() => setIsRequestMonitorOpen(false)}
+        user={user}
+        branches={branches}
+      />
+
   
 
       {/*PAGES */}
@@ -1614,7 +1640,7 @@ function App() {
 
         
         {/*INVENTORY PAGE*/}
-        <Route element={<RouteProtection>  <PageLayout setOpenNotif={handleNotificationPanelOpen} unreadCount={unreadCount}/>  </RouteProtection>}>
+  <Route element={<RouteProtection>  <PageLayout setOpenNotif={handleNotificationPanelOpen} unreadCount={unreadCount} onOpenRequestMonitor={handleRequestMonitorOpen}/>  </RouteProtection>}>
           <Route path="/inventory" exact element={ 
               <RouteProtection allowedRoles={['Owner', 'Inventory Staff', 'Branch Manager']}>
 
@@ -1722,6 +1748,7 @@ function App() {
                 approveInventoryRequest={handleOwnerApprovePendingInventory}
                 rejectInventoryRequest={handleOwnerRejectPendingInventory}
                 refreshInventoryRequests={fetchAdminPendingInventoryRequests}
+                onOpenRequestMonitor={handleRequestMonitorOpen}
               />
 
             </RouteProtection>

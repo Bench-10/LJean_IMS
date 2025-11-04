@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ChartLoading from "../components/common/ChartLoading";
 import NoInfoFound from "../components/common/NoInfoFound";
+import { MdInfoOutline } from "react-icons/md";
+import { useAuth } from "../authentication/Authentication";
 import RejectionReasonDialog from "../components/dialogs/RejectionReasonDialog";
 
 function Approvals({
@@ -13,7 +15,8 @@ function Approvals({
   inventoryRequestsLoading = false,
   approveInventoryRequest,
   rejectInventoryRequest,
-  refreshInventoryRequests
+  refreshInventoryRequests,
+  onOpenRequestMonitor
 }) {
   const [searchItem, setSearchItem] = useState("");
   const [approvingUserId, setApprovingUserId] = useState(null);
@@ -21,6 +24,13 @@ function Approvals({
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [pendingRejectId, setPendingRejectId] = useState(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const ownerCanOpenRequestMonitor = useMemo(() => {
+    if (!user) return false;
+    const roles = Array.isArray(user.role) ? user.role : user.role ? [user.role] : [];
+    return roles.includes("Owner");
+  }, [user]);
 
   const handleSearch = (event) => {
     if (!sanitizeInput) {
@@ -185,16 +195,27 @@ function Approvals({
             value={searchItem}
           />
         </div>
-        {typeof refreshInventoryRequests === "function" && (
-          <div className="w-full md:w-auto md:ml-auto">
-            <button
-              className="w-full md:w-auto px-4 py-2 text-xs sm:text-sm border border-amber-500 text-amber-600 rounded-md hover:bg-amber-100 transition-colors font-medium"
-              onClick={refreshInventoryRequests}
-            >
-              Refresh inventory approvals
-            </button>
+        {(ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function") || typeof refreshInventoryRequests === "function" ? (
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:ml-auto md:items-center md:justify-end">
+            {ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function" && (
+              <button
+                type="button"
+                className="w-full sm:w-auto px-4 py-2 text-xs sm:text-sm rounded-md bg-emerald-700 text-white font-medium transition hover:bg-emerald-600"
+                onClick={onOpenRequestMonitor}
+              >
+                View request status
+              </button>
+            )}
+            {typeof refreshInventoryRequests === "function" && (
+              <button
+                className="w-full sm:w-auto px-4 py-2 text-xs sm:text-sm border border-amber-500 text-amber-600 rounded-md hover:bg-amber-100 transition-colors font-medium"
+                onClick={refreshInventoryRequests}
+              >
+                Refresh inventory approvals
+              </button>
+            )}
           </div>
-        )}
+        ) : null}
       </div>
 
       <hr className="border-t-2 my-3 sm:my-4 w-full border-gray-500 rounded-lg" />
@@ -352,7 +373,10 @@ function Approvals({
         {combinedLoading ? (
           <ChartLoading message="Loading pending approvals..." />
         ) : combinedRequests.length === 0 ? (
-          <NoInfoFound col={1} message="No pending approvals at the moment." />
+          <div className="bg-transparent flex flex-col items-center justify-center h-[180px] w-full rounded-lg border border-dashed border-gray-300 text-center text-sm text-gray-500 py-6">
+            <MdInfoOutline className="text-3xl text-gray-400 mb-2" aria-hidden="true" />
+            <span className="font-medium italic">No pending approvals at the moment.</span>
+          </div>
         ) : (
           combinedRequests.map((entry) => {
             if (entry.kind === 'user') {
