@@ -278,23 +278,45 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
       printWindow.document.write(printableMarkup);
       printWindow.document.close();
 
-      let hasPrinted = false;
-
       const finalizePrint = () => {
-        if (hasPrinted) return;
-        hasPrinted = true;
         try {
           printWindow.focus();
+          
+          // Close window after print dialog is dismissed (print/cancel/close)
+          printWindow.addEventListener('afterprint', () => {
+            try {
+              printWindow.close();
+            } catch (err) {
+              console.error('Unable to close print window:', err);
+            }
+          });
+
+          // Fallback: close if window loses focus after a delay
+          const handleBlur = () => {
+            setTimeout(() => {
+              try {
+                if (printWindow && !printWindow.closed) {
+                  printWindow.close();
+                }
+              } catch (err) {
+                console.error('Unable to close print window on blur:', err);
+              }
+            }, 500);
+          };
+          printWindow.addEventListener('blur', handleBlur, { once: true });
+
           printWindow.print();
+          setPrinting(false);
         } catch (err) {
           console.error('Printing failed:', err);
-        } finally {
-          try {
-            printWindow.close();
-          } catch (closeErr) {
-            console.error('Unable to close print window:', closeErr);
-          }
           setPrinting(false);
+          try {
+            if (printWindow && !printWindow.closed) {
+              printWindow.close();
+            }
+          } catch (closeErr) {
+            console.error('Unable to close print window after error:', closeErr);
+          }
         }
       };
 
@@ -302,7 +324,11 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
         finalizePrint();
       } else {
         printWindow.addEventListener('load', finalizePrint, { once: true });
-        setTimeout(finalizePrint, 1000); // fallback in case load never fires
+        setTimeout(() => {
+          if (printWindow && !printWindow.closed) {
+            finalizePrint();
+          }
+        }, 1500);
       }
     } catch (error) {
       console.error('Failed to open printable invoice:', error);

@@ -312,20 +312,20 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
           </div>
 
           {/* DROPDOWN FILTER */}
-<DropdownCustom
-  value={saleFilter}
-  onChange={e => setSaleFilter(e.target.value)}
-  label="Sale Type"
-  variant="floating"
-  options={[
-    { value: 'all', label: 'All Sales' },
-    { value: 'normal', label: 'Normal Sales' },
-    { value: 'for_delivery', label: 'For Delivery Sales' },
-    { value: 'delivered', label: 'Delivered Sales' },
-    { value: 'undelivered', label: 'Undelivered Sales' },
-    { value: 'out_for_delivery', label: 'Out for Delivery Sales' }
-  ]}
-/>
+          <DropdownCustom
+            value={saleFilter}
+            onChange={e => setSaleFilter(e.target.value)}
+            label="Sale Type"
+            variant="floating"
+            options={[
+              { value: 'all', label: 'All Sales' },
+              { value: 'normal', label: 'Normal Sales' },
+              { value: 'for_delivery', label: 'For Delivery Sales' },
+              { value: 'delivered', label: 'Delivered Sales' },
+              { value: 'undelivered', label: 'Undelivered Sales' },
+              { value: 'out_for_delivery', label: 'Out for Delivery Sales' }
+            ]}
+          />
 
           {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
           {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) &&
@@ -430,13 +430,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
         </div>
 
         {/*PAGINATION AND CONTROLS */}
-<<<<<<< HEAD
-      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
-        {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
-        <div className='flex justify-between items-center gap-2 sm:hidden'>
-          {/* LEFT: ITEM COUNT (MOBILE) */}
-          <div className='text-xs text-gray-600 flex-shrink-0'>
-=======
         <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
           {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
           <div className='flex justify-between items-center gap-2 sm:hidden'>
@@ -475,7 +468,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
           {/* DESKTOP & TABLET: Item count, centered pagination controls, and placeholder */}
           <div className='text-sm text-gray-600 hidden sm:block flex-1'>
->>>>>>> c2373cd (pagination in sales)
             {filteredData.length > 0 ? (
               <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length}</>
             ) : (
@@ -483,71 +475,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
             )}
           </div>
 
-<<<<<<< HEAD
-          {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
-          {filteredData.length > 0 && (
-            <div className='flex items-center gap-1'>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
-              >
-                Previous
-              </button>
-              <span className='text-xs text-gray-600 whitespace-nowrap'>
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>{/* END OF MOBILE VIEW*/}
-
-        {/* DESKTOP LAYOUT: LEFT + CENTER PAGINATION */}
-<div className="hidden sm:relative sm:flex sm:items-center w-full mt-3 pb-6 px-3">
-
-  {/* LEFT: ITEM COUNT */}
-  <div className="text-sm text-gray-600">
-    {filteredData.length > 0 ? (
-      <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
-    ) : (
-      <span></span>
-    )}
-  </div>
-
-  {/* CENTER: PAGINATION CONTROLS */}
-  {filteredData.length > 0 && (
-    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-      <button
-        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-        disabled={currentPage === 1}
-        className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-      >
-        Previous
-      </button>
-      <span className="text-sm text-gray-600 whitespace-nowrap">
-        Page {currentPage} of {totalPages}
-      </span>
-      <button
-        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-        disabled={currentPage === totalPages}
-        className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-      >
-        Next
-      </button>
-    </div>
-  )}
-
-</div>
-
-
-      </div>
-=======
           <div className='flex justify-center flex-1'>
             {filteredData.length > 0 && (
               <div className='flex items-center space-x-2'>
@@ -576,7 +503,6 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
           <div className='flex justify-end flex-1'>
           </div>
         </div>
->>>>>>> c2373cd (pagination in sales)
 
     </div>
   )
