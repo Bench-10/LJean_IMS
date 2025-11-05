@@ -3,6 +3,7 @@ import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 import { restoreStockFromSale, deductStockAndTrackUsage } from "../sale/saleServices.js";
 import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, broadcastValidityUpdate } from "../../server.js";
 import { createNewDeliveryNotification, createDeliveryStatusNotification, createDeliveryStockNotification } from "./deliveryNotificationService.js";
+import { invalidateAnalyticsCache } from "../analytics/analyticsServices.js";
 
 
 
@@ -58,6 +59,8 @@ export const addDeliveryData = async(data) =>{
         console.log(`Delivery record created for sale ID: ${salesId} with status: ${status.is_delivered ? 'delivered' : 'pending'}`);
 
         await SQLquery('COMMIT');
+
+    invalidateAnalyticsCache();
 
         // BROADCAST NEW DELIVERY UPDATE TO ALL USERS IN THE BRANCH
         const createdDelivery = newData[0];
@@ -421,6 +424,8 @@ export const setToDelivered = async(saleID, update) => {
         }
 
         await SQLquery('COMMIT');
+
+        invalidateAnalyticsCache();
         return updateDelivery[0];
 
     } catch (error) {

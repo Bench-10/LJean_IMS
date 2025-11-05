@@ -3,6 +3,7 @@ import {correctDateFormat} from "../Services_Utils/convertRedableDate.js";
 import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
 import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, broadcastValidityUpdate } from "../../server.js";
 import { convertToBaseUnit, convertToDisplayUnit } from "../Services_Utils/unitConversion.js";
+import { invalidateAnalyticsCache } from "../analytics/analyticsServices.js";
 
 
 const getSaleUnitConfig = async (productId, branchId, sellUnit) => {
@@ -232,6 +233,8 @@ export const addSale = async (headerAndProducts) => {
 
 
         await SQLquery('COMMIT');
+
+        invalidateAnalyticsCache();
 
 
         const {rows} = await SQLquery(`
@@ -586,6 +589,8 @@ export const restoreStockFromSale = async (salesInformationId, reason = 'Order c
         
         await SQLquery('COMMIT');
 
+    invalidateAnalyticsCache();
+
         const restoredProductIds = [...new Set(stockUsage.map((usage) => usage.product_id))];
 
         for (const productId of restoredProductIds) {
@@ -646,6 +651,8 @@ export const cancelSale = async (salesInformationId, reason = 'Sale canceled') =
         // await SQLquery('UPDATE Sales_Information SET status = $1 WHERE sales_information_id = $2', ['canceled', salesInformationId]);
         
         await SQLquery('COMMIT');
+
+    invalidateAnalyticsCache();
         return { success: true, message: `Sale ${salesInformationId} canceled and stock restored` };
         
     } catch (error) {

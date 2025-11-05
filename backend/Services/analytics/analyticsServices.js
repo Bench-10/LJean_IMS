@@ -38,6 +38,19 @@ function setAnalyticsCache(key, value) {
   analyticsCache.set(key, { value, timestamp: Date.now() });
 }
 
+export function invalidateAnalyticsCache(prefix) {
+  if (!prefix) {
+    analyticsCache.clear();
+    return;
+  }
+
+  for (const key of Array.from(analyticsCache.keys())) {
+    if (key.startsWith(prefix)) {
+      analyticsCache.delete(key);
+    }
+  }
+}
+
 function buildSalesFilters({ start, end, branch_id, category_id }) {
   const filters = ['s.date BETWEEN $1 AND $2', RESTORED_SALES_FILTER];
   const params = [start, end];
