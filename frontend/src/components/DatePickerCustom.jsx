@@ -249,8 +249,11 @@ const formatDate = (dateString) => {
         </button>
 
         {isOpen && !disabled && (
-          <div ref={calendarRef} className="absolute z-50 mt-2 w-full bg-white rounded-xl shadow-2xl border-2 border-blue-100 overflow-hidden animate-popup">
-            {/* Calendar Header with Gradient */}
+          <div
+  ref={calendarRef}
+  className="absolute z-[10001] mt-2 w-full bg-white rounded-xl shadow-2xl border-2 border-blue-100
+             animate-popup max-h-[65vh] overflow-auto"
+>{/* Calendar Header with Gradient */}
             <div className="bg-blue-600 p-3">
               <div className="flex items-center justify-between">
                 <button
@@ -335,5 +338,4 @@ const formatDate = (dateString) => {
   );
 };
 
-// Demo Component
 export default DatePickerCustom

@@ -382,69 +382,75 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                 </div>
 
                 {/* RIGHT SIDE - FILTER BUTTON & POPUP */}
-                <div className='relative mt-2 sm:mt-0 w-full lg:w-auto'>
-                  <dialog className="absolute bg-transparent rounded-lg flex-col z-50 top-[110%] sm:top-[100%] right-0 sm:left-auto sm:right-0" open={openFilter}>
-                    <div className='w-[360px] lg:w-[360px] h-auto border rounded-md px-3 py-4 shadow-lg text-xs bg-white'>
-                      <h1 className='font-bold text-md'>Filter</h1>
+                <div className="relative mt-2 sm:mt-0 w-full lg:w-auto overflow-visible">
 
-                      <div className='w-full mt-3'>
-                        <DatePickerCustom
-                          label="Start date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          placeholder="Select start date"
-                          id="start-date"
-                        />
-                      </div>
+                  {/* POPUP (no nested <dialog>) */}
+{openFilter && (
+  <div
+    className="absolute z-[10000]
+               top-[110%] left-1/2 -translate-x-1/2
+               sm:top-[100%] sm:left-auto sm:right-0 sm:translate-x-0"
+  >
+    <div className="w-[92vw] sm:w-[360px] max-w-[420px]
+                    border rounded-md px-3 py-4 shadow-lg text-xs bg-white">
+      <h1 className="font-bold text-md">Filter</h1>
 
-                      <div className='w-full mt-3'>
-                        <DatePickerCustom
-                          label="End date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          placeholder="Select end date"
-                          id="end-date"
-                        />
-                      </div>
+      <div className="w-full mt-3">
+        <DatePickerCustom
+          label="Start date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          placeholder="Select start date"
+          id="start-date"
+        />
+      </div>
 
-                      <div className='w-full mt-4 flex gap-2'>
-                        <button
-                          className='flex-1 bg-white py-1.5 px-4 text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md transition-colors font-medium'
-                          onClick={async () => {
-                            setEndDate('');
-                            setStartDate('');
+      <div className="w-full mt-3">
+        <DatePickerCustom
+          label="End date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          placeholder="Select end date"
+          id="end-date"
+        />
+      </div>
 
-                            // Fetch with empty dates immediately
-                            try {
-                              setLoading(true);
-                              const dates = { startDate: '', endDate: '' };
-                              let response;
-                              if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
-                                response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
-                              } else {
-                                response = await api.post(`/api/product_history/`, dates);
-                              }
-                              setProductHistory(response.data);
-                            } catch (error) {
-                              setError(error.message);
-                            } finally {
-                              setLoading(false);
-                            }
+      <div className="w-full mt-4 flex gap-2">
+        <button
+          className="flex-1 bg-white py-1.5 px-4 text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md transition-colors font-medium"
+          onClick={async () => {
+            setEndDate(''); setStartDate('');
+            try {
+              setLoading(true);
+              const dates = { startDate: '', endDate: '' };
+              let response;
+              if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
+                response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
+              } else {
+                response = await api.post(`/api/product_history/`, dates);
+              }
+              setProductHistory(response.data);
+            } catch (error) {
+              setError(error.message);
+            } finally {
+              setLoading(false);
+            }
+            setOpenFilter(false);
+          }}
+        >
+          Clear
+        </button>
+        <button
+          className="flex-1 bg-gray-800 py-1.5 px-4 text-white hover:bg-gray-700 border border-gray-800 rounded-md transition-colors font-medium"
+          onClick={applyFilter}
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-                            setOpenFilter(false);
-                          }}
-                        >
-                          Clear
-                        </button>
-                        <button
-                          className='flex-1 bg-gray-800 py-1.5 px-4 text-white hover:bg-gray-700 border border-gray-800 rounded-md transition-colors font-medium'
-                          onClick={applyFilter}
-                        >
-                          Apply
-                        </button>
-                      </div>
-                    </div>
-                  </dialog>
 
                   <button
                     className={`h-9 w-full sm:w-9 flex items-center justify-center border border-gray-300 rounded-md 
