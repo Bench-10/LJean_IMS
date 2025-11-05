@@ -149,9 +149,11 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   }
 
   const filteredData = filteredSale.filter(sale => 
+    // Match by charge to, TIN, address or sales information id
     sale.charge_to?.toLowerCase().includes(searchSale.toLowerCase()) ||
     sale.tin?.toLowerCase().includes(searchSale.toLowerCase()) ||
-    sale.address?.toLowerCase().includes(searchSale.toLowerCase()) 
+    sale.address?.toLowerCase().includes(searchSale.toLowerCase()) ||
+    String(sale.sales_information_id).includes(searchSale)
   );
 
   const totalItems = filteredData.length;

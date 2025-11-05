@@ -319,9 +319,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
     const params = {
       branch_id: branchId || undefined,
-      category_id: categoryFilter || undefined,
-      start_date: resolvedRange.start_date,
-      end_date: resolvedRange.end_date,
+      range: '1y',
       limit: 50,
       interval: salesInterval,
       include_forecast: true
@@ -339,7 +337,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     } finally {
       setLoadingRestockSuggestions(false);
     }
-  }, [branchId, categoryFilter, resolvedRange, salesInterval, user]);
+  }, [branchId, salesInterval, user]);
 
   const fetchInventoryLevels = useCallback(async (signal) => {
     if (!user) return;

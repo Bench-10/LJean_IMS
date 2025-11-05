@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { currencyFormat } from '../../utils/formatCurrency';
 import {
-  FaThumbsUp,
   FaExclamationTriangle,
   FaInfoCircle,
   FaTimes,
@@ -121,6 +120,9 @@ const RestockSuggestionsDialog = ({
 
       const confidence = computeConfidence(periodsHistorical, forecastSeries.length);
 
+      const unitPrice = totalHistoricalUnits > 0 ? product.sales_amount / totalHistoricalUnits : 0;
+      const allocationCost = restockGap * unitPrice;
+
       return {
         id: product.product_id ?? `product-${index}`,
         priority: index + 1,
@@ -141,11 +143,15 @@ const RestockSuggestionsDialog = ({
         targetStock,
         restockGap,
         confidence,
+        unitPrice,
+        allocationCost,
         historySeries,
         forecastSeries
       };
     });
   }, [prioritizedProducts, coverageMultiplier]);
+
+  const totalAllocation = productInsights.reduce((sum, product) => sum + product.allocationCost, 0);
 
   const hasData = productInsights.length > 0;
   const lowStockCount = productInsights.filter(product => product.lowStock).length;
@@ -168,7 +174,7 @@ const RestockSuggestionsDialog = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-xl">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-xl flex flex-col">
         <div className="p-7 border-b-2 border-black/20">
           <div className="flex items-center justify-between">
             <div>
@@ -187,8 +193,8 @@ const RestockSuggestionsDialog = ({
           </div>
         </div>
 
-        <style>{hideScrollbarStyles}</style>
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] hide-scrollbar">
+  <style>{hideScrollbarStyles}</style>
+  <div className="p-6 overflow-y-auto flex-1 hide-scrollbar">
           {loading ? (
             <div className="text-center py-12">
               <FaInfoCircle className="text-4xl text-gray-400 mx-auto mb-4" />
@@ -243,7 +249,7 @@ const RestockSuggestionsDialog = ({
                 {productInsights.map(product => (
                   <div key={product.id} className="border border-gray-400 rounded-lg p-4 bg-white shadow-md hover:shadow-2xl hover:border-green-600 transition-all">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
+                      <div className="sm:flex-1">
                         <div className="text-xs font-semibold text-gray-500 uppercase">Priority {product.priority}</div>
                         <div className="flex items-center gap-2">
                           <h4 className="text-lg font-semibold text-gray-900">{product.name}</h4>
@@ -254,94 +260,73 @@ const RestockSuggestionsDialog = ({
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
+
+                      <div className="flex items-center justify-center">
+                        <div className="text-xs font-semibold text-gray-500">
+                          Confidence:&nbsp;
+                          <span className={confidenceTone(product.confidence)}>{product.confidence.toUpperCase()}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-right sm:w-48">
                         <div className="text-sm font-semibold text-emerald-600">{product.totalHistoricalUnits.toLocaleString()} units sold</div>
                         <div className="text-xs text-gray-500">{currencyFormat(product.salesAmount)}</div>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                    <div className="mt-4 flex flex-col md:flex-row md:items-stretch md:gap-4">
+                      <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 md:flex-1 flex flex-col items-center justify-center text-center md:h-full">
                         <h5 className="text-sm font-semibold text-gray-800">Historical snapshot</h5>
                         {product.periodsHistorical === 0 ? (
                           <p className="mt-2 text-xs text-gray-500">Not enough historical data for this product.</p>
                         ) : (
-                          <div className="mt-2 space-y-2 text-xs text-gray-600">
-                            <div>
-                              Average {Math.ceil(product.averageHistoricalUnits).toLocaleString()} unit{Math.ceil(product.averageHistoricalUnits) === 1 ? '' : 's'} per {intervalLabel} across {product.periodsHistorical} period{product.periodsHistorical === 1 ? '' : 's'}.
+                          <div className="mt-2 space-y-2 text-gray-600">
+                            <div className="text-2xl font-extrabold text-gray-900">
+                              {Math.ceil(product.averageHistoricalUnits).toLocaleString()}
                             </div>
-                            <div>
-                              Suggested buffer from history: {product.historicalSuggested.toLocaleString()} unit{product.historicalSuggested === 1 ? '' : 's'} (~{product.historyWindow} {intervalLabel}{product.historyWindow > 1 ? 's' : ''}).
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-lg border border-gray-100 bg-sky-50 p-4">
-                        <h5 className="text-sm font-semibold text-gray-800">Prophet forecast</h5>
-                        {product.forecastWindow === 0 ? (
-                          <p className="mt-2 text-xs text-gray-500">Forecast unavailable — additional sales data is required.</p>
-                        ) : (
-                          <div className="mt-2 space-y-2 text-xs text-gray-600">
-                            <div>
-                              Prophet projects {Math.ceil(product.totalForecastUnits).toLocaleString()} unit{Math.ceil(product.totalForecastUnits) === 1 ? '' : 's'} in the next {product.forecastWindow} {intervalLabel}{product.forecastWindow > 1 ? 's' : ''}.
-                            </div>
-                            <div>
-                              Forecast-based stock target: {product.forecastSuggested.toLocaleString()} unit{product.forecastSuggested === 1 ? '' : 's'}.
+                            <div className="text-sm">
+                              unit{Math.ceil(product.averageHistoricalUnits) === 1 ? '' : 's'} per {intervalLabel} • over the past {product.periodsHistorical} {intervalLabel}{product.periodsHistorical === 1 ? '' : 's'}
                             </div>
                           </div>
                         )}
+                      </div>
 
-                        {product.forecastSeries.length > 0 && (
-                          <ul className="mt-3 space-y-1 text-[11px] text-gray-500">
-                            {product.forecastSeries.slice(0, Math.min(product.forecastSeries.length, 3)).map(entry => (
-                              <li key={entry.period}>
-                                {entry.period}: {Math.ceil(entry.forecast_units).toLocaleString()} unit{Math.ceil(entry.forecast_units) === 1 ? '' : 's'} expected
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </div>
+                      <div className="rounded-lg bg-emerald-50 p-4 md:flex-1 md:border-l md:border-gray-200 md:pl-4 flex flex-col items-center justify-center md:h-full">
+                        <div className="w-full text-center">
+                          <div className="text-sm font-semibold text-gray-700 mb-2">Recommended restocking</div>
+                          <div className="flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="mt-1 text-2xl md:text-3xl font-extrabold text-emerald-900">{Math.ceil(product.totalForecastUnits).toLocaleString()}</div>
+                              <div className="text-xs text-gray-500">in next {product.forecastWindow} {intervalLabel}{product.forecastWindow > 1 ? 's' : ''}</div>
+                            </div>
+                          </div>
 
-                    <div className="mt-4 grid gap-3 text-xs text-gray-600 sm:grid-cols-3">
-                      <div>
-                        <span className="text-gray-500">Current stock</span>
-                        <div className="text-sm font-medium text-gray-800">
-                          {product.currentQuantity != null ? product.currentQuantity.toLocaleString() : 'Not provided'}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Minimum threshold</span>
-                        <div className="text-sm font-medium text-gray-800">
-                          {product.minThreshold != null ? product.minThreshold.toLocaleString() : 'Not set'}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Forecast target</span>
-                        <div className="text-sm font-medium text-gray-800">
-                          {product.targetStock.toLocaleString()} unit{product.targetStock === 1 ? '' : 's'}
+                          {product.forecastWindow === 0 ? (
+                            <p className="mt-2 text-xs text-gray-500">Forecast unavailable — additional sales data is required.</p>
+                          ) : (
+                            <div className="mt-2 text-xs text-gray-600">
+                              {/* Compact summary; header/icon removed. */}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        <FaThumbsUp className="text-green-600" />
-                        {product.restockGap > 0
-                          ? `Restock ${product.restockGap.toLocaleString()} unit${product.restockGap === 1 ? '' : 's'} to reach the Prophet-driven target of ${product.targetStock.toLocaleString()} units.`
-                          : 'Current inventory already meets the forecast coverage window.'}
-                      </div>
-                      <div className="text-xs font-semibold text-gray-500">
-                        Confidence:&nbsp;
-                        <span className={confidenceTone(product.confidence)}>{product.confidence.toUpperCase()}</span>
-                      </div>
-                    </div>
+                    
                   </div>
                 ))}
               </section>
             </div>
           )}
+        </div>
+
+        {/* Sticky footer: compact budget allocation that doesn't take much space */}
+        <div className="p-3 border-t bg-white flex items-center justify-start">
+          <div>
+            <div className="text-sm text-gray-700">Budget allocation recommendation</div>
+            <div className="text-lg font-extrabold text-gray-900 mt-1">{currencyFormat(totalAllocation)}</div>
+            <div className="text-xs text-gray-500">Total to allocate for the recommended restocking (based on {intervalLabel} forecast)</div>
+          </div>
         </div>
       </div>
     </div>

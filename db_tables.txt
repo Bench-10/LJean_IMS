@@ -572,11 +572,6 @@ COMMIT;
 
 
 
-
-
-
-
-
 CREATE TABLE inventory_alert_history_links (
     alert_id INT PRIMARY KEY REFERENCES Inventory_Alerts(alert_id) ON DELETE CASCADE,
     add_id INT NOT NULL REFERENCES Add_Stocks(add_id) ON DELETE CASCADE,

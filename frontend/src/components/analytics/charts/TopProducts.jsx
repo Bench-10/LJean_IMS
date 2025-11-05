@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { currencyFormat } from '../../../utils/formatCurrency';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Area, Legend, Cell, ReferenceLine, ComposedChart } from 'recharts';
 import ChartNoData from '../../common/ChartNoData.jsx';
@@ -89,9 +89,33 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
   const hasActualData = actualSeries.length > 0;
   const hasForecastData = forecastSeries.length > 0;
 
-  const lastActualPeriod = hasActualData ? actualSeries[actualSeries.length - 1]?.period : null;
+  const historicalLimits = {
+    daily: 15,
+    weekly: 8,
+    monthly: 6,
+    yearly: 6
+  };
 
-  const forecastChartData = combinedSeries.map(item => {
+  const historicalLimit = historicalLimits[salesInterval] ?? null;
+
+  const displayActualSeries = useMemo(() => {
+    if (!historicalLimit || actualSeries.length <= historicalLimit) return actualSeries;
+    return actualSeries.slice(-historicalLimit);
+  }, [actualSeries, historicalLimit]);
+
+  const displayCombinedSeries = useMemo(() => {
+    if (!historicalLimit || actualSeries.length <= historicalLimit) return combinedSeries;
+    const allowedPeriods = new Set(displayActualSeries.map(item => item.period));
+    return combinedSeries.filter(item => item.is_forecast === true || allowedPeriods.has(item.period));
+  }, [combinedSeries, displayActualSeries, actualSeries.length, historicalLimit]);
+
+  const displayForecastSeries = useMemo(() => {
+    if (!historicalLimit || actualSeries.length <= historicalLimit) return forecastSeries;
+    return displayCombinedSeries.filter(item => item && item.is_forecast === true);
+  }, [displayCombinedSeries, forecastSeries, historicalLimit, actualSeries.length]);
+
+  const lastActualPeriod = hasActualData ? actualSeries[actualSeries.length - 1]?.period : null;
+  const mapForecastSeriesToChart = (series) => series.map(item => {
     const period = item?.period ?? '';
     const isForecast = item && item.is_forecast === true;
     const actualUnits = !isForecast ? Number(item?.units_sold ?? item?.value ?? 0) : null;
@@ -117,6 +141,9 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
         : null
     };
   });
+
+  const forecastChartData = mapForecastSeriesToChart(combinedSeries);
+  const chartForecastData = mapForecastSeriesToChart(displayCombinedSeries);
   
   return (
     <>
@@ -248,7 +275,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
           ) : (
           <ResponsiveContainer width="100%" height="100%">
 
-            <LineChart data={actualSeries} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+            <LineChart data={displayActualSeries} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
               <defs>
                 <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#0f766e" stopOpacity={0.3}/>
@@ -261,8 +288,8 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
               <XAxis dataKey="period" tick={{ fontSize: 10 }} tickFormatter={formatPeriod} />
 
               {(() => {
-                const maxSales = actualSeries.reduce((m,p)=> Math.max(m, Number(p.sales_amount)||0), 0);
-                const maxUnits = actualSeries.reduce((m,p)=> Math.max(m, Number(p.units_sold)||0), 0);
+                const maxSales = displayActualSeries.reduce((m,p)=> Math.max(m, Number(p.sales_amount)||0), 0);
+                const maxUnits = displayActualSeries.reduce((m,p)=> Math.max(m, Number(p.units_sold)||0), 0);
                 const overallMax = Math.max(maxSales, maxUnits);
                                 
                 if (overallMax <= 0) return <YAxis type="number" domain={[0, 1]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
@@ -307,7 +334,7 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
   ) : (
   <div className="flex-1 min-h-0 overflow-hidden">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={forecastChartData} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
+          <ComposedChart data={chartForecastData} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
             <defs>
 
             <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
@@ -326,8 +353,8 @@ function TopProducts({topProducts, salesPerformance, formatPeriod, restockTrends
             <XAxis dataKey="period" tick={{ fontSize: 10 }} tickFormatter={formatPeriod} />
                         
             {(() => {
-              const maxActual = actualSeries.reduce((m,p)=> Math.max(m, Number(p.units_sold)||0), 0);
-              const maxForecast = forecastSeries.reduce((m,p)=> Math.max(m, Number(p.units_sold)||0), 0);
+              const maxActual = displayActualSeries.reduce((m,p)=> Math.max(m, Number(p.units_sold)||0), 0);
+              const maxForecast = displayForecastSeries.reduce((m,p)=> Math.max(m, Number(p.units_sold)||0), 0);
               const max = Math.max(maxActual, maxForecast);
                             
               if (max <= 0) return <YAxis tick={{ fontSize: 10 }} domain={[0, 1]} />;
