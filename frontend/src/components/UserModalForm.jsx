@@ -5,6 +5,7 @@ import { FaSpinner } from 'react-icons/fa';
 import api from '../utils/api';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
+import DropdownCustom from './DropdownCustom';
 
 function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes, setOpenUsers }) {
 
@@ -30,6 +31,15 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
   const [openDialog, setDialog] = useState(false);
 
   const message = mode === 'add' ? "Are you sure you want to add this user?" : "Are you sure you want to update this user?";
+
+  // Convert branches to dropdown options
+  const branchOptions = [
+    { value: '', label: '--Select a branch--' },
+    ...branches.map(b => ({
+      value: b.branch_id,
+      label: b.branch_name
+    }))
+  ];
 
   useEffect(() => {
     if (!user || !user.role) return;
@@ -157,8 +167,8 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
   };
 
   const inputDesign = (field) => `
-    w-full h-11 px-3 border rounded-lg text-gray-800 bg-white shadow-sm 
-    focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-all text-sm sm:text-base
+    w-full h-10 px-3 border rounded-lg text-gray-800 bg-white shadow-sm 
+    focus:outline-none hover:border-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-sm sm:text-base
     ${emptyField[field] ||
       (field === 'username' && (usernameExisting || invalidEmail)) ||
       (field === 'password' && passwordCheck) ||
@@ -204,7 +214,7 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
             >
               {/* Header */}
               <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-start sm:items-center gap-3 flex-shrink-0 sticky top-0 z-10">
-  <h1 className="text-white font-bold text-2xl">
+                <h1 className="text-white font-bold text-2xl">
                   {mode === 'add' ? 'ADD NEW USER' : 'Edit User Information'}
                 </h1>
                 <button
@@ -243,65 +253,70 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
                       {errorflag('last_name', 'Last Name')}
                     </div>
 
-                    {/* Branch */}
+                    {/* Branch - Using DropdownCustom */}
                     <div className="relative">
-                      <h2 className="font-medium text-green-900 mb-2">Branch</h2>
                       {user.role.some(role => ['Branch Manager'].includes(role)) ? (
-                        <input
-                          type="text"
-                          className={inputDesign('branch')}
-                          value={branches.find(b => b.branch_id === branch)?.branch_name || ''}
-                          readOnly
-                        />
+                        <>
+                          <h2 className="font-medium text-green-900 mb-2">Branch</h2>
+                          <input
+                            type="text"
+                            className={inputDesign('branch')}
+                            value={branches.find(b => b.branch_id === branch)?.branch_name || ''}
+                            readOnly
+                          />
+                        </>
                       ) : (
-                        <select
-                          className={inputDesign('branch')}
+                        <DropdownCustom
+                          label="Branch"
                           value={branch}
                           onChange={(e) => setBranch(e.target.value)}
-                        >
-                          <option value="">--Select a branch--</option>
-                          {branches.map(option => (
-                            <option key={option.branch_id} value={option.branch_id}>{option.branch_name}</option>
-                          ))}
-                        </select>
+                          options={branchOptions}
+                          variant="simple"
+                          error={emptyField.branch}
+                          labelClassName="block font-medium text-green-900 mb-2"
+                        />
                       )}
                       {errorflag('branch', 'Branch')}
                     </div>
 
                     {/* User Role */}
+
                     <div className="relative">
                       <h2 className="font-medium text-green-900 mb-2">User Role</h2>
-                      {user.role.some(role => ['Owner'].includes(role)) && (
-                        <div className="flex items-center gap-2 mb-2">
-                          <input
-                            type="checkbox"
-                            checked={role.isManager}
-                            onChange={(e) => setRole(prev => ({ ...prev, isManager: e.target.checked }))}
-                            className="h-5 w-5 accent-green-600 rounded-md border-gray-300 hover:ring-2 hover:ring-green-400"
-                          />
-                          <label className="text-sm sm:text-base text-gray-700">Branch Manager</label>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mb-2">
-                        <input
-                          type="checkbox"
-                          checked={role.isInventoryStaff}
-                          onChange={(e) => setRole(prev => ({ ...prev, isInventoryStaff: e.target.checked }))}
-                          className="h-5 w-5 accent-green-600 rounded-md border-gray-300 hover:ring-2 hover:ring-green-400"
-                        />
-                        <label className="text-sm sm:text-base text-gray-700">Inventory Staff</label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={role.isSalesAssociate}
-                          onChange={(e) => setRole(prev => ({ ...prev, isSalesAssociate: e.target.checked }))}
-                          className="h-5 w-5 accent-green-600 rounded-md border-gray-300 hover:ring-2 hover:ring-green-400"
-                        />
-                        <label className="text-sm sm:text-base text-gray-700">Sales Associate</label>
-                      </div>
+                      <DropdownCustom
+                        label=""
+                        value={
+                          role.isManager
+                            ? 'Branch Manager'
+                            : role.isInventoryStaff
+                              ? 'Inventory Staff'
+                              : role.isSalesAssociate
+                                ? 'Sales Associate'
+                                : ''
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setRole({
+                            isManager: value === 'Branch Manager',
+                            isInventoryStaff: value === 'Inventory Staff',
+                            isSalesAssociate: value === 'Sales Associate',
+                          });
+                        }}
+                        options={[
+                          { value: '', label: '-- Select Role --' },
+                          ...(user.role.some((r) => ['Owner'].includes(r))
+                            ? [{ value: 'Branch Manager', label: 'Branch Manager' }]
+                            : []),
+                          { value: 'Inventory Staff', label: 'Inventory Staff' },
+                          { value: 'Sales Associate', label: 'Sales Associate' },
+                        ]}
+                        variant="simple"
+                        error={emptyField.role}
+                        labelClassName="block font-medium text-green-900 mb-2"
+                      />
                       {errorflag('role', 'User Role')}
                     </div>
+
 
                     {/* Cell Number */}
                     <div className="relative">

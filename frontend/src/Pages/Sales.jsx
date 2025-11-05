@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import ChartLoading from '../components/common/ChartLoading.jsx';
@@ -21,51 +21,18 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50); // SHOW 50 ITEMS PER PAGE
-  const rowRefs = useRef({});
-  const tableContainerRef = useRef(null);
-  const navigationTargetRef = useRef(null);
-  const ignoreFilterResetRef = useRef(false);
-  const highlightTimeoutRef = useRef(null);
 
-  const [highlightedSaleId, setHighlightedSaleId] = useState(null);
-  const [pendingHighlightSaleId, setPendingHighlightSaleId] = useState(null);
-
-  // RESET PAGINATION WHEN FILTER CHANGES (SKIP DURING PROGRAMMATIC NAVIGATION)
+  // RESET PAGINATION WHEN FILTER CHANGES
   useEffect(() => {
-    if (ignoreFilterResetRef.current) {
-      ignoreFilterResetRef.current = false;
-      return;
-    }
     setCurrentPage(1);
-
   }, [saleFilter]);
-
-  // Smoothly center the highlighted row within the virtualized table viewport
-  const scrollRowIntoView = useCallback((rowElement) => {
-    if (!rowElement) return;
-
-    const container = tableContainerRef.current;
-    if (!container) {
-      requestAnimationFrame(() => scrollRowIntoView(rowElement));
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const rowRect = rowElement.getBoundingClientRect();
-    const offset = (rowRect.top - containerRect.top) - ((container.clientHeight - rowElement.clientHeight) / 2);
-    const targetScrollTop = container.scrollTop + offset;
-
-    container.scrollTo({
-      top: targetScrollTop,
-      behavior: 'smooth'
-    });
-  }, []);
 
   //HEADER AND TOTAL INFORMATION
   const [saleData, setSaleData ] = useState({
     sale_id: '',
     chargeTo: '',
     tin: '',
+    address: '',
     date: '',
     amountNet: '',
     vat: '',
@@ -132,8 +99,8 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
     setCurrentPage(1); // RESET TO FIRST PAGE WHEN SEARCHING
   };
 
-  // FILTER & PAGINATE SALES
-  let filteredSale = Array.isArray(saleHeader) ? saleHeader : [];
+  //FILTER DROPDOWN SELECTION
+  let filteredSale = saleHeader;
   if (saleFilter === 'normal') {
     filteredSale = filteredSale.filter(sale => !sale.is_for_delivery);
 
@@ -148,140 +115,22 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
   }
 
+  // Filter by search
   const filteredData = filteredSale.filter(sale => 
-    // Match by charge to, TIN, address or sales information id
     sale.charge_to?.toLowerCase().includes(searchSale.toLowerCase()) ||
     sale.tin?.toLowerCase().includes(searchSale.toLowerCase()) ||
-    sale.address?.toLowerCase().includes(searchSale.toLowerCase()) ||
-    String(sale.sales_information_id).includes(searchSale)
+    sale.address?.toLowerCase().includes(searchSale.toLowerCase()) 
   );
 
+  // PAGINATION LOGIC
   const totalItems = filteredData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentPageData = filteredData.slice(startIndex, endIndex);
 
-  rowRefs.current = {};
-
-  const attemptNavigationFocus = useCallback(() => {
-    const target = navigationTargetRef.current;
-    if (!target || !target.saleId) return;
-
-    if (saleFilter !== 'all') return;
-    if (searchSale !== '') return;
-
-    const salesList = Array.isArray(saleHeader) ? saleHeader : [];
-    if (!salesList.length) return;
-
-    const saleIndex = salesList.findIndex(
-      (sale) => Number(sale.sales_information_id) === Number(target.saleId)
-    );
-
-    if (saleIndex === -1) return;
-
-    const targetPage = Math.floor(saleIndex / itemsPerPage) + 1;
-
-    if (currentPage !== targetPage) {
-      setCurrentPage(targetPage);
-      return;
-    }
-
-    setPendingHighlightSaleId(Number(target.saleId));
-    navigationTargetRef.current = null;
-  }, [saleHeader, saleFilter, searchSale, itemsPerPage, currentPage]);
-
-  useEffect(() => {
-    attemptNavigationFocus();
-  }, [attemptNavigationFocus, saleHeader, currentPage, saleFilter, searchSale]);
-
-  useEffect(() => {
-    const handleNavigateToSaleRow = (event) => {
-      const detail = event.detail || {};
-      if (!detail.saleId) return;
-
-      try {
-        // remove any persisted pending navigation for sale since we're handling it now
-        sessionStorage.removeItem('pendingNavigateToSale');
-      } catch (e) { /* ignore non-browser env */ }
-
-      navigationTargetRef.current = {
-        saleId: Number(detail.saleId),
-        highlightContext: detail.highlightContext ?? null
-      };
-
-      setOpenSoldItems(false);
-      setModalType("");
-
-      setSearchSale((prev) => (prev === '' ? prev : ''));
-
-      setSaleFilter((prev) => {
-        if (prev === 'all') return prev;
-        ignoreFilterResetRef.current = true;
-        return 'all';
-      });
-
-      attemptNavigationFocus();
-    };
-
-    window.addEventListener('navigate-to-sale-row', handleNavigateToSaleRow);
-
-    // If a navigation event fired before this component mounted, consume any pending navigation stored in sessionStorage
-    try {
-      const pending = sessionStorage.getItem('pendingNavigateToSale');
-      if (pending) {
-        const parsed = JSON.parse(pending);
-        if (parsed && parsed.saleId) {
-          navigationTargetRef.current = {
-            saleId: Number(parsed.saleId),
-            highlightContext: parsed.highlightContext ?? null
-          };
-
-          // Clear stored pending navigation now that we're consuming it
-          sessionStorage.removeItem('pendingNavigateToSale');
-
-          // Attempt to focus/navigation; attemptNavigationFocus will handle pagination readiness
-          attemptNavigationFocus();
-        }
-      }
-    } catch (e) { /* ignore non-browser env */ }
-
-    return () => {
-      window.removeEventListener('navigate-to-sale-row', handleNavigateToSaleRow);
-    };
-  }, [attemptNavigationFocus]);
-
-  useEffect(() => {
-    return () => {
-      if (highlightTimeoutRef.current) {
-        clearTimeout(highlightTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (pendingHighlightSaleId === null) return;
-
-    const rowElement = rowRefs.current[pendingHighlightSaleId];
-
-  if (!rowElement) return;
-
-  // Use the table container scroll helper so only the table scrolls —
-  // this prevents shifting the global page/banner when auto-scrolling.
-  scrollRowIntoView(rowElement);
-    setHighlightedSaleId(pendingHighlightSaleId);
-    setPendingHighlightSaleId(null);
-
-    if (highlightTimeoutRef.current) {
-      clearTimeout(highlightTimeoutRef.current);
-    }
-    highlightTimeoutRef.current = setTimeout(() => {
-      setHighlightedSaleId(null);
-    }, 2000);
-  }, [currentPageData, pendingHighlightSaleId, scrollRowIntoView]);
-
   return (
-    <div className='pt-20 lg:pt-8 px-4 lg:px-8 h-screen'>
+    <div className='pt-20 lg:pt-8 px-4 lg:px-8'>
 
       <ViewingSalesAndDelivery 
         openModal={openItems}
@@ -314,20 +163,20 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
           </div>
 
           {/* DROPDOWN FILTER */}
-          <DropdownCustom
-            value={saleFilter}
-            onChange={e => setSaleFilter(e.target.value)}
-            label="Sale Type"
-            variant="floating"
-            options={[
-              { value: 'all', label: 'All Sales' },
-              { value: 'normal', label: 'Normal Sales' },
-              { value: 'for_delivery', label: 'For Delivery Sales' },
-              { value: 'delivered', label: 'Delivered Sales' },
-              { value: 'undelivered', label: 'Undelivered Sales' },
-              { value: 'out_for_delivery', label: 'Out for Delivery Sales' }
-            ]}
-          />
+<DropdownCustom
+  value={saleFilter}
+  onChange={e => setSaleFilter(e.target.value)}
+  label="Sale Type"
+  variant="floating"
+  options={[
+    { value: 'all', label: 'All Sales' },
+    { value: 'normal', label: 'Normal Sales' },
+    { value: 'for_delivery', label: 'For Delivery Sales' },
+    { value: 'delivered', label: 'Delivered Sales' },
+    { value: 'undelivered', label: 'Undelivered Sales' },
+    { value: 'out_for_delivery', label: 'Out for Delivery Sales' }
+  ]}
+/>
 
           {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
           {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) &&
@@ -342,7 +191,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
 
         <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg"/>
 
-  <div ref={tableContainerRef} className="overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+      <div className="overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
         <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 z-10">
               <tr>
@@ -394,24 +243,9 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
                   ) : 
 
                   (
-                    currentPageData.map((row, rowIndex) => {
-                      const saleIdValue = Number(row.sales_information_id);
-                      const isHighlighted = highlightedSaleId === saleIdValue;
-
-                      return (
-                        <tr
-                          key={saleIdValue || rowIndex}
-                          ref={(el) => {
-                            if (!saleIdValue) return;
-                            if (el) {
-                              rowRefs.current[saleIdValue] = el;
-                            } else {
-                              delete rowRefs.current[saleIdValue];
-                            }
-                          }}
-                          className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""} transition-colors duration-300 ease-in-out ${isHighlighted ? 'bg-green-100' : ''}`}
-                          onClick={() => {openSoldItems(row); setModalType("sales")}}
-                        >
+                    currentPageData.map((row, rowIndex) => (
+                  
+                      <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1 ) % 2 === 0 ? "bg-[#F6F6F6]":""}`} onClick={() => {openSoldItems(row); setModalType("sales")}}>
                         <td className="px-4 py-2 text-center"  >{row.sales_information_id}</td>
                         <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.charge_to}</td>
                         <td className="px-4 py-2 whitespace-nowrap"  >{row.tin}</td>
@@ -421,9 +255,8 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
                         <td className="px-4 py-2 text-right"  >{currencyFormat(row.vat)}</td>
                         <td className="px-5 py-2 text-right"  >{currencyFormat(row.total_amount_due)}</td>
 
-                        </tr>
-                      );
-                    })
+                      </tr>
+                    ))
                   ) 
               }
               
@@ -432,44 +265,11 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
         </div>
 
         {/*PAGINATION AND CONTROLS */}
-        <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
-          {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
-          <div className='flex justify-between items-center gap-2 sm:hidden'>
-            {/* LEFT: ITEM COUNT (MOBILE) */}
-            <div className='text-xs text-gray-600 flex-shrink-0'>
-              {filteredData.length > 0 ? (
-                <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length}</>
-              ) : (
-                <span></span>
-              )}
-            </div>
-
-            {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
-            {filteredData.length > 0 && (
-              <div className='flex items-center gap-1'>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
-                >
-                  Previous
-                </button>
-                <span className='text-xs text-gray-600 whitespace-nowrap'>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* DESKTOP & TABLET: Item count, centered pagination controls, and placeholder */}
-          <div className='text-sm text-gray-600 hidden sm:block flex-1'>
+      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
+        {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
+        <div className='flex justify-between items-center gap-2 sm:hidden'>
+          {/* LEFT: ITEM COUNT (MOBILE) */}
+          <div className='text-xs text-gray-600 flex-shrink-0'>
             {filteredData.length > 0 ? (
               <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length}</>
             ) : (
@@ -477,34 +277,69 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
             )}
           </div>
 
-          <div className='flex justify-center flex-1'>
-            {filteredData.length > 0 && (
-              <div className='flex items-center space-x-2'>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
-                >
-                  Previous
-                </button>
-                <span className='text-sm text-gray-600'>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className='px-3 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
+          {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
+          {filteredData.length > 0 && (
+            <div className='flex items-center gap-1'>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+              >
+                Previous
+              </button>
+              <span className='text-xs text-gray-600 whitespace-nowrap'>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>{/* END OF MOBILE VIEW*/}
 
-          {/* RIGHT: PLACEHOLDER FOR CONSISTENCY */}
-          <div className='flex justify-end flex-1'>
-          </div>
-        </div>
+        {/* DESKTOP LAYOUT: LEFT + CENTER PAGINATION */}
+{/* DESKTOP ONLY: left count + centered pagination */}
+<div className="hidden lg:relative lg:flex lg:items-center w-full">
+  {/* LEFT: ITEM COUNT (desktop) */}
+  <div className="text-sm text-gray-600">
+    {filteredData.length > 0 ? (
+      <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
+    ) : (
+      <span></span>
+    )}
+  </div>
+
+  {/* CENTER: PAGINATION (desktop only) */}
+  {filteredData.length > 0 && (
+    <div className="lg:absolute lg:left-1/2 lg:-translate-x-1/2 flex items-center gap-2">
+      <button
+        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+        disabled={currentPage === 1}
+        className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+      >
+        Previous
+      </button>
+      <span className="text-sm text-gray-600 whitespace-nowrap">
+        Page {currentPage} of {totalPages}
+      </span>
+      <button
+        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+        disabled={currentPage === totalPages}
+        className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+      >
+        Next
+      </button>
+    </div>
+  )}
+</div>
+
+
+
+      </div>
 
     </div>
   )

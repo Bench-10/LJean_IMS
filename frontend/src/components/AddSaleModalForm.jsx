@@ -4,7 +4,8 @@ import { IoMdAdd } from "react-icons/io";
 import toTwoDecimals from '../utils/fixedDecimalPlaces.js';
 import { currencyFormat } from '../utils/formatCurrency.js';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
-import FormLoading from './common/FormLoading';
+import FormLoading from './common/FormLoading'; 
+import DropdownUnitSelect from '../components/DropdownUnitSelect';
 import dayjs from 'dayjs';
 import api from '../utils/api.js';
 import {
@@ -650,7 +651,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
       )}
 
       <dialog className='bg-transparent fixed top-0 bottom-0 z-[9999] rounded-lg animate-popup' open={openSaleModal && user && user.role.some(role => ['Sales Associate'].includes(role))}>
-        <div className="relative flex flex-col border border-gray-300 bg-white h-[90vh] max-h-[700px] w-[90vw] lg:w-[1100px] rounded-lg shadow-2xl animate-popup" >
+        <div className="relative flex flex-col border border-gray-300 bg-white h-[90vh] max-h-[700px] w-[95vw] lg:w-[1100px] rounded-lg shadow-2xl animate-popup" >
 
 
           {/* FIXED HEADER */}
@@ -897,23 +898,24 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                           </td>
 
 
-                          <td className="px-2">
-                              <select
-                                className="border w-full rounded-md px-2 py-1.5"
-                                value={row.unit || ''}
-                                onChange={e => handleUnitChange(idx, e.target.value)}
-                                disabled={!row.product_id}
-                              >
-                                <option value="" disabled>
-                                  {row.product_id ? 'Select unit' : 'Choose product first'}
-                                </option>
-                                {Array.isArray(row.sellingUnits) && row.sellingUnits.map(unitOption => (
-                                  <option key={unitOption.unit} value={unitOption.unit}>
-                                    {`${unitOption.unit}`}
-                                  </option>
-                                ))}
-                              </select>
-                          </td>
+                          <td className="px-2 relative overflow-visible min-w-[140px]">
+  <DropdownUnitSelect
+    className="relative"                 // anchor the absolute-positioned menu
+    label="Unit"
+    labelClassName="sr-only"             // hide label in table
+    placeholder={row.product_id ? 'Select unit' : 'Choose product first'}
+    disabled={!row.product_id}
+    value={row.unit || ''}
+    onChange={(e) => handleUnitChange(idx, e.target.value)}
+    options={
+      !row.product_id
+        ? [{ value: '', label: 'Choose product first' }]
+        : (Array.isArray(row.sellingUnits) ? row.sellingUnits : [])
+            .map(u => ({ value: u.unit, label: u.unit }))
+    }
+  />
+</td>
+
 
 
                           <td className="px-2">
@@ -1045,15 +1047,23 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                           </div>
                         </div>
 
-                        <div>
-                          <label className='block text-xs font-bold mb-1 text-gray-600 uppercase'>Unit</label>
-                          <input
-                            type="text"
-                            className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50"
-                            value={row.unit}
-                            readOnly
-                          />
-                        </div>
+                        <div className="relative">
+  <label className="block text-xs font-bold mb-1 text-gray-600 uppercase">Unit</label>
+  <DropdownUnitSelect
+    className="relative"  // anchor for absolute dropdown
+    placeholder={row.product_id ? 'Select unit' : 'Choose product first'}
+    disabled={!row.product_id}
+    value={row.unit || ''}
+    onChange={(e) => handleUnitChange(idx, e.target.value)}
+    options={
+      !row.product_id
+        ? [{ value: '', label: 'Choose product first' }]
+        : (Array.isArray(row.sellingUnits) ? row.sellingUnits : [])
+            .map(u => ({ value: u.unit, label: u.unit }))
+    }
+  />
+</div>
+
                       </div>
 
                       {/* Unit Price and Amount */}
