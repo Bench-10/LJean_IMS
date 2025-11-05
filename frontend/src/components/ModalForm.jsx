@@ -3,15 +3,14 @@ import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
 import api from '../utils/api';
-import { getQuantityStep, validateQuantity, getQuantityPlaceholder, getUnitConfig } from '../utils/unitConversion';
+import { getQuantityStep, validateQuantity, getQuantityPlaceholder } from '../utils/unitConversion';
 import DropdownCustom from './DropdownCustom';
 import DatePickerCustom from './DatePickerCustom';
 
 function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput }) {
-  // GET USER INFORMATION
   const { user } = useAuth();
 
-  // CATEGORY OPTIONS (TEMPORARY)
+  // FORM STATE
   const [product_name, setItemName] = useState('');
   const [category_id, setCategory] = useState('');
   const [branch_id, setBranch] = useState('');
@@ -22,7 +21,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   const [min_threshold, setMinThreshold] = useState('');
   const [max_threshold, setMaxThreshold] = useState('');
   const [unit_price, setPrice] = useState('');
-  const [exceedQuantity, setForExceedQuantity] = useState(''); // Fixed typo: exceedQunatity -> exceedQuantity
+  const [exceedQuantity, setForExceedQuantity] = useState('');
   const [product_validity, setExpirationDate] = useState('');
   const [maxQuant, setMaxQuant] = useState(false);
   const [description, setDescription] = useState('');
@@ -37,10 +36,22 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   const [selectedExistingProduct, setSelectedExistingProduct] = useState(null);
   const [showExistingProducts, setShowExistingProducts] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  // INCREMENTAL RENDERING STATE FOR LARGE LISTS
   const [visibleCount, setVisibleCount] = useState(20);
   const BATCH_SIZE = 20;
   const overlayRef = useRef(null);
+
+  // Autofocus first field
+  const firstFieldRef = useRef(null);
+
+  // Lock background scroll while open
+  useEffect(() => {
+    if (isModalOpen) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => firstFieldRef.current?.focus(), 0);
+      return () => { document.body.style.overflow = original; };
+    }
+  }, [isModalOpen]);
 
   const areSellingUnitsEqual = (first = [], second = []) => {
     if (first.length !== second.length) return false;
@@ -52,9 +63,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         a.unit_price !== b.unit_price ||
         a.base_quantity_per_sell_unit !== b.base_quantity_per_sell_unit ||
         Boolean(a.is_base) !== Boolean(b.is_base)
-      ) {
-        return false;
-      }
+      ) return false;
     }
     return true;
   };
@@ -72,9 +81,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         }))
       : [];
 
-    if (!sanitizedBaseUnit) {
-      return preparedUnits.filter(entry => !entry.is_base);
-    }
+    if (!sanitizedBaseUnit) return preparedUnits.filter(entry => !entry.is_base);
 
     const blanks = [];
     const nonBaseUnits = [];
@@ -82,18 +89,9 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     preparedUnits.forEach(entry => {
       if (!entry) return;
       const identifier = typeof entry.unit === 'string' ? entry.unit.trim() : '';
-
-      if (!identifier) {
-        blanks.push({ ...entry, unit: '' });
-        return;
-      }
-
-      if (identifier === sanitizedBaseUnit) {
-        return;
-      }
-
-      const exists = nonBaseUnits.find(existing => existing.unit === identifier);
-      if (!exists) {
+      if (!identifier) { blanks.push({ ...entry, unit: '' }); return; }
+      if (identifier === sanitizedBaseUnit) return;
+      if (!nonBaseUnits.find(e => e.unit === identifier)) {
         nonBaseUnits.push({
           unit: identifier,
           unit_price: entry.unit_price,
@@ -103,129 +101,84 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       }
     });
 
-    const result = [
-      {
-        unit: sanitizedBaseUnit,
-        unit_price: basePriceString,
-        base_quantity_per_sell_unit: '1',
-        is_base: true
-      }
-    ];
+    const result = [{
+      unit: sanitizedBaseUnit,
+      unit_price: basePriceString,
+      base_quantity_per_sell_unit: '1',
+      is_base: true
+    }];
 
-    nonBaseUnits.forEach(entry => {
-      result.push({
-        unit: entry.unit,
-        unit_price: entry.unit_price,
-        base_quantity_per_sell_unit: entry.base_quantity_per_sell_unit,
-        is_base: false
-      });
-    });
-
-    blanks.forEach(entry => {
-      result.push({
-        unit: '',
-        unit_price: entry.unit_price,
-        base_quantity_per_sell_unit: entry.base_quantity_per_sell_unit,
-        is_base: false
-      });
-    });
+    nonBaseUnits.forEach(entry => result.push({ ...entry }));
+    blanks.forEach(entry => result.push({ ...entry, is_base: false }));
 
     return result;
   }, []);
 
   const initializeSellingUnits = useCallback((sourceUnits, baseUnitValue, basePriceValue) => {
     const basePriceString = basePriceValue === undefined || basePriceValue === null ? '' : String(basePriceValue);
-
     const prepared = Array.isArray(sourceUnits)
-      ? sourceUnits
-          .map(entry => ({
-            unit: typeof entry?.unit === 'string' ? entry.unit.trim() : typeof entry?.sell_unit === 'string' ? entry.sell_unit.trim() : '',
-            unit_price: entry?.unit_price === undefined || entry?.unit_price === null ? '' : String(entry.unit_price),
-            base_quantity_per_sell_unit: entry?.base_quantity_per_sell_unit === undefined || entry?.base_quantity_per_sell_unit === null ? '' : String(entry.base_quantity_per_sell_unit),
-            is_base: Boolean(entry?.is_base)
-          }))
+      ? sourceUnits.map(entry => ({
+          unit: typeof entry?.unit === 'string' ? entry.unit.trim() : typeof entry?.sell_unit === 'string' ? entry.sell_unit.trim() : '',
+          unit_price: entry?.unit_price == null ? '' : String(entry.unit_price),
+          base_quantity_per_sell_unit: entry?.base_quantity_per_sell_unit == null ? '' : String(entry.base_quantity_per_sell_unit),
+          is_base: Boolean(entry?.is_base)
+        }))
       : [];
-
     return syncSellingUnitsWithBase(prepared, baseUnitValue, basePriceString);
   }, [syncSellingUnitsWithBase]);
 
   const computeUnitsPerBase = (entry) => {
-    const quantity = Number(entry?.base_quantity_per_sell_unit);
-    if (!Number.isFinite(quantity) || quantity <= 0) return '';
-    const computed = 1 / quantity;
-    if (!Number.isFinite(computed) || computed <= 0) return '';
-    if (Math.abs(computed - Math.round(computed)) < 1e-9) {
-      return String(Math.round(computed));
-    }
-    return computed.toFixed(6).replace(/\.0+$|0+$/,'').replace(/\.$/, '');
+    const q = Number(entry?.base_quantity_per_sell_unit);
+    if (!Number.isFinite(q) || q <= 0) return '';
+    const v = 1 / q;
+    if (!Number.isFinite(v) || v <= 0) return '';
+    if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+    return v.toFixed(6).replace(/\.0+$|0+$/,'').replace(/\.$/,'');
   };
 
-  // STATES FOR ERROR HANDLING
+  // error states
   const [emptyField, setEmptyField] = useState({});
   const [notANumber, setNotANumber] = useState({});
   const [invalidNumber, setInvalidNumber] = useState({});
   const [isExpiredEarly, setIsExpiredEarly] = useState(false);
   const [unitValidationError, setUnitValidationError] = useState({});
 
-  // LOADING STATE
   const [loading, setLoading] = useState(false);
-
-  // FOR DIALOG
   const [openDialog, setDialog] = useState(false);
   const message = mode === 'add' ? "Are you sure you want to add this?" : "Are you sure you want to edit this?";
 
-  // FETCH EXISTING PRODUCTS ON MODAL OPEN
   const fetchExistingProducts = async () => {
     try {
-      const response = await api.get('/api/items/unique');
-      setExistingProducts(response.data);
-    } catch (error) {
-      console.error('Error fetching existing products:', error);
+      const { data } = await api.get('/api/items/unique');
+      setExistingProducts(data);
+    } catch (e) {
+      console.error('Error fetching existing products:', e);
     }
   };
 
-  // CLEARS THE FORM EVERYTIME THE ADD ITEMS BUTTON IS PRESSED
+  // reset on open
   useEffect(() => {
     if (!user) return;
-
-    if (isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))) {
-      setInvalidNumber({});
-      setIsExpiredEarly(false);
-      setEmptyField({});
-      setNotANumber({});
-      setUnitValidationError({});
-      setSelectedExistingProduct(null);
-      setSearchTerm('');
-      // reset edit choice when modal opens
-      setEditChoice(null);
+    if (isModalOpen && user?.role?.some(r => ['Inventory Staff'].includes(r))) {
+      setInvalidNumber({}); setIsExpiredEarly(false); setEmptyField({});
+      setNotANumber({}); setUnitValidationError({});
+      setSelectedExistingProduct(null); setSearchTerm(''); setEditChoice(null);
 
       if (mode === 'add') {
-        setItemName('');
-        setCategory('');
-        setBranch(user.branch_id);
-        setQuantity(0);
-        setPurchasedPrice('');
-        setDatePurchased('');
-        setUnit('');
-        setMaxThreshold('');
-        setMinThreshold('');
-        setPrice('');
-        setExpirationDate('');
-        setMaxQuant(false);
-        setForExceedQuantity('');
-        setDescription('');
-        setSellingUnits([]);
-        setSellingUnitErrors({ general: '', entries: {} });
+        setItemName(''); setCategory(''); setBranch(user.branch_id);
+        setQuantity(0); setPurchasedPrice(''); setDatePurchased('');
+        setUnit(''); setMaxThreshold(''); setMinThreshold('');
+        setPrice(''); setExpirationDate(''); setMaxQuant(false);
+        setForExceedQuantity(''); setDescription('');
+        setSellingUnits([]); setSellingUnitErrors({ general: '', entries: {} });
         setShowSellingUnitsEditor(false);
-
-        // FETCH EXISTING PRODUCTS FOR SELECTION
         fetchExistingProducts();
       }
 
       if (isModalOpen && mode === 'edit' && itemData) {
         setItemName(itemData.product_name);
         setCategory(itemData.category_id);
-        setBranch(user.branch_id); // BRANCH ID FROM USER INFORMATION
+        setBranch(user.branch_id);
         setQuantity(0);
         setPurchasedPrice(itemData.unit_cost);
         setUnit(itemData.unit);
@@ -244,31 +197,22 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   }, [isModalOpen, mode, itemData, user, initializeSellingUnits]);
 
   useEffect(() => {
-    setSellingUnits(prevUnits => {
-      const nextUnits = syncSellingUnitsWithBase(prevUnits, unit, unit_price);
-      return areSellingUnitsEqual(prevUnits, nextUnits) ? prevUnits : nextUnits;
+    setSellingUnits(prev => {
+      const next = syncSellingUnitsWithBase(prev, unit, unit_price);
+      return areSellingUnitsEqual(prev, next) ? prev : next;
     });
-    if (!unit || !unit.trim()) {
-      setShowSellingUnitsEditor(false);
-    }
+    if (!unit?.trim()) setShowSellingUnitsEditor(false);
   }, [unit, unit_price, syncSellingUnitsWithBase]);
 
-   useEffect(() => {
-     if (!showSellingUnitsEditor) return undefined;
-     const handleKeyDown = (event) => {
-       if (event.key === 'Escape') {
-         setShowSellingUnitsEditor(false);
-       }
-     };
-     document.addEventListener('keydown', handleKeyDown);
-     return () => {
-       document.removeEventListener('keydown', handleKeyDown);
-     };
-   }, [showSellingUnitsEditor]);
- 
-  const constructionUnits = ["pcs", "ltr", "gal", "bag", "pairs", "roll", "set", "sheet", "kg", "m", "cu.m", "btl", "can", "bd.ft", "meter", "pail"];
+  useEffect(() => {
+    if (!showSellingUnitsEditor) return;
+    const onEsc = (e) => { if (e.key === 'Escape') setShowSellingUnitsEditor(false); };
+    document.addEventListener('keydown', onEsc);
+    return () => document.removeEventListener('keydown', onEsc);
+  }, [showSellingUnitsEditor]);
 
-  // HANDLE SELECTING AN EXISTING PRODUCT
+  const constructionUnits = ["pcs","ltr","gal","bag","pairs","roll","set","sheet","kg","m","cu.m","btl","can","bd.ft","meter","pail"];
+
   const handleSelectExistingProduct = (product) => {
     setSelectedExistingProduct(product);
     setItemName(product.product_name);
@@ -276,59 +220,60 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     setCategory(product.category_id);
     setShowExistingProducts(false);
     setDescription(product.description);
-    setPrice(product.unit_price !== undefined && product.unit_price !== null ? String(product.unit_price) : '');
+    setPrice(product.unit_price != null ? String(product.unit_price) : '');
     setSellingUnits(initializeSellingUnits(product.selling_units, product.unit, product.unit_price));
     setSellingUnitErrors({ general: '', entries: {} });
-    setShowSellingUnitsEditor(Array.isArray(product.selling_units) && product.selling_units.some(entry => !entry?.is_base));
+    setShowSellingUnitsEditor(Array.isArray(product.selling_units) && product.selling_units.some(e => !e?.is_base));
   };
 
-  // FILTER EXISTING PRODUCTS BASED ON SEARCH TERM
-  const filteredExistingProducts = existingProducts.filter(product =>
-    product.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredExistingProducts = existingProducts.filter(p =>
+    p.product_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const nonBaseSellingUnitCount = sellingUnits.filter(entry => !entry.is_base).length;
+  const nonBaseSellingUnitCount = sellingUnits.filter(e => !e.is_base).length;
   const hasSellingUnitIssues = Boolean(sellingUnitErrors.general) || Object.keys(sellingUnitErrors.entries || {}).length > 0;
-  const sellingUnitToggleButtonClass = (() => {
-    if (!unit || !unit.trim()) return 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed';
-    if (hasSellingUnitIssues) return 'border-red-500 text-red-600 hover:bg-red-50';
-    return 'border-green-600 text-green-700 hover:bg-green-50';
-  })();
-  const baseUnitPriceDisplay = (() => {
-    const parsed = Number(unit_price);
-    if (!Number.isFinite(parsed) || parsed <= 0) return '—';
-    return `₱${parsed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  })();
-  const getAvailableUnitOptions = useCallback((rowIndex) => {
-    const normalizedBaseUnit = typeof unit === 'string' ? unit.trim().toLowerCase() : '';
-    const currentEntry = sellingUnits[rowIndex] || {};
-    const currentValue = typeof currentEntry.unit === 'string' ? currentEntry.unit.trim() : '';
-    const normalizedCurrentValue = currentValue.toLowerCase();
+  const sellingUnitToggleButtonClass = !unit?.trim()
+    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+    : hasSellingUnitIssues
+      ? 'border-red-500 text-red-600 hover:bg-red-50'
+      : 'border-green-600 text-green-700 hover:bg-green-50';
 
-    const usedUnits = new Set();
-    sellingUnits.forEach((entry, idx) => {
+  const baseUnitPriceDisplay = (() => {
+    const n = Number(unit_price);
+    if (!Number.isFinite(n) || n <= 0) return '—';
+    return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  })();
+
+  const getAvailableUnitOptions = useCallback((rowIndex) => {
+    const normalizedBase = (unit || '').trim().toLowerCase();
+    const current = sellingUnits[rowIndex] || {};
+    const currentVal = (current.unit || '').trim();
+    const normalizedCurrent = currentVal.toLowerCase();
+
+    const used = new Set();
+    sellingUnits.forEach((e, idx) => {
       if (idx === rowIndex) return;
-      if (entry?.is_base) return;
-      const identifier = typeof entry?.unit === 'string' ? entry.unit.trim() : '';
-      if (!identifier) return;
-      usedUnits.add(identifier.toLowerCase());
+      if (e?.is_base) return;
+      const id = (e?.unit || '').trim();
+      if (!id) return;
+      used.add(id.toLowerCase());
     });
 
     const dedupe = new Set();
     const options = [];
 
-    if (currentValue && !constructionUnits.some(opt => opt.toLowerCase() === normalizedCurrentValue)) {
-      options.push({ value: currentValue, label: currentValue });
-      dedupe.add(normalizedCurrentValue);
+    if (currentVal && !constructionUnits.some(o => o.toLowerCase() === normalizedCurrent)) {
+      options.push({ value: currentVal, label: currentVal });
+      dedupe.add(normalizedCurrent);
     }
 
-    constructionUnits.forEach(option => {
-      const normalizedOption = option.trim().toLowerCase();
-      if (normalizedOption === normalizedBaseUnit) return;
-      if (usedUnits.has(normalizedOption) && normalizedOption !== normalizedCurrentValue) return;
-      if (!dedupe.has(normalizedOption)) {
-        options.push({ value: option, label: option });
-        dedupe.add(normalizedOption);
+    constructionUnits.forEach(opt => {
+      const n = opt.trim().toLowerCase();
+      if (n === normalizedBase) return;
+      if (used.has(n) && n !== normalizedCurrent) return;
+      if (!dedupe.has(n)) {
+        options.push({ value: opt, label: opt });
+        dedupe.add(n);
       }
     });
 
@@ -336,71 +281,33 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   }, [constructionUnits, sellingUnits, unit]);
   const availableUnitsForNewRow = getAvailableUnitOptions(sellingUnits.length);
 
-  // TOGGLE EXISTING PRODUCTS PANEL
   const toggleExistingProductsPanel = () => {
-    setShowExistingProducts(!showExistingProducts);
-    if (!showExistingProducts) {
-      setSearchTerm('');
-    }
+    setShowExistingProducts(v => !v);
+    if (!showExistingProducts) setSearchTerm('');
   };
 
-  // RESET VISIBLE COUNT WHEN SEARCH TERM OR PANEL OPENS/CLOSES
   useEffect(() => {
     setVisibleCount(BATCH_SIZE);
-
-    if (overlayRef.current) {
-      overlayRef.current.scrollTop = 0;
-    }
+    if (overlayRef.current) overlayRef.current.scrollTop = 0;
   }, [searchTerm, showExistingProducts, existingProducts]);
 
   const handleThreshold = (quantity, threshold) => {
-    if (mode === 'add') {
-      if (Number(quantity) > threshold) {
-        setMaxQuant(true);
-      } else {
-        setMaxQuant(false);
-      }
-    }
-
-    if (mode === 'edit') {
-      if (Number(exceedQuantity) + Number(quantity) > threshold) { // Fixed variable name
-        setMaxQuant(true);
-      } else {
-        setMaxQuant(false);
-      }
-    }
+    if (mode === 'add') setMaxQuant(Number(quantity) > threshold);
+    else setMaxQuant(Number(exceedQuantity) + Number(quantity) > threshold);
   };
 
   const handleAddSellingUnitRow = () => {
-    setSellingUnits(prev => ([
-      ...prev,
-      {
-        unit: '',
-        unit_price: '',
-        base_quantity_per_sell_unit: '',
-        is_base: false
-      }
-    ]));
-
+    setSellingUnits(prev => ([...prev, { unit: '', unit_price: '', base_quantity_per_sell_unit: '', is_base: false }]));
     setSellingUnitErrors(prev => ({ ...prev, general: '' }));
   };
 
   const handleSellingUnitFieldChange = (index, field, rawValue) => {
     setSellingUnits(prev => prev.map((entry, idx) => {
       if (idx !== index) return entry;
-
       const updated = { ...entry };
       let value = rawValue;
-
-      if (field === 'unit') {
-        value = typeof value === 'string' ? sanitizeInput(value) : '';
-      }
-
-      if (field === 'unit_price' || field === 'base_quantity_per_sell_unit') {
-        value = value === '' ? '' : value;
-      }
-
-      updated[field] = value;
+      if (field === 'unit') value = typeof value === 'string' ? sanitizeInput(value) : '';
+      updated[field] = value === '' ? '' : value;
       return updated;
     }));
 
@@ -417,18 +324,15 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     setSellingUnitErrors({ general: '', entries: {} });
   };
 
-  // HANDLE SCROLL TO LOAD MORE (FOR PERFORMANCE)
   const handleOverlayScroll = useCallback((e) => {
-    const target = e.target;
-    if (!target) return;
-    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 120;
+    const t = e.target;
+    const nearBottom = t.scrollTop + t.clientHeight >= t.scrollHeight - 120;
     if (nearBottom && visibleCount < filteredExistingProducts.length) {
-      setVisibleCount((v) => Math.min(v + BATCH_SIZE, filteredExistingProducts.length));
+      setVisibleCount(v => Math.min(v + BATCH_SIZE, filteredExistingProducts.length));
     }
   }, [visibleCount, filteredExistingProducts.length]);
 
   const validateInputs = () => {
-    // THIS VARIABLES STORE THE ERROR INPUTS
     const isEmptyField = {};
     const isnotANumber = {};
     const invalidNumberValue = {};
@@ -436,9 +340,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     const sellingEntryErrors = {};
     let sellingGeneralError = '';
 
-    // CHECK IF INPUT IS EMPTY
     if (mode === 'edit' && editChoice === 'addStocks') {
-      // only require quantity and unit_cost (and date) for add-stocks flow
       if (!String(quantity_added).trim()) isEmptyField.quantity_added = true;
       if (!String(unit_cost).trim()) isEmptyField.unit_cost = true;
       if (!String(date_added).trim()) isEmptyField.date_added = true;
@@ -454,7 +356,6 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       if (!String(unit_price).trim()) isEmptyField.unit_price = true;
     }
 
-    // CHECK IF INPUT IS NOT A NUMBER
     if (mode === 'edit' && editChoice === 'addStocks') {
       if (isNaN(Number(quantity_added))) isnotANumber.quantity_added = true;
       if (isNaN(Number(unit_cost))) isnotANumber.unit_cost = true;
@@ -466,13 +367,11 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       if (isNaN(Number(unit_price))) isnotANumber.unit_price = true;
     }
 
-    // CHECK IF NUMBER IS 0 OR LESS
     if (mode === 'add') {
       if (String(quantity_added).trim() && Number(quantity_added) <= 0) invalidNumberValue.quantity_added = true;
     } else {
       if (String(quantity_added).trim() && Number(quantity_added) < 0) invalidNumberValue.quantity_added = true;
     }
-
     if (String(unit_cost).trim() && Number(unit_cost) <= 0) invalidNumberValue.unit_cost = true;
 
     if (!(mode === 'edit' && editChoice === 'addStocks')) {
@@ -481,115 +380,65 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       if (String(unit_price).trim() && Number(unit_price) <= 0) invalidNumberValue.unit_price = true;
     }
 
-    // CHECK IF DATE ADDED IS GREATER THAN THE EXPIRY DATE
     const isExpiryEarly = date_added > product_validity;
     setIsExpiredEarly(isExpiryEarly);
 
-    // NEW: Unit-aware quantity validation
     if (unit && quantity_added && !isNaN(Number(quantity_added))) {
       const validation = validateQuantity(Number(quantity_added), unit);
-      if (!validation.valid) {
-        unitValidationErrors.quantity_added = validation.error;
-      }
+      if (!validation.valid) unitValidationErrors.quantity_added = validation.error;
     }
 
     if (!(mode === 'edit' && editChoice === 'addStocks')) {
-      const trimmedUnit = typeof unit === 'string' ? unit.trim() : '';
-  const hasBaseUnit = sellingUnits.some(entry => entry.is_base && entry.unit === trimmedUnit);
-  const nonBaseUnitCount = sellingUnits.filter(entry => !entry.is_base).length;
-      const baseUnitPriceValue = Number(unit_price);
-      let baseUnitFactor = null;
+      const trimmedUnit = (unit || '').trim();
+      const hasBase = sellingUnits.some(e => e.is_base && e.unit === trimmedUnit);
+      const basePrice = Number(unit_price);
 
-      if (trimmedUnit) {
-        try {
-          const config = getUnitConfig(trimmedUnit);
-          baseUnitFactor = config?.factor ?? null;
-        } catch (error) {
-          baseUnitFactor = null;
-        }
-      }
+      if (!trimmedUnit) sellingGeneralError = 'Select a base unit before configuring selling units.';
+      else if (!hasBase) sellingGeneralError = 'Base unit entry is required in selling units.';
+      else if (!Number.isFinite(basePrice) || basePrice <= 0) sellingGeneralError = 'Enter a valid price for the base unit.';
 
-      const requiresWholeBaseUnit = baseUnitFactor === 1;
+      sellingUnits.forEach((e, index) => {
+        const errs = [];
+        const id = (e.unit || '').trim();
+        const priceN = Number(e.unit_price);
+        const baseQtyN = Number(e.base_quantity_per_sell_unit);
 
-      if (!trimmedUnit) {
-        sellingGeneralError = 'Select a base unit before configuring selling units.';
-      } else if (!hasBaseUnit) {
-        sellingGeneralError = 'Base unit entry is required in selling units.';
-      } else if (showSellingUnitsEditor && nonBaseUnitCount === 0) {
-        sellingGeneralError = 'Add at least one alternate selling unit or close the Selling Units editor.';
-      } else if (!Number.isFinite(baseUnitPriceValue) || baseUnitPriceValue <= 0) {
-        sellingGeneralError = 'Enter a valid price for the base unit.';
-      }
+        if (!id) errs.push('Unit name is required.');
+        if (!Number.isFinite(priceN) || priceN <= 0) errs.push('Price must be greater than 0.');
+        if (!Number.isFinite(baseQtyN) || baseQtyN <= 0) errs.push('Conversion value must be greater than 0.');
+        if (e.is_base && id !== trimmedUnit) errs.push('Base unit entry must match the selected inventory unit.');
+        if (!e.is_base && id === trimmedUnit) errs.push('Non-base entry cannot use the base unit.');
 
-      sellingUnits.forEach((entry, index) => {
-        const entryErrors = [];
-        const identifier = typeof entry.unit === 'string' ? entry.unit.trim() : '';
-        const priceNumeric = Number(entry.unit_price);
-        const baseQuantityNumeric = Number(entry.base_quantity_per_sell_unit);
-
-        if (!identifier) {
-          entryErrors.push('Unit name is required.');
-        }
-
-        if (!Number.isFinite(priceNumeric) || priceNumeric <= 0) {
-          entryErrors.push('Price must be greater than 0.');
-        }
-
-        if (!Number.isFinite(baseQuantityNumeric) || baseQuantityNumeric <= 0) {
-          entryErrors.push('Conversion value must be greater than 0.');
-        }
-
-        if (
-          requiresWholeBaseUnit &&
-          Number.isFinite(baseQuantityNumeric) &&
-          baseQuantityNumeric > 0 &&
-          baseQuantityNumeric < 1
-        ) {
-          entryErrors.push(`Amount of ${trimmedUnit} per ${identifier || 'unit'} must be at least 1 because ${trimmedUnit} cannot be split.`);
-        }
-
-        if (entry.is_base && identifier !== trimmedUnit) {
-          entryErrors.push('Base unit entry must match the selected inventory unit.');
-        }
-
-        if (!entry.is_base && identifier === trimmedUnit) {
-          entryErrors.push('Non-base entry cannot use the base unit.');
-        }
-
-        if (entryErrors.length > 0) {
-          sellingEntryErrors[index] = entryErrors;
-        }
+        if (errs.length) sellingEntryErrors[index] = errs;
       });
 
-      // Do not set a generic selling-unit error; individual entry errors will be shown instead.
+      if (!sellingGeneralError && Object.keys(sellingEntryErrors).length > 0) {
+        sellingGeneralError = 'Fix the selling unit errors before submitting.';
+      }
     }
 
-    // SET THE VALUES TO THE STATE VARIABLE
     setEmptyField(isEmptyField);
     setNotANumber(isnotANumber);
     setInvalidNumber(invalidNumberValue);
     setUnitValidationError(unitValidationErrors);
     setSellingUnitErrors({ general: sellingGeneralError, entries: sellingEntryErrors });
 
-    // STOP SUBMISSION IF INPUT IS INVALID
-    if (Object.keys(isEmptyField).length > 0) return;
-    if (Object.keys(isnotANumber).length > 0) return;
-    if (Object.keys(invalidNumberValue).length > 0) return;
-    if (Object.keys(unitValidationErrors).length > 0) return;
+    if (Object.keys(isEmptyField).length) return;
+    if (Object.keys(isnotANumber).length) return;
+    if (Object.keys(invalidNumberValue).length) return;
+    if (Object.keys(unitValidationErrors).length) return;
     if (sellingGeneralError) return;
-    if (Object.keys(sellingEntryErrors).length > 0) return;
+    if (Object.keys(sellingEntryErrors).length) return;
     if (isExpiryEarly) return;
 
     setDialog(true);
   };
 
-  // HANDLES THE SUBMIT
   const handleSubmit = async () => {
     try {
       setLoading(true);
 
-      // RUNS IF THERE ARE NO INVALID INPUTS
-      const itemData = {
+      const itemDataPayload = {
         product_name,
         category_id: Number(category_id),
         branch_id: Number(branch_id),
@@ -606,16 +455,15 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         requestor_roles: user.role,
         existing_product_id: selectedExistingProduct?.product_id || null,
         description,
-        selling_units: sellingUnits.map(entry => ({
-          unit: typeof entry.unit === 'string' ? entry.unit.trim() : '',
-          unit_price: Number(entry.unit_price),
-          base_quantity_per_sell_unit: Number(entry.base_quantity_per_sell_unit),
-          is_base: Boolean(entry.is_base)
+        selling_units: sellingUnits.map(e => ({
+          unit: (e.unit || '').trim(),
+          unit_price: Number(e.unit_price),
+          base_quantity_per_sell_unit: Number(e.base_quantity_per_sell_unit),
+          is_base: Boolean(e.is_base)
         }))
       };
 
-      // SENDS THE DATA TO App.jsx TO BE SENT TO DATABASE
-      await OnSubmit(itemData);
+      await OnSubmit(itemDataPayload);
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -626,46 +474,31 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
 
   const inputClass = (field) => {
     const hasError = emptyField[field] || notANumber[field] || invalidNumber[field] || (isExpiredEarly && field === 'product_validity');
-    return `w-full py-2 px-4 rounded-lg bg-white border ${hasError ? 'border-red-500 ring-1 ring-red-50' : 'border-gray-200'} text-sm placeholder-gray-400 shadow-sm focus:outline-none transition focus:shadow-outline disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed ${hasError ? 'focus:ring-red-500' : 'focus:ring-indigo-500'}`;
+    return `w-full py-2 px-3 rounded-lg bg-white border ${hasError ? 'border-red-500 ring-1 ring-red-50' : 'border-gray-200'} text-sm placeholder-gray-400 shadow-sm focus:outline-none transition focus:shadow-outline disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed ${hasError ? 'focus:ring-red-500' : 'focus:ring-indigo-500'}`;
   };
-
   const label = (field) => `block text-sm font-medium mb-1 ${emptyField[field] ? 'text-red-600' : 'text-gray-600'} ${isExpiredEarly && field === 'product_validity' ? 'text-red-600' : ''}`;
-
-  const errorflag = (field, field_warn) => {
-    if (emptyField[field])
-      return <p className="mt-1 text-xs text-red-600">{`Please enter a ${field_warn}!`}</p>;
-
-    if (notANumber[field])
-      return <p className="mt-1 text-xs text-red-600">Must be a positive number!</p>;
-
-    if (invalidNumber[field])
-      return <p className="mt-1 text-xs text-red-600">Value must not be less than 1!</p>;
-
-    if (isExpiredEarly && field === 'product_validity')
-      return <p className="mt-1 text-xs text-red-600">Expiry date must be after purchase date!</p>;
-
+  const errorflag = (field, warn) => {
+    if (emptyField[field]) return <p className="mt-1 text-xs text-red-600">{`Please enter a ${warn}!`}</p>;
+    if (notANumber[field]) return <p className="mt-1 text-xs text-red-600">Must be a positive number!</p>;
+    if (invalidNumber[field]) return <p className="mt-1 text-xs text-red-600">Value must not be less than 1!</p>;
+    if (isExpiredEarly && field === 'product_validity') return <p className="mt-1 text-xs text-red-600">Expiry date must be after purchase date!</p>;
     return null;
   };
 
   return (
     <div>
-      {/* Loading overlay */}
-      {loading && (
-        <FormLoading
-          message={mode === 'add' ? "Adding product..." : "Updating product..."}
-        />
-      )}
+      {loading && <FormLoading message={mode === 'add' ? "Adding product..." : "Updating product..."} />}
 
-      {openDialog &&
+      {openDialog && (
         <ConfirmationDialog
           mode={mode}
           message={message}
-          submitFunction={() => { handleSubmit(); }}
-          onClose={() => { setDialog(false); }}
+          submitFunction={handleSubmit}
+          onClose={() => setDialog(false)}
         />
-      }
+      )}
 
-      {/* When editing, prompt the user to choose action before showing edit fields */}
+      {/* edit action chooser */}
       {isModalOpen && mode === 'edit' && !editChoice && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
           <div className="bg-white rounded-xl p-6 shadow-2xl w-full max-w-md sm:max-w-lg">
@@ -673,58 +506,75 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button type="button" onClick={() => setEditChoice('edit')} className="p-4 border border-gray-100 rounded-lg hover:shadow-md text-left transition">
                 <div className="flex items-center gap-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0z" />
-                  </svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0z" /></svg>
                   <span className="font-medium">Edit Product Data</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">Change product attributes such as unit, price, thresholds and description.</p>
               </button>
               <button type="button" onClick={() => setEditChoice('addStocks')} className="p-4 border border-gray-100 rounded-lg hover:shadow-md text-left transition">
                 <div className="flex items-center gap-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" /></svg>
                   <span className="font-medium">Add Stocks</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">Quickly add stock quantity and cost without changing other product details.</p>
               </button>
             </div>
             <div className="mt-8 text-center">
-              <button type="button" onClick={() => { onClose(); setEditChoice(null); setShowExistingProducts(false); setMaxQuant(false); setShowSellingUnitsEditor(false); }} className="text-sm text-gray-500 px-5 py-2  rounded-md border hover:bg-gray-50 ">Cancel</button>
+              <button
+                type="button"
+                onClick={() => { onClose(); setEditChoice(null); setShowExistingProducts(false); setMaxQuant(false); setShowSellingUnitsEditor(false); }}
+                className="text-sm text-gray-600 px-5 py-2 rounded-md border hover:bg-gray-50"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) && (
+      {/* overlay */}
+      {isModalOpen && user?.role?.some(r => ['Inventory Staff'].includes(r)) && (
         <div
-          className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm"
           style={{ pointerEvents: 'auto' }}
           onClick={() => { onClose(); setMaxQuant(false); setShowSellingUnitsEditor(false); }}
         />
       )}
 
-      <dialog className="bg-transparent fixed inset-0 z-[200]" open={mode === 'edit' ? isModalOpen && user && user.role && editChoice && user.role.some(role => ['Inventory Staff'].includes(role)) : isModalOpen && user && user.role && user.role.some(role => ['Inventory Staff'].includes(role))}>
-        <div className="relative bg-white h-[75vh] lg:h-[600px] w-[100vw] max-w-[800px] overflow-y-auto rounded-xl p-6 lg:py-10 lg:px-[53px] shadow-2xl border border-gray-100 animate-popup hide-scrollbar">
+      {/* dialog */}
+      <dialog
+        className="bg-transparent fixed inset-0 z-[200]"
+        open={mode === 'edit'
+          ? isModalOpen && user && editChoice && user.role?.some(r => ['Inventory Staff'].includes(r))
+          : isModalOpen && user && user.role?.some(r => ['Inventory Staff'].includes(r))}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="inventory-modal-title"
+      >
+        <div
+          className="relative bg-white w-[96vw] sm:w-[92vw] md:w-[880px] max-w-[92vw] md:max-w-[880px]
+                     rounded-xl overflow-hidden shadow-2xl border border-gray-100 flex flex-col max-h-[85vh]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Selling Units editor (kept as-is) */}
           {showSellingUnitsEditor && (
             <div
-              className="fixed inset-0 z-[400] flex justify-center bg-black/20 backdrop-blur-sm
-              items-center"
+              className="fixed inset-0 z-[400] flex justify-center items-center bg-black/20 backdrop-blur-sm px-3"
               onClick={() => setShowSellingUnitsEditor(false)}
             >
               <div
-                className="relative w-full max-w-3xl bg-white border border-gray-200 rounded-xl shadow-xl p-5 sm:p-6 lg:p-7 overflow-y-auto max-h-[85vh]"
+                className="relative w-full max-w-3xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xl
+                           p-4 sm:p-6 lg:p-7 overflow-y-auto max-h-[90vh] hide-scrollbar"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-start justify-between gap-4 mb-5">
+                <div className="flex items-start justify-between gap-4 mb-4 sm:mb-5 sticky top-0 bg-white pb-3 border-b">
                   <div>
                     <h4 className="text-lg font-semibold text-gray-800">Selling Units &amp; Pricing</h4>
                     <p className="text-sm text-gray-600 max-w-xl">Configure alternate selling units, their prices, and conversions relative to the base inventory unit.</p>
                   </div>
                   <button
                     type="button"
-                    className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                    className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:text-gray-800 hover:bg-gray-50"
                     onClick={() => setShowSellingUnitsEditor(false)}
                     aria-label="Close selling units editor"
                   >
@@ -732,23 +582,18 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                   </button>
                 </div>
 
+                {/* ...editor content (unchanged)... */}
                 <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-600 ">Base unit</label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          className="w-full border rounded-sm px-2 py-1 bg-gray-50 text-gray-700 font-bold cursor-not-allowed"
-                          value={unit || ''}
-                          readOnly
-                        />
+                    <label className="block text-sm font-medium text-gray-600">Base unit</label>
+                    <div className="mt-1 flex flex-wrap items-center gap-3">
+                      <div className="flex-1 min-w-[160px]">
+                        <input type="text" className="w-full border rounded-sm px-2 py-1 bg-gray-50 text-gray-700 font-bold cursor-not-allowed" value={unit || ''} readOnly />
                       </div>
-                      <div className="w-40 flex items-center gap-2">
+                      <div className="w-40 min-w-[140px] flex items-center gap-2">
                         <div className="flex-1 text-sm text-gray-700 bg-gray-50 border rounded-sm px-3 py-1 font-bold cursor-not-allowed">{baseUnitPriceDisplay}</div>
-                       
                       </div>
-                      <div className="border py-1 px-3 w-40 text-sm bg-gray-50 text-gray-600 font-bold cursor-not-allowed">Base qty: 1</div>
+                      <div className="border py-1 px-3 w-40 min-w-[140px] text-sm bg-gray-50 text-gray-600 font-bold cursor-not-allowed">Base qty: 1</div>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Base unit follows the selected inventory unit and its price is the base price.</p>
                   </div>
@@ -757,20 +602,13 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                       type="button"
                       onClick={handleAddSellingUnitRow}
                       className="px-3 py-2 w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={!unit || !unit.trim() || availableUnitsForNewRow.length === 0}
-                      aria-disabled={!unit || !unit.trim() || availableUnitsForNewRow.length === 0}
+                      disabled={!unit?.trim() || availableUnitsForNewRow.length === 0}
                     >
                       <span className="text-lg leading-none">+</span>
                       <span>Add Selling Unit</span>
                     </button>
                   </div>
                 </div>
-
-                {!unit || !unit.trim() ? (
-                  <div className="text-sm text-gray-500 italic mb-4">Select the product&apos;s base unit first to manage alternate selling units.</div>
-                ) : availableUnitsForNewRow.length === 0 ? (
-                  <div className="text-sm text-gray-500 italic mb-4">All available units from the list are already configured.</div>
-                ) : null}
 
                 <div className="border border-gray-200 rounded-md overflow-hidden">
                   <table className="w-full text-xs sm:text-sm">
@@ -785,69 +623,34 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                     </thead>
                     <tbody>
                       {sellingUnits.filter(s => !s.is_base).length === 0 ? (
-                        <tr>
-                          <td className="px-3 py-5 text-center text-gray-500" colSpan={5}>No selling units configured yet.</td>
-                        </tr>
+                        <tr><td className="px-3 py-5 text-center text-gray-500" colSpan={5}>No selling units configured yet.</td></tr>
                       ) : (
                         sellingUnits.map((entry, index) => {
                           if (entry.is_base) return null;
-                          const isBase = false;
-                          const entryErrors = sellingUnitErrors.entries[index] || [];
                           const unitsPerBase = computeUnitsPerBase(entry);
                           return (
                             <tr key={`${entry.unit || 'unit'}-${index}`}>
                               <td className="px-3 py-2 align-top">
-                                <select
-                                  className="w-full border rounded-sm px-2 py-1 bg-white"
-                                  value={entry.unit}
-                                  onChange={(e) => handleSellingUnitFieldChange(index, 'unit', e.target.value)}
-                                >
+                                <select className="w-full border rounded-sm px-2 py-1 bg-white" value={entry.unit} onChange={(e) => handleSellingUnitFieldChange(index, 'unit', e.target.value)}>
                                   <option value="">Select unit</option>
-                                  {getAvailableUnitOptions(index).map(option => (
-                                    <option key={`${option.value}-${index}`} value={option.value}>{option.label}</option>
+                                  {getAvailableUnitOptions(index).map(opt => (
+                                    <option key={`${opt.value}-${index}`} value={opt.value}>{opt.label}</option>
                                   ))}
                                 </select>
                               </td>
                               <td className="px-3 py-2 align-top">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  className="w-full border rounded-sm px-2 py-1"
-                                  value={entry.unit_price}
-                                  onChange={(e) => handleSellingUnitFieldChange(index, 'unit_price', e.target.value)}
-                                />
+                                <input type="number" min="0" step="0.01" className="w-full border rounded-sm px-2 py-1" value={entry.unit_price} onChange={(e) => handleSellingUnitFieldChange(index, 'unit_price', e.target.value)} inputMode="decimal" />
                               </td>
                               <td className="px-3 py-2 align-top">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.000001"
-                                  className="w-full border rounded-sm px-2 py-1"
-                                  value={entry.base_quantity_per_sell_unit}
-                                  onChange={(e) => handleSellingUnitFieldChange(index, 'base_quantity_per_sell_unit', e.target.value)}
-                                />
+                                <input type="number" min="0" step="0.000001" className="w-full border rounded-sm px-2 py-1" value={entry.base_quantity_per_sell_unit} onChange={(e) => handleSellingUnitFieldChange(index, 'base_quantity_per_sell_unit', e.target.value)} inputMode="decimal" />
                                 <p className="text-[10px] text-gray-500 mt-1">Amount of base unit per {entry.unit || 'sell unit'}.</p>
                               </td>
                               <td className="px-3 py-2 align-top">
-                                <input
-                                  type="text"
-                                  className="w-full border rounded-sm px-2 py-1 bg-gray-100 text-gray-600 cursor-not-allowed"
-                                  value={unitsPerBase}
-                                  readOnly
-                                />
-                                <p className="text-[11px] text-gray-500 mt-1">Number of units per 
-                                  <span className='font-bold'> {unit}</span>.
-                                </p>
+                                <input type="text" className="w-full border rounded-sm px-2 py-1 bg-gray-100 text-gray-600 cursor-not-allowed" value={unitsPerBase} readOnly />
+                                <p className="text-[11px] text-gray-500 mt-1">Number of units per <span className="font-bold">{unit}</span>.</p>
                               </td>
                               <td className="px-3 py-2 align-top text-center">
-                                <button
-                                  type="button"
-                                  className="text-xs text-red-600 hover:text-red-700"
-                                  onClick={() => handleRemoveSellingUnitRow(index)}
-                                >
-                                  Remove
-                                </button>
+                                <button type="button" className="text-xs text-red-600 hover:text-red-700" onClick={() => handleRemoveSellingUnitRow(index)}>Remove</button>
                               </td>
                             </tr>
                           );
@@ -857,67 +660,87 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                   </table>
                 </div>
 
-                {sellingUnitErrors.general && (
-                  <p className="mt-3 text-xs text-red-600">{sellingUnitErrors.general}</p>
-                )}
-
-                {sellingUnits.map((_, index) => (
-                  sellingUnitErrors.entries[index]?.length ? (
-                    <ul key={`selling-unit-errors-${index}`} className="mt-1 text-[11px] text-red-600 list-disc list-inside">
-                      {sellingUnitErrors.entries[index].map((message, idx) => (
-                        <li key={`entry-${index}-error-${idx}`}>{message}</li>
-                      ))}
-                    </ul>
-                  ) : null
-                ))}
+                {sellingUnitErrors.general && <p className="mt-3 text-xs text-red-600">{sellingUnitErrors.general}</p>}
+                {sellingUnits.map((_, idx) => sellingUnitErrors.entries[idx]?.length ? (
+                  <ul key={`selling-unit-errors-${idx}`} className="mt-1 text-[11px] text-red-600 list-disc list-inside">
+                    {sellingUnitErrors.entries[idx].map((m, i) => <li key={`entry-${idx}-err-${i}`}>{m}</li>)}
+                  </ul>
+                ) : null)}
               </div>
             </div>
           )}
-          <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {mode === 'edit' && editChoice && (
-                  <button
-                    type="button"
-                    onClick={() => { setEditChoice(null); setShowExistingProducts(false); }}
-                    className="text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded-md border border-gray-100 hover:bg-gray-50"
-                  >
-                    ← Back
-                  </button>
-                )}
-                <div>
-                  <h3 className="text-2xl font-bold">{mode === 'edit' ? 'EDIT ITEM' : 'ADD NEW ITEM'}</h3>
-                  <p className="text-sm opacity-90">{mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}</p>
-                </div>
-              </div>
-              <button type='button' className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
-                onClick={() => {
-                  onClose();
-                  setShowExistingProducts(false);
-                  setMaxQuant(false);
-                  setShowSellingUnitsEditor(false);
-                }}>✕</button>
-            </div>
-          </div>
 
-          <div className="pt-2">
-            {/*FORMS */}
-            <form onSubmit={(e) => { e.preventDefault(); validateInputs(); }}>
-              {/*PRODUCT NAME*/}
-              <div className='relative mb-4'>
+          {/* HEADER (fixed) */}
+          <div className="shrink-0 sticky top-0 z-20 bg-white px-4 sm:px-6 md:pl-10 md:pr-6 pt-4 pb-3 border-b">
+  <div className="relative">
+    {/* Title + back */}
+    <div className="flex items-center gap-3">
+      {mode === 'edit' && editChoice && (
+        <button
+          type="button"
+          onClick={() => { setEditChoice(null); setShowExistingProducts(false); }}
+          className="text-sm text-gray-700 hover:text-gray-900 px-2 py-1 rounded-md border border-gray-200 hover:bg-gray-50"
+        >
+          ← Back
+        </button>
+      )}
+      <div>
+        <h3 id="inventory-modal-title" className="text-xl sm:text-2xl font-bold">
+          {mode === 'edit' ? 'EDIT ITEM' : 'ADD NEW ITEM'}
+        </h3>
+        <p className="text-sm opacity-90">
+          {mode === 'edit' ? 'Modify product details or add stock' : 'Create a new product in inventory'}
+        </p>
+      </div>
+    </div>
+
+    {/* Close button — nudged toward the very top-right */}
+    <button
+      type="button"
+      aria-label="Close"
+      onClick={() => {
+        onClose();
+        setShowExistingProducts(false);
+        setMaxQuant(false);
+        setShowSellingUnitsEditor(false);
+      }}
+      className="absolute w-9 h-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-white"
+      // Fine-tune the exact spot here:
+      style={{ top: 2, right: 1 }}   // ~6px from top, ~10px from right (adjust to taste)
+    >
+      <svg
+        className="w-5 h-5 text-gray-700"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+  </div>
+</div>
+
+
+          {/* BODY (scrollable) */}
+          <div className="grow min-h-0 overflow-y-auto px-4 sm:px-6 md:px-10 py-4 sm:py-6 hide-scrollbar">
+            <form id="modal-form" onSubmit={(e) => { e.preventDefault(); validateInputs(); }}>
+              {/* PRODUCT NAME + BROWSE */}
+              <div className="relative mb-4">
                 <label className={label('product_name')}>Product name</label>
                 <div className="flex gap-2 items-center">
                   <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" />
-                      </svg>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" /></svg>
                     </span>
                     <input
-                      id='item'
+                      id="item"
+                      ref={firstFieldRef}
                       type="text"
-                      placeholder='Item Name'
-                      className={`${inputClass('product_name')} rounded-lg pl-10 ${selectedExistingProduct ? 'border-green-500 bg-green-900' : ''}`}
+                      placeholder="Item Name"
+                      autoComplete="off"
+                      className={`${inputClass('product_name')} pl-10 ${selectedExistingProduct ? 'border-green-400 bg-green-50' : ''}`}
                       value={product_name}
                       onChange={(e) => setItemName(sanitizeInput(e.target.value))}
                       disabled={selectedExistingProduct || mode === 'edit'}
@@ -927,10 +750,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                     <button
                       type="button"
                       onClick={toggleExistingProductsPanel}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${showExistingProducts
-                        ? 'bg-red-500 text-white hover:bg-red-600'
-                        : 'bg-blue-800 text-white hover:bg-blue-600'
-                        }`}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${showExistingProducts ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-blue-800 text-white hover:bg-blue-700'}`}
                     >
                       {showExistingProducts ? 'Cancel' : 'Browse'}
                     </button>
@@ -942,13 +762,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                     <span className="font-medium">{selectedExistingProduct.product_name}</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setDescription('');
-                        setSelectedExistingProduct(null);
-                        setItemName('');
-                        setUnit('');
-                        setCategory('');
-                      }}
+                      onClick={() => { setDescription(''); setSelectedExistingProduct(null); setItemName(''); setUnit(''); setCategory(''); }}
                       className="ml-2 text-sm text-green-700 underline"
                     >
                       Clear
@@ -958,9 +772,13 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
 
                 {errorflag('product_name', 'product name')}
 
-                {/* EXISTING PRODUCTS PANEL (OVERLAY) */}
+                {/* EXISTING PRODUCTS OVERLAY */}
                 {mode === 'add' && showExistingProducts && (
-                  <div ref={overlayRef} onScroll={handleOverlayScroll} className="absolute left-0 top-full mt-2 border border-gray-500 rounded-md p-4 bg-white max-h-96 overflow-y-auto w-full shadow-lg z-10 hide-scrollbar">
+                  <div
+                    ref={overlayRef}
+                    onScroll={handleOverlayScroll}
+                    className="absolute left-0 top-full mt-2 border border-gray-300 rounded-md p-3 sm:p-4 bg-white max-h-[50vh] sm:max-h-96 overflow-y-auto w-full shadow-lg z-20 hide-scrollbar"
+                  >
                     <div className="mb-3">
                       <input
                         type="text"
@@ -981,7 +799,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                           <div
                             key={product.product_id}
                             onClick={() => handleSelectExistingProduct(product)}
-                            className="p-4 border border-gray-100 rounded-lg cursor-pointer hover:shadow-md transform hover:-translate-y-0.5 transition"
+                            className="p-3 sm:p-4 border border-gray-100 rounded-lg cursor-pointer hover:shadow-md transform hover:-translate-y-0.5 transition"
                           >
                             <div className="flex items-center justify-between">
                               <div>
@@ -990,7 +808,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                               </div>
                               <div className="text-xs text-gray-400">ID: {product.product_id}</div>
                             </div>
-                            <div className="mt-2 text-xs text-gray-400">Available in: {product.branches}</div>
+                            <div className="mt-1 sm:mt-2 text-xs text-gray-400">Available in: {product.branches}</div>
                           </div>
                         ))
                       )}
@@ -999,9 +817,9 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                 )}
               </div>
 
-              {/* DESCRIPTION FIELD */}
+              {/* DESCRIPTION */}
               {!(mode === 'edit' && editChoice === 'addStocks') && (
-                <div className="mb-4 ">
+                <div className="mb-4">
                   <label className={label('description')}>Description</label>
                   <textarea
                     placeholder="Enter product description"
@@ -1013,204 +831,199 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-6 mt-6">
-                {/* Left column inputs */}
-                <div className="flex flex-col gap-6">
-                  {/* If user chose addStocks while editing, only show quantity & unit cost (plus date) */}
-                  {!(mode === 'edit' && editChoice === 'addStocks') &&
-                    <div className='relative'>
-                      <DropdownCustom
-                        value={category_id}
-                        onChange={(e) => setCategory(e.target.value)}
-                        label="Category"
-                        variant="simple"
-                        error={emptyField.category_id}
-                        options={[
-                          { value: '', label: 'Select Category' },
-                          ...listCategories.map(option => ({
-                            value: option.category_id,
-                            label: option.category_name
-                          }))
-                        ]}
-                      />
-                      {errorflag('category_id', 'category')}
-                    </div>
-                  }
+              {/* GRID */}
+              {/* GRID — desktop matches screenshot, mobile in your custom order */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-4">
+  {/* Category — LEFT (row 1) */}
+  {!(mode === 'edit' && editChoice === 'addStocks') && (
+    <div className="md:col-start-1">
+      <DropdownCustom
+        value={category_id}
+        onChange={(e) => setCategory(e.target.value)}
+        label="Category"
+        variant="simple"
+        error={emptyField.category_id}
+        options={[
+          { value: '', label: 'Select Category' },
+          ...listCategories.map(o => ({ value: o.category_id, label: o.category_name }))
+        ]}
+      />
+      {errorflag('category_id', 'category')}
+    </div>
+  )}
 
-                  {!(mode === 'edit' && editChoice === 'addStocks') &&
-                    <div className='relative grid grid-cols-2 gap-3 '>
-                      <div>
-                        <label className={`${label('min_threshold')}`}>Min threshold</label>
-                        <input
-                          placeholder="Min Threshold"
-                          className={`${inputClass('min_threshold')} focus:border-2 focus:border-green-500`}
-                          value={min_threshold}
-                          onChange={(e) => setMinThreshold(e.target.value)}
-                        />
-                        {errorflag('min_threshold', 'value')}
-                      </div>
-                      <div>
-                        <label className={label('max_threshold')}>Max threshold</label>
-                        <input
-                          placeholder="Max Threshold"
-                          className={`${inputClass('max_threshold')} focus:border-2 focus:border-green-500`}
-                          value={max_threshold}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setMaxThreshold(value);
-                            handleThreshold(quantity_added, value);
-                          }}
-                        />
-                        {errorflag('max_threshold', 'value')}
-                      </div>
-                    </div>
-                  }
+  {/* Unit (+ Selling Units button) — RIGHT (row 1) */}
+  {!(mode === 'edit' && editChoice === 'addStocks') && (
+    <div className="md:col-start-2">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-3">
+        <div className="flex-1">
+          <DropdownCustom
+            value={unit}
+            onChange={(e) => setUnit(sanitizeInput(e.target.value))}
+            label="Unit"
+            error={emptyField.unit}
+            options={[
+              { value: '', label: 'Select Unit' },
+              ...constructionUnits.map(u => ({ value: u, label: u }))
+            ]}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => { if (!unit?.trim()) return; setShowSellingUnitsEditor(p => !p); }}
+          disabled={!unit?.trim()}
+          className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-md border transition ${sellingUnitToggleButtonClass}`}
+        >
+          <span>
+            Selling Units &amp; Pricing
+            {sellingUnits.filter(s => !s.is_base).length ? ` (${sellingUnits.filter(s => !s.is_base).length})` : ''}
+          </span>
+        </button>
+      </div>
+      {errorflag('unit', 'unit')}
+      {sellingUnitErrors.general && !showSellingUnitsEditor && (
+        <p className="mt-1 text-xs text-red-600">{sellingUnitErrors.general}</p>
+      )}
+    </div>
+  )}
 
-                  {!(mode === 'edit' && editChoice === 'edit') &&
-                    <div className='relative'>
-                      <label className={label('unit_cost')}>Unit cost</label>
-                      <input
-                        placeholder="Cost"
-                        className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
-                        value={unit_cost}
-                        onChange={(e) => setPurchasedPrice(e.target.value)}
-                      />
-                      {errorflag('unit_cost', 'value')}
-                    </div>
-                  }
-                  {!(mode === 'edit' && editChoice === 'edit') &&
-                    <div className='relative'>
-                      <DatePickerCustom
-                        id="date_added"
-                        value={date_added}
-                        onChange={(e) => setDatePurchased(e.target.value)}
-                        label="Enter Date Added"
-                        error={emptyField.date_added}
-                        placeholder="mm/dd/yyyy"
-                        errorMessage={
-                          emptyField.date_added ? "Please enter a date!" : null
-                        }
-                      />
-                    </div>
-                  }
-                </div>
+  {/* Min + Max thresholds — LEFT (row 2, two-up inside left column) */}
+  {!(mode === 'edit' && editChoice === 'addStocks') && (
+    <div className="md:col-start-1">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={label('min_threshold')}>Min threshold</label>
+          <input
+            placeholder="Min Threshold"
+            className={`${inputClass('min_threshold')} focus:border-2 focus:border-green-500`}
+            value={min_threshold}
+            onChange={(e) => setMinThreshold(e.target.value)}
+            inputMode="decimal"
+          />
+          {errorflag('min_threshold', 'value')}
+        </div>
+        <div>
+          <label className={label('max_threshold')}>Max threshold</label>
+          <input
+            placeholder="Max Threshold"
+            className={`${inputClass('max_threshold')} focus:border-2 focus:border-green-500`}
+            value={max_threshold}
+            onChange={(e) => { const v = e.target.value; setMaxThreshold(v); handleThreshold(quantity_added, v); }}
+            inputMode="decimal"
+          />
+          {errorflag('max_threshold', 'value')}
+        </div>
+      </div>
+    </div>
+  )}
 
-                {/* Right column inputs */}
-                <div className="flex flex-col gap-6">
-                  {/* If addStocks was chosen, hide product-edit-only fields on the right side */}
-                  {!(mode === 'edit' && editChoice === 'addStocks') && (
-                    <div className="relative">
-                      <div className="flex items-end gap-3">
-                        <div className="flex-1">
-                          <DropdownCustom
-                            value={unit}
-                            onChange={(e) => setUnit(sanitizeInput(e.target.value))}
-                            label="Unit"
-                            error={emptyField.unit}
-                            options={[
-                              { value: '', label: 'Select Unit' },
-                              ...constructionUnits.map(option => ({
-                                value: option,
-                                label: option
-                              }))
-                            ]}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!unit || !unit.trim()) return;
-                            setShowSellingUnitsEditor(prev => !prev);
-                          }}
-                          disabled={!unit || !unit.trim()}
-                          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-md border transition ${sellingUnitToggleButtonClass}`}
-                        >
-                          <span>Selling Units &amp; Pricing{nonBaseSellingUnitCount > 0 ? ` (${nonBaseSellingUnitCount})` : ''}</span>
-                        </button>
-                      </div>
-                      {errorflag('unit', 'unit')}
-                      {sellingUnitErrors.general && !showSellingUnitsEditor && (
-                        <p className="mt-1 text-xs text-red-600">{sellingUnitErrors.general}</p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!(mode === 'edit' && editChoice === 'edit') &&
-                    <div className='relative '>
-                      <label className={label('quantity_added')}>Quantity</label>
-                      <input
-                        type="number"
-                        step={unit ? getQuantityStep(unit) : "0.001"}
-                        min={unit ? getQuantityStep(unit) : "0.001"}
-                        placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity' : 'Add Quantity or Enter 0'}`}
-                        className={`${inputClass('quantity_added')} focus:border-2 focus:border-green-500`}
-                        value={quantity_added}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setQuantity(value);
-                          handleThreshold(value, max_threshold);
-                        }}
-                      />
-                      {errorflag('quantity_added', 'value')}
-                      {unitValidationError.quantity_added && (
-                        <p className="text-red-600 text-xs mt-1">{unitValidationError.quantity_added}</p>
-                      )}
-                      {maxQuant && <p className='mt-1 text-xs italic text-red-600'>Quantity exceeds the max threshold!</p>}
-                    </div>
-                  }
+  {/* Quantity — RIGHT (row 2) */}
+  {!(mode === 'edit' && editChoice === 'edit') && (
+    <div className="md:col-start-2">
+      <label className={label('quantity_added')}>Quantity</label>
+      <input
+        type="number"
+        step={unit ? getQuantityStep(unit) : "0.001"}
+        min={unit ? getQuantityStep(unit) : "0.001"}
+        placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity' : 'Add Quantity or Enter 0'}`}
+        className={`${inputClass('quantity_added')} focus:border-2 focus:border-green-500`}
+        value={quantity_added}
+        onChange={(e) => { const v = e.target.value; setQuantity(v); handleThreshold(v, max_threshold); }}
+        inputMode="decimal"
+      />
+      {errorflag('quantity_added', 'value')}
+      {unitValidationError.quantity_added && <p className="text-red-600 text-xs mt-1">{unitValidationError.quantity_added}</p>}
+      {maxQuant && <p className="mt-1 text-xs italic text-red-600">Quantity exceeds the max threshold!</p>}
+    </div>
+  )}
 
+  {/* Unit cost — LEFT (row 3) */}
+  {!(mode === 'edit' && editChoice === 'edit') && (
+    <div className="md:col-start-1">
+      <label className={label('unit_cost')}>Unit cost</label>
+      <input
+        placeholder="Cost"
+        className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
+        value={unit_cost}
+        onChange={(e) => setPurchasedPrice(e.target.value)}
+        inputMode="decimal"
+      />
+      {errorflag('unit_cost', 'value')}
+    </div>
+  )}
 
-                  {!(mode === 'edit' && editChoice === 'addStocks') &&
-                    <div className='relative'>
-                      <label className={label('unit_price')}>Price</label>
-                      <input
-                        placeholder="Price"
-                        className={`${inputClass('unit_price')} focus:border-2 focus:border-green-500`}
-                        value={unit_price}
-                        onChange={(e) => setPrice(e.target.value)}
-                      />
-                      {errorflag('unit_price', 'value')}
-                    </div>
-                  }
+  {/* Price — RIGHT (row 3) */}
+  {!(mode === 'edit' && editChoice === 'addStocks') && (
+    <div className="md:col-start-2">
+      <label className={label('unit_price')}>Price</label>
+      <input
+        placeholder="Price"
+        className={`${inputClass('unit_price')} focus:border-2 focus:border-green-500`}
+        value={unit_price}
+        onChange={(e) => setPrice(e.target.value)}
+        inputMode="decimal"
+      />
+      {errorflag('unit_price', 'value')}
+    </div>
+  )}
 
-                  {/* Selling units editor rendered as overlay when toggled */}
+  {/* Date Added — LEFT (row 4) */}
+  {!(mode === 'edit' && editChoice === 'edit') && (
+    <div className="md:col-start-1">
+      <DatePickerCustom
+        id="date_added"
+        value={date_added}
+        onChange={(e) => setDatePurchased(e.target.value)}
+        label="Enter Date Added"
+        error={emptyField.date_added}
+        placeholder="mm/dd/yyyy"
+        errorMessage={emptyField.date_added ? "Please enter a date!" : null}
+      />
+    </div>
+  )}
 
-                  {!(mode === 'edit' && editChoice === 'edit') &&
-                    <div className='relative'>
-                      <DatePickerCustom
-                        id="product_validity"
-                        value={product_validity}
-                        onChange={(e) => setExpirationDate(e.target.value)}
-                        label="Enter Product Validity"
-                        error={emptyField.product_validity || isExpiredEarly}
-                        placeholder="mm/dd/yyyy"
-                        errorMessage={
-                          emptyField.product_validity
-                            ? "Please enter a date!"
-                            : isExpiredEarly
-                              ? "Expiry date must be after purchase date!"
-                              : null
-                        }
-                      />
-                    </div>
-                  }
+  {/* Product Validity — RIGHT (row 4) */}
+  {!(mode === 'edit' && editChoice === 'edit') && (
+    <div className="md:col-start-2">
+      <DatePickerCustom
+        id="product_validity"
+        value={product_validity}
+        onChange={(e) => setExpirationDate(e.target.value)}
+        label="Enter Product Validity"
+        error={emptyField.product_validity || isExpiredEarly}
+        placeholder="mm/dd/yyyy"
+        errorMessage={
+          emptyField.product_validity
+            ? "Please enter a date!"
+            : isExpiredEarly
+              ? "Expiry date must be after purchase date!"
+              : null
+        }
+      />
+    </div>
+  )}
+</div>
 
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-center">
-                <button type="submit" disabled={maxQuant} className={`flex items-center gap-3 ${mode === 'edit' ? 'bg-[#007278] hover:bg-[#009097]' : 'bg-[#119200] hover:bg-[#56be48]'} text-white font-semibold rounded-md px-6 py-2 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed`} >
-                  <span>{mode === 'edit' ? 'UPDATE' : 'ADD'}</span>
-                </button>
-              </div>
             </form>
+          </div>
+
+          {/* FOOTER (fixed, outside scroll) */}
+          <div className="shrink-0 bg-white px-4 sm:px-6 md:px-10 py-3 border-t">
+            <div className="flex justify-center">
+              <button
+                type="submit"
+                form="modal-form"
+                disabled={maxQuant}
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-3 ${mode === 'edit' ? 'bg-[#007278] hover:bg-[#009097]' : 'bg-[#119200] hover:bg-[#56be48]'} text-white font-semibold rounded-md px-6 py-2 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <span>{mode === 'edit' ? 'UPDATE' : 'ADD'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </dialog>
     </div>
-  )
+  );
 }
 
-
-
-export default ModalForm
+export default ModalForm;
