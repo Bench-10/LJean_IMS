@@ -10,6 +10,8 @@ function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval, de
   );
   const hasData = normalizedData.length > 0;
 
+  const barColor = deliveryStatus === 'undelivered' ? '#f87171' : '#4ade80';
+
   return (
     <>
       <Card title={"Delivery Analytics"} className="col-span-full h-[500px]" exportRef={deliveryChartRef}>
@@ -69,8 +71,8 @@ function Delivery({Card, deliveryData, deliveryInterval, setDeliveryInterval, de
 
                     })()}
                     
-                    <Tooltip />
-                    <Bar dataKey="number_of_deliveries" fill="#4ade80" />
+                    <Tooltip formatter={(value) => [value, deliveryStatus === 'undelivered' ? 'Undelivered' : 'Delivered']} />
+                    <Bar dataKey="number_of_deliveries" fill={barColor} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

@@ -1,48 +1,68 @@
 import { SQLquery } from '../../db.js';
 
-
-
-
 export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_date, status = 'delivered') => {
+    const statusValue = String(status).toLowerCase();
+    const isUndelivered = statusValue === 'undelivered';
 
+    const referenceDateExpr = isUndelivered
+        ? "COALESCE(s.date, CURRENT_DATE)"
+        : 'd.delivered_date';
 
-    let filterFormat;
-    let dateFilter = '';
-    let params = [branch_id];
+        let bucketExpression;
+        let labelProjection;
 
-    const statusFilter = (String(status).toLowerCase() === 'undelivered')
-        ? '(is_delivered = false AND is_pending = true)'
-        : '(is_delivered = true AND is_pending = false)';
+        switch (dateFormat) {
+            case 'yearly':
+                bucketExpression = `DATE_TRUNC('year', ${referenceDateExpr})`;
+                labelProjection = `TO_CHAR(bucket, 'YYYY')`;
+                break;
+            case 'monthly':
+                bucketExpression = `DATE_TRUNC('month', ${referenceDateExpr})`;
+                labelProjection = `TO_CHAR(bucket, 'Mon YYYY')`;
+                break;
+            default:
+                bucketExpression = `${referenceDateExpr}`;
+                labelProjection = `TO_CHAR(bucket, 'DD Mon YYYY')`;
+                break;
+        }
 
-    if (dateFormat === 'monthly') {
+    const filters = [];
+    const params = [];
+    let paramIndex = 1;
 
-        filterFormat = "TO_CHAR(delivered_date, 'Mon YYYY') AS date";
-
-    } else if (dateFormat === 'yearly') {
-
-        filterFormat = "TO_CHAR(delivered_date, 'YYYY') AS date";
-
-    } else {
-
-        filterFormat = "TO_CHAR(delivered_date, 'DD Mon YYYY') AS date";
+    if (branch_id) {
+        filters.push(`d.branch_id = $${paramIndex++}`);
+        params.push(branch_id);
     }
 
-    // Add date range filter if provided
+            filters.push(
+                isUndelivered
+                    ? '(d.is_delivered = false)'
+                    : '(d.is_delivered = true)'
+            );
+
+            filters.push(`${referenceDateExpr} IS NOT NULL`);
+
     if (start_date && end_date) {
-        dateFilter = ' AND delivered_date BETWEEN $2 AND $3';
-        params = [branch_id, start_date, end_date];
+        filters.push(`${referenceDateExpr} BETWEEN $${paramIndex} AND $${paramIndex + 1}`);
+        params.push(start_date, end_date);
+        paramIndex += 2;
     }
 
-    const {rows: deliveryData} = await SQLquery(
+    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
 
-        `SELECT ${filterFormat}, COUNT(delivered_date) AS number_of_deliveries 
-         FROM Delivery
-         WHERE branch_id = $1 AND ${statusFilter}${dateFilter}
-         GROUP BY date
-         ORDER BY MIN(delivered_date);`,
-         params
+        const query = `
+            SELECT ${labelProjection} AS date, COUNT(*)::int AS number_of_deliveries
+            FROM (
+                SELECT ${bucketExpression} AS bucket
+                FROM Delivery d
+                INNER JOIN Sales_Information s ON s.sales_information_id = d.sales_information_id
+                ${whereClause}
+            ) buckets
+            GROUP BY bucket
+            ORDER BY bucket;
+        `;
 
-    );
-
-    return deliveryData;
+    const { rows } = await SQLquery(query, params);
+    return rows;
 };
