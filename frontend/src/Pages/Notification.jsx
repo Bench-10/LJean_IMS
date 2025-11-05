@@ -151,12 +151,12 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
   return (
     <>
       {openNotif && (
-        <div className="fixed inset-0 bg-black/50 z-[998] backdrop-blur-[1px]" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/50 z-[998] backdrop-blur-sm" onClick={onClose} />
       )}
 
       {openNotif && (
         <dialog className='bg-transparent w-[100%] lg:w-[50%] fixed inset-0 flex items-center justify-center z-[999]'>
-          <div className='bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[80vh] mx-2 lg:mx-4 overflow-hidden relative flex flex-col'>
+          <div className='bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] mx-2 lg:mx-4 overflow-hidden relative flex flex-col'>
 
             <button
               onClick={onClose}

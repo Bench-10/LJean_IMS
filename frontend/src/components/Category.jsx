@@ -89,9 +89,9 @@ function Category({ isCategoryOpen, onClose, setListCategories, listCategories, 
         />
       )}
 
-      <dialog className='bg-transparent fixed top-10 lg:top-0 bottom-0  z-[9999]' open={isCategoryOpen}>
+      <dialog className='bg-transparent fixed top-10 lg:top-0 bottom-0 z-[9999]' open={isCategoryOpen}>
 
-        <div className="relative flex flex-col border border-gray-600/40 bg-white h-[55vh] lg:h-[600px] w-[95vw] max-w-[600px] rounded-xl p-4 lg:p-6 pb-14 border-gray-300 animate-popup mx-auto my-auto overflow-hidden">
+        <div className="relative flex flex-col border border-gray-600/40 bg-white h-[75vh] lg:h-[600px] w-[95vw] max-w-[600px] rounded-xl p-4 lg:p-6 pb-14 border-gray-300 animate-popup mx-auto my-auto overflow-hidden">
 
           <button type='button' className="absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
                 

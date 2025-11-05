@@ -181,7 +181,7 @@ function ProductInventory({
 
   return (
 
-    <div className="pt-20 lg:pt-8 px-4 lg:px-8 pb-6 h-screen">
+    <div className="pt-20 lg:pt-8 px-4 lg:px-8 pb-6">
 
       {/*REJECTION REASON */}
       <RejectionReasonDialog
@@ -431,119 +431,120 @@ function ProductInventory({
         </div>
       )}
 
+{/* SEARCH + FILTERS + ACTIONS */}
+<div className="w-full lg:flex lg:items-center lg:gap-6">
+  {/* LEFT: search + filters */}
+  <div className="flex flex-col lg:flex-row gap-2 lg:gap-6 flex-1 min-w-0">
+    {/* Search */}
+    <div className="w-full lg:w-[400px] text-sm lg:text-base">
+      <input
+        type="text"
+        placeholder="Search Item Name..."
+        className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all px-3 py-0 mb-2 lg:mb-0 rounded-lg w-full h-9 leading-none"
+        onChange={handleSearch}
+      />
+    </div>
 
-      {/*SEARCH AND ADD*/}
-      <div className='w-full space-y-4 lg:space-y-0 lg:flex lg:items-center lg:justify-between flex-shrink-0'>
-        <div className='flex flex-col lg:flex-row gap-2 lg:gap-7 w-full lg:w-auto items-center lg:items-start'>
-          {/*SEARCH */}
-          <div className='w-full lg:w-[400px] text-sm lg:text-base '>
+    {/* Category */}
+    <div className="w-full lg:w-auto">
+      <DropdownCustom
+        value={selectedCategory}
+        onChange={e => setSelectedCategory(e.target.value)}
+        label="Filter by Category:"
+        variant="floating"
+        options={[
+          { value: '', label: 'All Categories' },
+          ...listCategories.map(cat => ({
+            value: cat.category_id,
+            label: cat.category_name
+          }))
+        ]}
+      />
+    </div>
 
-            <input
-              type="text"
-              placeholder="Search Item Name..."
-              className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all px-3 py-0 mb-4 lg:mb-0 rounded-lg w-full h-9 leading-none align-middle"
-              onChange={handleSearch}
-            />
-
-          </div>
-
-          {/* CATEGORY DROPDOWN */}
-          <div className="w-full lg:w-auto mb-2 lg:mb-0">
-            <DropdownCustom
-              value={selectedCategory}
-              onChange={e => setSelectedCategory(e.target.value)}
-              label="Filter by Category:"
-              variant="floating"
-              options={[
-                { value: '', label: 'All Categories' },
-                ...listCategories.map(cat => ({
-                  value: cat.category_id,
-                  label: cat.category_name
-                }))
-              ]}
-            />
-          </div>
-
-          {/* BRANCH DROPDOWN */}
-          {(user && user.role && user.role.some(role => ['Branch Manager', 'Owner'].includes(role))) && (
-            <div className="w-full lg:w-auto mt-1 lg:mt-0">
-              <DropdownCustom
-                value={selectedBranch}
-                onChange={e => setSelectedBranch(e.target.value)}
-                label="Filter by Branch:"
-                variant="floating"
-                options={[
-                  ...(user && user.role && user.role.some(role => ['Owner'].includes(role))
-                    ? [{ value: '', label: 'All Branch' }]
-                    : branches.length !== 0 ? [] : [{ value: '', label: `${user.branch_name} (Your Branch)` }]),
-                  ...branches.map(branch => ({
-                    value: branch.branch_id,
-                    label: `${branch.branch_name}${branch.branch_id === user.branch_id ? ' (Your Branch)' : ''}`
-                  }))
-                ]}
-              />
-            </div>
-          )}
-
-        </div>
-
-
-
-
-        {/*EXPORT AND CATEGORIES AND ADD ITEM */}
-        <div className="ml-auto flex items-center gap-4">
-
-          {/* Pending approvals button (keeps same height as other controls) */}
-          {displayPendingApprovals && (
-            <button
-              className="relative flex items-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
-              onClick={() => setIsPendingDialogOpen(true)}
-              aria-label="Open pending inventory requests"
-            >
-              <span className="whitespace-nowrap">Pendings</span>
-              <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-white text-amber-700 rounded-full">
-                {pendingRequests?.length ?? 0}
-              </span>
-            </button>
-          )}
-
-          {/*EXPORT DROPDOWN*/}
-          <div className="relative group">
-            <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center gap-2'>
-              <TbFileExport />
-              <span className="leading-none">EXPORT</span>
-            </button>
-            <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-              <button
-                onClick={() => handleExportInventory('csv')}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-              >
-                Export as CSV
-              </button>
-              <button
-                onClick={() => handleExportInventory('pdf')}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-              >
-                Export as PDF
-              </button>
-            </div>
-          </div>
-
-          {/*CATEGORIES AND ADD ITEM - APPEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-          {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) && (
-            <>
-              {/*CATEGORIES BTN*/}
-              <button className='bg-[#007278] text-white font-medium hover:bg-[#009097] px-5 h-10 rounded-lg transition-all flex items-center justify-center' onClick={() => setIsCategory(true)}>CATEGORIES</button>
-
-              {/*ADD ITEM BTN*/}
-              <button className='bg-[#119200] text-white font-medium hover:bg-[#56be48] text-sm lg:text-base px-5 h-10 rounded-lg transition-all flex items-center justify-center' onClick={() => handleOpen('add')}>ADD ITEMS</button>
-            </>
-          )}
-
-        </div>
-
-
+    {/* Branch (if allowed) */}
+    {(user && user.role && user.role.some(r => ['Branch Manager', 'Owner'].includes(r))) && (
+      <div className="w-full lg:w-auto">
+        <DropdownCustom
+          value={selectedBranch}
+          onChange={e => setSelectedBranch(e.target.value)}
+          label="Filter by Branch:"
+          variant="floating"
+          options={[
+            ...(user.role.some(r => r === 'Owner')
+              ? [{ value: '', label: 'All Branch' }]
+              : branches.length !== 0 ? [] : [{ value: '', label: `${user.branch_name} (Your Branch)` }]),
+            ...branches.map(b => ({
+              value: b.branch_id,
+              label: `${b.branch_name}${b.branch_id === user.branch_id ? ' (Your Branch)' : ''}`
+            }))
+          ]}
+        />
       </div>
+    )}
+  </div>
+
+  {/* RIGHT: actions */}
+  {/* Base: grid with 2 columns so Export spans full width and the other two sit side-by-side.
+      Desktop (≥lg): switches to a single flex row aligned right. */}
+  <div className="mt-3 lg:mt-0 ml-0 lg:ml-auto grid grid-cols-2 gap-3 items-center w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 shrink-0">
+    {/* Export (full width on mobile) */}
+    <div className="relative group col-span-2 lg:col-span-1">
+      <button className="w-full lg:w-auto bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center justify-center gap-2">
+        <TbFileExport />
+        <span className="leading-none">EXPORT</span>
+      </button>
+      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+        <button
+          onClick={() => handleExportInventory('csv')}
+          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+        >
+          Export as CSV
+        </button>
+        <button
+          onClick={() => handleExportInventory('pdf')}
+          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+        >
+          Export as PDF
+        </button>
+      </div>
+    </div>
+
+    {/* Inventory Staff only */}
+    {user && user.role && user.role.some(r => r === 'Inventory Staff') && (
+      <>
+        <button
+          className="col-span-1 bg-[#007278] text-white font-medium hover:bg-[#009097] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+          onClick={() => setIsCategory(true)}
+        >
+          CATEGORIES
+        </button>
+
+        <button
+          className="col-span-1 bg-[#119200] text-white font-medium hover:bg-[#56be48] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+          onClick={() => handleOpen('add')}
+        >
+          ADD ITEMS
+        </button>
+      </>
+    )}
+
+    {/* (Optional) Pendings */}
+    {displayPendingApprovals && (
+      <button
+        className="col-span-2 lg:col-span-1 relative flex items-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
+        onClick={() => setIsPendingDialogOpen(true)}
+        aria-label="Open pending inventory requests"
+      >
+        <span className="whitespace-nowrap">Pendings</span>
+        <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-white text-amber-700 rounded-full">
+          {pendingRequests?.length ?? 0}
+        </span>
+      </button>
+    )}
+  </div>
+</div>
+
 
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
@@ -629,31 +630,9 @@ function ProductInventory({
 
                       <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
                       <td className="px-4 py-2 text-center w-36"  >
-                        {(() => {
-                          const qty = Number(row.quantity);
-                          const min = Number(row.min_threshold ?? 0);
-                          const max = Number(row.max_threshold ?? Infinity);
-                          let statusClass = 'bg-[#61E85C] text-green-700';
-                          let statusText = 'In Stock';
-
-                          
-                          if (!Number.isFinite(qty) || qty <= 0) {
-                            statusClass = 'bg-red-800 text-white';
-                            statusText = 'No Stock';
-                          } else if (qty <= min) {
-                            statusClass = 'bg-[#f05959] text-red-900';
-                            statusText = 'Low Stock';
-                          } else if (qty >= max) {
-                            statusClass = 'bg-[#1e5e1b] text-white';
-                            statusText = 'Max Stock';
-                          }
-
-                          return (
-                            <div className={`rounded-full px-5 py-1 font-medium ${statusClass}`} aria-live="polite">
-                              {statusText}
-                            </div>
-                          );
-                        })()}
+                        <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.min_threshold ? 'bg-[#f05959] text-red-900' : row.quantity >= row.max_threshold ? 'bg-[#1e5e1b] text-white' : 'bg-[#61E85C] text-green-700'} font-medium`}>
+                          {row.quantity <= row.min_threshold ? 'Low Stock' : row.quantity >= row.max_threshold ? 'Max Stock' : 'In Stock'}
+                        </div>
                       </td>
 
                       {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}

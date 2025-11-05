@@ -290,8 +290,8 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [] }) =
   const handleRefresh = () => setRefreshIndex((prev) => prev + 1);
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm">
-      <div className="relative flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="relative flex h-[90vh] w-full max-w-4xl mx-2 lg:mx-4 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
   <div className="sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>

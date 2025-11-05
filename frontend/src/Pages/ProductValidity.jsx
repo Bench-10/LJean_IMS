@@ -1,4 +1,4 @@
-import { React, useState, useEffect, useRef } from 'react';
+import { React, useState, useEffect } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
 import { TbFileExport } from "react-icons/tb";
 import api from '../utils/api';
@@ -8,7 +8,7 @@ import ChartLoading from '../components/common/ChartLoading';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 import DropdownCustom from '../components/DropdownCustom';
 
-function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList, focusEntry, onClearFocus }) {
+function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList }) {
   const [productValidityList, setValidity] = useState(propValidityList || []);
   const [searchValidity, setSearchValidity] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,10 +16,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const [showExpired, setShowExpired] = useState(false);
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
-  const rowRefs = useRef({});
-  const pendingFocusRef = useRef(null);
-  const [pendingRowKey, setPendingRowKey] = useState(null);
-  const [highlightedRowKey, setHighlightedRowKey] = useState(null);
 
   // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
@@ -27,92 +23,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
   const { user } = useAuth();
   const cacheKey = `product_validity_branch_${user?.branch_id || 'unknown'}`;
-
-  useEffect(() => {
-    if (Array.isArray(propValidityList)) {
-      setValidity(propValidityList);
-    }
-  }, [propValidityList]);
-
-  const matchesFocus = (entry, focus) => {
-    if (!entry || !focus) return false;
-
-    const focusAddIdRaw = focus.addStockId ?? focus.add_id ?? focus.addId ?? null;
-    if (focusAddIdRaw !== null && focusAddIdRaw !== undefined) {
-      const focusAddId = String(focusAddIdRaw);
-      const entryAddIdRaw = entry.primary_add_id ?? entry.add_id ?? entry.add_stock_id ?? entry.addId ?? null;
-
-      if (entryAddIdRaw !== null && entryAddIdRaw !== undefined) {
-        const entryAddId = String(entryAddIdRaw);
-        if (entryAddId === focusAddId) {
-          return true;
-        }
-
-        // When an add-id is provided but this row has different id, treat as non-match.
-        return false;
-      }
-    }
-
-    if (focus.productId !== undefined && focus.productId !== null) {
-      if (entry.product_id === undefined || entry.product_id === null) {
-        return false;
-      }
-
-      if (Number(entry.product_id) !== Number(focus.productId)) {
-        return false;
-      }
-    }
-
-    if (focus.alertType) {
-      const type = focus.alertType.toLowerCase();
-      if (type.includes('expired') && !type.includes('near')) {
-        if (!entry.expy) {
-          return false;
-        }
-      }
-
-      if (type.includes('near') && !entry.near_expy) {
-        return false;
-      }
-    }
-
-    if (focus.productValidityDate) {
-      const focusDate = new Date(focus.productValidityDate);
-      if (!Number.isNaN(focusDate.getTime())) {
-        const entryDate = entry.product_validity ? new Date(entry.product_validity) : null;
-        if (!entryDate || Number.isNaN(entryDate.getTime())) {
-          return false;
-        }
-
-        if (focusDate.toISOString().slice(0, 10) !== entryDate.toISOString().slice(0, 10)) {
-          return false;
-        }
-      }
-    }
-
-    return true;
-  };
-
-  const getRowKey = (entry, fallbackIndex = 0) => {
-    if (!entry) {
-      return `validity-row-${fallbackIndex}`;
-    }
-
-    const entryAddIdRaw = entry.primary_add_id ?? entry.add_id ?? entry.add_stock_id ?? entry.addId ?? null;
-    if (entryAddIdRaw !== null && entryAddIdRaw !== undefined) {
-      return `validity-add-${entryAddIdRaw}`;
-    }
-
-    if (entry.product_id !== undefined && entry.product_id !== null && entry.product_validity) {
-      return `validity-${entry.product_id}-${entry.product_validity}`;
-    }
-
-    if (entry.product_id !== undefined && entry.product_id !== null) {
-      return `validity-${entry.product_id}`;
-    }
-
-    return `validity-row-${fallbackIndex}`;
-  };
 
 
   const getProductInfo = async ({ force = false } = {}) => {
@@ -160,12 +70,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     // On mount: show cache if available, then refresh in background
     getProductInfo({ force: false });
   }, [user.branch_id]);
-
-  useEffect(() => {
-    if (focusEntry) {
-      getProductInfo({ force: true });
-    }
-  }, [focusEntry]);
 
   // LISTEN FOR REAL-TIME VALIDITY UPDATES
   useEffect(() => {
@@ -240,42 +144,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     };
   }, []);
 
-  useEffect(() => {
-    if (focusEntry) {
-      pendingFocusRef.current = focusEntry;
-      setSearchValidity('');
-      setShowNearExpiry(false);
-      setShowExpired(false);
-      setSelectedYear('');
-      setSelectedMonth('');
-    }
-  }, [focusEntry]);
-
-  useEffect(() => {
-    if (!pendingFocusRef.current) return;
-    if (!Array.isArray(productValidityList) || productValidityList.length === 0) return;
-
-    const focus = pendingFocusRef.current;
-    const matchIndex = productValidityList.findIndex(entry => matchesFocus(entry, focus));
-
-    if (matchIndex === -1) {
-      return;
-    }
-
-    const targetEntry = productValidityList[matchIndex];
-    const targetKey = getRowKey(targetEntry, matchIndex);
-
-    pendingFocusRef.current = null;
-
-    const targetPage = Math.floor(matchIndex / itemsPerPage) + 1;
-    setCurrentPage(targetPage);
-    setPendingRowKey(targetKey);
-
-    if (typeof onClearFocus === 'function') {
-      onClearFocus();
-    }
-  }, [productValidityList, itemsPerPage, onClearFocus]);
-
 
 
 
@@ -323,55 +191,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const endIndex = startIndex + itemsPerPage;
   const currentPageData = filteredValidityData.slice(startIndex, endIndex);
 
-  useEffect(() => {
-    if (!pendingRowKey) return;
-
-    const refEntry = rowRefs.current[pendingRowKey];
-    if (!refEntry) {
-      return;
-    }
-
-    const prefersDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
-    const targetElement = prefersDesktop
-      ? (refEntry.table || refEntry.card)
-      : (refEntry.card || refEntry.table);
-
-    if (!targetElement) {
-      return;
-    }
-
-    setHighlightedRowKey(pendingRowKey);
-
-    const headerOffset = prefersDesktop ? 120 : 90;
-    const previousScrollMarginTop = targetElement.style.scrollMarginTop;
-    let marginResetTimer;
-
-    if (typeof targetElement.scrollIntoView === 'function') {
-      targetElement.style.scrollMarginTop = `${headerOffset}px`;
-      targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-      marginResetTimer = window.setTimeout(() => {
-        if (targetElement) {
-          targetElement.style.scrollMarginTop = previousScrollMarginTop;
-        }
-      }, 600);
-    }
-
-    const highlightTimer = window.setTimeout(() => {
-      setHighlightedRowKey(null);
-      setPendingRowKey(null);
-    }, 2000);
-
-    return () => {
-      window.clearTimeout(highlightTimer);
-      if (marginResetTimer) {
-        window.clearTimeout(marginResetTimer);
-        if (targetElement) {
-          targetElement.style.scrollMarginTop = previousScrollMarginTop;
-        }
-      }
-    };
-  }, [pendingRowKey, currentPageData]);
-
   // Export functionality
   const handleExportValidity = (format) => {
     const exportData = formatForExport(filteredValidityData, []);
@@ -393,11 +212,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
 
 
-
-  rowRefs.current = {};
-
   return (
-    <div className="pt-20 lg:pt-8 px-4 lg:px-8 h-screen" >
+    <div className="pt-20 lg:pt-8 px-4 lg:px-8" >
       {/*TITLE*/}
       <h1 className=' text-4xl font-bold text-green-900'>
         PRODUCT VALIDITY
@@ -406,109 +222,81 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       <hr className="mt-3 mb-6 border-t-4 border-green-800 rounded-lg" />
 
       {/*SEARCH AND ADD*/}
-      <div className='lg:flex w-full'>
-        {/*SEARCH */}
-        <div className='w-auto min-w-[350px] text-sm lg:text-base pb-3 lg:pb-0'>
+      {/* SEARCH + FILTERS (1 line on desktop; controls at right) */}
+<div className="w-full lg:flex lg:items-center lg:flex-nowrap lg:gap-4">
+  {/* SEARCH (left) */}
+  <div className="w-full lg:basis-[360px] lg:flex-none text-sm lg:text-base pb-3 lg:pb-0">
+    <input
+      type="text"
+      placeholder="Search Item Name or Category"
+      className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:py-2 transition-all px-3 py-2 rounded-lg w-full h-9"
+      onChange={handleSearch}
+    />
+  </div>
 
-          <input
-            type="text"
-            placeholder="Search Item Name or Category"
-            className={`border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:py-2 transition-all px-3 py-2 rounded-lg w-full h-9`}
-            onChange={handleSearch}
+  {/* RIGHT: chips + dropdowns (flush right on desktop) */}
+  <div className="w-full lg:w-auto lg:ml-auto lg:flex lg:items-center lg:justify-end lg:gap-3">
+    {/* Chips: grid on mobile, inline on desktop */}
+    <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 lg:shrink-0">
+      <button
+        type="button"
+        onClick={() => { setShowNearExpiry(p => !p); setCurrentPage(1); }}
+        className={`w-full lg:w-auto flex h-[36px] items-center justify-center gap-2 px-3 lg:px-4 text-sm lg:text-base rounded-lg border transition-all
+          ${showNearExpiry
+            ? 'bg-[#FFF3C1] text-gray-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
+            : 'bg-white text-gray-700 border-gray-200 hover:bg-yellow-50'}`}
+      >
+        <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#f8e189]" />
+        <span className="whitespace-nowrap">Near Expiry</span>
+      </button>
 
-          />
+      <button
+        type="button"
+        onClick={() => { setShowExpired(p => !p); setCurrentPage(1); }}
+        className={`w-full lg:w-auto flex h-[36px] lg:h-[38px] items-center justify-center gap-2 px-3 lg:px-4 text-sm lg:text-base rounded-lg border transition-all
+          ${showExpired
+            ? 'bg-[#FF3131] text-white border-red-500 ring-2 ring-red-400 ring-offset-2'
+            : 'bg-white text-gray-700 border-gray-200 hover:bg-red-50'}`}
+      >
+        <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#c32525]" />
+        <span className="whitespace-nowrap">Expired</span>
+      </button>
+    </div>
 
-        </div>
-
-        <div className="ml-auto lg:flex gap-4 items-center rounded-lg">
-
-
-          {/*EXPIRY FILTERS (clickable chips)*/}
-          <div className="flex flex-wrap gap-2 lg:gap-4 items-center justify-center lg:justify-start">
-            <button
-              type="button"
-              onClick={() => {
-                setShowNearExpiry(prev => !prev);
-                setCurrentPage(1);
-              }}
-              className={`flex h-[36px] w-[45vw] lg:w-auto items-center justify-center gap-2 px-3 lg:px-4 text-sm lg:text-base rounded-lg border transition-all
-                  ${showNearExpiry
-                  ? 'bg-[#FFF3C1] text-gray-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
-                  : 'bg-white text-gray-700 border-gray-200 hover:bg-yellow-50 '}`}
-            >
-              <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#f8e189]" />
-              <span className="whitespace-nowrap">Near Expiry</span>
-            </button>
-
-
-
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowExpired(prev => !prev);
-                setCurrentPage(1);
-              }}
-              className={` h-[36px] lg:h-[38px] w-[45vw] lg:w-auto px-3 lg:px-4 gap-2 flex items-center justify-center text-sm lg:text-base rounded-lg border transition-all
-              ${showExpired
-                  ? 'bg-[#FF3131] text-white border-red-500 ring-2 ring-red-400 ring-offset-2'
-                  : 'bg-white text-gray-700 border-gray-200 hover:bg-red-50'}`}
-            >
-              <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#c32525]" />
-              <span className="whitespace-nowrap">Expired</span>
-            </button>
-
-
-
-
-            {/* YEAR & MONTH FILTERS */}
-            <div className="relative flex gap-2 lg:ml-4 h-9 lg:h-11 w-full lg:w-auto mt-2 lg:mt-0">
-              <div className="flex-1 lg:flex-initial">
-                <DropdownCustom
-                  value={selectedYear}
-                  onChange={(e) => {
-                    setSelectedYear(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  variant="simple"
-                  options={[
-                    { value: '', label: 'All Years' },
-                    ...Array.from(new Set(productValidityList.map(v => v.year).filter(Boolean)))
-                      .sort((a, b) => b - a)
-                      .map(y => ({
-                        value: y,
-                        label: y
-                      }))
-                  ]}
-                />
-              </div>
-
-              <div className="flex-1 lg:flex-initial">
-                <DropdownCustom
-                  value={selectedMonth}
-                  onChange={(e) => {
-                    setSelectedMonth(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  variant="simple"
-                  options={[
-                    { value: '', label: 'All Months' },
-                    ...(() => {
-                      const monthNames = [null, 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                      const months = Array.from(new Set(productValidityList.map(v => v.month).filter(m => m != null).map(Number)))
-                        .sort((a, b) => a - b);
-                      return months.map(m => ({
-                        value: m,
-                        label: monthNames[m] || m
-                      }));
-                    })()
-                  ]}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+    {/* Year/Month: grid on mobile, inline on desktop */}
+    <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-2 lg:ml-3 lg:shrink-0 mt-2 lg:mt-0">
+      <div className="col-span-1 lg:w-40">
+        <DropdownCustom
+          value={selectedYear}
+          onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
+          variant="simple"
+          options={[
+            { value: '', label: 'All Years' },
+            ...Array.from(new Set(productValidityList.map(v => v.year).filter(Boolean)))
+              .sort((a, b) => b - a)
+              .map(y => ({ value: y, label: y }))
+          ]}
+        />
       </div>
+      <div className="col-span-1 lg:w-40">
+        <DropdownCustom
+          value={selectedMonth}
+          onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); }}
+          variant="simple"
+          options={[
+            { value: '', label: 'All Months' },
+            ...(() => {
+              const names = [null,'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+              const months = Array.from(new Set(productValidityList.map(v => v.month).filter(m => m != null).map(Number))).sort((a,b)=>a-b);
+              return months.map(m => ({ value: m, label: names[m] || m }));
+            })()
+          ]}
+        />
+      </div>
+    </div>
+  </div>
+</div>
+
 
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
@@ -523,38 +311,17 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
             <NoInfoFound isTable={false} />
           </div>
         ) : (
-          currentPageData.map((validity, index) => {
-            const rowKey = getRowKey(validity, startIndex + index);
-            const isHighlighted = highlightedRowKey === rowKey;
-
-            const cardHighlightStyle = isHighlighted
-              ? {
-                  boxShadow: '0 0 0 4px rgba(34,197,94,0.18)',
-                  transition: 'box-shadow 200ms ease, transform 200ms ease, background-color 200ms ease',
-                  zIndex: 2
-                }
-              : undefined;
-
-            return (
-              <div
-                key={rowKey}
-                ref={el => {
-                  rowRefs.current[rowKey] = {
-                    ...(rowRefs.current[rowKey] || {}),
-                    card: el || null
-                  };
-                }}
-                className={`rounded-lg p-4 border-l-4 shadow-sm transition-colors duration-300 ease-in-out ${
-                  isHighlighted
-                    ? 'bg-green-200 text-gray-900 border-green-200'
-                    : validity.expy
-                      ? 'bg-[#FF3131] text-white border-red-700'
-                      : validity.near_expy
-                        ? 'bg-[#FFF3C1] border-yellow-500'
-                        : 'bg-white border-gray-300'
-                } ${isHighlighted ? 'relative' : ''}`}
-                
-              >
+          currentPageData.map((validity, index) => (
+            <div
+              key={index}
+              className={`rounded-lg p-4 border-l-4 shadow-sm ${
+                validity.expy
+                  ? 'bg-[#bc2424] text-white border-red-700'
+                  : validity.near_expy
+                  ? 'bg-[#FFF3C1] border-yellow-500'
+                  : 'bg-white border-gray-300'
+              }`}
+            >
               {(validity.expy || validity.near_expy) && (
                 <div className="flex items-center gap-2 mb-2">
                   <RiErrorWarningLine className="text-xl" />
@@ -568,28 +335,27 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 <div className="font-bold text-base">{validity.product_name}</div>
                
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Category:</span>
+                  <span className="text-white-600">Category:</span>
                   <span className="font-medium">{validity.category_name}</span>
                 </div>
                
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Date Purchased:</span>
+                  <span className="text-white-600">Date Purchased:</span>
                   <span className="font-medium">{validity.formated_date_added}</span>
                 </div>
                
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Expiry Date:</span>
+                  <span className="text-white-600">Expiry Date:</span>
                   <span className="font-medium">{validity.formated_product_validity}</span>
                 </div>
                
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Quantity:</span>
+                  <span className="text-white-600">Quantity:</span>
                   <span className="font-bold text-base">{validity.quantity_left}</span>
                 </div>
               </div>
-              </div>
-            );
-          })
+            </div>
+          ))
         )}
         
       </div>
@@ -644,32 +410,20 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 ) :
 
                 (
-                  currentPageData.map((validity, index) => {
-                    const rowKey = getRowKey(validity, startIndex + index);
-                    const isHighlighted = highlightedRowKey === rowKey;
-
-                    const rowBgClass = isHighlighted
-                      ? 'bg-green-100 text-gray-900'
-                      : (validity.expy
-                          ? 'bg-[#FF3131] text-white hover:bg-[#FF3131]/90'
+                  currentPageData.map((validity, index) => (
+                    <tr
+                      key={index}
+                      className={
+                        validity.expy
+                          ? 'bg-[#bc2424] text-white hover:bg-[#bc2424]/90 h-14'
                           : validity.near_expy
-                            ? 'bg-[#FFF3C1] hover:bg-yellow-100'
-                            : 'hover:bg-gray-200/70');
-
-                    return (
-                      <tr
-                        key={rowKey}
-                        ref={el => {
-                          rowRefs.current[rowKey] = {
-                            ...(rowRefs.current[rowKey] || {}),
-                            table: el || null
-                          };
-                        }}
-                        className={`transition-colors duration-300 ease-in-out ${rowBgClass} h-14 ${isHighlighted ? 'relative' : ''}`}
-                      >
+                            ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
+                            : 'hover:bg-gray-200/70 h-14'
+                      }
+                    >
                       {(validity.expy || validity.near_expy) ?
 
-                        (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]">
+                        (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
 
                           <div className='flex items-center'>
                             <RiErrorWarningLine className='h-[100%]' />
@@ -683,7 +437,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                         ) :
 
                         (
-                          <td className="px-4 py-2 text-center items-center"  >
+                          <td className="px-4 py-2 text-center items-center "  >
                             {validity.formated_date_added}
                           </td>
                         )
@@ -691,15 +445,14 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                       }
 
 
-                      <td className="px-4 py-2 text-center font-medium whitespace-nowrap">{validity.formated_product_validity}</td>
-                      <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap">{validity.product_name}</td>
-                      <td className="px-4 py-2 text-center">{validity.category_name}</td>
-                      <td className="px-4 py-2 text-center">{validity.quantity_left}</td>
+                      <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
+                      <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
+                      <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
+                      <td className="px-4 py-2 text-center "  >{validity.quantity_left}</td>
 
-                      </tr>
+                    </tr>
 
-                    );
-                  })
+                  ))
 
                 )
             }
@@ -783,7 +536,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
         {/* RIGHT: EXPORT DROPDOWN */}
         <div className='flex justify-center sm:justify-end w-full sm:flex-1'>
           <div className="relative group w-full sm:w-auto">
-            <button className='bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 lg:px-5 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-sm lg:text-base w-full sm:w-auto'>
+            <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 lg:px-5 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-sm lg:text-base w-full sm:w-auto'>
               <TbFileExport />EXPORT
             </button>
             <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 bottom-full mb-2 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
