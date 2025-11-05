@@ -3,7 +3,7 @@ import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
 import api from '../utils/api';
-import { getQuantityStep, validateQuantity, getQuantityPlaceholder, allowsFractional } from '../utils/unitConversion';
+import { getQuantityStep, validateQuantity, getQuantityPlaceholder, getUnitConfig } from '../utils/unitConversion';
 import DropdownCustom from './DropdownCustom';
 import DatePickerCustom from './DatePickerCustom';
 
@@ -495,13 +495,28 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
 
     if (!(mode === 'edit' && editChoice === 'addStocks')) {
       const trimmedUnit = typeof unit === 'string' ? unit.trim() : '';
-      const hasBaseUnit = sellingUnits.some(entry => entry.is_base && entry.unit === trimmedUnit);
+  const hasBaseUnit = sellingUnits.some(entry => entry.is_base && entry.unit === trimmedUnit);
+  const nonBaseUnitCount = sellingUnits.filter(entry => !entry.is_base).length;
       const baseUnitPriceValue = Number(unit_price);
+      let baseUnitFactor = null;
+
+      if (trimmedUnit) {
+        try {
+          const config = getUnitConfig(trimmedUnit);
+          baseUnitFactor = config?.factor ?? null;
+        } catch (error) {
+          baseUnitFactor = null;
+        }
+      }
+
+      const requiresWholeBaseUnit = baseUnitFactor === 1;
 
       if (!trimmedUnit) {
         sellingGeneralError = 'Select a base unit before configuring selling units.';
       } else if (!hasBaseUnit) {
         sellingGeneralError = 'Base unit entry is required in selling units.';
+      } else if (showSellingUnitsEditor && nonBaseUnitCount === 0) {
+        sellingGeneralError = 'Add at least one alternate selling unit or close the Selling Units editor.';
       } else if (!Number.isFinite(baseUnitPriceValue) || baseUnitPriceValue <= 0) {
         sellingGeneralError = 'Enter a valid price for the base unit.';
       }
@@ -524,6 +539,15 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
           entryErrors.push('Conversion value must be greater than 0.');
         }
 
+        if (
+          requiresWholeBaseUnit &&
+          Number.isFinite(baseQuantityNumeric) &&
+          baseQuantityNumeric > 0 &&
+          baseQuantityNumeric < 1
+        ) {
+          entryErrors.push(`Amount of ${trimmedUnit} per ${identifier || 'unit'} must be at least 1 because ${trimmedUnit} cannot be split.`);
+        }
+
         if (entry.is_base && identifier !== trimmedUnit) {
           entryErrors.push('Base unit entry must match the selected inventory unit.');
         }
@@ -537,9 +561,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         }
       });
 
-      if (!sellingGeneralError && Object.keys(sellingEntryErrors).length > 0) {
-        sellingGeneralError = 'Fix the selling unit errors before submitting.';
-      }
+      // Do not set a generic selling-unit error; individual entry errors will be shown instead.
     }
 
     // SET THE VALUES TO THE STATE VARIABLE

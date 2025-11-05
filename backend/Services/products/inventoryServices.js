@@ -50,6 +50,16 @@ const normalizeSellingUnitsPayload = (rawUnits, baseUnit, basePrice) => {
     const seenUnits = new Set();
     const normalizedUnits = [];
     let baseUnitPrice = toNumberOrNull(basePrice);
+    let requiresWholeBaseUnit = false;
+
+    if (sanitizedBaseUnit) {
+        try {
+            const baseConversion = getUnitConversion(sanitizedBaseUnit);
+            requiresWholeBaseUnit = baseConversion.conversion_factor === 1;
+        } catch (error) {
+            throw new InventoryValidationError(`Base unit '${sanitizedBaseUnit}' is not registered in the conversion table.`);
+        }
+    }
 
     if (Array.isArray(rawUnits)) {
         rawUnits.forEach((rawUnit) => {
@@ -83,6 +93,10 @@ const normalizeSellingUnitsPayload = (rawUnits, baseUnit, basePrice) => {
 
             if (!Number.isFinite(resolvedBaseQuantity) || resolvedBaseQuantity <= 0) {
                 throw new InventoryValidationError(`Invalid conversion value for unit '${unitValue}'.`);
+            }
+
+            if (requiresWholeBaseUnit && resolvedBaseQuantity < 1) {
+                throw new InventoryValidationError(`Unit '${unitValue}' must contain at least 1 ${sanitizedBaseUnit}.`);
             }
 
             const unitsPerBase = 1 / resolvedBaseQuantity;
