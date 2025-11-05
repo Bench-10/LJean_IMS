@@ -6,6 +6,7 @@ import api from '../utils/api';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
 import DropdownCustom from './DropdownCustom';
+import DropdownCheckbox from './DropdownCheckbox';
 
 function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo, userDetailes, setUserDetailes, setOpenUsers }) {
 
@@ -189,6 +190,29 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
       return <div className="italic text-red-500 absolute text-xs mt-1 pl-1">Incorrect format! Use 09XXXXXXXXX</div>
   };
 
+  // Allowed role options (Owner can assign Branch Manager; others cannot)
+  const roleOptions = [
+    ...(user.role.some(r => ['Owner'].includes(r)) ? [{ value: 'Branch Manager', label: 'Branch Manager' }] : []),
+    { value: 'Inventory Staff', label: 'Inventory Staff' },
+    { value: 'Sales Associate', label: 'Sales Associate' },
+  ];
+
+  // Convert role object <-> array of values
+  const selectedRoles = [
+    ...(role.isManager ? ['Branch Manager'] : []),
+    ...(role.isInventoryStaff ? ['Inventory Staff'] : []),
+    ...(role.isSalesAssociate ? ['Sales Associate'] : []),
+  ];
+
+  const handleRoleChange = (vals) => {
+    setRole({
+      isManager: vals.includes('Branch Manager'),
+      isInventoryStaff: vals.includes('Inventory Staff'),
+      isSalesAssociate: vals.includes('Sales Associate'),
+    });
+  };
+
+
   return (
     <div>
       {loading && (
@@ -207,9 +231,9 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
       {openUserModal && (
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999]" onClick={handleClose} />
-          <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4 animate-popup">
+          <div className="fixed inset-0 flex items-center justify-center z-[9999] p-2 animate-popup">
             <div
-              className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[80vh] overflow-y-auto hide-scrollbar flex flex-col"
+              className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] overflow-y-auto hide-scrollbar flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -282,37 +306,12 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
                     {/* User Role */}
 
                     <div className="relative">
-                      <h2 className="font-medium text-green-900 mb-2">User Role</h2>
-                      <DropdownCustom
-                        label=""
-                        value={
-                          role.isManager
-                            ? 'Branch Manager'
-                            : role.isInventoryStaff
-                              ? 'Inventory Staff'
-                              : role.isSalesAssociate
-                                ? 'Sales Associate'
-                                : ''
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setRole({
-                            isManager: value === 'Branch Manager',
-                            isInventoryStaff: value === 'Inventory Staff',
-                            isSalesAssociate: value === 'Sales Associate',
-                          });
-                        }}
-                        options={[
-                          { value: '', label: '-- Select Role --' },
-                          ...(user.role.some((r) => ['Owner'].includes(r))
-                            ? [{ value: 'Branch Manager', label: 'Branch Manager' }]
-                            : []),
-                          { value: 'Inventory Staff', label: 'Inventory Staff' },
-                          { value: 'Sales Associate', label: 'Sales Associate' },
-                        ]}
-                        variant="simple"
+                      <DropdownCheckbox
+                        label="User Role"
+                        values={selectedRoles}
+                        options={roleOptions}
+                        onChange={handleRoleChange}
                         error={emptyField.role}
-                        labelClassName="block font-medium text-green-900 mb-2"
                       />
                       {errorflag('role', 'User Role')}
                     </div>

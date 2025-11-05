@@ -32,7 +32,7 @@ const DropdownCustom = ({ value, onChange, options, label, variant = 'default', 
 
   const getButtonClassName = () => {
     if (variant === 'simple' || variant === 'default') {
-      return `w-full h-[36px] flex items-center justify-center lg:justify-between px-3 text-sm leading-none bg-white 
+      return `w-full h-[36px] flex items-center justify-between px-3 text-sm leading-none bg-white 
       transition-all duration-200 border rounded-md text-gray-900 
       ${error 
         ? 'border-red-500 ring-1 ring-red-50 focus:ring-red-500' 
