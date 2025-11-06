@@ -74,19 +74,31 @@ function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, d
     <div className="h-full bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 relative overflow-hidden">
       {loading && <ChartLoading message={title} type="kpi" />}
       <div className={`absolute left-0 top-0 bottom-0 w-1.5 sm:w-2 ${accentClass}`} />
-      <div className="grid grid-cols-[auto,1fr] items-center gap-3 sm:gap-4">
+      
+      <div className="grid grid-cols-[auto,1fr] items-start gap-3 sm:gap-4">
         <div className="place-self-start">
           <Icon className={`text-2xl sm:text-3xl ${iconClass}`} />
         </div>
+
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="text-[11px] sm:text-[13px] font-semibold text-gray-700">{title}</h3>
+          {/* Title + Date: allow wrapping; no truncate on the date */}
+          <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2 min-w-0">
+            <h3 className="text-[14px] sm:text-[18px] font-semibold text-gray-700 whitespace-nowrap">
+              {title}
+            </h3>
             {dateRangeDisplay && (
-              <span className="text-[10px] sm:text-[11px] text-gray-500 truncate">{dateRangeDisplay}</span>
+              <span className="text-[10px] sm:text-[11px] text-gray-500 leading-none">
+                {dateRangeDisplay}
+              </span>
             )}
           </div>
-          <p className="text-[clamp(18px,5vw,26px)] font-bold leading-tight truncate">{value}</p>
-          <p className="text-[11px] text-gray-400 font-medium mt-1 truncate">{sub}</p>
+
+          <p className="text-[clamp(18px,5vw,26px)] font-bold leading-tight truncate">
+            {value}
+          </p>
+          <p className="text-[11px] text-gray-400 font-medium mt-1 truncate">
+            {sub}
+          </p>
         </div>
       </div>
     </div>

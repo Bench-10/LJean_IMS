@@ -35,7 +35,7 @@ function GlobalBanner({setOpenNotif, unreadCount, onOpenRequestMonitor}) {
     }, [onOpenRequestMonitor]);
 
   return (
-    <div className='hidden lg:block lg:ml-[var(--sidebar-width)] pt-12 sm:pt-4 pb-4 px-8 bg-white/95 backdrop-blur-sm '>
+    <div className='hidden lg:block lg:ml-[var(--sidebar-width)] pt-12 sm:pt-4 pb-2 px-8 bg-white/95 backdrop-blur-sm '>
         {/*GREETINGS BANNER */}
         <div className='flex items-center justify-between'>
 

@@ -18,7 +18,7 @@ function PageLayout({ setOpenNotif, unreadCount, onOpenRequestMonitor }) {
           unreadCount={unreadCount}
           onOpenRequestMonitor={onOpenRequestMonitor} 
         />
-<main className="flex-1 overflow-y-auto xl:ml-[var(--sidebar-width)] pt-2 xl:pt-0">
+<main className="flex-1 overflow-y-auto xl:ml-[var(--sidebar-width)] pt-2 xl:pt-0 hide-scrollbar">
   <Outlet />
 </main>
       </div>

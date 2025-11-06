@@ -1,41 +1,47 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
+import {
+  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, Legend, PieChart, Pie, Cell
+} from 'recharts';
 import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 
-function BranchPerformance({ Card, branchTotals, loading, error, branchPerformanceRef, revenueDistributionRef }) {
+function BranchPerformance({
+  Card,
+  branchTotals,
+  loading,
+  error,
+  branchPerformanceRef,
+  revenueDistributionRef
+}) {
   const { user } = useAuth();
   const [screenDimensions, setScreenDimensions] = useState({
     width: window.innerWidth,
     height: window.innerHeight
   });
 
-  // ROLE CHECK: ONLY OWNER SHOULD SEE BRANCH PERFORMANCE CHARTS
+  // Owner-only
   const isOwner = useMemo(() => {
     if (!user) return false;
     const roles = Array.isArray(user.role) ? user.role : user?.role ? [user.role] : [];
     return roles.includes('Owner');
   }, [user]);
 
-  // COLORS FOR PIE CHART SEGMENTS
+  // Colors for pie
   const PIE_COLORS = ['#22c55e','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16','#f97316'];
 
-  // UPDATE SCREEN DIMENSIONS ON RESIZE
+  // Resize listener
   useEffect(() => {
     const handleResize = () => {
-      setScreenDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
+      setScreenDimensions({ width: window.innerWidth, height: window.innerHeight });
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  
+  // Responsive sizes for pie/legend/tooltip
   const responsiveSizes = useMemo(() => {
     const { width, height } = screenDimensions;
     const baseRadius = Math.min(width * 0.05, height * 0.08);
@@ -43,16 +49,10 @@ function BranchPerformance({ Card, branchTotals, loading, error, branchPerforman
     const legendFontSize = width < 768 ? 10 : width < 1024 ? 11 : 12;
     const tooltipFontSize = width < 768 ? 12 : 14;
     const centerY = height < 600 ? '40%' : '45%';
-
-    return {
-      outerRadius,
-      legendFontSize,
-      tooltipFontSize,
-      centerY,
-      isMobile: width < 768
-    };
+    return { outerRadius, legendFontSize, tooltipFontSize, centerY, isMobile: width < 768 };
   }, [screenDimensions]);
 
+  // Pie data
   const pieChartData = useMemo(
     () => branchTotals.filter(item => Number(item.total_amount_due) > 0),
     [branchTotals]
@@ -67,11 +67,7 @@ function BranchPerformance({ Card, branchTotals, loading, error, branchPerforman
     () => pieChartData.map(item => {
       const amount = Number(item.total_amount_due);
       const percentage = totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0;
-      return {
-        ...item,
-        total_amount_due: amount,
-        percentage: Number(percentage.toFixed(1))
-      };
+      return { ...item, total_amount_due: amount, percentage: Number(percentage.toFixed(1)) };
     }),
     [pieChartData, totalRevenue]
   );
@@ -87,14 +83,52 @@ function BranchPerformance({ Card, branchTotals, loading, error, branchPerforman
     return `${name.substring(0, maxLength)}...`;
   }, []);
 
+  // Normalize numeric values; keep both display_name (elsewhere) and original_name (axis)
   const processedBarData = useMemo(
-    () => branchTotals.map(item => ({
-      ...item,
-      display_name: truncateBranchName(item.branch_name, 8),
-      original_name: item.branch_name
-    })),
+    () => branchTotals.map(item => {
+      const raw = item.total_amount_due ?? item.total_amount ?? item.total ?? 0;
+      const val = Number(raw);
+      return {
+        ...item,
+        total_amount_due: Number.isFinite(val) ? val : 0,
+        display_name: truncateBranchName(item.branch_name, 8),
+        original_name: item.branch_name
+      };
+    }),
     [branchTotals, truncateBranchName]
   );
+
+  // Two-line tick helpers (Option A: straight labels + auto-skip)
+  const maxCharsPerLine = useMemo(
+    () => (screenDimensions.width < 640 ? 10 : 14),
+    [screenDimensions.width]
+  );
+
+  const splitTwoLines = useCallback((text) => {
+    const words = String(text ?? "").split(" ");
+    let line1 = "";
+    let line2 = "";
+    for (const w of words) {
+      const test = line1 ? `${line1} ${w}` : w;
+      if (test.length <= maxCharsPerLine) line1 = test;
+      else line2 = line2 ? `${line2} ${w}` : w;
+    }
+    if (line2.length > maxCharsPerLine) line2 = line2.slice(0, maxCharsPerLine - 1) + "…";
+    return [line1, line2];
+  }, [maxCharsPerLine]);
+
+  const TwoLineTick = useCallback(({ x, y, payload }) => {
+    const [l1, l2] = splitTwoLines(payload.value);
+    const lh = 12;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text textAnchor="middle" fontSize={11} fill="#374151">
+          <tspan x="0" dy="0">{l1}</tspan>
+          {l2 && <tspan x="0" dy={lh}>{l2}</tspan>}
+        </text>
+      </g>
+    );
+  }, [splitTwoLines]);
 
   const showBarChart = !loading && !error && branchTotals.length > 0 && hasPositiveBarValues;
   const showPieChart = !loading && !error && processedPieData.length > 0;
@@ -111,58 +145,60 @@ function BranchPerformance({ Card, branchTotals, loading, error, branchPerforman
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {loading && <ChartLoading message="Loading branch performance..." />}
           {error && !loading && (
-            <ChartNoData
-              message={error}
-              hint="Please try refreshing the analytics page."
-            />
+            <ChartNoData message={error} hint="Please try refreshing the analytics page." />
           )}
-          
+
           {showBarChart && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="branch-performance">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={processedBarData}
-                  margin={{ top: 10, right: 5, left: 5, bottom: 25 }}
+                  margin={{ top: 10, right: 5, left: 5, bottom: 40 }} // extra room for 2nd line
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-                  <XAxis 
-                    dataKey="display_name" 
-                    tick={{ fontSize: 10 }} 
-                    axisLine={false} 
-                    tickLine={false} 
-                    interval={0} 
-                    textAnchor="end" 
-                    height={60}
+
+                  <XAxis
+                    dataKey="original_name"  // full names
+                    tick={<TwoLineTick />}   // two-line tick
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"         // auto-skip when crowded
+                    tickMargin={8}
+                    height={screenDimensions.width < 640 ? 44 : 36}
                     angle={0}
                   />
+
                   {(() => {
-                    const maxAmount = processedBarData.reduce((m,p) => Math.max(m, Number(p.total_amount_due)||0), 0);
-                    
-                    if (maxAmount <= 0) return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 1]} />;
-                    
-                    const target = Math.ceil(maxAmount * 1.15); 
+                    const maxAmount = processedBarData.reduce((m, p) => Math.max(m, Number(p.total_amount_due) || 0), 0);
+                    if (maxAmount <= 0) {
+                      return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 1]} />;
+                    }
+                    const target = Math.ceil(maxAmount * 1.15);
                     const magnitude = Math.pow(10, Math.floor(Math.log10(target)));
                     const padded = Math.ceil(target / magnitude) * magnitude;
-                    
                     return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, padded]} />;
                   })()}
-                  <Tooltip 
+
+                  <Tooltip
                     formatter={(value) => [currencyFormat(value), "Total Sales"]}
                     labelFormatter={(label, payload) => {
                       const item = payload && payload[0] && payload[0].payload;
                       return item ? `Branch: ${item.original_name}` : `Branch: ${label}`;
                     }}
                   />
-                  <Bar 
-                    name="Total Sales" 
-                    dataKey="total_amount_due" 
-                    fill="#3b82f6" 
-                    radius={[4,4,0,0]} 
+
+                  <Bar
+                    name="Total Sales"
+                    dataKey="total_amount_due"
+                    fill="#3b82f6"
+                    radius={[4, 4, 0, 0]}
+                    minPointSize={2}      // ensure tiny values still show
                   />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
+
           {!loading && !error && !showBarChart && (
             <ChartNoData
               message="No branch performance data for the selected range."
@@ -181,12 +217,9 @@ function BranchPerformance({ Card, branchTotals, loading, error, branchPerforman
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {loading && <ChartLoading message="Loading distribution..." />}
           {error && !loading && (
-            <ChartNoData
-              message={error}
-              hint="Please try refreshing the analytics page."
-            />
+            <ChartNoData message={error} hint="Please try refreshing the analytics page." />
           )}
-          
+
           {showPieChart && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="revenue-distribution">
               <ResponsiveContainer width="100%" height="100%">
@@ -207,31 +240,31 @@ function BranchPerformance({ Card, branchTotals, loading, error, branchPerforman
                       <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value, name, props) => [
                       `${props.payload.percentage}% (${currencyFormat(value)}) `,
                       name
-                    ]} 
+                    ]}
                     labelFormatter={(label) => `Branch: ${label}`}
-                    contentStyle={{ 
+                    contentStyle={{
                       fontSize: responsiveSizes.tooltipFontSize,
                       padding: responsiveSizes.isMobile ? '8px' : '12px'
                     }}
                   />
-                  <Legend 
-                    wrapperStyle={{ 
+                  <Legend
+                    wrapperStyle={{
                       fontSize: responsiveSizes.legendFontSize,
                       paddingTop: responsiveSizes.isMobile ? '10px' : '15px'
                     }}
                     iconSize={responsiveSizes.isMobile ? 12 : 14}
-                    layout={responsiveSizes.isMobile ? 'horizontal' : 'horizontal'}
-                    align={responsiveSizes.isMobile ? 'center' : 'center'}
+                    layout="horizontal"
+                    align="center"
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           )}
-          
+
           {!loading && !error && !showPieChart && (
             <ChartNoData
               message="No revenue distribution data available."
