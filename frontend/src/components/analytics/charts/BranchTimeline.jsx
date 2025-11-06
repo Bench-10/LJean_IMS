@@ -5,6 +5,7 @@ import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 import api from '../../../utils/api.js';
+import DropdownCustom from '../../DropdownCustom.jsx';
 
 function BranchTimeline({ Card, categoryFilter, allBranches, branchTimelineRef }) {
   const { user } = useAuth();
@@ -82,8 +83,11 @@ function BranchTimeline({ Card, categoryFilter, allBranches, branchTimelineRef }
   return (
     <>
       {/* BRANCH TIMELINE CHART */}
-      <Card title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`} className="col-span-full h-[220px] md:h-[260px] lg:h-[280px]" exportRef={branchTimelineRef}>
-        <div className="flex flex-col h-full max-h-full overflow-hidden relative">
+      <Card title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`} 
+      className="col-span-full h-[calc(100vh-260px)] min-h-[420px]"
+      exportRef={branchTimelineRef}>
+
+        <div className="flex flex-col h-full overflow-hidden relative">
           {loading && <ChartLoading message="Loading branch timeline..." />}
           {error && !loading && (
             <ChartNoData
@@ -93,42 +97,38 @@ function BranchTimeline({ Card, categoryFilter, allBranches, branchTimelineRef }
           )}
           
           {/* CONTROLS */}
-          <div data-export-exclude className="flex items-center gap-3 justify-end mb-4 flex-wrap">
-            {/* BRANCH SELECTOR */}
-            <div className="flex items-center gap-2">
-              <label className="text-[11px] text-gray-600 font-semibold">Branch</label>
-              <select
-                value={selectedBranch}
-                onChange={e => setSelectedBranch(e.target.value)}
-                className="text-xs border rounded px-2 py-1 bg-white min-w-[140px]"
-              >
-                <option value="">Select Branch</option>
-                {allBranches && allBranches.length > 0 ? (
-                  allBranches.map(branch => (
-                    <option key={branch.branch_id} value={branch.branch_id}>
-                      {branch.branch_name}
-                    </option>
-                  ))
-                ) : (
-                  <option disabled>Loading branches...</option>
-                )}
-              </select>
-            </div>
+          <div data-export-exclude className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 sm:gap-3 justify-end mb-4">
+  {/* BRANCH SELECTOR */}
+  <div className="w-full sm:w-[260px]">
+    <DropdownCustom
+      label="Branch"
+      value={selectedBranch}
+      labelClassName="text-[11px]"   // slightly smaller label
+      onChange={e => setSelectedBranch(e.target.value)}
+      options={[{ value: '', label: 'Select Branch' }, ...(Array.isArray(allBranches) ? allBranches.map(b=>({ value: String(b.branch_id), label: b.branch_name })) : [])]}
+      variant="simple"
+      size="xs"                       // << make this one compact
+    />
+  </div>
 
-            {/* INTERVAL SELECTOR */}
-            <div className="flex items-center gap-2">
-              <label className="text-[11px] text-gray-600 font-semibold">Interval</label>
-              <select
-                value={timelineInterval}
-                onChange={e => setTimelineInterval(e.target.value)}
-                className="text-xs border rounded px-2 py-1 bg-white"
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-            </div>
-          </div>
+  {/* INTERVAL SELECTOR */}
+  <div className="w-full sm:w-[160px]">
+    <DropdownCustom
+      label="Interval"
+      value={timelineInterval}
+      labelClassName="text-[11px]"
+      onChange={e => setTimelineInterval(e.target.value)}
+      options={[
+        { value: 'daily', label: 'Daily' },
+        { value: 'weekly', label: 'Weekly' },
+        { value: 'monthly', label: 'Monthly' },
+      ]}
+      variant="simple"
+      size="xs"                       // << and this one too
+    />
+  </div>
+</div>
+
 
           {/* CHART AREA */}
           {!selectedBranch && !loading && !error && (

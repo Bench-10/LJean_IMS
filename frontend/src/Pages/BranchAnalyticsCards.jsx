@@ -23,7 +23,7 @@ function BranchAnalyticsCards() {
     <div className='pt-20 lg:pt-8 px-4 lg:px-8 pb-6 h-screen flex flex-col bg-[#eef2ee] min-h-0'>
 
             <div className="flex flex-wrap items-center mb-4" >
-                <NavLink to="/dashboard" className='flex gap-x-2 items-center relative py-2 px-4 border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100'>
+                <NavLink to="/dashboard" className='flex gap-x-2 items-center relative px-3 lg:px-4 py-1 lg:py-2 border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100'>
                     <IoArrowBack />
                     <span className="text-sm">Back to Overview</span>
                 </NavLink>

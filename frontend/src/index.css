@@ -19,14 +19,9 @@ html, body {
   overflow: hidden;
 } /* END */
 
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 
-.hide-scrollbar {
-  -ms-overflow-style: none;  
-  scrollbar-width: none;    
-}
+.hide-scrollbar::-webkit-scrollbar { display: none; }
 
 /* WebSocket Real-time Update Animations */
 @keyframes slideInRight {

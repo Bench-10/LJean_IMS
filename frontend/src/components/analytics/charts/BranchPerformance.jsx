@@ -133,7 +133,7 @@ function BranchPerformance({ Card, branchTotals, loading, error, branchPerforman
                     interval={0} 
                     textAnchor="end" 
                     height={60}
-                    angle={-45}
+                    angle={0}
                   />
                   {(() => {
                     const maxAmount = processedBarData.reduce((m,p) => Math.max(m, Number(p.total_amount_due)||0), 0);

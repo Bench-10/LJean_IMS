@@ -2,27 +2,32 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
+
 import api from '../../utils/api.js';
-import {currencyFormat} from '../../utils/formatCurrency.js';
+import { currencyFormat } from '../../utils/formatCurrency.js';
 import { NavLink } from "react-router-dom";
+
 import TopProducts from './charts/TopProducts.jsx';
 import Delivery from './charts/Delivery.jsx';
 import BranchPerformance from './charts/BranchPerformance.jsx';
 import BranchTimeline from './charts/BranchTimeline.jsx';
 import ExportReportDialog from '../dialogs/ExportReportDialog.jsx';
+
 import { TbTruckDelivery } from "react-icons/tb";
 import { FaRegMoneyBillAlt, FaLongArrowAltUp, FaLongArrowAltDown, FaShoppingCart, FaPiggyBank, FaWallet, FaFileExport } from "react-icons/fa";
 import { HiOutlineBuildingOffice2 } from "react-icons/hi2";
 import { AiFillProduct } from "react-icons/ai";
+
 import { useAuth } from '../../authentication/Authentication.jsx';
 import ChartLoading from '../common/ChartLoading.jsx';
+import DropdownCustom from '../DropdownCustom.jsx';
+import DatePickerCustom from '../DatePickerCustom.jsx';
 
 const FETCH_DEBOUNCE_MS = 150;
 
-
-
+/* ---------- Small utility card ---------- */
 const Card = ({ title, children, className = '', exportRef, bodyClassName = '' }) => {
-  const bodyClasses = ['flex-1', bodyClassName].filter(Boolean).join(' ');
+  const bodyClasses = ['flex-1', 'min-h-0', bodyClassName].filter(Boolean).join(' ');
   return (
     <div ref={exportRef} className={`flex flex-col border border-gray-200 rounded-md bg-white p-4 shadow-sm ${className}`}>
       {title && <h2 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase mb-2">{title}</h2>}
@@ -31,34 +36,73 @@ const Card = ({ title, children, className = '', exportRef, bodyClassName = '' }
   );
 };
 
-
-
+/* ---------- Category select that also exposes the chosen name ---------- */
 const CategorySelect = ({ categoryFilter, setCategoryFilter, onCategoryNameChange }) => {
   const [list, setList] = useState([]);
-  useEffect(()=>{
-    async function load(){
-      try { const res = await api.get(`/api/categories`); setList(res.data); } catch(e){ console.error(e);} }
+  useEffect(() => {
+    async function load() {
+      try { const res = await api.get(`/api/categories`); setList(res.data); } catch (e) { console.error(e); }
+    }
     load();
-  },[]);
+  }, []);
+  const options = [{ value: '', label: 'All Categories' }, ...list.map(c => ({ value: String(c.category_id), label: c.category_name }))];
   return (
-    <select value={categoryFilter} onChange={e=>{ const val = e.target.value; setCategoryFilter(val); if(!val) onCategoryNameChange('All Products'); else { const found = list.find(c=> String(c.category_id)===val); onCategoryNameChange(found? found.category_name : 'All Products'); } }} className="border px-2 py-1 rounded text-sm bg-white h-10 min-w-[140px]">
-      <option value="">All Categories</option>
-      {list.map(c => <option key={c.category_id} value={c.category_id}>{c.category_name}</option>)}
-    </select>
+    <div className="min-w-[180px] w-full sm:w-auto">
+      <DropdownCustom
+        label="Category"
+        value={categoryFilter}
+        onChange={e => {
+          const val = e.target.value;
+          setCategoryFilter(val);
+          if (!val) onCategoryNameChange('All Products');
+          else {
+            const found = list.find(c => String(c.category_id) === val);
+            onCategoryNameChange(found ? found.category_name : 'All Products');
+          }
+        }}
+        options={options}
+        variant="floating"
+      />
+    </div>
   );
 };
 
-export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) {
+
+/* ---------- Responsive KPI tile ---------- */
+function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, dateRangeDisplay }) {
+  return (
+    <div className="h-full bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 relative overflow-hidden">
+      {loading && <ChartLoading message={title} type="kpi" />}
+      <div className={`absolute left-0 top-0 bottom-0 w-1.5 sm:w-2 ${accentClass}`} />
+      <div className="grid grid-cols-[auto,1fr] items-center gap-3 sm:gap-4">
+        <div className="place-self-start">
+          <Icon className={`text-2xl sm:text-3xl ${iconClass}`} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[11px] sm:text-[13px] font-semibold text-gray-700">{title}</h3>
+            {dateRangeDisplay && (
+              <span className="text-[10px] sm:text-[11px] text-gray-500 truncate">{dateRangeDisplay}</span>
+            )}
+          </div>
+          <p className="text-[clamp(18px,5vw,26px)] font-bold leading-tight truncate">{value}</p>
+          <p className="text-[11px] text-gray-400 font-medium mt-1 truncate">{sub}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AnalyticsDashboard({ branchId, canSelectBranch = false }) {
   const { user } = useAuth();
 
-  // ROLE CHECK: ONLY OWNER SHOULD SEE BRANCH PERFORMANCE OPTION
   const isOwner = useMemo(() => {
     if (!user) return false;
     const roles = Array.isArray(user.role) ? user.role : user?.role ? [user.role] : [];
     return roles.includes('Owner');
   }, [user]);
 
-  // REFS FOR EXPORT
+  // Refs (export)
   const salesChartRef = useRef(null);
   const topProductsRef = useRef(null);
   const deliveryChartRef = useRef(null);
@@ -78,114 +122,80 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
   const [loadingBranchPerformance, setLoadingBranchPerformance] = useState(false);
   const [restockSuggestions, setRestockSuggestions] = useState([]);
   const [loadingRestockSuggestions, setLoadingRestockSuggestions] = useState(false);
-  
-  // Loading states for each chart
+
   const [loadingSalesPerformance, setLoadingSalesPerformance] = useState(false);
   const [loadingTopProducts, setLoadingTopProducts] = useState(false);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [loadingKPIs, setLoadingKPIs] = useState(false);
-  
-  // Graph intervals (separate from KPI/Top Products)
+
   const [salesInterval, setSalesInterval] = useState('monthly');
   const [restockInterval, setRestockInterval] = useState('monthly');
-  
-  // Delivery specific controls
+
   const [deliveryInterval, setDeliveryInterval] = useState('monthly');
   const [deliveryStatus, setDeliveryStatus] = useState('delivered');
-  // Use dayjs to avoid timezone shifts
+
   const todayISO = dayjs().format('YYYY-MM-DD');
   const monthStartISO = dayjs().startOf('month').format('YYYY-MM-DD');
-  const [deliveryRangeMode, setDeliveryRangeMode] = useState('preset');
-  const [deliveryPreset, setDeliveryPreset] = useState('current_month');
-  const [deliveryStartDate, setDeliveryStartDate] = useState(monthStartISO);
-  const [deliveryEndDate, setDeliveryEndDate] = useState(todayISO);
-  
-  // KPI & Top Products range handling
-  const [rangeMode, setRangeMode] = useState('preset'); 
+
+  const [rangeMode, setRangeMode] = useState('preset');
   const [preset, setPreset] = useState('current_month');
   const [startDate, setStartDate] = useState(monthStartISO);
   const [endDate, setEndDate] = useState(todayISO);
-  const [categoryFilter, setCategoryFilter] = useState(''); 
-  const [productIdFilter, setProductIdFilter] = useState('')
-  const [categories, setCategories] = useState([]);
-  const [kpis, setKpis] = useState({ total_sales:0, total_investment:0, total_profit:0, prev_total_sales:0, prev_total_investment:0, prev_total_profit:0, inventory_count: 0});
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [productIdFilter, setProductIdFilter] = useState('');
+  const [kpis, setKpis] = useState({
+    total_sales: 0, total_investment: 0, total_profit: 0,
+    prev_total_sales: 0, prev_total_investment: 0, prev_total_profit: 0,
+    inventory_count: 0
+  });
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
 
-  // Compute date range display for preset mode
   const dateRangeDisplay = useMemo(() => {
     if (rangeMode !== 'preset') return null;
     const today = dayjs().startOf('day');
     let s = today;
-    if (preset === 'current_day') {
-      s = today;
-    } else if (preset === 'current_week') {
-      s = today.isoWeekday(1).startOf('day');
-    } else if (preset === 'current_month') {
-      s = today.startOf('month');
-    } else if (preset === 'current_year') {
-      s = today.startOf('year');
-    }
+    if (preset === 'current_day') s = today;
+    else if (preset === 'current_week') s = today.isoWeekday(1).startOf('day');
+    else if (preset === 'current_month') s = today.startOf('month');
+    else if (preset === 'current_year') s = today.startOf('year');
     const start = s.format('MMM DD, YYYY');
     const end = today.format('MMM DD, YYYY');
     return `${start} - ${end}`;
   }, [rangeMode, preset]);
 
-  // Keep startDate/endDate in sync when using preset mode so children (e.g., BranchPerformance) get accurate ranges
   useEffect(() => {
     if (rangeMode !== 'preset') return;
     const today = dayjs().startOf('day');
     let s = today;
-    if (preset === 'current_day') {
-      s = today;
-    } else if (preset === 'current_week') {
-      s = today.isoWeekday(1).startOf('day');
-    } else if (preset === 'current_month') {
-      s = today.startOf('month');
-    } else if (preset === 'current_year') {
-      s = today.startOf('year');
-    }
+    if (preset === 'current_day') s = today;
+    else if (preset === 'current_week') s = today.isoWeekday(1).startOf('day');
+    else if (preset === 'current_month') s = today.startOf('month');
+    else if (preset === 'current_year') s = today.startOf('year');
     const newStart = s.format('YYYY-MM-DD');
     const newEnd = today.format('YYYY-MM-DD');
-    // Only update if changed to avoid unnecessary renders
     if (newStart !== startDate) setStartDate(newStart);
     if (newEnd !== endDate) setEndDate(newEnd);
   }, [rangeMode, preset]);
 
- 
   const [currentCharts, setCurrentCharts] = useState(() => {
-    // CHECK IF USER HAS OWNER ROLE
     if (user && !branchId && user.role && user.role.some(role => role === "Owner")) {
       return "branch";
-    } else {
-      return "sale";
     }
+    return "sale";
   });
+
   const resolvedRange = useMemo(() => {
     if (rangeMode === 'preset') {
       const today = dayjs().startOf('day');
       let start = today;
-      if (preset === 'current_day') {
-        start = today;
-      } else if (preset === 'current_week') {
-        start = today.isoWeekday(1).startOf('day');
-      } else if (preset === 'current_month') {
-        start = today.startOf('month');
-      } else if (preset === 'current_year') {
-        start = today.startOf('year');
-      }
-      return {
-        start_date: start.format('YYYY-MM-DD'),
-        end_date: today.format('YYYY-MM-DD'),
-        presetKey: preset
-      };
+      if (preset === 'current_day') start = today;
+      else if (preset === 'current_week') start = today.isoWeekday(1).startOf('day');
+      else if (preset === 'current_month') start = today.startOf('month');
+      else if (preset === 'current_year') start = today.startOf('year');
+      return { start_date: start.format('YYYY-MM-DD'), end_date: today.format('YYYY-MM-DD'), presetKey: preset };
     }
-
-    return {
-      start_date: startDate,
-      end_date: endDate,
-      presetKey: 'custom'
-    };
+    return { start_date: startDate, end_date: endDate, presetKey: 'custom' };
   }, [rangeMode, preset, startDate, endDate]);
 
   const [allBranches, setAllBranches] = useState([]);
@@ -216,12 +226,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     setTopProducts([]);
     setCategoryDist([]);
     setKpis({
-      total_sales: 0,
-      total_investment: 0,
-      total_profit: 0,
-      prev_total_sales: 0,
-      prev_total_investment: 0,
-      prev_total_profit: 0,
+      total_sales: 0, total_investment: 0, total_profit: 0,
+      prev_total_sales: 0, prev_total_investment: 0, prev_total_profit: 0,
       inventory_count: 0
     });
     setDeliveryData([]);
@@ -243,31 +249,23 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
   const fetchSalesPerformance = useCallback(async (signal) => {
     if (!user) return;
-
     const params = { interval: salesInterval };
     if (branchId) params.branch_id = branchId;
     if (categoryFilter) params.category_id = categoryFilter;
     if (productIdFilter) params.product_id = productIdFilter;
-
     setLoadingSalesPerformance(true);
     try {
       const response = await api.get(`/api/analytics/sales-performance`, { params, signal });
       const normalized = Array.isArray(response.data)
-        ? {
-            history: response.data,
-            forecast: [],
-            series: response.data
-          }
+        ? { history: response.data, forecast: [], series: response.data }
         : {
-            history: response.data?.history ?? [],
-            forecast: response.data?.forecast ?? [],
-            series: response.data?.series ?? response.data?.history ?? []
-          };
+          history: response.data?.history ?? [],
+          forecast: response.data?.forecast ?? [],
+          series: response.data?.series ?? response.data?.history ?? []
+        };
       setSalesPerformance(normalized);
     } catch (e) {
-      if (e?.code !== 'ERR_CANCELED') {
-        console.error('Sales performance fetch error', e);
-      }
+      if (e?.code !== 'ERR_CANCELED') console.error('Sales performance fetch error', e);
     } finally {
       setLoadingSalesPerformance(false);
     }
@@ -319,7 +317,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
 
     const params = {
       branch_id: branchId || undefined,
-      range: '1y',
+      category_id: categoryFilter || undefined,
+      start_date: resolvedRange.start_date,
+      end_date: resolvedRange.end_date,
       limit: 50,
       interval: salesInterval,
       include_forecast: true
@@ -330,48 +330,38 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
       const response = await api.get(`/api/analytics/top-products`, { params, signal });
       setRestockSuggestions(Array.isArray(response.data) ? response.data : []);
     } catch (e) {
-      if (e?.code !== 'ERR_CANCELED') {
-        console.error('Restock suggestions fetch error', e);
-      }
+      if (e?.code !== 'ERR_CANCELED') console.error('Restock suggestions fetch error', e);
       setRestockSuggestions([]);
     } finally {
       setLoadingRestockSuggestions(false);
     }
-  }, [branchId, salesInterval, user]);
+  }, [branchId, categoryFilter, resolvedRange, salesInterval, user]);
 
   const fetchInventoryLevels = useCallback(async (signal) => {
     if (!user) return;
-
     const params = {};
     if (branchId) params.branch_id = branchId;
-
     try {
       const response = await api.get(`/api/analytics/inventory-levels`, { params, signal });
       setInventoryLevels(Array.isArray(response.data) ? response.data : []);
     } catch (e) {
-      if (e?.code !== 'ERR_CANCELED') {
-        console.error('Inventory levels fetch error', e);
-      }
+      if (e?.code !== 'ERR_CANCELED') console.error('Inventory levels fetch error', e);
     }
   }, [branchId, user]);
 
   const fetchCategoryDistribution = useCallback(async (signal) => {
     if (!user) return;
-
     const params = branchId ? { branch_id: branchId } : {};
     try {
       const response = await api.get(`/api/analytics/category-distribution`, { params, signal });
       setCategoryDist(Array.isArray(response.data) ? response.data : []);
     } catch (e) {
-      if (e?.code !== 'ERR_CANCELED') {
-        console.error('Category distribution fetch error', e);
-      }
+      if (e?.code !== 'ERR_CANCELED') console.error('Category distribution fetch error', e);
     }
   }, [branchId, user]);
 
   const fetchKPIsData = useCallback(async (signal) => {
     if (!user) return;
-
     const params = {
       start_date: resolvedRange.start_date,
       end_date: resolvedRange.end_date,
@@ -394,9 +384,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         inventory_count: 0
       });
     } catch (e) {
-      if (e?.code !== 'ERR_CANCELED') {
-        console.error('KPIs fetch error', e);
-      }
+      if (e?.code !== 'ERR_CANCELED') console.error('KPIs fetch error', e);
       setKpis({
         total_sales: 0,
         total_investment: 0,
@@ -411,13 +399,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     }
   }, [branchId, categoryFilter, productIdFilter, resolvedRange, user]);
 
+
+
   const fetchDeliveryData = useCallback(async (signal) => {
     if (!user) return;
-
-    const params = {
-      format: deliveryInterval,
-      status: deliveryStatus
-    };
+    const params = { format: deliveryInterval, status: deliveryStatus };
     if (branchId) params.branch_id = branchId;
 
     setLoadingDelivery(true);
@@ -428,9 +414,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
         : [];
       setDeliveryData(rows);
     } catch (e) {
-      if (e?.code !== 'ERR_CANCELED') {
-        console.error('Delivery analytics fetch error', e);
-      }
+      if (e?.code !== 'ERR_CANCELED') console.error('Delivery analytics fetch error', e);
       setDeliveryData([]);
     } finally {
       setLoadingDelivery(false);
@@ -449,10 +433,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     setBranchError(null);
 
     try {
-      const params = {
-        start_date: resolvedRange.start_date,
-        end_date: resolvedRange.end_date
-      };
+      const params = { start_date: resolvedRange.start_date, end_date: resolvedRange.end_date };
       if (categoryFilter) params.category_id = categoryFilter;
 
       const response = await api.get(`/api/analytics/branches-summary`, { params, signal });
@@ -468,532 +449,403 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch=false }) 
     }
   }, [user, isOwner, branchId, resolvedRange, categoryFilter]);
 
+  /* --------- Effects ---------- */
   useEffect(() => {
     if (!user) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchSalesPerformance(controller.signal);
-    }, FETCH_DEBOUNCE_MS);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    const c = new AbortController();
+    const t = setTimeout(() => { fetchSalesPerformance(c.signal); }, FETCH_DEBOUNCE_MS);
+    return () => { c.abort(); clearTimeout(t); };
   }, [fetchSalesPerformance, user]);
 
   useEffect(() => {
     if (!user) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchTopProductsData(controller.signal);
-    }, FETCH_DEBOUNCE_MS);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    const c = new AbortController();
+    const t = setTimeout(() => { fetchTopProductsData(c.signal); }, FETCH_DEBOUNCE_MS);
+    return () => { c.abort(); clearTimeout(t); };
   }, [fetchTopProductsData, user]);
 
   useEffect(() => {
     if (!user) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchRestockSuggestionsData(controller.signal);
-    }, FETCH_DEBOUNCE_MS);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    const c = new AbortController();
+    const t = setTimeout(() => { fetchRestockSuggestionsData(c.signal); }, FETCH_DEBOUNCE_MS);
+    return () => { c.abort(); clearTimeout(t); };
   }, [fetchRestockSuggestionsData, user]);
 
   useEffect(() => {
     if (!user) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchKPIsData(controller.signal);
-    }, FETCH_DEBOUNCE_MS);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    const c = new AbortController();
+    const t = setTimeout(() => { fetchKPIsData(c.signal); }, FETCH_DEBOUNCE_MS);
+    return () => { c.abort(); clearTimeout(t); };
   }, [fetchKPIsData, user]);
 
   useEffect(() => {
     if (!user) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchInventoryLevels(controller.signal);
-    }, FETCH_DEBOUNCE_MS);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    const c = new AbortController();
+    const t = setTimeout(() => { fetchInventoryLevels(c.signal); }, FETCH_DEBOUNCE_MS);
+    return () => { c.abort(); clearTimeout(t); };
   }, [fetchInventoryLevels, user]);
 
   useEffect(() => {
     if (!user) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchCategoryDistribution(controller.signal);
-    }, FETCH_DEBOUNCE_MS);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    const c = new AbortController();
+    const t = setTimeout(() => { fetchCategoryDistribution(c.signal); }, FETCH_DEBOUNCE_MS);
+    return () => { c.abort(); clearTimeout(t); };
   }, [fetchCategoryDistribution, user]);
 
   useEffect(() => {
     if (!user) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchDeliveryData(controller.signal);
-    }, FETCH_DEBOUNCE_MS);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    const c = new AbortController();
+    const t = setTimeout(() => { fetchDeliveryData(c.signal); }, FETCH_DEBOUNCE_MS);
+    return () => { c.abort(); clearTimeout(t); };
   }, [fetchDeliveryData, user]);
 
   useEffect(() => {
     if (!user || branchId || !isOwner) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchBranchPerformance(controller.signal);
-    }, FETCH_DEBOUNCE_MS);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    const c = new AbortController();
+    const t = setTimeout(() => { fetchBranchPerformance(c.signal); }, FETCH_DEBOUNCE_MS);
+    return () => { c.abort(); clearTimeout(t); };
   }, [branchId, fetchBranchPerformance, isOwner, user]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    loadBranches(controller.signal);
-    return () => controller.abort();
+    const c = new AbortController();
+    loadBranches(c.signal);
+    return () => c.abort();
   }, [loadBranches]);
 
+  /* --------- Helpers ---------- */
+  const formatByInterval = (d, intervalType = 'monthly') => {
+    if (intervalType === 'daily') return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (intervalType === 'weekly') {
+      const day = new Date(d);
+      const dow = day.getDay();
+      const offset = (dow === 0 ? -6 : 1 - dow);
+      day.setDate(day.getDate() + offset);
+      return day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    return d.toLocaleDateString('en-US', { month: 'short' });
+  };
+
   const formatPeriod = (raw) => {
-    if(raw == null) return '';
+    if (raw == null) return '';
     let p = raw;
-    
-    if(p instanceof Date) {
-      if(isNaN(p)) return '';
+    if (p instanceof Date) {
+      if (isNaN(p)) return '';
       return formatByInterval(p, salesInterval);
     }
-    
     p = String(p);
-   
     const isoMatch = p.match(/^(\d{4}-\d{2}-\d{2})(T.*)?$/);
-    if(isoMatch) {
-      // USE DAYJS TO AVOID TIMEZONE ISSUES
+    if (isoMatch) {
       const d = dayjs(isoMatch[1], 'YYYY-MM-DD');
-      if(d.isValid()) return formatByInterval(d.toDate(), salesInterval);
+      if (d.isValid()) return formatByInterval(d.toDate(), salesInterval);
     }
-   
     const ymMatch = p.match(/^(\d{4})-(\d{2})$/);
-    if(ymMatch) {
+    if (ymMatch) {
       const d = dayjs(`${ymMatch[1]}-${ymMatch[2]}-01`, 'YYYY-MM-DD');
-      if(d.isValid()) return d.format('MMM');
+      if (d.isValid()) return d.format('MMM');
     }
-    return p; 
+    return p;
   };
 
-  const formatByInterval = (d, intervalType = salesInterval) => {
-    if(intervalType === 'daily') return d.toLocaleDateString('en-US', { month:'short', day:'numeric' }); // Aug 5
-    if(intervalType === 'weekly') {
-     
-      const day = new Date(d);
-    
-      const dow = day.getDay(); 
-      const offset = (dow === 0 ? -6 : 1 - dow); 
-      day.setDate(day.getDate() + offset);
-      return day.toLocaleDateString('en-US', { month:'short', day:'numeric' });
-    }
-   
-    return d.toLocaleDateString('en-US', { month:'short' });
-
-  };
-
-
-  //COMPARES PREVIOUS VALUES FROM THE CURRENT
   const compareValues = (current, previous) => {
-
-    if (previous === 0 && current !== 0) return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(current.toFixed(2)).toLocaleString()}% Increase!</span>)
-
-    if (previous !== 0 && current === 0) return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(previous.toFixed(2)).toLocaleString()}% Decrease!</span>)
-
+    if (previous === 0 && current !== 0) return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(current.toFixed(2)).toLocaleString()}% Increase!</span>);
+    if (previous !== 0 && current === 0) return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(previous.toFixed(2)).toLocaleString()}% Decrease!</span>);
     if (previous === current) return "No change";
-    
+    const percentageChange = ((current - previous) / (previous || 1)) * 100;
+    if (percentageChange > 0) return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(percentageChange.toFixed(2)).toLocaleString()}% Increase!</span>);
+    if (percentageChange < 0) return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(percentageChange.toFixed(2)).toLocaleString()}% Decrease!</span>);
+    return "No change";
+  };
 
-
-    const percentageChange = ((current - previous) / previous) * 100;
-
-    if (percentageChange > 0) {
-
-      return (<span className='flex items-center text-green-500 italic'><FaLongArrowAltUp />  {Number(percentageChange.toFixed(2)).toLocaleString()}% Increase!</span>)
-
-    } else if (percentageChange < 0) {
-
-      return (<span className='flex items-center text-red-500 italic'><FaLongArrowAltDown />  {Number(percentageChange.toFixed(2)).toLocaleString()}% Decrease!</span>)
-
-    } 
-  }
-
-  
-  const latestDate = inventoryLevels.length>0 ? inventoryLevels[inventoryLevels.length-1].date : null;
-  const latestSnapshot = latestDate ? inventoryLevels.filter(r=> r.date=== latestDate) : [];
-
-  // BUILD AVAILABLE CHARTS FOR EXPORT
-  const availableChartsForExport = useMemo(() => {
-    const charts = [
-      { id: 'kpi-summary', label: 'KPI Summary', ref: kpiRef }
-    ];
-    
-    if (currentCharts === 'sale') {
-      charts.push({ id: 'sales-performance', label: 'Sales Performance & Forecast', ref: salesChartRef });
-      charts.push({ id: 'top-products', label: 'Top Products', ref: topProductsRef });
-    }
-    
-    if (currentCharts === 'delivery') {
-      charts.push({ id: 'delivery', label: 'Delivery Analytics', ref: deliveryChartRef });
-    }
-    
-    if (currentCharts === 'branch' && !branchId && isOwner) {
-      charts.push({ id: 'branch-performance', label: 'Branch Performance', ref: branchPerformanceRef });
-      charts.push({ id: 'revenue-distribution', label: 'Revenue Distribution', ref: revenueDistributionRef });
-      charts.push({ id: 'branch-timeline', label: 'Branch Timeline', ref: branchTimelineRef });
-    }
-    
-    return charts;
-  }, [currentCharts, branchId, isOwner]);
-
+  /* ---------- UI ---------- */
   return (
-  <div className="flex flex-col gap-5 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 sm:gap-5 flex-1 min-h-0">
 
       <ExportReportDialog
         isOpen={showExportDialog}
         onClose={() => setShowExportDialog(false)}
-        availableCharts={availableChartsForExport}
+        availableCharts={useMemo(() => {
+          const charts = [{ id: 'kpi-summary', label: 'KPI Summary', ref: kpiRef }];
+          if (currentCharts === 'sale') {
+            charts.push({ id: 'sales-performance', label: 'Sales Performance & Forecast', ref: salesChartRef });
+            charts.push({ id: 'top-products', label: 'Top Products', ref: topProductsRef });
+          }
+          if (currentCharts === 'delivery') {
+            charts.push({ id: 'delivery', label: 'Delivery Analytics', ref: deliveryChartRef });
+          }
+          if (currentCharts === 'branch' && !branchId && isOwner) {
+            charts.push({ id: 'branch-performance', label: 'Branch Performance', ref: branchPerformanceRef });
+            charts.push({ id: 'revenue-distribution', label: 'Revenue Distribution', ref: revenueDistributionRef });
+            charts.push({ id: 'branch-timeline', label: 'Branch Timeline', ref: branchTimelineRef });
+          }
+          return charts;
+        }, [currentCharts, branchId, isOwner])}
       />
 
-      <div className="flex flex-wrap items-center justify-between" >
-
-        <div className="flex gap-3 items-center">
-          {(!branchId) &&
-              <NavLink to="/branches" className={`relative py-2 px-4 border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100`} >
-                <span className="text-sm">
-                    View Branch Analytics
-                </span>
-              </NavLink>
-          }
-
-          <button
-            onClick={() => setShowExportDialog(true)}
-            className="flex items-center gap-2 py-2 px-4 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-all shadow-sm"
+      {/* Outside: View Branch Analytics stays here */}
+      <div className="w-full flex justify-end px-3 sm:px-5">
+        {!branchId && (
+          <NavLink
+            to="/branches"
+            className="px-3 lg:px-4 py-1 lg:py-2 text-sm lg:text-base border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 hover:bg-green-100 transition"
           >
-            <FaFileExport />
-            <span className="text-sm">Export Report</span>
-          </button>
-        </div>
+            View Branch Analytics
+          </NavLink>
+        )}
+      </div>
 
-        <div className={`flex flex-wrap gap-3 items-center ${!branchId ? 'justify-between' : ''}`}>
-          <CategorySelect categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} onCategoryNameChange={setCategoryName} />
-          
-          {/* KPI & Top Products Range Controls */}
-          <div className="flex items-center gap-2 bg-white border rounded-md px-2 py-1">
-            <label className="text-[11px] text-gray-600 font-semibold">Mode</label>
-            <select value={rangeMode} onChange={e=>setRangeMode(e.target.value)} className="text-xs border rounded px-1 py-1">
-              <option value="preset">Preset</option>
-              <option value="custom">Custom</option>
-            </select>
+      {/* Sticky tabs + filters (Export on the right) */}
+      <div className="sticky top-0 z-30 bg-white/95 supports-[backdrop-filter]:bg-white/60 backdrop-blur border-b py-3 px-3 sm:px-5 rounded-md">
+
+        {/* Row 1: Tabs + Export */}
+{/* Row 1: Tabs + Export */}
+<div className="flex items-center gap-3 -mx-2 px-2 overflow-x-auto hide-scrollbar">
+  {(branchId || (!branchId && isOwner)) && (
+    <div className="flex w-full sm:w-auto sm:min-w-max border-2 rounded-full bg-gray-50 shadow-sm overflow-hidden transition-all duration-200">
+      {!branchId && isOwner && (
+        <button
+          className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "branch" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
+          aria-selected={currentCharts === "branch"}
+          onClick={() => { setCurrentCharts("branch"); setProductIdFilter(''); }}
+        >
+          <HiOutlineBuildingOffice2 />
+          Branch
+        </button>
+      )}
+      <button
+        className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "sale" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
+        aria-selected={currentCharts === "sale"}
+        onClick={() => setCurrentCharts("sale")}
+      >
+        <FaRegMoneyBillAlt />
+        Sales
+      </button>
+      {branchId && (
+        <button
+          className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "delivery" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
+          aria-selected={currentCharts === "delivery"}
+          onClick={() => setCurrentCharts("delivery")}
+        >
+          <TbTruckDelivery />
+          Delivery
+        </button>
+      )}
+    </div>
+  )}
+
+  {/* Desktop/Tablet Export (right side) */}
+  <div className="ml-auto shrink-0 hidden md:block">
+    <button
+      onClick={() => setShowExportDialog(true)}
+      className="inline-flex items-center justify-center gap-2 py-2 px-4 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-all shadow-sm"
+    >
+      <FaFileExport />
+      <span className="text-sm">Export Report</span>
+    </button>
+  </div>
+</div>
+
+
+        {/* Row 2: Filters — single line on md+, stacked on mobile; Start/End aligned */}
+        {/* Row 2: Filters — equal width based on mode */}
+        <div className={`mt-5 grid grid-cols-1 gap-4 sm:gap-4 items-start ${rangeMode === 'preset' ? 'md:grid-cols-3' : 'md:grid-cols-4'}`}>
+          {/* Category */}
+          <div className="min-w-0">
+            <CategorySelect
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
+              onCategoryNameChange={setCategoryName}
+            />
           </div>
+
+          {/* Mode */}
+          <div className="min-w-0">
+            <DropdownCustom
+              label="Mode"
+              value={rangeMode}
+              onChange={(e) => setRangeMode(e.target.value)}
+              options={[
+                { value: 'preset', label: 'Preset' },
+                { value: 'custom', label: 'Custom' },
+              ]}
+              variant="floating"
+            />
+          </div>
+
+          {/* PRESET (takes one column in 3-col grid) */}
           {rangeMode === 'preset' && (
-            <select value={preset} onChange={e=>setPreset(e.target.value)} className="border px-2 py-2 rounded text-xs bg-white h-10 min-w-[140px]">
-              <option value="current_day">Current Day</option>
-              <option value="current_week">Current Week</option>
-              <option value="current_month">Current Month</option>
-              <option value="current_year">Current Year</option>
-            </select>
-          )}
-          {rangeMode === 'custom' && (
-            <div className="flex items-center gap-2 bg-white border rounded-md px-2 py-1">
-              <div className="flex flex-col text-[10px] text-gray-500">
-                <span>Start</span>
-                <input type="date" value={startDate} max={endDate} onChange={e=>setStartDate(e.target.value)} className="text-xs border rounded px-1 py-1" />
-              </div>
-              <div className="flex flex-col text-[10px] text-gray-500">
-                <span>End</span>
-                <input type="date" value={endDate} min={startDate} max={todayISO} onChange={e=>setEndDate(e.target.value)} className="text-xs border rounded px-1 py-1" />
-              </div>
+            <div className="min-w-0">
+              <DropdownCustom
+                label="Preset"
+                value={preset}
+                onChange={(e) => setPreset(e.target.value)}
+                options={[
+                  { value: 'current_day', label: 'Current Day' },
+                  { value: 'current_week', label: 'Current Week' },
+                  { value: 'current_month', label: 'Current Month' },
+                  { value: 'current_year', label: 'Current Year' },
+                ]}
+                variant="floating"
+              />
             </div>
           )}
+
+          {/* CUSTOM (Start and End each take one column in 4-col grid) */}
+          {rangeMode === 'custom' && (
+            <>
+              <div className="min-w-0">
+                <DatePickerCustom
+                  id="kpi-start"
+                  label="Start"
+                  variant="floating"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full"
+                  placeholder="MM/DD/YYYY"
+                />
+              </div>
+              <div className="min-w-0">
+                <DatePickerCustom
+                  id="kpi-end"
+                  label="End"
+                  variant="floating"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full"
+                  placeholder="MM/DD/YYYY"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="mt-3 md:hidden">
+  <button
+    onClick={() => setShowExportDialog(true)}
+    className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-all shadow-sm"
+  >
+    <FaFileExport />
+    <span className="text-sm">Export Report</span>
+  </button>
+</div>
+
+
+
         </div>
 
-
-        {/*LETS USER SWITCH TO DIFFERENT CHARTS (ONLY APPEAR IF USER HAS BRANCH_ID OR IS OWNER WITH NO BRANCH_ID)*/}
-        { (branchId || (!branchId && isOwner)) &&
-
-          <div 
-          className="flex border-2 rounded-full bg-gray-50 shadow-sm overflow-hidden transition-all duration-200"
-          role="tablist"
-          >
-            {/* BRANCH PERFORMANCE BUTTON - OWNER ONLY AND NO BRANCH_ID */}
-            {!branchId && isOwner && (
-              <button
-                className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
-                  ${currentCharts === "branch"
-                    ? "bg-green-800 text-white scale-105 shadow-md"
-                    : "text-green-800 hover:bg-green-100 "
-                  }`}
-                aria-selected={currentCharts === "branch"}
-                onClick={() => {setCurrentCharts("branch"); setProductIdFilter('');} }
-                tabIndex={0}
-              >
-                <HiOutlineBuildingOffice2 />
-                Branch
-              </button>
-            )}
-            <button
-              className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm
-                ${currentCharts === "sale"
-                  ? "bg-green-800 text-white scale-105 shadow-md"
-                  : "text-green-800 hover:bg-green-100 "
-                } ${!branchId && isOwner ? 'rounded-r-full' : ''}`}
-              aria-selected={currentCharts === "sale"}
-              onClick={() => setCurrentCharts("sale")}
-              tabIndex={0}
-            >
-              <FaRegMoneyBillAlt />
-              Sales
-            </button>
-            {branchId && (
-              <button
-                className={`flex items-center gap-2 py-2 px-7 font-semibold text-sm 
-                  ${currentCharts === "delivery"
-                    ? "bg-green-800 text-white scale-105 shadow-md"
-                    : "text-green-800 hover:bg-green-100 "
-                  } rounded-r-full`}
-                aria-selected={currentCharts === "delivery"}
-                onClick={() => setCurrentCharts("delivery")}
-                tabIndex={0}
-              >
-                <TbTruckDelivery />
-                Delivery
-              </button>
-            )}
-            
-          </div>
-
-        }
-        
-        
-        
-      </div> 
-
-    {/* KPI CARDS*/}
-  <div ref={kpiRef} className="grid gap-5 w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 relative">
-            
-            <div className="flex items-center w-full bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
-              {loadingKPIs && <ChartLoading message='Loading total sales' type='kpi' /> }
-              <div className='mr-5 ml-1'>
-                
-
-                <FaShoppingCart className='text-4xl text-green-500'/>
-                
-               
-              </div>
-
-              <div>
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-400" />
-
-                <div className="flex w-full items-center mb-1">
-                  <h3 className="text-[13px] font-semibold text-gray-700 mr-2">Total Sales</h3>
-                  {dateRangeDisplay && (
-                    <span className="text-[9px] text-gray-600">{dateRangeDisplay}</span>
-                  )}
-                </div>
-                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight w-full text-left">
-                  {currencyFormat(kpis.total_sales)}
-                </p>
-                <p className="text-[11px] text-gray-400 font-medium mt-1">
-                  {compareValues(kpis.total_sales, kpis.prev_total_sales)}
-                </p>
-              </div>
-              
-              
-              
-
-            </div>
-
-
-            <div className="flex items-center w-full bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
-
-              {loadingKPIs && <ChartLoading message='Loading total investments' type='kpi' /> }
-
-              <div className='mr-5 ml-1'>
-                
-                <FaPiggyBank className='text-4xl text-yellow-500'/>
-                
-               
-              </div>
-
-
-              <div>
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-yellow-400" />
-                <div className="flex w-full items-center mb-1">
-                  <h3 className="text-[13px] font-semibold text-gray-700 mr-2">Total Investment</h3>
-                  {dateRangeDisplay && (
-                    <span className="text-[9px] text-gray-600">{dateRangeDisplay}</span>
-                  )}
-                </div>
-                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight w-full text-left">{currencyFormat(kpis.total_investment)}</p>
-                <p className="text-[11px] text-gray-400 font-medium mt-1">
-                  {compareValues(kpis.total_investment, kpis.prev_total_investment)}
-                </p>
-              </div>
-              
-              
-
-            </div>
-
-
-            <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
-
-              {loadingKPIs && <ChartLoading message='Loading total profit' type='kpi' /> }
-
-              <div className='mr-5 ml-1'>
-                
-                <FaWallet className='text-4xl text-blue-500'/>
-                
-               
-              </div>
-
-
-              <div>
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-400" />
-                <div className="flex w-full items-center mb-1">
-                  <h3 className="text-[13px] font-semibold text-gray-700 mr-2">Total Profit</h3>
-                  {dateRangeDisplay && (
-                    <span className="text-[9px] text-gray-600">{dateRangeDisplay}</span>
-                  )}
-                </div>
-                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight w-full text-left">{kpis.total_sales >  kpis.total_investment ? currencyFormat(kpis.total_profit) : currencyFormat(0)}</p>
-                <p className="text-[11px] text-gray-400 font-medium mt-1">
-                  {compareValues(kpis.total_profit, kpis.prev_total_profit)}
-                </p>
-              </div>
-
-              
-              
-
-            </div>
-
-            {/* INVENTORY COUNT KPI */}
-            <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-200 p-5 h-28 relative overflow-hidden">
-
-              {loadingKPIs && <ChartLoading message='Loading produc count' type='kpi' /> }
-
-              <div className='mr-5 ml-1'>
-               
-                <AiFillProduct  className='text-4xl text-purple-500'/>
-              </div>
-
-              <div>
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-purple-400" />  
-                <div className="flex w-full items-center mb-1">
-                  <h3 className="text-[13px] font-semibold text-gray-700 mr-2">Inventory Items</h3>
-                  {dateRangeDisplay && (
-                    <span className="text-[9px] text-gray-600">{dateRangeDisplay}</span>
-                  )}
-                </div>
-                <p className="text-[clamp(18px,2vw,26px)] font-bold mt-1 leading-tight w-full text-left">{Number(kpis.inventory_count).toLocaleString()}</p>
-                <p className="text-[11px] text-gray-400 font-medium mt-1">Total distinct products</p>
-              </div>
-
-            </div>
 
       </div>
-  
-      {/*CHARTS CONTAINAER*/}
-  <div className="grid grid-cols-12 gap-5 flex-1 min-h-0 max-h-screen overflow-hidden">
-       
 
-       { currentCharts === "sale" && 
+      {/* Scrollable content */}
+      <div className="flex-1 min-h-0 overflow-y-auto min-w-0 pt-3 pb-16 px-2 sm:px-0 hide-scrollbar">
 
-        (
-          <TopProducts 
-            topProducts={topProducts} 
-            salesPerformance={salesPerformance} 
-            formatPeriod={formatPeriod} 
-            restockTrends={restockTrends} 
-            Card={Card} 
-            categoryName={categoryName}
-            salesInterval={salesInterval}
-            setSalesInterval={setSalesInterval}
-            restockInterval={restockInterval}
-            setRestockInterval={setRestockInterval}
-            setProductIdFilter={setProductIdFilter}
-            productIdFilter={productIdFilter}
-            loadingSalesPerformance={loadingSalesPerformance}
-            loadingTopProducts={loadingTopProducts}
+        {/* KPI CARDS (responsive, equal height) */}
+        <div
+          ref={kpiRef}
+          className="grid w-full gap-3 sm:gap-4 lg:gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-4 auto-rows-fr relative mb-4 sm:mb-2"
+        >
+          <KPI
+            loading={loadingKPIs}
+            icon={FaShoppingCart}
+            iconClass="text-green-500"
+            accentClass="bg-green-400"
+            title="Total Sales"
+            value={currencyFormat(kpis.total_sales)}
+            sub={compareValues(kpis.total_sales, kpis.prev_total_sales)}
             dateRangeDisplay={dateRangeDisplay}
-            restockSuggestions={restockSuggestions}
-            loadingRestockSuggestions={loadingRestockSuggestions}
-            salesChartRef={salesChartRef}
-            topProductsRef={topProductsRef}
           />
-        )
-
-       }
-
-
-       { currentCharts === "delivery" && 
-
-        (
-          <Delivery
-            Card={Card}
-            deliveryData={deliveryData}
-            deliveryInterval={deliveryInterval}
-            setDeliveryInterval={setDeliveryInterval}
-            deliveryStatus={deliveryStatus}
-            setDeliveryStatus={setDeliveryStatus}
-            loadingDelivery={loadingDelivery}
-            deliveryChartRef={deliveryChartRef}
+          <KPI
+            loading={loadingKPIs}
+            icon={FaPiggyBank}
+            iconClass="text-yellow-500"
+            accentClass="bg-yellow-400"
+            title="Total Investment"
+            value={currencyFormat(kpis.total_investment)}
+            sub={compareValues(kpis.total_investment, kpis.prev_total_investment)}
+            dateRangeDisplay={dateRangeDisplay}
           />
-        )
-       
-       }
+          <KPI
+            loading={loadingKPIs}
+            icon={FaWallet}
+            iconClass="text-blue-500"
+            accentClass="bg-blue-400"
+            title="Total Profit"
+            value={kpis.total_sales > kpis.total_investment ? currencyFormat(kpis.total_profit) : currencyFormat(0)}
+            sub={compareValues(kpis.total_profit, kpis.prev_total_profit)}
+            dateRangeDisplay={dateRangeDisplay}
+          />
+          <KPI
+            loading={loadingKPIs}
+            icon={AiFillProduct}
+            iconClass="text-purple-500"
+            accentClass="bg-purple-400"
+            title="Inventory Items"
+            value={Number(kpis.inventory_count).toLocaleString()}
+            sub="Total distinct products"
+            dateRangeDisplay={dateRangeDisplay}
+          />
+        </div>
 
-       {/* BRANCH PERFORMANCE CHARTS - OWNER ONLY AND NO BRANCH_ID */}
-       { currentCharts === "branch" && !branchId && isOwner && 
-
-        (
-          <>
-            <BranchPerformance
+        {/* CHARTS */}
+        <div className="grid grid-cols-12 gap-2 sm:gap-3 flex-1 min-h-0 min-w-0">
+          {currentCharts === "sale" && (
+            <TopProducts
+              topProducts={topProducts}
+              salesPerformance={salesPerformance}
+              formatPeriod={formatPeriod}
+              restockTrends={restockTrends}
               Card={Card}
+              categoryName={categoryName}
+              salesInterval={salesInterval}
+              setSalesInterval={setSalesInterval}
+              restockInterval={restockInterval}
+              setRestockInterval={setRestockInterval}
+              setProductIdFilter={setProductIdFilter}
+              productIdFilter={productIdFilter}
+              loadingSalesPerformance={loadingSalesPerformance}
+              loadingTopProducts={loadingTopProducts}
+              dateRangeDisplay={dateRangeDisplay}
+              salesChartRef={salesChartRef}
+              topProductsRef={topProductsRef}
+              restockSuggestions={restockSuggestions}
+              loadingRestockSuggestions={loadingRestockSuggestions}
+            />
+          )}
+
+          {currentCharts === "delivery" && (
+            <Delivery
+              Card={Card}
+              deliveryData={deliveryData}
+              deliveryInterval={deliveryInterval}
+              setDeliveryInterval={setDeliveryInterval}
+              deliveryStatus={deliveryStatus}
+              setDeliveryStatus={setDeliveryStatus}
+              loadingDelivery={loadingDelivery}
+              deliveryChartRef={deliveryChartRef}
+            />
+          )}
+
+          {currentCharts === "branch" && !branchId && isOwner && (
+            <>
+              <BranchPerformance
+                Card={Card}
                 branchTotals={branchTotals}
                 loading={loadingBranchPerformance}
                 error={branchError}
-              branchPerformanceRef={branchPerformanceRef}
-              revenueDistributionRef={revenueDistributionRef}
-            />
-            
-            <BranchTimeline
-              Card={Card}
-              categoryFilter={categoryFilter}
-              allBranches={allBranches}
-              branchTimelineRef={branchTimelineRef}
-            />
-          </>
-        )
-       
-       }
- 
+                branchPerformanceRef={branchPerformanceRef}
+                revenueDistributionRef={revenueDistributionRef}
+              />
+              <div className="col-span-12 mt-5 min-h-[420px] mb-8">
+                <BranchTimeline
+                  Card={Card}
+                  categoryFilter={categoryFilter}
+                  allBranches={allBranches}
+                  branchTimelineRef={branchTimelineRef}
+                />
+              </div>
+            </>
+          )}
+        </div>
 
       </div>
-
-
     </div>
-
   );
-
 }
-

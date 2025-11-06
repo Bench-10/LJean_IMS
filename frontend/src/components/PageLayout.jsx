@@ -18,9 +18,9 @@ function PageLayout({ setOpenNotif, unreadCount, onOpenRequestMonitor }) {
           unreadCount={unreadCount}
           onOpenRequestMonitor={onOpenRequestMonitor} 
         />
-        <main className='flex-1 min-h-0 overflow-y-auto lg:ml-[var(--sidebar-width)] pt-2 lg:pt-0 pb-[env(safe-area-inset-bottom)]'>
-          <Outlet />
-        </main>
+<main className="flex-1 overflow-y-auto xl:ml-[var(--sidebar-width)] pt-2 xl:pt-0">
+  <Outlet />
+</main>
       </div>
     </div>
   );
