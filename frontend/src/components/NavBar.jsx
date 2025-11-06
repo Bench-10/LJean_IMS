@@ -213,7 +213,7 @@ function NavBar({ setOpenNotif, unreadCount, onOpenRequestMonitor }) {
         </div>
 
         {/* Logout Button - Fixed at bottom */}
-        <div className="flex-shrink-0 pt-3 pb-3 lg:pb-0">
+        <div className="flex-shrink-0 pt-3 pb-3 lg:pb-2">
           <button
             className="w-full bg-green-600 py-2 px-2 rounded-md flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
             onClick={() => {

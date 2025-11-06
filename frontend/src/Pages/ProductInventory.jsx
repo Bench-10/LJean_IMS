@@ -446,7 +446,7 @@ function ProductInventory({
     </div>
 
     {/* Category */}
-    <div className="w-full lg:w-auto">
+    <div className="w-full lg:w-auto py-2 lg:py-0">
       <DropdownCustom
         value={selectedCategory}
         onChange={e => setSelectedCategory(e.target.value)}
