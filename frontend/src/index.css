@@ -23,6 +23,11 @@ html, body {
 
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 
+.modal-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* WebSocket Real-time Update Animations */
 @keyframes slideInRight {
   from {
