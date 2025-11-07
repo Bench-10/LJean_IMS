@@ -295,7 +295,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
       />
 
       {/*TITLE*/}
-      <h1 className='text-4xl font-bold text-green-900'>
+      <h1 className='text-[35px] leading-[36px] font-bold text-green-900'>
         DELIVERY
       </h1>
 
@@ -305,7 +305,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
       <div className='lg:flex '>
         <div className='flex lg:gap-x-9'>
           {/*SEARCH */}
-          <div className='w-[100vw] lg:w-[400px] text-sm lg:text-base lg:pb-0 pb-3'>
+          <div className='w-[100vw] lg:w-[400px] text-sm lg:text-sm lg:pb-0 pb-3'>
 
             <input
               type="text"
@@ -325,7 +325,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
           {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
           {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) && (
             <button
-              className='flex items-center gap-x-3 w-full lg:w-auto justify-center bg-[#119200] text-white font-medium hover:bg-[#56be48] px-5 py-2 rounded-lg transition-all'
+              className='flex items-center gap-x-3 w-full lg:w-auto justify-center bg-[#119200] text-sm text-white font-medium hover:bg-[#56be48] px-5 py-2 rounded-lg transition-all'
               onClick={() => setAddDelivery(true)}
             >
               <TbTruckDelivery />

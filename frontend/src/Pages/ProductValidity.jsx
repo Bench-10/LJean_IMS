@@ -215,7 +215,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   return (
     <div className="pt-20 lg:pt-8 px-4 lg:px-8" >
       {/*TITLE*/}
-      <h1 className=' text-4xl font-bold text-green-900'>
+      <h1 className='text-[35px] leading-[36px] font-bold text-green-900'>
         PRODUCT VALIDITY
       </h1>
 
@@ -225,7 +225,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       {/* SEARCH + FILTERS (1 line on desktop; controls at right) */}
 <div className="w-full lg:flex lg:items-center lg:flex-nowrap lg:gap-4">
   {/* SEARCH (left) */}
-  <div className="w-full lg:basis-[360px] lg:flex-none text-sm lg:text-base pb-3 lg:pb-0">
+  <div className="w-full lg:basis-[360px] lg:flex-none text-sm lg:text-sm pb-3 lg:pb-0">
     <input
       type="text"
       placeholder="Search Item Name or Category"
@@ -241,7 +241,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       <button
         type="button"
         onClick={() => { setShowNearExpiry(p => !p); setCurrentPage(1); }}
-        className={`w-full lg:w-auto flex h-[36px] items-center justify-center gap-2 px-3 lg:px-4 text-sm lg:text-base rounded-lg border transition-all
+        className={`w-full lg:w-auto flex h-[36px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
           ${showNearExpiry
             ? 'bg-[#FFF3C1] text-gray-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
             : 'bg-white text-gray-700 border-gray-200 hover:bg-yellow-50'}`}
@@ -253,7 +253,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       <button
         type="button"
         onClick={() => { setShowExpired(p => !p); setCurrentPage(1); }}
-        className={`w-full lg:w-auto flex h-[36px] lg:h-[38px] items-center justify-center gap-2 px-3 lg:px-4 text-sm lg:text-base rounded-lg border transition-all
+        className={`w-full lg:w-auto flex h-[36px] lg:h-[38px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
           ${showExpired
             ? 'bg-[#FF3131] text-white border-red-500 ring-2 ring-red-400 ring-offset-2'
             : 'bg-white text-gray-700 border-gray-200 hover:bg-red-50'}`}

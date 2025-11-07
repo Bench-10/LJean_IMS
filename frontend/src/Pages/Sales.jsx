@@ -144,7 +144,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
       />
         
 
-        <h1 className=' text-4xl font-bold text-green-900'>
+        <h1 className='text-[35px] leading-[36px] font-bold text-green-900'>
           SALES TRANSACTIONS
         </h1>
 
@@ -153,7 +153,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
         {/*SEARCH AND ADD*/}
         <div className='lg:flex gap-4 lg:gap-9 ' >
           {/*SEARCH */}
-          <div className='w-full lg:w-[400px] text-sm lg:text-base pb-4 lg:pb-0'>
+          <div className='w-full lg:w-[400px] text-sm lg:text-sm pb-4 lg:pb-0'>
             <input
               type="text"
               placeholder="Search"
@@ -168,6 +168,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   onChange={e => setSaleFilter(e.target.value)}
   label="Sale Type"
   variant="floating"
+  size="sm"
   options={[
     { value: 'all', label: 'All Sales' },
     { value: 'normal', label: 'Normal Sales' },
@@ -182,7 +183,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
           {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) &&
             <div className="lg:pt-0 pt-3 ml-auto flex gap-4">
               {/*ADD SALE BTN*/}
-              <button className='flex items-center justify-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#56be48] w-full lg:w-auto px-5 py-2 rounded-lg transition-all'  onClick={() => setOpenSaleModal(true)}> 
+              <button className='flex items-center justify-center gap-x-3 bg-[#119200] text-sm text-white font-medium hover:bg-[#56be48] w-full lg:w-auto px-5 py-2 rounded-lg transition-all'  onClick={() => setOpenSaleModal(true)}> 
                 <FaCashRegister /> ADD SALE
               </button>
             </div>

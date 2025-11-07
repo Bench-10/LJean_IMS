@@ -30,7 +30,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
 
   // ---- Safe roles helper ----
   const roles = Array.isArray(user?.role) ? user.role : (user?.role ? [user.role] : []);
-  const canSeeRequestStatus = roles.some(r => ['Inventory Staff'].includes(r));
+  const canSeeRequestStatus = roles.some(r => ['Inventory Staff', 'Branch Manager'].includes(r));
   const canSeeNotifications = roles.some(r => ['Inventory Staff', 'Branch Manager', 'Owner'].includes(r));
 
   const handleRequestClick = () => {

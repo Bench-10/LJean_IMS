@@ -364,8 +364,9 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                   value={search}
                 />
 
-                <div className='relative h-11 w-full'>
+                <div className='relative w-full'>
                   <DropdownCustom
+                  size="sm"
                     value={selectedCategory}
                     onChange={(e) => {
                       setSelectedCategory(e.target.value);

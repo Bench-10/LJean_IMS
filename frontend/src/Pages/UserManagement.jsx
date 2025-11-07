@@ -92,18 +92,17 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
       }
 
       {/*TITLE*/}
-      <h1 className='text-2xl md:text-4xl font-bold text-green-900'>
+      <h1 className='text-2xl md:text-[35px] leading-[36px] font-bold text-green-900'>
         USER MANAGEMENT
       </h1>
 
       <hr className="mt-3 mb-6 border-t-4 border-green-800"/>
 
       {/*SEARCH AND ADD*/}
-{/*SEARCH, BRANCH & ADD USER SECTION*/}
 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 w-full">
 
   {/* Left: Search + Branch beside each other on desktop */}
-  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 w-full lg:w-auto">
+  <div className="flex flex-col text-sm sm:flex-row sm:items-center sm:gap-3 w-full lg:w-auto">
     {/* Search Field */}
     <input
       type="text"
