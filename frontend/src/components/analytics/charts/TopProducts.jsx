@@ -9,8 +9,46 @@ import ChartLoading from '../../common/ChartLoading.jsx';
 import RestockSuggestionsDialog from '../../dialogs/RestockSuggestionsDialog.jsx';
 import { FaLightbulb } from 'react-icons/fa';
 
-// ⬇️ adjust this path if needed
 import DropdownCustom from '../../../components/DropdownCustom';
+
+// For Y-axis ticks (compact ₱60M, ₱1.2B, etc.)
+const pesoAxis = (v) =>
+  new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(Number(v) || 0);
+
+/** Compact tooltip that wraps long product names so it doesn't cover the chart */
+const TopBarTooltip = ({ active, payload }) => {
+  if (!active || !payload || !payload.length) return null;
+  const p = payload[0]?.payload || {};
+
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        padding: '8px 10px',
+        maxWidth: 260,
+        boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
+        pointerEvents: 'none',
+        lineHeight: 1.25,
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>
+        {p.product_name ?? ''}
+      </div>
+      <div style={{ fontSize: 12, color: '#475569' }}>
+        Sales Amount: <strong>{currencyFormat(p?.sales_amount || 0)}</strong>
+      </div>
+    </div>
+  );
+};
 
 function TopProducts({
   topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName,
@@ -65,17 +103,17 @@ function TopProducts({
 
   const normalizedPerformance = Array.isArray(salesPerformance)
     ? {
-        history: salesPerformance,
-        forecast: [],
-        series: salesPerformance.map(item => ({ ...item, is_forecast: false }))
-      }
+      history: salesPerformance,
+      forecast: [],
+      series: salesPerformance.map(item => ({ ...item, is_forecast: false }))
+    }
     : (salesPerformance ?? { history: [], forecast: [], series: [] });
 
   const combinedSeries = Array.isArray(normalizedPerformance.series) && normalizedPerformance.series.length
     ? normalizedPerformance.series
     : (Array.isArray(normalizedPerformance.history)
-        ? normalizedPerformance.history.map(item => ({ ...item, is_forecast: false }))
-        : []);
+      ? normalizedPerformance.history.map(item => ({ ...item, is_forecast: false }))
+      : []);
 
   const actualSeries = combinedSeries
     .filter(item => item && item.is_forecast !== true)
@@ -154,6 +192,8 @@ function TopProducts({
   const forecastChartData = mapForecastSeriesToChart(combinedSeries);
   const chartForecastData = mapForecastSeriesToChart(displayCombinedSeries);
 
+
+
   return (
     <>
       {/* TOP PRODUCTS */}
@@ -218,16 +258,14 @@ function TopProducts({
                     tickMargin={4}
                   />
 
+                  {/* Compact, wrapping tooltip */}
                   <Tooltip
-                    formatter={(value) => [currencyFormat(value), 'Sales Amount']}
-                    labelFormatter={(label, payload) => {
-                      if (payload && payload.length > 0) {
-                        return payload[0]?.payload?.product_name || label;
-                      }
-                      return label;
-                    }}
+                    content={<TopBarTooltip />}
+                    wrapperStyle={{ outline: 'none', zIndex: 20 }}
+                    allowEscapeViewBox={{ x: true, y: true }}
                     cursor={{ fill: 'rgba(0,0,0,0.04)' }}
                   />
+
                   <Bar
                     dataKey="sales_amount"
                     radius={[0, 4, 4, 0]}
@@ -280,7 +318,6 @@ function TopProducts({
                   { value: 'weekly', label: 'Weekly' },
                   { value: 'monthly', label: 'Monthly' },
                   { value: 'yearly', label: 'Yearly' },
-                 
                 ]}
               />
             </div>
@@ -297,7 +334,6 @@ function TopProducts({
                 >
                   <FaLightbulb className="text-sm" />
                 </button>
-                
               </div>
             )}
           </div>
@@ -328,17 +364,40 @@ function TopProducts({
                     const overallMax = Math.max(maxSales, maxUnits);
 
                     if (overallMax <= 0) {
-                      return <YAxis type="number" domain={[0, 1]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
+                      return (
+                        <YAxis
+                          type="number"
+                          domain={[0, 1]}
+                          tick={{ fontSize: 10 }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={pesoAxis} // ← show ₱ on zero-scale too
+                        />
+                      );
                     }
 
                     const target = Math.ceil(overallMax * 1.15);
                     const magnitude = Math.pow(10, Math.floor(Math.log10(target)));
                     const padded = Math.ceil(target / magnitude) * magnitude;
 
-                    return <YAxis type="number" domain={[0, padded]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />;
+                    return (
+                      <YAxis
+                        type="number"
+                        domain={[0, padded]}
+                        tick={{ fontSize: 10 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={pesoAxis} // ← ₱ compact ticks
+                      />
+                    );
                   })()}
 
-                  <Tooltip labelFormatter={formatPeriod} />
+
+                  <Tooltip
+                    labelFormatter={formatPeriod}
+                    formatter={(value) => [currencyFormat(value), 'Sales']}
+                  />
+
                   <Area type="monotone" dataKey="sales_amount" stroke="none" fillOpacity={1} fill="url(#colorSales)" />
                   <Line type="monotone" dataKey="sales_amount" name="Sales" stroke="#0f766e" strokeWidth={2} dot={false} />
                 </LineChart>
