@@ -36,6 +36,8 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   const [selectedExistingProduct, setSelectedExistingProduct] = useState(null);
   const [showExistingProducts, setShowExistingProducts] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const blurTimeoutRef = useRef(null);
   const [visibleCount, setVisibleCount] = useState(20);
   const BATCH_SIZE = 20;
   const overlayRef = useRef(null);
@@ -214,11 +216,16 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   const constructionUnits = ["pcs","ltr","gal","bag","pairs","roll","set","sheet","kg","m","cu.m","btl","can","bd.ft","meter","pail"];
 
   const handleSelectExistingProduct = (product) => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    setSearchFocused(false);
+    setShowExistingProducts(false);
     setSelectedExistingProduct(product);
     setItemName(product.product_name);
     setUnit(product.unit);
     setCategory(product.category_id);
-    setShowExistingProducts(false);
     setDescription(product.description);
     setPrice(product.unit_price != null ? String(product.unit_price) : '');
     setSellingUnits(initializeSellingUnits(product.selling_units, product.unit, product.unit_price));
@@ -833,19 +840,39 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                       autoComplete="off"
                       className={`${inputClass('product_name')} pl-10 ${selectedExistingProduct ? 'border-green-400 bg-green-50' : ''}`}
                       value={product_name}
-                      onChange={(e) => setItemName(sanitizeInput(e.target.value))}
+                      onFocus={() => {
+                        if (blurTimeoutRef.current) {
+                          clearTimeout(blurTimeoutRef.current);
+                          blurTimeoutRef.current = null;
+                        }
+                        setSearchFocused(true);
+                        setShowExistingProducts(Boolean(product_name && product_name.trim()));
+                      }}
+                      onBlur={() => {
+                        // delay hiding to allow clicks inside the overlay
+                        blurTimeoutRef.current = setTimeout(() => {
+                          setSearchFocused(false);
+                          setShowExistingProducts(false);
+                          blurTimeoutRef.current = null;
+                        }, 150);
+                      }}
+                      onChange={(e) => {
+                        const v = sanitizeInput(e.target.value);
+                        // keep typed value as the primary product name
+                        setItemName(v);
+                        // update search term used for filtering suggestions
+                        setSearchTerm(v);
+                        // only mark suggestions available; visibility depends on focus
+                        setShowExistingProducts(Boolean(v && v.trim()));
+                        // if user had previously selected an existing product, clear it when they edit
+                        if (selectedExistingProduct && v !== (selectedExistingProduct.product_name || '')) {
+                          setSelectedExistingProduct(null);
+                        }
+                      }}
                       disabled={selectedExistingProduct || mode === 'edit'}
                     />
                   </div>
-                  {mode === 'add' && (
-                    <button
-                      type="button"
-                      onClick={toggleExistingProductsPanel}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${showExistingProducts ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-blue-800 text-white hover:bg-blue-700'}`}
-                    >
-                      {showExistingProducts ? 'Cancel' : 'Browse'}
-                    </button>
-                  )}
+                  {/* Suggestions now appear automatically as the user types; manual Browse button removed */}
                 </div>
 
                 {selectedExistingProduct && (
@@ -864,21 +891,21 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                 {errorflag('product_name', 'product name')}
 
                 {/* EXISTING PRODUCTS OVERLAY */}
-                {mode === 'add' && showExistingProducts && (
+                {mode === 'add' && showExistingProducts && searchFocused && (
                   <div
                     ref={overlayRef}
                     onScroll={handleOverlayScroll}
+                    onMouseDown={() => {
+                      // prevent input blur from hiding the overlay when interacting with it
+                      if (blurTimeoutRef.current) {
+                        clearTimeout(blurTimeoutRef.current);
+                        blurTimeoutRef.current = null;
+                      }
+                      setSearchFocused(true);
+                    }}
                     className="absolute left-0 top-full mt-2 border border-gray-300 rounded-md p-3 sm:p-4 bg-white max-h-[50vh] sm:max-h-96 overflow-y-auto w-full shadow-lg z-20 hide-scrollbar"
                   >
-                    <div className="mb-3">
-                      <input
-                        type="text"
-                        placeholder="Search existing products..."
-                        className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
+                    {/* Search is driven by the main product name input; inline search removed to avoid duplication */}
 
                     <div className="space-y-2">
                       {filteredExistingProducts.length === 0 ? (
@@ -889,7 +916,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
                         filteredExistingProducts.slice(0, visibleCount).map((product) => (
                           <div
                             key={product.product_id}
-                            onClick={() => handleSelectExistingProduct(product)}
+                            onMouseDown={(e) => { e.preventDefault(); handleSelectExistingProduct(product); }}
                             className="p-3 sm:p-4 border border-gray-100 rounded-lg cursor-pointer hover:shadow-md transform hover:-translate-y-0.5 transition"
                           >
                             <div className="flex items-center justify-between">

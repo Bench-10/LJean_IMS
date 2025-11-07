@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ChartLoading from "../components/common/ChartLoading";
 import NoInfoFound from "../components/common/NoInfoFound";
@@ -16,7 +16,9 @@ function Approvals({
   approveInventoryRequest,
   rejectInventoryRequest,
   refreshInventoryRequests,
-  onOpenRequestMonitor
+  onOpenRequestMonitor,
+  highlightDirective = null,
+  onHighlightConsumed
 }) {
   const [searchItem, setSearchItem] = useState("");
   const [approvingUserId, setApprovingUserId] = useState(null);
@@ -25,6 +27,12 @@ function Approvals({
   const [pendingRejectId, setPendingRejectId] = useState(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [highlightedInventoryIds, setHighlightedInventoryIds] = useState([]);
+  const pendingRowRefs = useRef(new Map());
+  const pendingMobileRefs = useRef(new Map());
+  const tableScrollContainerRef = useRef(null);
+  const mobileScrollContainerRef = useRef(null);
+  const lastHandledHighlightRef = useRef(null);
 
   const ownerCanOpenRequestMonitor = useMemo(() => {
     if (!user) return false;
@@ -134,6 +142,106 @@ function Approvals({
 
   const combinedLoading = usersLoading || inventoryRequestsLoading;
 
+  const setPendingRowRef = useCallback((pendingId, node) => {
+    const map = pendingRowRefs.current;
+    if (!map) return;
+    if (node) {
+      map.set(pendingId, node);
+    } else {
+      map.delete(pendingId);
+    }
+  }, []);
+
+  const setPendingMobileRef = useCallback((pendingId, node) => {
+    const map = pendingMobileRefs.current;
+    if (!map) return;
+    if (node) {
+      map.set(pendingId, node);
+    } else {
+      map.delete(pendingId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!highlightDirective || highlightDirective.type !== 'owner-approvals') {
+      return;
+    }
+
+    if (inventoryRequestsLoading) {
+      return;
+    }
+
+    if (lastHandledHighlightRef.current === highlightDirective.triggeredAt) {
+      return;
+    }
+
+    const targetUserId = Number(highlightDirective.userId);
+    const normalizedName = (highlightDirective.userName || '').toLowerCase();
+
+    const matchesDirective = (request) => {
+      const createdBy = Number(request.created_by ?? request.created_by_id ?? request.user_id ?? null);
+      if (Number.isFinite(targetUserId) && createdBy === targetUserId) {
+        return true;
+      }
+      if (!normalizedName) {
+        return false;
+      }
+      return (request.created_by_name || '').toLowerCase() === normalizedName;
+    };
+
+    const targetIds = (inventoryRequests || []).filter(matchesDirective).map(req => req.pending_id);
+
+    lastHandledHighlightRef.current = highlightDirective.triggeredAt;
+
+    if (targetIds.length === 0) {
+      onHighlightConsumed?.('owner-approvals');
+      return;
+    }
+
+    setHighlightedInventoryIds(targetIds);
+
+    const isMobileView = typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 767px)').matches
+      : false;
+
+    const firstId = targetIds[0];
+    const preferredElement = isMobileView
+      ? (pendingMobileRefs.current.get(firstId) || pendingRowRefs.current.get(firstId))
+      : (pendingRowRefs.current.get(firstId) || pendingMobileRefs.current.get(firstId));
+
+    const fallbackElement = isMobileView
+      ? pendingRowRefs.current.get(firstId)
+      : pendingMobileRefs.current.get(firstId);
+
+    const targetElement = preferredElement || fallbackElement;
+    const scrollContainer = isMobileView ? mobileScrollContainerRef.current : tableScrollContainerRef.current;
+
+    const scrollAction = () => {
+      if (scrollContainer && targetElement && scrollContainer.contains(targetElement)) {
+        const offset = targetElement.offsetTop - scrollContainer.offsetTop;
+        scrollContainer.scrollTo({
+          top: Math.max(offset - scrollContainer.clientHeight / 3, 0),
+          behavior: 'smooth'
+        });
+        return;
+      }
+
+      if (targetElement && typeof targetElement.scrollIntoView === 'function') {
+        targetElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    };
+
+    const scrollTimer = setTimeout(scrollAction, 140);
+    const clearTimer = setTimeout(() => setHighlightedInventoryIds([]), 6000);
+
+    onHighlightConsumed?.('owner-approvals');
+
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [highlightDirective, inventoryRequests, inventoryRequestsLoading, onHighlightConsumed]);
+
   const handleInventoryApprove = async (pendingId) => {
     if (!approveInventoryRequest) return;
 
@@ -228,7 +336,10 @@ function Approvals({
       <hr className="border-t-2 my-3 sm:my-4 w-full border-gray-500 rounded-lg" />
 
       {/* DESKTOP TABLE VIEW */}
-      <div className="hidden md:block overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6 bg-white">
+      <div
+        className="hidden md:block overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6 bg-white"
+        ref={tableScrollContainerRef}
+      >
         <table className={`w-full ${combinedRequests.length === 0 ? "h-full" : ""} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 bg-green-500 text-white z-10">
             <tr>
@@ -311,10 +422,15 @@ function Approvals({
                 const unitCost = productData?.unit_cost ? `₱ ${Number(productData.unit_cost).toLocaleString()}` : '—';
                 const quantityAdded = productData?.quantity_added ?? 0;
 
+                const isHighlighted = highlightedInventoryIds.includes(request.pending_id);
+
                 return (
                   <tr
                     key={`inventory-${request.pending_id}`}
-                    className="h-auto border-b last:border-b-0 hover:bg-blue-50 transition-colors bg-blue-50/20"
+                    ref={(node) => setPendingRowRef(request.pending_id, node)}
+                    className={`h-auto border-b last:border-b-0 hover:bg-blue-50 transition-colors bg-blue-50/20 ${
+                      isHighlighted ? 'ring-2 ring-amber-400 ring-offset-2 animate-pulse' : ''
+                    }`}
                   >
                     <td className="px-4 py-4 align-top">
                       <div className="flex flex-col gap-2">
@@ -376,7 +492,10 @@ function Approvals({
       </div>
 
       {/* MOBILE CARD VIEW */}
-      <div className="md:hidden space-y-3 sm:space-y-4 overflow-y-auto max-h-[60vh] pb-6 hide-scrollbar">
+      <div
+        className="md:hidden space-y-3 sm:space-y-4 overflow-y-auto max-h-[60vh] pb-6 hide-scrollbar"
+        ref={mobileScrollContainerRef}
+      >
         {combinedLoading ? (
           <ChartLoading message="Loading pending approvals..." />
         ) : combinedRequests.length === 0 ? (
@@ -459,11 +578,15 @@ function Approvals({
             const unitPrice = productData?.unit_price ? `₱ ${Number(productData.unit_price).toLocaleString()}` : '—';
             const unitCost = productData?.unit_cost ? `₱ ${Number(productData.unit_cost).toLocaleString()}` : '—';
             const quantityAdded = productData?.quantity_added ?? 0;
+            const isHighlighted = highlightedInventoryIds.includes(request.pending_id);
 
             return (
               <div
                 key={`inventory-${request.pending_id}`}
-                className="bg-white border-2 border-blue-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+                ref={(node) => setPendingMobileRef(request.pending_id, node)}
+                className={`bg-white border-2 border-blue-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
+                  isHighlighted ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse' : ''
+                }`}
               >
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">

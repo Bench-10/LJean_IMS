@@ -218,6 +218,9 @@ export const userDeletionAccount = async (req, res) =>{
         res.status(200).json(user);
     } catch (error) {
         console.error('Error to delete a user: ', error);
+        if (error?.name === 'UserPendingRequestsError') {
+            return res.status(409).json({ message: error.message });
+        }
         res.status(500).json({message: 'Internal Server Error'})
     }
 }

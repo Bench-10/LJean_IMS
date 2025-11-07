@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import { TbFileExport } from "react-icons/tb";
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
@@ -24,7 +24,9 @@ function ProductInventory({
   pendingRequestsLoading = false,
   approvePendingRequest,
   rejectPendingRequest,
-  refreshPendingRequests
+  refreshPendingRequests,
+  highlightPendingDirective = null,
+  onHighlightConsumed
 }) {
 
   const { user } = useAuth();
@@ -39,6 +41,10 @@ function ProductInventory({
   // Loading states for approve/reject actions (store pending_id while processing)
   const [approveLoadingId, setApproveLoadingId] = useState(null);
   const [rejectLoadingId, setRejectLoadingId] = useState(null);
+  const [highlightedPendingIds, setHighlightedPendingIds] = useState([]);
+  const pendingRequestRefs = useRef(new Map());
+  const pendingDialogScrollRef = useRef(null);
+  const lastHandledPendingHighlightRef = useRef(null);
 
   const displayPendingApprovals = user && user.role && user.role.some(role => ['Branch Manager'].includes(role));
 
@@ -158,6 +164,85 @@ function ProductInventory({
   const endIndex = startIndex + itemsPerPage;
   const currentPageData = filteredData.slice(startIndex, endIndex);
 
+  const setPendingRequestRef = useCallback((pendingId, node) => {
+    const map = pendingRequestRefs.current;
+    if (!map) return;
+    if (node) {
+      map.set(pendingId, node);
+    } else {
+      map.delete(pendingId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!highlightPendingDirective || highlightPendingDirective.type !== 'branch-pending') {
+      return;
+    }
+
+    if (pendingRequestsLoading) {
+      return;
+    }
+
+    if (lastHandledPendingHighlightRef.current === highlightPendingDirective.triggeredAt) {
+      return;
+    }
+
+    const targetUserId = Number(highlightPendingDirective.userId);
+    const normalizedName = (highlightPendingDirective.userName || '').toLowerCase();
+
+    const matchesDirective = (request) => {
+      const createdBy = Number(request.created_by ?? request.created_by_id ?? null);
+      if (Number.isFinite(targetUserId) && createdBy === targetUserId) {
+        return true;
+      }
+      if (!normalizedName) {
+        return false;
+      }
+      return (request.created_by_name || '').toLowerCase() === normalizedName;
+    };
+
+    const targetIds = (pendingRequests || []).filter(matchesDirective).map(req => req.pending_id);
+
+    lastHandledPendingHighlightRef.current = highlightPendingDirective.triggeredAt;
+
+    if (targetIds.length === 0) {
+      onHighlightConsumed?.('branch-pending');
+      return;
+    }
+
+    setIsPendingDialogOpen(true);
+    setHighlightedPendingIds(targetIds);
+
+    const firstId = targetIds[0];
+    const targetElement = pendingRequestRefs.current.get(firstId);
+
+    const scrollAction = () => {
+      const container = pendingDialogScrollRef.current;
+      if (container && targetElement && container.contains(targetElement)) {
+        const offset = targetElement.offsetTop - container.offsetTop;
+        container.scrollTo({
+          top: Math.max(offset - container.clientHeight / 3, 0),
+          behavior: 'smooth'
+        });
+        return;
+      }
+
+      if (targetElement && typeof targetElement.scrollIntoView === 'function') {
+        targetElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    };
+
+    const scrollTimer = setTimeout(scrollAction, 160);
+    const clearTimer = setTimeout(() => setHighlightedPendingIds([]), 6000);
+
+    onHighlightConsumed?.('branch-pending');
+
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [highlightPendingDirective, pendingRequests, pendingRequestsLoading, onHighlightConsumed]);
+
   // EXPORT FUNCTIONALITY
   const handleExportInventory = (format) => {
     const exportData = formatForExport(filteredData, ['product_id']);
@@ -248,7 +333,10 @@ function ProductInventory({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+            <div
+              className="flex-1 overflow-y-auto px-4 sm:px-6 py-4"
+              ref={pendingDialogScrollRef}
+            >
               {pendingRequestsLoading ? (
                 <div className="py-10">
                   <ChartLoading message="Loading pending inventory approvals..." />
@@ -266,11 +354,15 @@ function ProductInventory({
                     const { payload } = request;
                     const requestedProduct = payload?.productData || payload;
                     const currentState = payload?.currentState;
+                    const isHighlighted = highlightedPendingIds.includes(request.pending_id);
 
                     return (
                       <div
                         key={request.pending_id}
-                        className="border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition"
+                        ref={(node) => setPendingRequestRef(request.pending_id, node)}
+                        className={`border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition ${
+                          isHighlighted ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse' : ''
+                        }`}
                       >
                         {/* Header Info */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-2">

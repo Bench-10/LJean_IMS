@@ -29,10 +29,22 @@ import ProductExistsDialog from "./components/dialogs/ProductExistsDialog";
 import Approvals from "./Pages/Approvals";
 import { Toaster, toast } from "react-hot-toast";
 import InventoryRequestMonitorDialog from "./components/dialogs/InventoryRequestMonitorDialog.jsx";
+import PendingRequestsGuardDialog from "./components/dialogs/PendingRequestsGuardDialog.jsx";
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 const TAB_HIDDEN_GRACE_MS = 20 * 1000;
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'touchmove'];
+
+
+const createDeleteGuardState = () => ({
+  open: false,
+  message: '',
+  targetUserId: null,
+  targetUserName: '',
+  roleHint: '',
+  showReviewButton: false,
+  highlightType: null
+});
 
 
 
@@ -124,6 +136,8 @@ function App() {
   // PRODUCT EXISTS DIALOG STATES
   const [showProductExistsDialog, setShowProductExistsDialog] = useState(false);
   const [productExistsMessage, setProductExistsMessage] = useState('');
+  const [deleteGuardDialog, setDeleteGuardDialog] = useState(createDeleteGuardState);
+  const [highlightDirective, setHighlightDirective] = useState(null);
 
   //LOADING STATES
   const [invetoryLoading, setInventoryLoading] = useState(false);
@@ -631,6 +645,48 @@ function App() {
     }
     setIsRequestMonitorOpen(true);
   }, [canOpenRequestMonitor]);
+
+  const handleCloseDeleteGuardDialog = useCallback(() => {
+    setDeleteGuardDialog(createDeleteGuardState());
+  }, []);
+
+  const handleHighlightConsumed = useCallback((type) => {
+    setHighlightDirective(prev => {
+      if (!prev || prev.type !== type) {
+        return prev;
+      }
+      return null;
+    });
+  }, []);
+
+  const handleReviewDeleteGuard = useCallback(() => {
+    const { targetUserId, targetUserName, highlightType } = deleteGuardDialog;
+    setDeleteGuardDialog(createDeleteGuardState());
+
+    if (!targetUserId || !highlightType) {
+      return;
+    }
+
+    const directiveBase = {
+      userId: Number(targetUserId),
+      userName: targetUserName,
+      triggeredAt: Date.now()
+    };
+
+    setHighlightDirective({
+      type: highlightType,
+      ...directiveBase
+    });
+
+    if (highlightType === 'owner-approvals') {
+      navigate('/approvals');
+      return;
+    }
+
+    if (highlightType === 'branch-pending') {
+      navigate('/inventory');
+    }
+  }, [deleteGuardDialog, navigate]);
 
   // CHECK USER STATUS ON INITIAL LOAD OR USER CHANGE
   useEffect(() => {
@@ -1499,6 +1555,83 @@ function App() {
       // DON'T MANUALLY REFRESH - LET WEBSOCKET HANDLE REAL-TIME UPDATES
     } catch (error) {
       console.error('Error deleting user:', error);
+      const serverMessage = error?.response?.data?.message;
+      const status = error?.response?.status;
+      const fallbackMessage = 'Unable to delete this user account right now. Please try again later.';
+
+      if (status === 409) {
+        const normalizedId = Number(userID);
+        const blockingUser = Array.isArray(users) ? users.find(record => Number(record.user_id) === normalizedId) : null;
+        const derivedName = blockingUser?.full_name
+          || [blockingUser?.first_name, blockingUser?.last_name].filter(Boolean).join(' ').trim()
+          || 'This user';
+
+        const resolveCreatedById = (record) => {
+          if (!record) return null;
+          const candidates = [
+            record.created_by,
+            record?.payload?.created_by,
+            record?.payload?.createdBy,
+            record?.payload?.productData?.created_by,
+            record?.payload?.productData?.createdBy
+          ];
+
+          for (const candidate of candidates) {
+            const parsed = Number(candidate);
+            if (Number.isFinite(parsed)) {
+              return parsed;
+            }
+          }
+          return null;
+        };
+
+        const managerPendingForUser = Array.isArray(pendingInventoryRequests)
+          ? pendingInventoryRequests.filter(req => (
+              String(req?.status ?? '').toLowerCase() === 'pending' && resolveCreatedById(req) === normalizedId
+            ))
+          : [];
+
+        const ownerPendingForUser = Array.isArray(adminInventoryRequests)
+          ? adminInventoryRequests.filter(req => (
+              String(req?.status ?? '').toLowerCase() === 'pending' && resolveCreatedById(req) === normalizedId
+            ))
+          : [];
+
+        const hasManagerStage = managerPendingForUser.length > 0;
+        const hasOwnerStage = ownerPendingForUser.length > 0;
+
+        let showReviewButton = false;
+        let highlightType = null;
+        let roleHint = '';
+
+        if (isBranchManager && hasManagerStage) {
+          showReviewButton = true;
+          highlightType = 'branch-pending';
+          roleHint = 'Open your pending inventory requests to approve or reject their submissions.';
+        } else if (isOwner && hasOwnerStage) {
+          showReviewButton = true;
+          highlightType = 'owner-approvals';
+          roleHint = 'Navigate to the Approval Center to finish reviewing their pending inventory requests.';
+        } else if (isBranchManager) {
+          roleHint = 'These requests are already with the owner for final approval. Please coordinate with them before deleting this account.';
+        } else if (isOwner) {
+          roleHint = 'These requests are still waiting for branch manager review. Ask the manager to resolve them before deleting this account.';
+        }
+
+        setDeleteGuardDialog({
+          ...createDeleteGuardState(),
+          open: true,
+          message: serverMessage || 'Cannot delete this user while pending inventory requests remain. Please resolve them first.',
+          targetUserId: normalizedId,
+          targetUserName: derivedName,
+          roleHint,
+          showReviewButton,
+          highlightType
+        });
+        return;
+      }
+
+      toast.error(serverMessage || fallbackMessage);
     } finally {
       setDeleteLoading(false);
     }
@@ -1619,6 +1752,16 @@ function App() {
         isOpen={showProductExistsDialog}
         message={productExistsMessage}
         onClose={() => setShowProductExistsDialog(false)}
+      />
+
+      <PendingRequestsGuardDialog
+        open={deleteGuardDialog.open}
+        message={deleteGuardDialog.message}
+        userName={deleteGuardDialog.targetUserName}
+        roleHint={deleteGuardDialog.roleHint}
+        showReviewButton={deleteGuardDialog.showReviewButton}
+        onCancel={handleCloseDeleteGuardDialog}
+        onReview={handleReviewDeleteGuard}
       />
 
       {/*COMPONENTS*/}
@@ -1752,6 +1895,8 @@ function App() {
                     approvePendingRequest={handleApprovePendingInventory}
                     rejectPendingRequest={handleRejectPendingInventory}
                     refreshPendingRequests={fetchPendingInventoryRequests}
+                    highlightPendingDirective={highlightDirective?.type === 'branch-pending' ? highlightDirective : null}
+                    onHighlightConsumed={handleHighlightConsumed}
 
                   />
 
@@ -1844,6 +1989,8 @@ function App() {
                 rejectInventoryRequest={handleOwnerRejectPendingInventory}
                 refreshInventoryRequests={fetchAdminPendingInventoryRequests}
                 onOpenRequestMonitor={handleRequestMonitorOpen}
+                highlightDirective={highlightDirective?.type === 'owner-approvals' ? highlightDirective : null}
+                onHighlightConsumed={handleHighlightConsumed}
               />
 
             </RouteProtection>

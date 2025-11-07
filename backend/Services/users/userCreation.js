@@ -281,6 +281,46 @@ export const deleteUser = async (userID, branchId) =>{
     const userIdInt = parseInt(userID, 10);
     
     console.log(`Deleting user ${userIdInt} from branch ${branchId}`);
+    const { rows: pendingRequests } = await SQLquery(
+        `SELECT pending_id
+         FROM Inventory_Pending_Actions
+         WHERE created_by = $1
+           AND status = 'pending'
+         LIMIT 1`,
+        [userIdInt]
+    );
+
+    if (pendingRequests.length > 0) {
+        const error = new Error('Cannot delete this user while they still have pending inventory requests. Please approve or reject their requests first.');
+        error.name = 'UserPendingRequestsError';
+        throw error;
+    }
+
+    const { rows: userRows } = await SQLquery(
+        `SELECT first_name, last_name, role
+         FROM Users
+         WHERE user_id = $1`,
+        [userIdInt]
+    );
+
+    if (userRows.length > 0) {
+        const { first_name, last_name, role } = userRows[0];
+        const fullName = [first_name, last_name].filter(Boolean).join(' ').trim() || 'Former User';
+        const normalizedRoles = Array.isArray(role)
+            ? role.filter(Boolean)
+            : role ? [role] : [];
+
+        await SQLquery(
+            `UPDATE Inventory_Pending_Actions
+             SET created_by_name = COALESCE(created_by_name, $1),
+                 created_by_roles = CASE
+                     WHEN created_by_roles IS NULL OR array_length(created_by_roles, 1) = 0 THEN $2
+                     ELSE created_by_roles
+                 END
+             WHERE created_by = $3`,
+            [fullName, normalizedRoles, userIdInt]
+        );
+    }
 
     await SQLquery('DELETE FROM Users WHERE user_id = $1', [userIdInt]);
 
