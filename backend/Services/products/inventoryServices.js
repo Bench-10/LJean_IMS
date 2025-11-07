@@ -22,6 +22,9 @@ const needsBranchManagerApproval = (roles) => {
     return !normalized.some(role => ['Branch Manager', 'Owner'].includes(role));
 };
 
+const normalizeWhitespace = (value) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+const normalizeProductNameKey = (value) => normalizeWhitespace(value).toLowerCase();
+
 
 class InventoryValidationError extends Error {
     constructor(message) {
@@ -242,6 +245,7 @@ const ensureSellingUnitsForResponse = (units, baseUnit, basePrice) => {
 const sanitizeProductPayload = (productData) => {
     if (!productData) return null;
 
+    const sanitizedName = normalizeWhitespace(productData.product_name);
     const baseUnit = typeof productData.unit === 'string' ? productData.unit.trim() : productData.unit;
     let sanitizedUnitPrice = Number(productData.unit_price);
     if (!Number.isFinite(sanitizedUnitPrice)) {
@@ -265,7 +269,7 @@ const sanitizeProductPayload = (productData) => {
 
     return {
         product_id: productData.product_id ?? null,
-        product_name: productData.product_name,
+    product_name: sanitizedName,
         category_id: Number(productData.category_id),
         branch_id: Number(productData.branch_id),
         unit: baseUnit,
@@ -283,6 +287,55 @@ const sanitizeProductPayload = (productData) => {
         description: productData.description || null,
         selling_units: normalizedSellingUnits
     };
+};
+
+
+const ensureProductIsUniqueForBranch = async ({ branchId, productName, ignorePendingId = null }) => {
+    const resolvedBranchId = Number(branchId);
+    const normalizedName = normalizeProductNameKey(productName);
+
+    if (!Number.isFinite(resolvedBranchId) || !normalizedName) {
+        return;
+    }
+
+    const { rows: existingRows } = await SQLquery(
+        `SELECT product_id, product_name
+         FROM Inventory_Product
+         WHERE branch_id = $1
+           AND LOWER(TRIM(product_name)) = $2
+         LIMIT 1`,
+        [resolvedBranchId, normalizedName]
+    );
+
+    if (existingRows.length > 0) {
+        const existingName = normalizeWhitespace(existingRows[0].product_name || productName);
+        throw new Error(`Product already exists in this branch. "${existingName}" is already registered in your branch inventory.`);
+    }
+
+    const params = [resolvedBranchId, normalizedName];
+    let pendingQuery = `
+        SELECT pending_id
+        FROM Inventory_Pending_Actions
+        WHERE branch_id = $1
+          AND status = 'pending'
+          AND action_type = 'create'
+          AND LOWER(TRIM(payload->'productData'->>'product_name')) = $2`;
+
+    const resolvedIgnorePendingId = ignorePendingId !== null && ignorePendingId !== undefined ? Number(ignorePendingId) : null;
+
+    if (resolvedIgnorePendingId !== null && Number.isFinite(resolvedIgnorePendingId)) {
+        params.push(resolvedIgnorePendingId);
+        pendingQuery += ' AND pending_id <> $3';
+    }
+
+    pendingQuery += ' LIMIT 1';
+
+    const pendingResult = await SQLquery(pendingQuery, params);
+
+    if (pendingResult.rowCount > 0) {
+        const displayName = normalizeWhitespace(productName) || productName;
+        throw new Error(`Product already exists in this branch. "${displayName}" already has a pending request awaiting approval.`);
+    }
 };
 
 
@@ -850,24 +903,38 @@ export const getProductItems = async(branchId) => {
 
 
 export const addProductItem = async (productData, options = {}) => {
-    const { bypassApproval = false, requestedBy = null, actingUser = null } = options;
+    const { bypassApproval = false, requestedBy = null, actingUser = null, pendingActionId = null } = options;
 
     const roles = normalizeRoles(productData.requestor_roles || productData.userRoles);
-    const pendingBranchId = Number(productData.branch_id ?? productData.branchId);
     const isBranchManager = roles.includes('Branch Manager');
     const isOwner = roles.includes('Owner');
-    const existingProductId = productData.existing_product_id ?? productData.existingProductId ?? null;
-    const isNewProductSubmission = !existingProductId;
     const actingUserId = actingUser?.userID ?? productData.userID;
     const actingUserName = actingUser?.fullName ?? productData.fullName;
     const requiresApproval = !bypassApproval && needsBranchManagerApproval(roles);
 
+    const cleanedData = sanitizeProductPayload({
+        ...productData,
+        userID: actingUserId,
+        fullName: actingUserName
+    });
+
+    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id, description, selling_units: sanitizedSellingUnits } = cleanedData;
+
+    const isNewProductSubmission = !existing_product_id;
+    const ignorePendingId = bypassApproval ? pendingActionId : null;
+
+    await ensureProductIsUniqueForBranch({
+        branchId: branch_id,
+        productName: product_name,
+        ignorePendingId
+    });
+
     if (requiresApproval) {
         const pendingRecord = await createPendingInventoryAction({
             actionType: 'create',
-            productData,
-            branchId: pendingBranchId,
-            productId: existingProductId || null,
+            productData: cleanedData,
+            branchId: branch_id,
+            productId: existing_product_id || null,
             currentState: null
         });
 
@@ -877,8 +944,8 @@ export const addProductItem = async (productData, options = {}) => {
     if (!bypassApproval && isNewProductSubmission && isBranchManager && !isOwner) {
         const pendingRecord = await createPendingInventoryAction({
             actionType: 'create',
-            productData,
-            branchId: pendingBranchId,
+            productData: cleanedData,
+            branchId: branch_id,
             productId: null,
             currentState: null,
             initialStage: 'admin_review',
@@ -893,14 +960,6 @@ export const addProductItem = async (productData, options = {}) => {
             pending: pendingRecord
         };
     }
-
-    const cleanedData = sanitizeProductPayload({
-        ...productData,
-        userID: actingUserId,
-        fullName: actingUserName
-    });
-
-    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id, description, selling_units: sanitizedSellingUnits } = cleanedData;
 
     const productAddedNotifheader = "New Product";
     const requestSuffix = requestedBy?.fullName && requestedBy.userID !== userID ? ` Requested by ${requestedBy.fullName}.` : '';
@@ -1615,7 +1674,8 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
                 actingUser: {
                     userID: approverId,
                     fullName: adminName
-                }
+                },
+                pendingActionId: pending.pending_id
             });
         } else {
             throw new Error(`Unsupported pending inventory action type: ${pending.action_type}`);
@@ -1780,7 +1840,8 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
             actingUser: {
                 userID: approverId,
                 fullName: approverName
-            }
+            },
+            pendingActionId: pending.pending_id
         });
     } else {
         throw new Error(`Unsupported pending inventory action type: ${pending.action_type}`);

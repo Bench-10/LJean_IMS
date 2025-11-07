@@ -570,7 +570,7 @@ COMMIT;
 
 
 
-
+BEGIN;
 
 CREATE TABLE inventory_alert_history_links (
     alert_id INT PRIMARY KEY REFERENCES Inventory_Alerts(alert_id) ON DELETE CASCADE,
@@ -601,3 +601,6 @@ CREATE INDEX idx_inventory_alert_sale_links_sale_id
 CREATE INDEX idx_inventory_alert_sale_links_delivery_id
     ON inventory_alert_sale_links(delivery_id);
 
+
+
+COMMIT;
