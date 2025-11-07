@@ -7,7 +7,7 @@
 /* Left side */
 .login-left {
   flex: 1;
-  background-image: url('/LogIn.png');
+  background-image: url('/login2.png');
   background-size: cover;
   background-position: center;
 }
