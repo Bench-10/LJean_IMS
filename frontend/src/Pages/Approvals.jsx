@@ -287,7 +287,7 @@ function Approvals({
   return (
     <div className="pt-20 lg:pt-8 px-3 sm:px-4 lg:px-8 pb-6 min-h-screen bg-[#eef2ee]">
       <div className="mb-4 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-green-900">APPROVAL CENTER</h1>
+        <h1 className="text-2xl sm:text-3xl lg:text-[35px] leading-[36px] font-bold text-green-900">APPROVAL CENTER</h1>
         <hr className="mt-2 sm:mt-3 mb-4 sm:mb-6 border-t-4 border-green-800 rounded-lg" />
       </div>
 
@@ -298,7 +298,7 @@ function Approvals({
             placeholder="Search pending request by name, branch, or role"
             className="border outline outline-1 outline-gray-400 
              focus:border-green-500 focus:ring-2 focus:ring-green-200 
-            transition-all px-3 mb-2 sm:mb-0 rounded-lg w-full h-[35px] text-sm sm:text-base"
+            transition-all px-3 mb-2 sm:mb-0 rounded-lg w-full h-[35px] text-sm sm:text-sm"
             onChange={handleSearch}
             value={searchItem}
           />

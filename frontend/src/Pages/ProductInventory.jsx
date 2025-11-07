@@ -290,7 +290,7 @@ function ProductInventory({
 
       <div className='flex items-center justify-between'>
         {/*TITLE*/}
-        <h1 className=' text-4xl font-bold text-green-900'>
+        <h1 className=' text-[35px] leading-[36px] font-bold text-green-900'>
           INVENTORY
         </h1>
 
@@ -528,7 +528,7 @@ function ProductInventory({
   {/* LEFT: search + filters */}
   <div className="flex flex-col lg:flex-row gap-2 lg:gap-6 flex-1 min-w-0">
     {/* Search */}
-    <div className="w-full lg:w-[400px] text-sm lg:text-base">
+    <div className="w-full lg:w-[400px] text-sm lg:text-sm">
       <input
         type="text"
         placeholder="Search Item Name..."
@@ -544,6 +544,7 @@ function ProductInventory({
         onChange={e => setSelectedCategory(e.target.value)}
         label="Filter by Category:"
         variant="floating"
+        size="sm"
         options={[
           { value: '', label: 'All Categories' },
           ...listCategories.map(cat => ({
@@ -562,6 +563,7 @@ function ProductInventory({
           onChange={e => setSelectedBranch(e.target.value)}
           label="Filter by Branch:"
           variant="floating"
+          size="sm"
           options={[
             ...(user.role.some(r => r === 'Owner')
               ? [{ value: '', label: 'All Branch' }]
@@ -623,17 +625,19 @@ function ProductInventory({
 
     {/* (Optional) Pendings */}
     {displayPendingApprovals && (
-      <button
-        className="col-span-2 lg:col-span-1 relative flex items-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
-        onClick={() => setIsPendingDialogOpen(true)}
-        aria-label="Open pending inventory requests"
-      >
-        <span className="whitespace-nowrap">Pendings</span>
-        <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-white text-amber-700 rounded-full">
-          {pendingRequests?.length ?? 0}
-        </span>
-      </button>
-    )}
+  <div className="col-span-2 lg:col-span-1">
+    <button
+      className="w-full lg:w-auto inline-flex items-center justify-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
+      onClick={() => setIsPendingDialogOpen(true)}
+      aria-label="Open pending inventory requests"
+    >
+      <span className="whitespace-nowrap">Pendings</span>
+      <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-white text-amber-700 rounded-full">
+        {pendingRequests?.length ?? 0}
+      </span>
+    </button>
+  </div>
+)}
   </div>
 </div>
 

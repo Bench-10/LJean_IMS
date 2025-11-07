@@ -215,7 +215,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   return (
     <div className="pt-20 lg:pt-8 px-4 lg:px-8" >
       {/*TITLE*/}
-      <h1 className=' text-4xl font-bold text-green-900'>
+      <h1 className='text-[35px] leading-[36px] font-bold text-green-900'>
         PRODUCT VALIDITY
       </h1>
 
@@ -225,7 +225,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       {/* SEARCH + FILTERS (1 line on desktop; controls at right) */}
 <div className="w-full lg:flex lg:items-center lg:flex-nowrap lg:gap-4">
   {/* SEARCH (left) */}
-  <div className="w-full lg:basis-[360px] lg:flex-none text-sm lg:text-base pb-3 lg:pb-0">
+  <div className="w-full lg:basis-[360px] lg:flex-none text-sm lg:text-sm pb-3 lg:pb-0">
     <input
       type="text"
       placeholder="Search Item Name or Category"

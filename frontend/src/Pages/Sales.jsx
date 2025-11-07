@@ -144,7 +144,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
       />
         
 
-        <h1 className=' text-4xl font-bold text-green-900'>
+        <h1 className='text-[35px] leading-[36px] font-bold text-green-900'>
           SALES TRANSACTIONS
         </h1>
 
@@ -153,7 +153,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
         {/*SEARCH AND ADD*/}
         <div className='lg:flex gap-4 lg:gap-9 ' >
           {/*SEARCH */}
-          <div className='w-full lg:w-[400px] text-sm lg:text-base pb-4 lg:pb-0'>
+          <div className='w-full lg:w-[400px] text-sm lg:text-sm pb-4 lg:pb-0'>
             <input
               type="text"
               placeholder="Search"
@@ -168,6 +168,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
   onChange={e => setSaleFilter(e.target.value)}
   label="Sale Type"
   variant="floating"
+  size="sm"
   options={[
     { value: 'all', label: 'All Sales' },
     { value: 'normal', label: 'Normal Sales' },

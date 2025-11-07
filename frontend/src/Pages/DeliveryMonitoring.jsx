@@ -295,7 +295,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
       />
 
       {/*TITLE*/}
-      <h1 className='text-4xl font-bold text-green-900'>
+      <h1 className='text-[35px] leading-[36px] font-bold text-green-900'>
         DELIVERY
       </h1>
 
@@ -305,7 +305,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
       <div className='lg:flex '>
         <div className='flex lg:gap-x-9'>
           {/*SEARCH */}
-          <div className='w-[100vw] lg:w-[400px] text-sm lg:text-base lg:pb-0 pb-3'>
+          <div className='w-[100vw] lg:w-[400px] text-sm lg:text-sm lg:pb-0 pb-3'>
 
             <input
               type="text"
