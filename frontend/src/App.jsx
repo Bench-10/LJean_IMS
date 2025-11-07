@@ -36,6 +36,47 @@ const TAB_HIDDEN_GRACE_MS = 20 * 1000;
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'touchmove'];
 
 
+const normalizeAlertId = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  try {
+    return String(value);
+  } catch (error) {
+    return null;
+  }
+};
+
+const dedupeNotifications = (notifications) => {
+  if (!Array.isArray(notifications)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const result = [];
+
+  notifications.forEach((notification) => {
+    if (!notification || typeof notification !== 'object') {
+      return;
+    }
+
+    const normalizedId = normalizeAlertId(notification.alert_id ?? notification.alertId ?? null);
+
+    if (normalizedId) {
+      if (seen.has(normalizedId)) {
+        return;
+      }
+      seen.add(normalizedId);
+    }
+
+    result.push(notification);
+  });
+
+  return result;
+};
+
+
 const createDeleteGuardState = () => ({
   open: false,
   message: '',
@@ -878,31 +919,50 @@ function App() {
     // LISTEN FOR NEW NOTIFICATION
     newSocket.on('new-notification', (notification) => {
       console.log('New notification received:', notification);
-      
-      // CHECK ROLE-BASED FILTERING AND CREATOR EXCLUSION
-      const shouldReceiveNotification = () => {
-        // Exclude the creator from receiving their own notification
-        if (notification.creator_id && user.user_id === notification.creator_id) {
+
+      const userRolesForFilter = Array.isArray(user?.role)
+        ? user.role
+        : (user?.role ? [user.role] : []);
+
+      const canAcceptNotification = () => {
+        if (notification?.creator_id && user?.user_id === notification.creator_id) {
           return false;
         }
-        
-        // Check if user has required roles for this notification
-        if (notification.target_roles && notification.target_roles.length > 0) {
-          if (!user.role || !user.role.some(role => notification.target_roles.includes(role))) {
+
+        if (Array.isArray(notification?.target_roles) && notification.target_roles.length > 0) {
+          const matchesRole = userRolesForFilter.some(role => notification.target_roles.includes(role));
+
+          if (!matchesRole) {
             return false;
           }
         }
-        
+
         return true;
       };
-   
+
+      const incomingAlertId = normalizeAlertId(notification?.alert_id);
+
       setNotify(prevNotify => {
-        // CHECK IF NOTIFICATION ALREADY EXIST
-        const exists = prevNotify.some(notif => notif.alert_id === notification.alert_id);
-        
-        if (!exists && user.user_id !== notification.user_id && shouldReceiveNotification()) {
-          return [notification, ...prevNotify];
+        if (!canAcceptNotification()) {
+          return prevNotify;
         }
+
+        const alreadyExists = incomingAlertId
+          ? prevNotify.some(existing => normalizeAlertId(existing?.alert_id) === incomingAlertId)
+          : false;
+
+        const isSelfNotification = notification?.user_id !== undefined && notification?.user_id !== null
+          ? String(notification.user_id) === String(user?.user_id)
+          : false;
+
+        if (!alreadyExists && !isSelfNotification) {
+          return dedupeNotifications([notification, ...prevNotify]);
+        }
+
+        if (!incomingAlertId) {
+          return dedupeNotifications([notification, ...prevNotify]);
+        }
+
         return prevNotify;
       });
     });
@@ -1592,8 +1652,9 @@ function App() {
 
       const queryString = params.toString();
       const endpoint = `/api/notifications${queryString ? `?${queryString}` : ''}`;
-      const time = await api.get(endpoint);
-      setNotify(Array.isArray(time.data) ? time.data : []);
+  const time = await api.get(endpoint);
+  const fetchedNotifications = Array.isArray(time.data) ? time.data : [];
+  setNotify(dedupeNotifications(fetchedNotifications));
     } catch (error) {
       console.log(error.message);
     } 

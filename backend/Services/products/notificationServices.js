@@ -117,31 +117,37 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
 
   const { rows } = await SQLquery(`
     SELECT 
-      Inventory_Alerts.alert_id, 
-      alert_type,
-      message, 
-      alert_date, 
-      banner_color, 
-      COALESCE(user_notification.is_read, false) AS is_read, 
-      user_full_name, 
-      Inventory_Alerts.user_id,
-      Inventory_Alerts.product_id,
-      Inventory_Alerts.branch_id,
+      ia.alert_id, 
+      ia.alert_type,
+      ia.message, 
+      ia.alert_date, 
+      ia.banner_color, 
+      COALESCE(un.is_read, false) AS is_read, 
+      ia.user_full_name, 
+      ia.user_id,
+      ia.product_id,
+      ia.branch_id,
       iahl.add_id AS add_stock_id,
       iahl.history_timestamp,
       iahl.alert_timestamp,
       iasl.sales_information_id AS linked_sales_information_id,
       iasl.delivery_id AS linked_delivery_id
-    FROM Inventory_Alerts
-    LEFT JOIN inventory_alert_history_links iahl ON Inventory_Alerts.alert_id = iahl.alert_id
-    LEFT JOIN inventory_alert_sale_links iasl ON Inventory_Alerts.alert_id = iasl.alert_id
-    LEFT JOIN user_notification
-      ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1
-    WHERE Inventory_Alerts.branch_id = $2
-      AND Inventory_Alerts.alert_date >= $3
-      AND Inventory_Alerts.user_id != $4
-      ${disallowedTypes.size > 0 ? 'AND NOT (Inventory_Alerts.alert_type = ANY($5::text[]))' : ''}
-    ORDER BY Inventory_Alerts.alert_date DESC;
+    FROM Inventory_Alerts ia
+    LEFT JOIN inventory_alert_history_links iahl ON ia.alert_id = iahl.alert_id
+    LEFT JOIN inventory_alert_sale_links iasl ON ia.alert_id = iasl.alert_id
+    LEFT JOIN LATERAL (
+      SELECT un_inner.is_read
+      FROM user_notification un_inner
+      WHERE un_inner.alert_id = ia.alert_id
+        AND un_inner.user_id = $1
+      ORDER BY un_inner.is_read DESC
+      LIMIT 1
+    ) un ON TRUE
+    WHERE ia.branch_id = $2
+      AND ia.alert_date >= $3
+      AND ia.user_id != $4
+      ${disallowedTypes.size > 0 ? 'AND NOT (ia.alert_type = ANY($5::text[]))' : ''}
+    ORDER BY ia.alert_date DESC;
   `, disallowedTypes.size > 0
       ? [userId, branchId, hireDate, userId, Array.from(disallowedTypes)]
       : [userId, branchId, hireDate, userId]
@@ -182,7 +188,20 @@ export const markAsRead = async (userAndAlertID) =>{
     return;
   }
 
-  await SQLquery(`INSERT INTO user_notification(user_id, alert_id) VALUES($1, $2)`,[user_id, alert_id]);
+  const updateResult = await SQLquery(
+    `UPDATE user_notification
+     SET is_read = TRUE
+     WHERE user_id = $1 AND alert_id = $2`,
+    [user_id, alert_id]
+  );
+
+  if (updateResult.rowCount === 0) {
+    await SQLquery(
+      `INSERT INTO user_notification(user_id, alert_id, is_read)
+       VALUES($1, $2, TRUE)`,
+      [user_id, alert_id]
+    );
+  }
 };
 
 //MARKS ALL NOTIFICATIONS AS READ FOR A USER
@@ -210,22 +229,55 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
     return adminAlerts.length;
   }
 
-  const {rows: unreadAlerts} = await SQLquery(`
-      SELECT Inventory_Alerts.alert_id
-      FROM Inventory_Alerts
-      LEFT JOIN user_notification
-      ON Inventory_Alerts.alert_id = user_notification.alert_id AND user_notification.user_id = $1
-      WHERE Inventory_Alerts.branch_id = $2 AND Inventory_Alerts.alert_date >= $3 
-      AND user_notification.is_read IS NULL 
-      AND Inventory_Alerts.user_id != $1
+  const { rows: unreadAlerts } = await SQLquery(`
+      SELECT ia.alert_id
+      FROM Inventory_Alerts ia
+      LEFT JOIN LATERAL (
+        SELECT un_inner.is_read
+        FROM user_notification un_inner
+        WHERE un_inner.alert_id = ia.alert_id
+          AND un_inner.user_id = $1
+        ORDER BY un_inner.is_read DESC
+        LIMIT 1
+      ) un ON TRUE
+      WHERE ia.branch_id = $2
+        AND ia.alert_date >= $3
+        AND ia.user_id != $1
+        AND COALESCE(un.is_read, false) = FALSE
   `, [userId, branchId, hireDate]);
 
-  if (unreadAlerts.length > 0) {
-    const values = unreadAlerts.map(alert => `(${userId}, ${alert.alert_id})`).join(', ');
-
-    await SQLquery(`INSERT INTO user_notification(user_id, alert_id) VALUES ${values}`);
-
+  if (unreadAlerts.length === 0) {
+    return 0;
   }
 
-  return unreadAlerts.length;
+  const alertIds = unreadAlerts
+    .map(alert => {
+      const parsed = parseInt(alert.alert_id, 10);
+      return Number.isNaN(parsed) ? null : parsed;
+    })
+    .filter((value) => value !== null);
+
+  if (alertIds.length === 0) {
+    return 0;
+  }
+
+  await SQLquery(
+    `UPDATE user_notification
+     SET is_read = TRUE
+     WHERE user_id = $1 AND alert_id = ANY($2::int[])`,
+    [userId, alertIds]
+  );
+
+  await SQLquery(
+    `INSERT INTO user_notification(user_id, alert_id, is_read)
+     SELECT $1, alert_id, TRUE
+     FROM unnest($2::int[]) AS alert_id
+     WHERE NOT EXISTS (
+       SELECT 1 FROM user_notification existing
+       WHERE existing.user_id = $1 AND existing.alert_id = alert_id
+     )`,
+    [userId, alertIds]
+  );
+
+  return alertIds.length;
 };

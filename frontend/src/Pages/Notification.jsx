@@ -40,13 +40,14 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
       const newNotification = notify[0];
       if (newNotification) {
         const toastId = `notification-${newNotification.alert_id ?? Date.now()}`;
+        const senderName = newNotification.user_full_name || 'System';
         const toastContent = (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
               {newNotification.alert_type || 'System Update'}
             </span>
             <span className="text-sm text-slate-800">
-              <strong className="text-emerald-800">{newNotification.user_full_name}:</strong> {newNotification.message}
+              <strong className="text-emerald-800">{senderName}:</strong> {newNotification.message}
             </span>
           </div>
         );
@@ -231,7 +232,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
 
                             <div className='mb-8 sm:mb-6'>
                               <p className='text-gray-600 text-xs sm:text-sm leading-relaxed break-words'>
-                                <strong>{notification.user_full_name}: </strong>
+                                <strong>{notification.user_full_name || 'System'}: </strong>
                                 {notification.message || ''}
                               </p>
                             </div>
@@ -285,7 +286,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
 
                             <div className='mb-8 sm:mb-6'>
                               <p className='text-gray-600 text-xs sm:text-sm leading-relaxed break-words'>
-                                <strong>{notification.user_full_name}: </strong>
+                                <strong>{notification.user_full_name || 'System'}: </strong>
                                 {notification.message || ''}
                               </p>
                             </div>

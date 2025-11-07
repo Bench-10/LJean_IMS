@@ -26,6 +26,50 @@ const normalizeWhitespace = (value) => typeof value === 'string' ? value.replace
 const normalizeProductNameKey = (value) => normalizeWhitespace(value).toLowerCase();
 
 
+const createSystemInventoryNotification = async ({
+    productId = null,
+    branchId,
+    alertType,
+    message,
+    bannerColor = 'blue'
+}) => {
+    if (!branchId || !alertType || !message) {
+        return null;
+    }
+
+    const alertResult = await SQLquery(
+        `INSERT INTO Inventory_Alerts
+         (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING alert_id, alert_date` ,
+        [productId, branchId, alertType, message, bannerColor, 0, 'System']
+    );
+
+    if (alertResult.rowCount === 0) {
+        return null;
+    }
+
+    const { alert_id: alertId, alert_date: alertDate } = alertResult.rows[0];
+
+    const resolvedAlertDate = (() => {
+        if (!alertDate) return new Date().toISOString();
+        if (alertDate instanceof Date) return alertDate.toISOString();
+
+        const parsedDate = new Date(alertDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+            return parsedDate.toISOString();
+        }
+
+        return new Date().toISOString();
+    })();
+
+    return {
+        alert_id: alertId,
+        alert_date: resolvedAlertDate
+    };
+};
+
+
 class InventoryValidationError extends Error {
     constructor(message) {
         super(message);
@@ -1707,26 +1751,44 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
         });
 
         const productName = productPayload.product_name || 'Inventory item';
+    const notificationRecipients = [...new Set([requestedBy.userID, pending.manager_approver_id].filter(Boolean))];
+        let persistedApprovalNotification = null;
 
-        if (requestedBy.userID) {
-            broadcastToUser(requestedBy.userID, {
-                alert_id: `inventory-final-approved-${pendingId}-${Date.now()}`,
-                alert_type: 'Inventory Request Approved',
-                message: `${productName} was approved by the owner.`,
-                banner_color: 'green',
-                created_at: new Date().toISOString()
-            });
+        if (notificationRecipients.length > 0) {
+            try {
+                persistedApprovalNotification = await createSystemInventoryNotification({
+                    productId: pending.product_id || productPayload.product_id || null,
+                    branchId: pending.branch_id,
+                    alertType: 'Inventory Request Approved',
+                    message: `${productName} was approved by the owner.`,
+                    bannerColor: 'green'
+                });
+            } catch (error) {
+                console.error('Failed to persist owner approval notification', {
+                    pendingId,
+                    error: error?.message || error
+                });
+            }
         }
 
-        if (pending.manager_approver_id) {
-            broadcastToUser(pending.manager_approver_id, {
-                alert_id: `inventory-final-approved-manager-${pendingId}-${Date.now()}`,
-                alert_type: 'Inventory Request Approved',
-                message: `${productName} was approved by the owner.`,
-                banner_color: 'green',
-                created_at: new Date().toISOString()
-            });
-        }
+        const approvalTimestamp = persistedApprovalNotification?.alert_date || new Date().toISOString();
+
+        const realTimeApprovalPayload = {
+            alert_id: persistedApprovalNotification?.alert_id || `inventory-final-approved-${pendingId}-${Date.now()}`,
+            alert_type: 'Inventory Request Approved',
+            message: `${productName} was approved by the owner.`,
+            banner_color: 'green',
+            created_at: approvalTimestamp,
+            alert_date: approvalTimestamp,
+            user_full_name: 'System',
+            isDateToday: true,
+            alert_date_formatted: 'Just now'
+        };
+
+        notificationRecipients.forEach(userId => {
+            broadcastToUser(userId, { ...realTimeApprovalPayload });
+        });
+
 
         return {
             status: 'approved',
@@ -1939,25 +2001,43 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
             ? `Inventory request was rejected by the owner: ${reason}`
             : 'Inventory request was rejected by the owner.';
 
-        if (requestedBy.userID) {
-            broadcastToUser(requestedBy.userID, {
-                alert_id: `inventory-admin-reject-${pendingId}-${Date.now()}`,
-                alert_type: 'Inventory Request Rejected',
-                message: rejectionMessage,
-                banner_color: 'red',
-                created_at: new Date().toISOString()
-            });
+    const rejectionRecipients = [...new Set([requestedBy.userID, pending.manager_approver_id].filter(Boolean))];
+        let persistedRejectionNotification = null;
+
+        if (rejectionRecipients.length > 0) {
+            try {
+                persistedRejectionNotification = await createSystemInventoryNotification({
+                    productId: pending.product_id || null,
+                    branchId: pending.branch_id,
+                    alertType: 'Inventory Request Rejected',
+                    message: rejectionMessage,
+                    bannerColor: 'red'
+                });
+            } catch (error) {
+                console.error('Failed to persist owner rejection notification', {
+                    pendingId,
+                    error: error?.message || error
+                });
+            }
         }
 
-        if (pending.manager_approver_id) {
-            broadcastToUser(pending.manager_approver_id, {
-                alert_id: `inventory-admin-reject-manager-${pendingId}-${Date.now()}`,
-                alert_type: 'Inventory Request Rejected',
-                message: rejectionMessage,
-                banner_color: 'red',
-                created_at: new Date().toISOString()
-            });
-        }
+        const rejectionTimestamp = persistedRejectionNotification?.alert_date || new Date().toISOString();
+
+        const realTimeRejectionPayload = {
+            alert_id: persistedRejectionNotification?.alert_id || `inventory-admin-reject-${pendingId}-${Date.now()}`,
+            alert_type: 'Inventory Request Rejected',
+            message: rejectionMessage,
+            banner_color: 'red',
+            created_at: rejectionTimestamp,
+            alert_date: rejectionTimestamp,
+            user_full_name: 'System',
+            isDateToday: true,
+            alert_date_formatted: 'Just now'
+        };
+
+        rejectionRecipients.forEach(userId => {
+            broadcastToUser(userId, { ...realTimeRejectionPayload });
+        });
 
         return mapPendingRequest(updated);
     }
