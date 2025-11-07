@@ -48,6 +48,9 @@ export const getAllUsers = async (branchId, userId) =>{
                 username, 
                 password,
                 status,
+                ucr.creator_user_id AS created_by_id,
+                ucr.resolution_status AS creator_request_status,
+                ucr.resolved_at AS creator_request_resolved_at,
                 Users.created_by,
                 Users.approved_by,
                 Users.approved_at
@@ -55,6 +58,7 @@ export const getAllUsers = async (branchId, userId) =>{
             FROM Users
             JOIN Branch ON Branch.branch_id = Users.branch_id
             JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
+            LEFT JOIN User_Creation_Requests ucr ON ucr.pending_user_id = Users.user_id
             ${whereClause}
             ORDER BY hire_date;
         `, conditions);

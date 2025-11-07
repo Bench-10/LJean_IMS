@@ -31,6 +31,35 @@ export const checkExistingUsername = async (username) =>{
 export const createUserAccount = async (UserData) => {
     const { branch, role, first_name, last_name, cell_number, address, username, password, created_by_id, created_by, creator_roles } = UserData;
 
+    const creatorName = typeof created_by === 'string'
+        ? created_by.replace(/\s+/g, ' ').trim()
+        : created_by ?? null;
+
+    const resolveExistingUserId = async (candidate) => {
+        if (candidate === null || candidate === undefined) {
+            return null;
+        }
+
+        const normalizedCandidate = typeof candidate === 'string' ? candidate.trim() : candidate;
+        if (normalizedCandidate === '') {
+            return null;
+        }
+
+        const numericId = Number(normalizedCandidate);
+        if (!Number.isFinite(numericId)) {
+            return null;
+        }
+
+        const { rowCount } = await SQLquery('SELECT 1 FROM Users WHERE user_id = $1', [numericId]);
+        return rowCount > 0 ? numericId : null;
+    };
+
+    let creatorId = await resolveExistingUserId(created_by_id);
+
+    if (creatorId === null && typeof creatorName === 'string' && creatorName) {
+        creatorId = await resolveExistingUserId(creatorName);
+    }
+
     const {isManager, isInventoryStaff, isSalesAssociate} = role;
 
     //CREATES A UNIQUE USER ID
@@ -87,35 +116,54 @@ export const createUserAccount = async (UserData) => {
 
     const securePassword = await passwordEncryption.encryptPassword(password);
 
-    const creatorId = created_by_id ?? null;
     const creatorRoles = Array.isArray(creator_roles) ? creator_roles : [];
     const isOwnerCreator = creatorRoles.includes("Owner");
     const accountStatus = isOwnerCreator ? 'active' : 'pending';
-    const approvedBy = isOwnerCreator ? created_by : null;
+    const approvedBy = isOwnerCreator ? (creatorName || null) : null;
     const approvedAt = isOwnerCreator ? new Date() : null;
+    const requestResolutionStatus = accountStatus === 'pending' ? 'pending' : 'approved';
+    const resolvedAt = accountStatus === 'pending' ? null : approvedAt;
 
     await SQLquery('BEGIN');
 
-    await SQLquery(
-        `INSERT INTO Users(user_id, branch_id, role, first_name, last_name, cell_number, is_active, last_login, permissions, address, status, created_by, approved_by, approved_at) 
-        VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-        [user_id, branch, allowedRoles, first_name, last_name, cell_number, false, 'Not yet logged in.', permissions, address, accountStatus, created_by, approvedBy, approvedAt]
-    );
+    try {
+        await SQLquery(
+            `INSERT INTO Users(user_id, branch_id, role, first_name, last_name, cell_number, is_active, last_login, permissions, address, status, created_by, approved_by, approved_at) 
+            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            [user_id, branch, allowedRoles, first_name, last_name, cell_number, false, 'Not yet logged in.', permissions, address, accountStatus, creatorName, approvedBy, approvedAt]
+        );
 
-    await SQLquery(
-        `INSERT INTO Login_credentials(user_id, username, password) 
-        VALUES($1, $2, $3)`,
-        [user_id, username, securePassword]
-    );
+        await SQLquery(
+            `INSERT INTO Login_credentials(user_id, username, password) 
+            VALUES($1, $2, $3)`,
+            [user_id, username, securePassword]
+        );
 
-    await SQLquery('COMMIT');
+        await SQLquery(
+            `INSERT INTO User_Creation_Requests (pending_user_id, creator_user_id, creator_name, creator_roles, resolution_status, created_at, resolved_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+             ON CONFLICT (pending_user_id) DO UPDATE
+             SET creator_user_id = EXCLUDED.creator_user_id,
+                 creator_name = EXCLUDED.creator_name,
+                 creator_roles = EXCLUDED.creator_roles,
+                 resolution_status = EXCLUDED.resolution_status,
+                 resolved_at = EXCLUDED.resolved_at`,
+            [user_id, creatorId, creatorName || null, creatorRoles.length > 0 ? creatorRoles : null, requestResolutionStatus, resolvedAt]
+        );
+
+        await SQLquery('COMMIT');
+    } catch (error) {
+        await SQLquery('ROLLBACK');
+        throw error;
+    }
 
     // GET THE NEWLY CREATED USER DATA FOR BROADCASTING
     const { rows } = await SQLquery(`
-        SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, Users.is_disabled, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password, status, Users.created_by, Users.approved_by, Users.approved_at
+    SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, Users.is_disabled, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password, status, Users.created_by, Users.approved_by, Users.approved_at, ucr.creator_user_id AS created_by_id, ucr.resolution_status AS creator_request_status, ucr.resolved_at AS creator_request_resolved_at
         FROM Users
         JOIN Branch ON Branch.branch_id = Users.branch_id
         JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
+        LEFT JOIN User_Creation_Requests ucr ON ucr.pending_user_id = Users.user_id
         WHERE Users.user_id = $1
         ORDER BY hire_date;
     `, [user_id]);
@@ -136,7 +184,7 @@ export const createUserAccount = async (UserData) => {
         const creatorIsBranchManager = creatorRoles.includes('Branch Manager');
         if (accountStatus === 'pending' && creatorIsBranchManager) {
             const approvalMessage = `${userWithDecryptedPassword.full_name} needs approval for ${userWithDecryptedPassword.branch}.`;
-            const creatorName = await getUserFullName(creatorId) || 'Branch Manager';
+            const creatorDisplayName = creatorId ? (await getUserFullName(creatorId)) || 'Branch Manager' : (creatorName || 'Branch Manager');
 
             const alertResult = await SQLquery(
                 `INSERT INTO Inventory_Alerts 
@@ -150,7 +198,7 @@ export const createUserAccount = async (UserData) => {
                     approvalMessage,
                     'amber',
                     creatorId,
-                    creatorName
+                    creatorDisplayName,
                 ]
             );
 
@@ -161,7 +209,7 @@ export const createUserAccount = async (UserData) => {
                     message: approvalMessage,
                     banner_color: 'amber',
                     user_id: alertResult.rows[0].user_id,
-                    user_full_name: creatorName,
+                    user_full_name: creatorDisplayName,
                     alert_date: alertResult.rows[0].alert_date,
                     isDateToday: true,
                     alert_date_formatted: 'Just now',
@@ -243,10 +291,11 @@ export const updateUserAccount = async (UserID, UserData) =>{
 
 
     const { rows } = await SQLquery(`
-        SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, Users.is_disabled, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password, status, Users.created_by, Users.approved_by, Users.approved_at
+        SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, Users.is_disabled, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password, status, Users.created_by, Users.approved_by, Users.approved_at, ucr.creator_user_id AS created_by_id, ucr.resolution_status AS creator_request_status, ucr.resolved_at AS creator_request_resolved_at
             FROM Users
             JOIN Branch ON Branch.branch_id = Users.branch_id
             JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
+            LEFT JOIN User_Creation_Requests ucr ON ucr.pending_user_id = Users.user_id
             WHERE Users.user_id = $1
             ORDER BY hire_date;
         `, [UserID]);
@@ -279,22 +328,12 @@ export const deleteUser = async (userID, branchId) =>{
 
     // ENSURE userID IS AN INTEGER
     const userIdInt = parseInt(userID, 10);
-    
-    console.log(`Deleting user ${userIdInt} from branch ${branchId}`);
-    const { rows: pendingRequests } = await SQLquery(
-        `SELECT pending_id
-         FROM Inventory_Pending_Actions
-         WHERE created_by = $1
-           AND status = 'pending'
-         LIMIT 1`,
-        [userIdInt]
-    );
 
-    if (pendingRequests.length > 0) {
-        const error = new Error('Cannot delete this user while they still have pending inventory requests. Please approve or reject their requests first.');
-        error.name = 'UserPendingRequestsError';
-        throw error;
+    if (Number.isNaN(userIdInt)) {
+        throw new Error('Invalid user id');
     }
+
+    console.log(`Deleting user ${userIdInt} from branch ${branchId}`);
 
     const { rows: userRows } = await SQLquery(
         `SELECT first_name, last_name, role
@@ -303,24 +342,79 @@ export const deleteUser = async (userID, branchId) =>{
         [userIdInt]
     );
 
-    if (userRows.length > 0) {
-        const { first_name, last_name, role } = userRows[0];
-        const fullName = [first_name, last_name].filter(Boolean).join(' ').trim() || 'Former User';
-        const normalizedRoles = Array.isArray(role)
-            ? role.filter(Boolean)
-            : role ? [role] : [];
-
-        await SQLquery(
-            `UPDATE Inventory_Pending_Actions
-             SET created_by_name = COALESCE(created_by_name, $1),
-                 created_by_roles = CASE
-                     WHEN created_by_roles IS NULL OR array_length(created_by_roles, 1) = 0 THEN $2
-                     ELSE created_by_roles
-                 END
-             WHERE created_by = $3`,
-            [fullName, normalizedRoles, userIdInt]
-        );
+    if (userRows.length === 0) {
+        return;
     }
+
+    const { first_name, last_name, role } = userRows[0];
+    const fullName = [first_name, last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || 'Former User';
+    const normalizedFullName = fullName.toLowerCase();
+    const normalizedRoles = Array.isArray(role)
+        ? role.filter(Boolean)
+        : role ? [role] : [];
+
+    const { rows: pendingInventoryRequests } = await SQLquery(
+        `SELECT pending_id
+         FROM Inventory_Pending_Actions
+         WHERE created_by = $1
+           AND status = 'pending'
+         LIMIT 1`,
+        [userIdInt]
+    );
+
+    if (pendingInventoryRequests.length > 0) {
+        const error = new Error('Cannot delete this user while they still have pending inventory requests. Please approve or reject their requests first.');
+        error.name = 'UserPendingRequestsError';
+        throw error;
+    }
+
+    const { rowCount: pendingUserApprovals } = await SQLquery(
+        `SELECT 1
+         FROM User_Creation_Requests
+         WHERE resolution_status = 'pending'
+           AND (
+                creator_user_id = $1
+                OR (
+                    creator_user_id IS NULL
+                    AND creator_name IS NOT NULL
+                    AND LOWER(regexp_replace(TRIM(creator_name), '\\s+', ' ', 'g')) = $2
+                )
+           )
+         LIMIT 1`,
+        [userIdInt, normalizedFullName]
+    );
+
+    if (pendingUserApprovals > 0) {
+        const error = new Error('Cannot delete this user while user accounts they requested are still pending approval. Please resolve those requests first.');
+        error.name = 'UserPendingRequestsError';
+        throw error;
+    }
+
+    await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET created_by_name = COALESCE(created_by_name, $1),
+             created_by_roles = CASE
+                 WHEN created_by_roles IS NULL OR array_length(created_by_roles, 1) = 0 THEN $2
+                 ELSE created_by_roles
+             END,
+             created_by = NULL
+         WHERE created_by = $3`,
+        [fullName, normalizedRoles, userIdInt]
+    );
+
+    await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET manager_approver_id = NULL
+         WHERE manager_approver_id = $1`,
+        [userIdInt]
+    );
+
+    await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET approved_by = NULL
+         WHERE approved_by = $1`,
+        [userIdInt]
+    );
 
     await SQLquery('DELETE FROM Users WHERE user_id = $1', [userIdInt]);
 
@@ -356,11 +450,21 @@ export const approvePendingUser = async (userId, approverId, approverName) => {
         [approverName, userIdInt]
     );
 
+    if (approvalResult.rowCount > 0) {
+        await SQLquery(
+            `UPDATE User_Creation_Requests
+             SET resolution_status = 'approved', resolved_at = NOW()
+             WHERE pending_user_id = $1`,
+            [userIdInt]
+        );
+    }
+
     const { rows } = await SQLquery(`
-        SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, Users.is_disabled, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password, status, Users.created_by, Users.approved_by, Users.approved_at
+    SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, Users.is_disabled, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password, status, Users.created_by, Users.approved_by, Users.approved_at, ucr.creator_user_id AS created_by_id, ucr.resolution_status AS creator_request_status, ucr.resolved_at AS creator_request_resolved_at
         FROM Users
         JOIN Branch ON Branch.branch_id = Users.branch_id
         JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
+        LEFT JOIN User_Creation_Requests ucr ON ucr.pending_user_id = Users.user_id
         WHERE Users.user_id = $1
     `, [userIdInt]);
 

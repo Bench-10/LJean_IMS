@@ -42,8 +42,12 @@ const createDeleteGuardState = () => ({
   targetUserId: null,
   targetUserName: '',
   roleHint: '',
+  userPendingDescription: '',
   showReviewButton: false,
-  highlightType: null
+  reviewLabel: 'Review requests',
+  highlightType: null,
+  highlightFocus: null,
+  targetPendingIds: []
 });
 
 
@@ -78,6 +82,127 @@ function App() {
   const [isRequestMonitorOpen, setIsRequestMonitorOpen] = useState(false);
 
   const normalizePendingId = (value) => (value === null || value === undefined ? '' : String(value));
+
+  const normalizeComparableName = (value) => {
+    if (!value) return '';
+    return String(value).replace(/\s+/g, ' ').trim().toLowerCase();
+  };
+
+  const pendingUserRequests = useMemo(() => {
+    if (!Array.isArray(users)) return [];
+
+    const relevantStatuses = new Set(['pending', 'approved', 'active', 'rejected']);
+    const recencyWindowMs = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+    const toIsoString = (value) => {
+      if (!value) return null;
+      const direct = new Date(value);
+      if (!Number.isNaN(direct.getTime())) {
+        return direct.toISOString();
+      }
+      const parsed = Date.parse(value);
+      if (!Number.isNaN(parsed)) {
+        return new Date(parsed).toISOString();
+      }
+      return null;
+    };
+
+    const nowMs = Date.now();
+
+    return users
+      .map((record) => {
+        const rawStatus = String(record?.status || '').toLowerCase();
+        if (!relevantStatuses.has(rawStatus)) {
+          return null;
+        }
+
+        const trimmedCreator = typeof record?.created_by === 'string'
+          ? record.created_by.replace(/\s+/g, ' ').trim()
+          : record?.created_by ?? null;
+
+        let createdById = null;
+        if (record?.created_by_id !== null && record?.created_by_id !== undefined) {
+          const explicitCreator = Number(record.created_by_id);
+          if (Number.isFinite(explicitCreator)) {
+            createdById = explicitCreator;
+          }
+        }
+
+        if (createdById === null && trimmedCreator) {
+          const numericCreatorFromName = Number(trimmedCreator);
+          if (Number.isFinite(numericCreatorFromName)) {
+            createdById = numericCreatorFromName;
+          }
+        }
+
+        const createdAtIso = toIsoString(
+          record?.request_created_at
+            ?? record?.created_at
+            ?? record?.createdAt
+            ?? (typeof record?.formated_hire_date === 'string' ? record.formated_hire_date.trim() : record?.formated_hire_date)
+        );
+
+        const approvedAtIso = toIsoString(record?.request_approved_at ?? record?.approved_at ?? record?.approvedAt);
+        const decisionAtIso = toIsoString(
+          record?.request_decision_at
+            ?? record?.approved_at
+            ?? record?.approvedAt
+            ?? record?.updated_at
+            ?? record?.status_updated_at
+        );
+
+        const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
+
+        const rejectionReason = record?.request_rejection_reason
+          ?? record?.rejection_reason
+          ?? record?.status_reason
+          ?? null;
+        const approvedBy = record?.request_approved_by ?? record?.approved_by ?? null;
+
+        return {
+          ...record,
+          created_by_display: trimmedCreator,
+          created_by_id: createdById,
+          request_created_at: createdAtIso,
+          request_status: normalizedStatus,
+          request_approved_at: approvedAtIso,
+          request_decision_at: decisionAtIso,
+          request_rejection_reason: rejectionReason,
+          request_approved_by: approvedBy
+        };
+      })
+      .filter((record) => {
+        if (!record) return false;
+
+        const hasCreatorReference = record.created_by_id !== null
+          || (typeof record.created_by_display === 'string' && record.created_by_display.trim() !== '');
+
+        if (!hasCreatorReference) {
+          return false;
+        }
+
+        const status = record.request_status;
+        if (status === 'pending') {
+          return true;
+        }
+
+        if (status === 'approved') {
+          const approvedAt = record.request_approved_at;
+          if (!approvedAt) return false;
+          const approvedMs = Date.parse(approvedAt);
+          return Number.isFinite(approvedMs) && nowMs - approvedMs <= recencyWindowMs;
+        }
+
+        if (status === 'rejected') {
+          const decisionAt = record.request_decision_at;
+          if (!decisionAt) return false;
+          const decisionMs = Date.parse(decisionAt);
+          return Number.isFinite(decisionMs) && nowMs - decisionMs <= recencyWindowMs;
+        }
+
+        return false;
+      });
+  }, [users]);
 
   // NOTIFICATION QUEUE SYSTEM
   const addToNotificationQueue = useCallback((message, options = {}) => {
@@ -660,17 +785,28 @@ function App() {
   }, []);
 
   const handleReviewDeleteGuard = useCallback(() => {
-    const { targetUserId, targetUserName, highlightType } = deleteGuardDialog;
+    const {
+      targetUserId,
+      targetUserName,
+      highlightType,
+      highlightFocus,
+      targetPendingIds
+    } = deleteGuardDialog;
     setDeleteGuardDialog(createDeleteGuardState());
 
-    if (!targetUserId || !highlightType) {
+    if (!highlightType) {
       return;
     }
 
+    const numericUserId = Number(targetUserId);
+    const hasNumericUserId = Number.isFinite(numericUserId);
+
     const directiveBase = {
-      userId: Number(targetUserId),
+      userId: hasNumericUserId ? numericUserId : null,
       userName: targetUserName,
-      triggeredAt: Date.now()
+      triggeredAt: Date.now(),
+      focusKind: highlightFocus || null,
+      targetIds: Array.isArray(targetPendingIds) && targetPendingIds.length > 0 ? targetPendingIds : null
     };
 
     setHighlightDirective({
@@ -1600,33 +1736,108 @@ function App() {
         const hasManagerStage = managerPendingForUser.length > 0;
         const hasOwnerStage = ownerPendingForUser.length > 0;
 
+        const pendingUserApprovals = Array.isArray(pendingUserRequests)
+          ? pendingUserRequests.filter(req => {
+              if (!req || String(req.status ?? '').toLowerCase() !== 'pending') {
+                return false;
+              }
+
+              const createdByMatch = Number(req?.created_by_id) === normalizedId;
+              const nameFallback = normalizeComparableName(req?.full_name || req?.created_by_name || '');
+              const targetNameComparable = normalizeComparableName(derivedName);
+
+              return createdByMatch || (
+                !!nameFallback && !!targetNameComparable && nameFallback === targetNameComparable
+              );
+            })
+          : [];
+
+        const userPendingIds = pendingUserApprovals
+          .map(req => Number(req?.user_id))
+          .filter(id => Number.isFinite(id));
+
+        const blockingRoles = Array.isArray(blockingUser?.role)
+          ? blockingUser.role
+          : blockingUser?.role
+            ? [blockingUser.role]
+            : [];
+
+        const isTargetBranchManager = blockingRoles.some(role => normalizeComparableName(role).includes('branch manager'));
+        const ownerHasUserApprovals = isOwner && isTargetBranchManager && pendingUserApprovals.length > 0;
+
         let showReviewButton = false;
         let highlightType = null;
+        let highlightFocus = null;
         let roleHint = '';
+        let reviewLabel = 'Review requests';
+        let pendingDescription = 'still has pending requests awaiting a decision.';
+        let messageText = serverMessage || 'Cannot delete this user while pending requests remain. Please resolve them first.';
+        let targetPendingIds = [];
 
-        if (isBranchManager && hasManagerStage) {
-          showReviewButton = true;
-          highlightType = 'branch-pending';
-          roleHint = 'Open your pending inventory requests to approve or reject their submissions.';
-        } else if (isOwner && hasOwnerStage) {
+        if (ownerHasUserApprovals) {
           showReviewButton = true;
           highlightType = 'owner-approvals';
-          roleHint = 'Navigate to the Approval Center to finish reviewing their pending inventory requests.';
-        } else if (isBranchManager) {
-          roleHint = 'These requests are already with the owner for final approval. Please coordinate with them before deleting this account.';
-        } else if (isOwner) {
-          roleHint = 'These requests are still waiting for branch manager review. Ask the manager to resolve them before deleting this account.';
+          highlightFocus = 'user';
+          reviewLabel = 'Review account requests';
+          pendingDescription = 'still has user account requests waiting for your approval.';
+          roleHint = 'Open the Approval Center to review and resolve their account requests.';
+          messageText = serverMessage || 'Resolve their outstanding account requests before deleting this branch manager.';
+          targetPendingIds = userPendingIds;
+        } else {
+          const inventoryPendingIds = [];
+          if (hasManagerStage) {
+            inventoryPendingIds.push(
+              ...managerPendingForUser
+                .map(req => Number(req?.pending_id))
+                .filter(id => Number.isFinite(id))
+            );
+          }
+          if (hasOwnerStage) {
+            inventoryPendingIds.push(
+              ...ownerPendingForUser
+                .map(req => Number(req?.pending_id))
+                .filter(id => Number.isFinite(id))
+            );
+          }
+
+          if (isBranchManager && hasManagerStage) {
+            showReviewButton = true;
+            highlightType = 'branch-pending';
+            highlightFocus = 'inventory';
+            roleHint = 'Open your pending inventory requests to approve or reject their submissions.';
+          } else if (isOwner && hasOwnerStage) {
+            showReviewButton = true;
+            highlightType = 'owner-approvals';
+            highlightFocus = 'inventory';
+            roleHint = 'Navigate to the Approval Center to finish reviewing their pending inventory requests.';
+          } else if (isBranchManager) {
+            roleHint = 'These requests are already with the owner for final approval. Coordinate with them before deleting this account.';
+          } else if (isOwner && hasManagerStage) {
+            roleHint = 'These requests are still waiting for branch manager review. Ask them to resolve the submissions before deleting this account.';
+          } else if (isOwner) {
+            roleHint = 'Pending requests must be resolved before you can delete this account.';
+          }
+
+          if (hasManagerStage || hasOwnerStage) {
+            pendingDescription = 'still has inventory requests awaiting a decision.';
+          }
+
+          targetPendingIds = inventoryPendingIds;
         }
 
         setDeleteGuardDialog({
           ...createDeleteGuardState(),
           open: true,
-          message: serverMessage || 'Cannot delete this user while pending inventory requests remain. Please resolve them first.',
+          message: messageText,
           targetUserId: normalizedId,
           targetUserName: derivedName,
           roleHint,
+          userPendingDescription: pendingDescription,
           showReviewButton,
-          highlightType
+          reviewLabel,
+          highlightType,
+          highlightFocus,
+          targetPendingIds
         });
         return;
       }
@@ -1759,7 +1970,9 @@ function App() {
         message={deleteGuardDialog.message}
         userName={deleteGuardDialog.targetUserName}
         roleHint={deleteGuardDialog.roleHint}
+        userPendingDescription={deleteGuardDialog.userPendingDescription}
         showReviewButton={deleteGuardDialog.showReviewButton}
+        reviewLabel={deleteGuardDialog.reviewLabel}
         onCancel={handleCloseDeleteGuardDialog}
         onReview={handleReviewDeleteGuard}
       />
@@ -1859,6 +2072,7 @@ function App() {
         onClose={() => setIsRequestMonitorOpen(false)}
         user={user}
         branches={branches}
+        userRequests={pendingUserRequests}
       />
 
   

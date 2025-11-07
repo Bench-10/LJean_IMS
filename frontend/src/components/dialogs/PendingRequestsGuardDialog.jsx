@@ -9,7 +9,9 @@ function PendingRequestsGuardDialog({
   onReview,
   userName,
   roleHint,
-  showReviewButton = true
+  userPendingDescription,
+  showReviewButton = true,
+  reviewLabel = "Review requests"
 }) {
   const panelRef = useRef(null);
   const reviewButtonRef = useRef(null);
@@ -102,7 +104,7 @@ function PendingRequestsGuardDialog({
         <div className="px-5 sm:px-6 py-6 space-y-4">
           {userName ? (
             <p className="text-sm text-gray-700">
-              <span className="font-semibold text-gray-900">{userName}</span> still has inventory requests awaiting a decision.
+              <span className="font-semibold text-gray-900">{userName}</span> {userPendingDescription || "still has requests awaiting a decision."}
             </p>
           ) : null}
           <p id="pending-guard-message" className="text-base text-gray-700 leading-relaxed">
@@ -126,7 +128,7 @@ function PendingRequestsGuardDialog({
               onClick={onReview}
               className="w-full sm:w-auto px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg shadow-sm transition"
             >
-              Review requests
+              {reviewLabel}
             </button>
           ) : null}
         </div>

@@ -28,8 +28,11 @@ function Approvals({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [highlightedInventoryIds, setHighlightedInventoryIds] = useState([]);
+  const [highlightedUserIds, setHighlightedUserIds] = useState([]);
   const pendingRowRefs = useRef(new Map());
   const pendingMobileRefs = useRef(new Map());
+  const pendingUserRowRefs = useRef(new Map());
+  const pendingUserMobileRefs = useRef(new Map());
   const tableScrollContainerRef = useRef(null);
   const mobileScrollContainerRef = useRef(null);
   const lastHandledHighlightRef = useRef(null);
@@ -162,8 +165,136 @@ function Approvals({
     }
   }, []);
 
+  const setPendingUserRowRef = useCallback((userId, node) => {
+    const map = pendingUserRowRefs.current;
+    if (!map) return;
+    if (node) {
+      map.set(userId, node);
+    } else {
+      map.delete(userId);
+    }
+  }, []);
+
+  const setPendingUserMobileRef = useCallback((userId, node) => {
+    const map = pendingUserMobileRefs.current;
+    if (!map) return;
+    if (node) {
+      map.set(userId, node);
+    } else {
+      map.delete(userId);
+    }
+  }, []);
+
   useEffect(() => {
     if (!highlightDirective || highlightDirective.type !== 'owner-approvals') {
+      return;
+    }
+
+    const focusKind = highlightDirective.focusKind || 'inventory';
+    if (focusKind !== 'user') {
+      return;
+    }
+
+    if (usersLoading) {
+      return;
+    }
+
+    if (lastHandledHighlightRef.current === highlightDirective.triggeredAt) {
+      return;
+    }
+
+    const directiveTargetIds = Array.isArray(highlightDirective.targetIds)
+      ? highlightDirective.targetIds
+          .map((value) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) ? numeric : null;
+          })
+          .filter((value) => value !== null)
+      : [];
+
+    const targetUserId = Number(highlightDirective.userId);
+    const normalizedName = (highlightDirective.userName || '').toLowerCase();
+
+    const matchesDirective = (record) => {
+      if (!record) return false;
+      const numericId = Number(record.user_id);
+      if (directiveTargetIds.length > 0) {
+        return directiveTargetIds.includes(numericId);
+      }
+      if (Number.isFinite(targetUserId) && numericId === targetUserId) {
+        return true;
+      }
+      if (!normalizedName) {
+        return false;
+      }
+      return (record.full_name || '').toLowerCase() === normalizedName;
+    };
+
+    let candidateIds = pendingUsers.filter(matchesDirective).map((record) => Number(record.user_id)).filter((value) => Number.isFinite(value));
+
+    if (candidateIds.length === 0 && directiveTargetIds.length > 0) {
+      candidateIds = directiveTargetIds.filter((id) => pendingUsers.some((record) => Number(record.user_id) === id));
+    }
+
+    lastHandledHighlightRef.current = highlightDirective.triggeredAt;
+
+    if (candidateIds.length === 0) {
+      onHighlightConsumed?.('owner-approvals');
+      return;
+    }
+
+    setHighlightedUserIds(candidateIds);
+    setHighlightedInventoryIds([]);
+
+    const isMobileView = typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 767px)').matches
+      : false;
+
+    const firstId = candidateIds[0];
+    const preferredElement = isMobileView
+      ? (pendingUserMobileRefs.current.get(firstId) || pendingUserRowRefs.current.get(firstId))
+      : (pendingUserRowRefs.current.get(firstId) || pendingUserMobileRefs.current.get(firstId));
+
+    const fallbackElement = isMobileView
+      ? pendingUserRowRefs.current.get(firstId)
+      : pendingUserMobileRefs.current.get(firstId);
+
+    const targetElement = preferredElement || fallbackElement;
+    const scrollContainer = isMobileView ? mobileScrollContainerRef.current : tableScrollContainerRef.current;
+
+    const scrollAction = () => {
+      if (scrollContainer && targetElement && scrollContainer.contains(targetElement)) {
+        const offset = targetElement.offsetTop - scrollContainer.offsetTop;
+        scrollContainer.scrollTo({
+          top: Math.max(offset - scrollContainer.clientHeight / 3, 0),
+          behavior: 'smooth'
+        });
+        return;
+      }
+
+      if (targetElement && typeof targetElement.scrollIntoView === 'function') {
+        targetElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    };
+
+    const scrollTimer = setTimeout(scrollAction, 140);
+    const clearTimer = setTimeout(() => setHighlightedUserIds([]), 6000);
+
+    onHighlightConsumed?.('owner-approvals');
+
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [highlightDirective, pendingUsers, usersLoading, onHighlightConsumed]);
+
+  useEffect(() => {
+    if (!highlightDirective || highlightDirective.type !== 'owner-approvals') {
+      return;
+    }
+
+    const focusKind = highlightDirective.focusKind || 'inventory';
+    if (focusKind === 'user') {
       return;
     }
 
@@ -174,6 +305,15 @@ function Approvals({
     if (lastHandledHighlightRef.current === highlightDirective.triggeredAt) {
       return;
     }
+
+    const directiveTargetIds = Array.isArray(highlightDirective.targetIds)
+      ? highlightDirective.targetIds
+          .map((value) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) ? numeric : null;
+          })
+          .filter((value) => value !== null)
+      : [];
 
     const targetUserId = Number(highlightDirective.userId);
     const normalizedName = (highlightDirective.userName || '').toLowerCase();
@@ -189,7 +329,15 @@ function Approvals({
       return (request.created_by_name || '').toLowerCase() === normalizedName;
     };
 
-    const targetIds = (inventoryRequests || []).filter(matchesDirective).map(req => req.pending_id);
+    let targetIds = [];
+
+    if (directiveTargetIds.length > 0) {
+      targetIds = (inventoryRequests || [])
+        .filter((req) => directiveTargetIds.includes(Number(req.pending_id)))
+        .map((req) => req.pending_id);
+    } else {
+      targetIds = (inventoryRequests || []).filter(matchesDirective).map((req) => req.pending_id);
+    }
 
     lastHandledHighlightRef.current = highlightDirective.triggeredAt;
 
@@ -199,6 +347,7 @@ function Approvals({
     }
 
     setHighlightedInventoryIds(targetIds);
+    setHighlightedUserIds([]);
 
     const isMobileView = typeof window !== 'undefined'
       ? window.matchMedia('(max-width: 767px)').matches
@@ -287,7 +436,7 @@ function Approvals({
   return (
     <div className="pt-20 lg:pt-8 px-3 sm:px-4 lg:px-8 pb-6 min-h-screen bg-[#eef2ee]">
       <div className="mb-4 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-green-900">APPROVAL CENTER</h1>
+        <h1 className="text-2xl sm:text-3xl lg:text-[35px] leading-[36px] font-bold text-green-900">APPROVAL CENTER</h1>
         <hr className="mt-2 sm:mt-3 mb-4 sm:mb-6 border-t-4 border-green-800 rounded-lg" />
       </div>
 
@@ -298,7 +447,7 @@ function Approvals({
             placeholder="Search pending request by name, branch, or role"
             className="border outline outline-1 outline-gray-400 
              focus:border-green-500 focus:ring-2 focus:ring-green-200 
-            transition-all px-3 mb-2 sm:mb-0 rounded-lg w-full h-[35px] text-sm sm:text-base"
+            transition-all px-3 mb-2 sm:mb-0 rounded-lg w-full h-[35px] text-sm sm:text-sm"
             onChange={handleSearch}
             value={searchItem}
           />
@@ -377,10 +526,21 @@ function Approvals({
                       return creator?.full_name || "Branch Manager";
                     })();
 
+                  const numericUserId = Number(pendingUser.user_id);
+                  const hasNumericId = Number.isFinite(numericUserId);
+                  const isUserHighlighted = hasNumericId && highlightedUserIds.includes(numericUserId);
+
                   return (
                     <tr
                       key={`user-${pendingUser.user_id}`}
-                      className="h-auto border-b last:border-b-0 hover:bg-amber-50 transition-colors cursor-pointer bg-amber-50/30"
+                      ref={(node) => {
+                        if (hasNumericId) {
+                          setPendingUserRowRef(numericUserId, node);
+                        }
+                      }}
+                      className={`h-auto border-b last:border-b-0 hover:bg-amber-50 transition-colors cursor-pointer bg-amber-50/30 ${
+                        isUserHighlighted ? 'ring-2 ring-amber-400 ring-offset-2 animate-pulse' : ''
+                      }`}
                       onClick={() => navigate(`/user_management?selected=${pendingUser.user_id}`)}
                     >
                       <td className="px-4 py-4 align-top">
@@ -520,10 +680,21 @@ function Approvals({
                   return creator?.full_name || "Branch Manager";
                 })();
 
+              const numericUserId = Number(pendingUser.user_id);
+              const hasNumericId = Number.isFinite(numericUserId);
+              const isUserHighlighted = hasNumericId && highlightedUserIds.includes(numericUserId);
+
               return (
                 <div
                   key={`user-${pendingUser.user_id}`}
-                  className="bg-white border-2 border-amber-300 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+                  ref={(node) => {
+                    if (hasNumericId) {
+                      setPendingUserMobileRef(numericUserId, node);
+                    }
+                  }}
+                  className={`bg-white border-2 border-amber-300 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
+                    isUserHighlighted ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse' : ''
+                  }`}
                   onClick={() => navigate(`/user_management?selected=${pendingUser.user_id}`)}
                 >
                   <div className="flex flex-col gap-3">

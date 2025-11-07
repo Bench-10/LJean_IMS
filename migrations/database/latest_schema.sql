@@ -33,6 +33,8 @@ CREATE TABLE Users (
     is_disabled BOOL DEFAULT FALSE,
     status VARCHAR(20) DEFAULT 'active',
     created_by VARCHAR(225),
+    created_by_user_id INT REFERENCES Users(user_id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
     approved_by VARCHAR(225),
     approved_at TIMESTAMP,
     FOREIGN KEY(branch_id) REFERENCES Branch(branch_id)
@@ -230,10 +232,15 @@ CREATE TABLE Inventory_Pending_Actions (
     status TEXT NOT NULL DEFAULT 'pending',
     current_stage TEXT NOT NULL DEFAULT 'manager_review',
     requires_admin_review BOOLEAN NOT NULL DEFAULT FALSE,
-    created_by INT NOT NULL REFERENCES Users(user_id),
+    created_by INT REFERENCES Users(user_id) ON DELETE SET NULL,
     created_by_name TEXT,
     created_by_roles TEXT[],
-    manager_approver_id INT REFERENCES Users(user_id),
+    manager_approver_id INT REFERENCES Users(user_id) ON DELETE SET NULL,
     manager_approved_at TIMESTAMP,
-    admin_approver_id INT REFERENCES Administrator(admin_id)
+    admin_approver_id INT REFERENCES Administrator(admin_id),
+    admin_approved_at TIMESTAMP,
+    approved_by INT REFERENCES Users(user_id) ON DELETE SET NULL,
+    approved_at TIMESTAMP,
+    rejection_reason TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
 );
