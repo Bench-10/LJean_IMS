@@ -1,8 +1,42 @@
-.login-container {
-  display: flex;
-  height: 100vh;
+
+/* Root container is a fixed-height grid, not min-height. Hide overflow so only the panel scrolls. */
+.login-container{
+  display: grid; 
+  grid-template-columns: minmax(0, 1fr) minmax(0, 620px); /* left image | right form */
+  height: 100dvh;      /* modern dynamic viewport */
+  height: 100svh;      /* iOS fallback */
+  height: 100vh;       /* legacy fallback */
+  overflow: hidden;    /* body doesn't scroll; a column will */
+  background: #fff;
   font-family: Arial, sans-serif;
 }
+
+.login-container {
+  display: flex;
+}
+
+/* optional but recommended: keep content readable and add bottom safe area */
+.login-right .login-form,
+.login-right .company-name-box{
+  margin-inline: auto;
+}
+.login-right{ padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
+/* Collapse to single column on phones/short screens/touch devices */
+@media (max-width: 1200px), (max-height: 650px),
+       (hover: none) and (pointer: coarse){
+  .login-container{
+    grid-template-columns: 1fr;
+  }
+  .login-left{ display: none; }
+  .login-right{
+    height: 100dvh;   /* keep the panel bounded on mobile */
+    overflow-y: auto; /* still scrolls */
+    scrollbar-width: none;
+  }
+}
+
+
 
 /* Left side */
 .login-left {
@@ -70,6 +104,14 @@
   color: #333;
   margin-top: 15px;
   display: block;
+}
+
+#userid {
+  border-radius: 10px;
+}
+
+#password {
+  border-radius: 10px;
 }
 
 .input-icon {

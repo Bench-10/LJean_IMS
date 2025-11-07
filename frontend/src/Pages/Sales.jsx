@@ -183,7 +183,7 @@ function Sales({setOpenSaleModal, saleHeader, sanitizeInput, salesLoading}) {
           {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) &&
             <div className="lg:pt-0 pt-3 ml-auto flex gap-4">
               {/*ADD SALE BTN*/}
-              <button className='flex items-center justify-center gap-x-3 bg-[#119200] text-white font-medium hover:bg-[#56be48] w-full lg:w-auto px-5 py-2 rounded-lg transition-all'  onClick={() => setOpenSaleModal(true)}> 
+              <button className='flex items-center justify-center gap-x-3 bg-[#119200] text-sm text-white font-medium hover:bg-[#56be48] w-full lg:w-auto px-5 py-2 rounded-lg transition-all'  onClick={() => setOpenSaleModal(true)}> 
                 <FaCashRegister /> ADD SALE
               </button>
             </div>

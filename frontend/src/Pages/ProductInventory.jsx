@@ -584,7 +584,7 @@ function ProductInventory({
   <div className="mt-3 lg:mt-0 ml-0 lg:ml-auto grid grid-cols-2 gap-3 items-center w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 shrink-0">
     {/* Export (full width on mobile) */}
     <div className="relative group col-span-2 lg:col-span-1">
-      <button className="w-full lg:w-auto bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center justify-center gap-2">
+      <button className="w-full text-sm lg:w-auto bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center justify-center gap-2">
         <TbFileExport />
         <span className="leading-none">EXPORT</span>
       </button>
@@ -608,14 +608,14 @@ function ProductInventory({
     {user && user.role && user.role.some(r => r === 'Inventory Staff') && (
       <>
         <button
-          className="col-span-1 bg-[#007278] text-white font-medium hover:bg-[#009097] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+          className="col-span-1 bg-[#007278] text-sm text-white font-medium hover:bg-[#009097] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
           onClick={() => setIsCategory(true)}
         >
           CATEGORIES
         </button>
 
         <button
-          className="col-span-1 bg-[#119200] text-white font-medium hover:bg-[#56be48] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+          className="col-span-1 bg-[#119200] text-sm text-white font-medium hover:bg-[#56be48] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
           onClick={() => handleOpen('add')}
         >
           ADD ITEMS

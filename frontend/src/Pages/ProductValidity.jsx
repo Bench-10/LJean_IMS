@@ -241,7 +241,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       <button
         type="button"
         onClick={() => { setShowNearExpiry(p => !p); setCurrentPage(1); }}
-        className={`w-full lg:w-auto flex h-[36px] items-center justify-center gap-2 px-3 lg:px-4 text-sm lg:text-base rounded-lg border transition-all
+        className={`w-full lg:w-auto flex h-[36px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
           ${showNearExpiry
             ? 'bg-[#FFF3C1] text-gray-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
             : 'bg-white text-gray-700 border-gray-200 hover:bg-yellow-50'}`}
@@ -253,7 +253,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       <button
         type="button"
         onClick={() => { setShowExpired(p => !p); setCurrentPage(1); }}
-        className={`w-full lg:w-auto flex h-[36px] lg:h-[38px] items-center justify-center gap-2 px-3 lg:px-4 text-sm lg:text-base rounded-lg border transition-all
+        className={`w-full lg:w-auto flex h-[36px] lg:h-[38px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
           ${showExpired
             ? 'bg-[#FF3131] text-white border-red-500 ring-2 ring-red-400 ring-offset-2'
             : 'bg-white text-gray-700 border-gray-200 hover:bg-red-50'}`}

@@ -325,7 +325,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
           {/*APPEAR ONLY IF THE USER ROLE IS SALES ASSOCIATE */}
           {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) && (
             <button
-              className='flex items-center gap-x-3 w-full lg:w-auto justify-center bg-[#119200] text-white font-medium hover:bg-[#56be48] px-5 py-2 rounded-lg transition-all'
+              className='flex items-center gap-x-3 w-full lg:w-auto justify-center bg-[#119200] text-sm text-white font-medium hover:bg-[#56be48] px-5 py-2 rounded-lg transition-all'
               onClick={() => setAddDelivery(true)}
             >
               <TbTruckDelivery />
