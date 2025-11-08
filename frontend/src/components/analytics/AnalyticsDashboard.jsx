@@ -24,7 +24,7 @@ import DropdownCustom from '../DropdownCustom.jsx';
 import DatePickerCustom from '../DatePickerCustom.jsx';
 
 const FETCH_DEBOUNCE_MS = 150;
-const DELIVERY_WINDOW_SIZES = { daily: 30, monthly: 12, yearly: 5 };
+const DELIVERY_WINDOW_SIZES = { daily: 20, monthly: 12, yearly: 5 };
 const DELIVERY_META_DEFAULT = {
   min_bucket: null,
   max_bucket: null,

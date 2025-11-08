@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, BarChart, Bar
+  CartesianGrid, BarChart, Bar, LabelList
 } from 'recharts';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
@@ -61,10 +61,14 @@ function Delivery({
     return raw;
   }, [deliveryInterval]);
 
-  // If there are many bars, tilt labels for readability
-  const manyTicks = normalizedData.length > (deliveryInterval === 'daily' ? 10 : 8);
+  // If there are many bars, tilt labels for readability. Thresholds tuned so
+  // initial window sizes (daily=20) still show labels by default.
+  const manyTicks = normalizedData.length > (deliveryInterval === 'daily' ? 24 : 12);
   const xAngle = manyTicks ? -35 : 0;
   const xAnchor = manyTicks ? 'end' : 'middle';
+
+  // Show numeric labels above bars when the chart is not too dense
+  const showBarLabels = !manyTicks;
 
   const loadOlderDisabled = loadingDelivery || !canLoadOlder;
   const resetDisabled = loadingDelivery || !hasExtendedRange;
@@ -211,7 +215,16 @@ function Delivery({
                     fill={barColor}
                     radius={[4, 4, 0, 0]}
                     background={{ fill: '#F8FAFC' }}
-                  />
+                  >
+                    {showBarLabels && (
+                      <LabelList
+                        dataKey="number_of_deliveries"
+                        position="top"
+                        formatter={(v) => (v == null ? '0' : String(v))}
+                        style={{ fontSize: 14, fill: '#0f172a', fontWeight: 600 }}
+                      />
+                    )}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
