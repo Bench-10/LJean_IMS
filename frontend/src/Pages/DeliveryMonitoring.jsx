@@ -295,7 +295,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
       />
 
       {/*TITLE*/}
-      <h1 className='text-[35px] leading-[36px] font-bold text-green-900'>
+      <h1 className='text-[33px] leading-[36px] font-bold text-green-900'>
         DELIVERY
       </h1>
 
@@ -487,7 +487,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
         <div className="hidden sm:relative sm:flex sm:items-center w-full mt-3 pb-6 px-3">
 
           {/* LEFT: ITEM COUNT */}
-          <div className="text-sm text-gray-600">
+          <div className="text-[13px] text-gray-600">
             {filteredData.length > 0 ? (
               <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
             ) : (
@@ -501,17 +501,17 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                className="px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Previous
               </button>
-              <span className="text-sm text-gray-600 whitespace-nowrap">
+              <span className="text-[13px] text-gray-600 whitespace-nowrap">
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                className="px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Next
               </button>

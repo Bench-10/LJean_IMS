@@ -57,7 +57,7 @@ function ConfirmationDialog({ mode, message, submitFunction, onClose }) {
       <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
 
       {/* Centering + mobile padding */}
-      <div className="relative min-h-full grid place-items-center p-4 sm:p-6">
+      <div className="relative min-h-full grid place-items-center p-4 sm:p-6 animate-popup">
         {/* Panel */}
         <div className="w-full max-w-[92vw] sm:max-w-lg bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
           {/* Header */}

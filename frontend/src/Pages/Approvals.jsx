@@ -436,51 +436,59 @@ function Approvals({
   return (
     <div className="pt-20 lg:pt-8 px-3 sm:px-4 lg:px-8 pb-6 min-h-screen bg-[#eef2ee]">
       <div className="mb-4 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl lg:text-[35px] leading-[36px] font-bold text-green-900">APPROVAL CENTER</h1>
+        <h1 className="text-2xl sm:text-3xl lg:text-[33px] leading-[36px] font-bold text-green-900">APPROVAL CENTER</h1>
         <hr className="mt-2 sm:mt-3 mb-4 sm:mb-6 border-t-4 border-green-800 rounded-lg" />
       </div>
 
-      <div className="flex w-full flex-col gap-3 sm:gap-4 md:flex-row md:items-center ">
-        <div className="w-full md:w-[360px] lg:w-[460px]">
-          <input
-            type="text"
-            placeholder="Search pending request by name, branch, or role"
-            className="border outline outline-1 outline-gray-400 
-             focus:border-green-500 focus:ring-2 focus:ring-green-200 
-            transition-all px-3 mb-2 sm:mb-0 rounded-lg w-full h-[35px] text-sm sm:text-sm"
-            onChange={handleSearch}
-            value={searchItem}
-          />
-        </div>
-        {(ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function") || typeof refreshInventoryRequests === "function" ? (
-          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:ml-auto md:items-center md:justify-end">
-            {ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function" && (
-              <button
-                type="button"
-                className="w-full sm:w-auto px-4 py-2 text-xs sm:text-sm rounded-md bg-emerald-700 text-white font-medium transition hover:bg-emerald-600"
-                onClick={onOpenRequestMonitor}
-              >
-                View request status
-              </button>
-            )}
+      {/* Search + Actions */}
+<div className="flex w-full flex-col gap-3 sm:gap-4 md:flex-row md:items-center">
+  {/* Search */}
+  <div className="w-full md:w-[360px] lg:w-[460px] md:mr-auto">
+    <input
+      type="text"
+      placeholder="Search pending request by name, branch, or role"
+      className="border outline outline-1 outline-gray-400 
+        focus:border-green-500 focus:ring-2 focus:ring-green-200 
+        transition-all px-3 mb-2 sm:mb-0 rounded-lg w-full h-[35px] text-sm sm:text-sm"
+      onChange={handleSearch}
+      value={searchItem}
+    />
+  </div>
 
-            {/* ICON REFRESH BUTTON */}
-            {typeof refreshInventoryRequests === "function" && (
-              <button
-                type="button"
-                className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-amber-500 text-amber-600 hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={refreshInventoryRequests}
-                disabled={inventoryRequestsLoading}
-                aria-label="Refresh inventory approvals"
-                title="Refresh inventory approvals"
-              >
-                <MdRefresh className={`text-xl ${inventoryRequestsLoading ? "animate-spin" : ""}`} />
-                <span className="sr-only">Refresh inventory approvals</span>
-              </button>
-            )}
-          </div>
-        ) : null}
-      </div>
+  {/* Actions (always side-by-side) */}
+  {((ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function") ||
+    typeof refreshInventoryRequests === "function") && (
+    <div className="flex items-center gap-2 md:ml-auto">
+
+      {typeof refreshInventoryRequests === "function" && (
+        <button
+          type="button"
+          className="inline-flex items-center justify-center px-2 w-9 h-9 rounded-md border border-gray-500 text-gray-600 hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={refreshInventoryRequests}
+          disabled={inventoryRequestsLoading}
+          aria-label="Refresh inventory approvals"
+          title="Refresh inventory approvals"
+        >
+          <MdRefresh className={`text-xl ${inventoryRequestsLoading ? "animate-spin" : ""}`} />
+          <span className="sr-only">Refresh inventory approvals</span>
+        </button>
+      )}
+
+      {ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function" && (
+        <button
+          type="button"
+          className="w-full px-4 py-2 text-sm rounded-md bg-emerald-700 text-white font-medium transition hover:bg-emerald-600"
+          onClick={onOpenRequestMonitor}
+        >
+          View request status
+        </button>
+      )}
+
+      
+    </div>
+  )}
+</div>
+
 
       <hr className="border-t-2 my-3 sm:my-4 w-full border-gray-500 rounded-lg" />
 

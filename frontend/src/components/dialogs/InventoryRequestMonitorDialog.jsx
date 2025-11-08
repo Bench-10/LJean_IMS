@@ -2,140 +2,53 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../utils/api';
 import { currencyFormat } from '../../utils/formatCurrency.js';
 import ChartLoading from '../common/ChartLoading.jsx';
+// Adjust path if needed
+import DropdownCustom from '../DropdownCustom';
+import { MdRefresh } from 'react-icons/md';
+import { IoMdClose } from "react-icons/io";
 
 const toneStyles = {
-  slate: {
-    badge: 'border-slate-200 bg-slate-50 text-slate-700',
-    dot: 'bg-slate-500'
-  },
-  emerald: {
-    badge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    dot: 'bg-emerald-500'
-  },
-  rose: {
-    badge: 'border-rose-200 bg-rose-50 text-rose-700',
-    dot: 'bg-rose-500'
-  },
-  amber: {
-    badge: 'border-amber-200 bg-amber-50 text-amber-700',
-    dot: 'bg-amber-500'
-  },
-  blue: {
-    badge: 'border-blue-200 bg-blue-50 text-blue-700',
-    dot: 'bg-blue-500'
-  }
+  slate:   { badge: 'border-slate-200 bg-slate-50 text-slate-700',   dot: 'bg-slate-500' },
+  emerald: { badge: 'border-emerald-200 bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+  rose:    { badge: 'border-rose-200 bg-rose-50 text-rose-700',      dot: 'bg-rose-500' },
+  amber:   { badge: 'border-amber-200 bg-amber-50 text-amber-700',   dot: 'bg-amber-500' },
+  blue:    { badge: 'border-blue-200 bg-blue-50 text-blue-700',      dot: 'bg-blue-500' }
 };
 
+// Merged: single Pending
 const statusFilters = [
-  { id: 'all', label: 'All' },
-  { id: 'pending', label: 'Pending Manager' },
-  { id: 'awaiting_owner', label: 'Awaiting Owner' },
+  { id: 'pending',  label: 'Pending' },
   { id: 'approved', label: 'Approved' },
   { id: 'rejected', label: 'Rejected' }
 ];
 
 const requestTypeFilters = [
-  { id: 'all', label: 'All' },
   { id: 'inventory', label: 'Inventory' },
-  { id: 'user', label: 'User Accounts' }
+  { id: 'user',      label: 'User Accounts' }
 ];
 
 const PAGE_SIZE = 12;
 
-const numberFormatter = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 0
-});
+const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 });
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
-const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
-  dateStyle: 'medium',
-  timeStyle: 'short'
-});
-
-const formatNumber = (value) => {
-  if (value === null || value === undefined) {
-    return '—';
-  }
-
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return '—';
-  }
-
-  return numberFormatter.format(numeric);
-};
-
-const formatCurrencyValue = (value) => {
-  if (value === null || value === undefined) {
-    return 'N/A';
-  }
-
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return 'N/A';
-  }
-
-  return currencyFormat(numeric);
-};
-
-const formatDateTime = (value) => {
-  if (!value) {
-    return '—';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '—';
-  }
-
-  return dateTimeFormatter.format(date);
-};
-
-const toISOStringSafe = (input) => {
-  if (!input) return null;
-  const date = new Date(input);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
-};
-
-const toTime = (value) => {
-  if (!value) return 0;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 0;
-  return date.getTime();
-};
+const formatNumber = (v) => (v === null || v === undefined || !Number.isFinite(Number(v))) ? '—' : numberFormatter.format(Number(v));
+const formatCurrencyValue = (v) => (v === null || v === undefined || !Number.isFinite(Number(v))) ? 'N/A' : currencyFormat(Number(v));
+const formatDateTime = (v) => { const d = new Date(v || ''); return Number.isNaN(d.getTime()) ? '—' : dateTimeFormatter.format(d); };
+const toISOStringSafe = (v) => { const d = new Date(v || ''); return Number.isNaN(d.getTime()) ? null : d.toISOString(); };
+const toTime = (v) => { const d = new Date(v || ''); return Number.isNaN(d.getTime()) ? 0 : d.getTime(); };
 
 const normalizeRoleArray = (roles) => {
-  if (!roles) {
-    return [];
-  }
-
-  if (Array.isArray(roles)) {
-    return roles.filter(Boolean);
-  }
-
-  if (typeof roles === 'string') {
-    return roles
-      .split(',')
-      .map((role) => role.trim())
-      .filter(Boolean);
-  }
-
+  if (!roles) return [];
+  if (Array.isArray(roles)) return roles.filter(Boolean);
+  if (typeof roles === 'string') return roles.split(',').map((r) => r.trim()).filter(Boolean);
   return [];
 };
-
-const normalizeComparableString = (value) => {
-  if (!value) {
-    return '';
-  }
-
-  return String(value).replace(/\s+/g, ' ').trim().toLowerCase();
-};
-
+const normalizeComparableString = (value) => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
 const findBranchName = (branches, branchId) => {
   if (!branchId) return null;
   const numeric = Number(branchId);
-  return branches.find((branch) => Number(branch.branch_id) === numeric)?.branch_name || null;
+  return branches.find((b) => Number(b.branch_id) === numeric)?.branch_name || null;
 };
 
 const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], userRequests = [] }) => {
@@ -144,30 +57,28 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
     return Array.isArray(user.role) ? user.role : [user.role];
   }, [user]);
 
-  const isOwnerUser = roleList.includes('Owner');
-  const canViewBranchScope = roleList.includes('Branch Manager') || roleList.includes('Owner');
-  const canViewAdminScope = roleList.includes('Owner');
+  const isOwnerUser     = roleList.includes('Owner');
+  const isBranchManager = roleList.includes('Branch Manager');
+  const canViewAdmin    = isOwnerUser;                 // Owner can filter by branch
+  const canSeeTypeFilter = isBranchManager || isOwnerUser; // Type visible to BM & Owner
+  const typeEnabled = canSeeTypeFilter;                // ALWAYS enabled when visible
 
-  const defaultScope = useMemo(() => {
-    if (canViewAdminScope) return 'admin';
-    if (canViewBranchScope) return 'branch';
-    return 'user';
-  }, [canViewAdminScope, canViewBranchScope]);
-
+  // Internal scope (no UI)
+  const defaultScope = useMemo(() => (isOwnerUser ? 'admin' : (isBranchManager ? 'branch' : 'user')), [isOwnerUser, isBranchManager]);
   const [scope, setScope] = useState(defaultScope);
+
   const [branchFilter, setBranchFilter] = useState(() => {
     if (defaultScope === 'branch') {
-      if (canViewAdminScope && branches.length > 0) {
-        return String(branches[0].branch_id);
-      }
-      if (user?.branch_id) {
-        return String(user.branch_id);
-      }
+      if (canViewAdmin && branches.length > 0) return String(branches[0].branch_id);
+      if (user?.branch_id) return String(user.branch_id);
     }
     return '';
   });
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [requestTypeFilter, setRequestTypeFilter] = useState('all');
+
+  // '' => show all
+  const [statusFilter, setStatusFilter] = useState('');
+  const [requestTypeFilter, setRequestTypeFilter] = useState('');
+
   const [requests, setRequests] = useState([]);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -175,11 +86,14 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
   const [refreshIndex, setRefreshIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
+  // On open: do NOT preselect any status
   useEffect(() => {
-    if (!open) {
-      setVisibleCount(PAGE_SIZE);
-      return;
-    }
+    if (!open) return;
+    setStatusFilter('');
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) { setVisibleCount(PAGE_SIZE); return; }
     setScope((prev) => (prev === defaultScope ? prev : defaultScope));
   }, [defaultScope, open]);
 
@@ -188,336 +102,189 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
     if (scope === 'branch') {
       setBranchFilter((prev) => {
         if (prev) return prev;
-        if (canViewAdminScope && branches.length > 0) {
-          return String(branches[0].branch_id);
-        }
-        if (user?.branch_id) {
-          return String(user.branch_id);
-        }
+        if (canViewAdmin && branches.length > 0) return String(branches[0].branch_id);
+        if (user?.branch_id) return String(user.branch_id);
         return prev;
       });
     } else if (scope === 'user') {
       setBranchFilter('');
     }
-  }, [scope, open, canViewAdminScope, branches, user]);
+  }, [scope, open, canViewAdmin, branches, user]);
 
   useEffect(() => {
     if (!open) return;
-    if (scope === 'branch' && !branchFilter) {
-      return;
-    }
+    if (scope === 'branch' && !branchFilter) return;
 
     let isMounted = true;
     const controller = new AbortController();
 
     const fetchRequests = async () => {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       try {
         const params = new URLSearchParams();
         params.set('scope', scope);
         params.set('limit', '50');
+        if ((scope === 'branch' || scope === 'admin') && branchFilter) params.set('branch_id', branchFilter);
 
-        if ((scope === 'branch' || scope === 'admin') && branchFilter) {
-          params.set('branch_id', branchFilter);
-        }
-
-        const response = await api.get(`/api/items/request-status?${params.toString()}`, {
-          signal: controller.signal
-        });
-
+        const res = await api.get(`/api/items/request-status?${params.toString()}`, { signal: controller.signal });
         if (!isMounted) return;
-        const data = response.data || {};
-        const list = Array.isArray(data.requests)
-          ? data.requests
-          : Array.isArray(data)
-            ? data
-            : [];
+        const data = res.data || {};
+        const list = Array.isArray(data.requests) ? data.requests : (Array.isArray(data) ? data : []);
         setRequests(list);
         setMeta(data.meta || null);
-      } catch (fetchError) {
+      } catch (e) {
         if (controller.signal.aborted) return;
-        console.error('Failed to fetch inventory request status feed:', fetchError);
-        if (isMounted) {
-          setError('Failed to load request status. Please try again.');
-          setRequests([]);
+        console.error('Failed to fetch inventory request status feed:', e);
+        if (isMounted) { setError('Failed to load request status. Please try again.'); setRequests([]);
         }
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchRequests();
-
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
+    return () => { isMounted = false; controller.abort(); };
   }, [open, scope, branchFilter, refreshIndex]);
 
-  // Ensure branch managers always have their branch set as the active filter
-  // so that requests for their branch are fetched even though they don't see
-  // the branch selector UI. Without this, `scope === 'branch'` and an empty
-  // branchFilter will cause the fetch to exit early and show no requests.
+  // Ensure BM branch set
   useEffect(() => {
-    if (!open) return;
-    if (!roleList.includes('Branch Manager')) return;
-    if (scope !== 'branch') return;
-    if (branchFilter) return;
-    if (user?.branch_id) {
-      setBranchFilter(String(user.branch_id));
-    }
-  }, [open, roleList, scope, branchFilter, user]);
+    if (!open || !isBranchManager || scope !== 'branch' || branchFilter) return;
+    if (user?.branch_id) setBranchFilter(String(user.branch_id));
+  }, [open, isBranchManager, scope, branchFilter, user]);
 
+  // Reset on close
   useEffect(() => {
     if (!open) {
-      setRequests([]);
-      setMeta(null);
-      setError(null);
-      setStatusFilter('all');
-      setRequestTypeFilter('all');
-      setVisibleCount(PAGE_SIZE);
+      setRequests([]); setMeta(null); setError(null);
+      setStatusFilter(''); setRequestTypeFilter(''); setVisibleCount(PAGE_SIZE);
     }
   }, [open]);
 
+  // Reset paging when inputs change
   useEffect(() => {
     if (!open) return;
     setVisibleCount(PAGE_SIZE);
   }, [open, scope, branchFilter, statusFilter, requestTypeFilter, refreshIndex]);
 
-  const availableScopes = useMemo(() => {
-    if (canViewAdminScope) {
-      return [
-        { id: 'admin', label: 'All Branches' },
-        { id: 'branch', label: 'Branch' }
-      ];
-    }
-
-    const options = [{ id: 'user', label: 'My Requests' }];
-    if (canViewBranchScope) {
-      options.push({ id: 'branch', label: 'Branch' });
-    }
-    return options;
-  }, [canViewAdminScope, canViewBranchScope]);
-
+  // Status chips: remove "Pending" for Owner
   const statusFilterOptions = useMemo(() => {
-    if (!isOwnerUser) {
-      return statusFilters;
-    }
-
-    return statusFilters.filter((filter) => filter.id !== 'pending');
+    return isOwnerUser ? statusFilters.filter((f) => f.id !== 'pending') : statusFilters;
   }, [isOwnerUser]);
 
+  // Keep status valid (allow '' or a valid id)
   useEffect(() => {
-    if (statusFilterOptions.some((filter) => filter.id === statusFilter)) {
-      return;
-    }
-
-    setStatusFilter('all');
+    if (statusFilter === '' || statusFilterOptions.some((f) => f.id === statusFilter)) return;
+    setStatusFilter('');
   }, [statusFilterOptions, statusFilter]);
 
-  const inventoryEntries = useMemo(() => {
-    if (!Array.isArray(requests)) {
-      return [];
-    }
+  // Branch dropdown options
+  const branchOptions = useMemo(() => ([
+    { value: '', label: 'All Branches' },
+    ...branches.map((b) => ({ value: String(b.branch_id), label: b.branch_name }))
+  ]), [branches]);
 
-    return requests.map((record) => ({ kind: 'inventory', ...record }));
-  }, [requests]);
+  // Normalize inventory as-is
+  const inventoryEntries = useMemo(
+    () => (Array.isArray(requests) ? requests.map((r) => ({ kind: 'inventory', ...r })) : []),
+    [requests]
+  );
 
+  // Normalize userRequests to our unified shape
   const normalizedUserRequests = useMemo(() => {
-    if (!Array.isArray(userRequests)) {
-      return [];
-    }
+    if (!Array.isArray(userRequests)) return [];
+    return userRequests.map((record) => {
+      const rawStatus = String(record?.request_status || record?.status || '').toLowerCase();
+      const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
+      if (!['pending', 'approved', 'rejected'].includes(normalizedStatus)) return null;
 
-    return userRequests
-      .map((record) => {
-        const rawStatus = String(record?.request_status || record?.status || '').toLowerCase();
-        const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
+      const branchName    = record?.branch || findBranchName(branches, record?.branch_id) || null;
+      const createdAtIso  = toISOStringSafe(record?.request_created_at || record?.created_at || record?.createdAt || record?.formated_hire_date || null);
+      const approvedAtIso = toISOStringSafe(record?.request_approved_at || record?.approved_at || record?.approvedAt || null);
+      const decisionAtIso = toISOStringSafe(record?.request_decision_at || record?.approved_at || record?.approvedAt || record?.updated_at || record?.status_updated_at || null);
 
-        if (!['pending', 'approved', 'rejected'].includes(normalizedStatus)) {
-          return null;
-        }
+      const lastActivityIso = decisionAtIso || approvedAtIso || createdAtIso;
+      const roles = normalizeRoleArray(record?.role);
+      const creatorName = record?.created_by_display || record?.created_by || 'Branch Manager';
+      const creatorIdValue = record?.created_by_id;
+      const createdById = (creatorIdValue !== null && creatorIdValue !== undefined && Number.isFinite(Number(creatorIdValue)))
+        ? Number(creatorIdValue) : null;
+      const creatorNormalized = normalizeComparableString(creatorName);
+      const approverName = record?.request_approved_by || record?.approved_by || null;
+      const rejectionReason = record?.request_rejection_reason || record?.rejection_reason || null;
 
-        const branchName = record?.branch || findBranchName(branches, record?.branch_id) || null;
-        const createdAtIso = toISOStringSafe(
-          record?.request_created_at
-          || record?.created_at
-          || record?.createdAt
-          || record?.formated_hire_date
-          || null
-        );
+      let statusDetail;
+      if (normalizedStatus === 'pending') {
+        // For user account flows, this effectively means "awaiting owner"; keep code generic 'pending'
+        statusDetail = { code: 'pending', label: 'Pending', tone: 'amber', is_final: false, stage: 'review' };
+      } else if (normalizedStatus === 'approved') {
+        statusDetail = { code: 'approved', label: 'Approved', tone: 'emerald', is_final: true, stage: 'review' };
+      } else {
+        statusDetail = { code: 'rejected', label: 'Rejected', tone: 'rose', is_final: true, stage: 'review' };
+      }
 
-        const approvedAtIso = toISOStringSafe(
-          record?.request_approved_at
-          || record?.approved_at
-          || record?.approvedAt
-          || null
-        );
+      const adminTimeline = normalizedStatus === 'pending'
+        ? { status: 'pending', acted_at: null, approver_id: null, approver_name: null }
+        : { status: normalizedStatus === 'approved' ? 'completed' : 'rejected', acted_at: decisionAtIso, approver_id: null, approver_name: approverName };
 
-        const decisionAtIso = toISOStringSafe(
-          record?.request_decision_at
-          || record?.approved_at
-          || record?.approvedAt
-          || record?.updated_at
-          || record?.status_updated_at
-          || null
-        );
+      const finalTimeline = normalizedStatus === 'pending'
+        ? { status: 'pending', acted_at: null, rejection_reason: null }
+        : { status: normalizedStatus, acted_at: decisionAtIso, rejection_reason: normalizedStatus === 'rejected' ? (rejectionReason || null) : null };
 
-        const lastActivityIso = decisionAtIso || approvedAtIso || createdAtIso;
-        const roles = normalizeRoleArray(record?.role);
-        const creatorName = record?.created_by_display || record?.created_by || 'Branch Manager';
-        const creatorIdValue = record?.created_by_id;
-        const createdById = creatorIdValue !== null && creatorIdValue !== undefined
-          ? (Number.isFinite(Number(creatorIdValue)) ? Number(creatorIdValue) : null)
-          : null;
-        const creatorNormalized = normalizeComparableString(creatorName);
-        const approverName = record?.request_approved_by || record?.approved_by || null;
-        const rejectionReason = record?.request_rejection_reason || record?.rejection_reason || null;
-
-        let statusDetail;
-        if (normalizedStatus === 'pending') {
-          statusDetail = {
-            code: 'pending_admin',
-            label: 'Awaiting owner approval',
-            tone: 'amber',
-            is_final: false,
-            stage: 'owner_review'
-          };
-        } else if (normalizedStatus === 'approved') {
-          statusDetail = {
-            code: 'approved',
-            label: 'Approved',
-            tone: 'emerald',
-            is_final: true,
-            stage: 'owner_review'
-          };
-        } else {
-          statusDetail = {
-            code: 'rejected',
-            label: 'Rejected',
-            tone: 'rose',
-            is_final: true,
-            stage: 'owner_review'
-          };
-        }
-
-        const adminTimeline = normalizedStatus === 'pending'
-          ? {
-              status: 'pending',
-              acted_at: null,
-              approver_id: null,
-              approver_name: null
-            }
-          : {
-              status: normalizedStatus === 'approved' ? 'completed' : 'rejected',
-              acted_at: decisionAtIso,
-              approver_id: null,
-              approver_name: approverName
-            };
-
-        const finalTimeline = normalizedStatus === 'pending'
-          ? {
-              status: 'pending',
-              acted_at: null,
-              rejection_reason: null
-            }
-          : {
-              status: normalizedStatus,
-              acted_at: decisionAtIso,
-              rejection_reason: normalizedStatus === 'rejected' ? (rejectionReason || null) : null
-            };
-
-        return {
-          kind: 'user',
-          pending_id: `user-${record.user_id}`,
-          user_id: record.user_id,
-          branch_id: record.branch_id,
-          branch_name: branchName,
-          created_by_id: createdById,
-          created_by: createdById ?? creatorName,
-          created_by_name: creatorName,
-          created_by_normalized: creatorNormalized,
-          status_detail: statusDetail,
-          created_at: createdAtIso,
-          last_activity_at: lastActivityIso,
-          summary: {
-            action_label: 'User account approval',
-            product_name: record?.full_name || 'New user account',
-            roles
-          },
-          timeline: {
-            submitted_at: createdAtIso,
-            manager: null,
-            admin: adminTimeline,
-            final: finalTimeline
-          },
-          metadata: {
-            email: record?.username || null,
-            phone: record?.cell_number || null,
-            requested_roles: roles
-          },
-          user_status: normalizedStatus,
-          decision_at: decisionAtIso,
-          rejection_reason: rejectionReason
-        };
-      })
-      .filter(Boolean);
+      return {
+        kind: 'user',
+        pending_id: `user-${record.user_id}`,
+        user_id: record.user_id,
+        branch_id: record.branch_id,
+        branch_name: branchName,
+        created_by_id: createdById,
+        created_by: createdById ?? creatorName,
+        created_by_name: creatorName,
+        created_by_normalized: creatorNormalized,
+        status_detail: statusDetail,
+        created_at: createdAtIso,
+        last_activity_at: lastActivityIso,
+        summary: { action_label: 'User account approval', product_name: record?.full_name || 'New user account', roles },
+        timeline: { submitted_at: createdAtIso, manager: null, admin: adminTimeline, final: finalTimeline },
+        metadata: { email: record?.username || null, phone: record?.cell_number || null, requested_roles: roles },
+        user_status: normalizedStatus,
+        decision_at: decisionAtIso,
+        rejection_reason: rejectionReason
+      };
+    }).filter(Boolean);
   }, [userRequests, branches]);
 
   const scopedUserRequests = useMemo(() => {
-    const parseBranchId = (value) => {
-      if (value === null || value === undefined || value === '') {
-        return null;
-      }
-
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? numeric : null;
+    const parseBranchId = (v) => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
     };
 
-    // If admin scope (owner) and a branch is selected, apply the branch filter
-    // to user requests as well. Previously admin returned all user requests
-    // ignoring the branchFilter which caused requests from one branch to be
-    // visible when another branch was selected.
     if (scope === 'admin') {
       const explicitBranch = parseBranchId(branchFilter);
       if (explicitBranch === null) return normalizedUserRequests;
-      return normalizedUserRequests.filter((request) => parseBranchId(request.branch_id) === explicitBranch);
+      return normalizedUserRequests.filter((r) => parseBranchId(r.branch_id) === explicitBranch);
     }
 
     if (scope === 'branch') {
       const explicitBranch = parseBranchId(branchFilter);
       const fallbackBranch = parseBranchId(user?.branch_id);
       const targetBranch = explicitBranch ?? fallbackBranch;
-
-      if (targetBranch === null) {
-        return normalizedUserRequests;
-      }
-
-      return normalizedUserRequests.filter((request) => parseBranchId(request.branch_id) === targetBranch);
+      if (targetBranch === null) return normalizedUserRequests;
+      return normalizedUserRequests.filter((r) => parseBranchId(r.branch_id) === targetBranch);
     }
 
     if (scope === 'user') {
       const currentUserId = user?.user_id ? Number(user.user_id) : null;
       const comparableName = normalizeComparableString(
         [user?.first_name, user?.last_name].filter(Boolean).join(' ')
-        || user?.full_name
-        || user?.name
-        || user?.email
-        || user?.username
-        || ''
+        || user?.full_name || user?.name || user?.email || user?.username || ''
       );
-
-      return normalizedUserRequests.filter((request) => {
-        if (currentUserId !== null && request.created_by_id !== null && request.created_by_id !== undefined) {
-          return Number(request.created_by_id) === currentUserId;
+      return normalizedUserRequests.filter((r) => {
+        if (currentUserId !== null && r.created_by_id !== null && r.created_by_id !== undefined) {
+          return Number(r.created_by_id) === currentUserId;
         }
-
-        if (comparableName) {
-          return request.created_by_normalized === comparableName;
-        }
-
+        if (comparableName) return r.created_by_normalized === comparableName;
         return false;
       });
     }
@@ -530,152 +297,121 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
     return aggregate.sort((a, b) => toTime(b.last_activity_at || b.created_at) - toTime(a.last_activity_at || a.created_at));
   }, [inventoryEntries, scopedUserRequests]);
 
+  // ✅ ROLE-BASED & chip filtering
   const filteredRequests = useMemo(() => {
-    if (statusFilter === 'all') {
-      return combinedRequests.filter((entry) => {
-        if (requestTypeFilter === 'all') return true;
-        if (requestTypeFilter === 'inventory') return entry.kind === 'inventory';
-        if (requestTypeFilter === 'user') return entry.kind === 'user';
-        return true;
-      });
-    }
-
-    return combinedRequests.filter((request) => {
-      if (requestTypeFilter === 'inventory' && request.kind !== 'inventory') {
-        return false;
-      }
-
-      if (requestTypeFilter === 'user' && request.kind !== 'user') {
-        return false;
-      }
-
-      const code = request?.status_detail?.code;
+    // 1) Role-based gate
+    const roleTrimmed = combinedRequests.filter((req) => {
+      const code = req?.status_detail?.code;
       if (!code) return false;
 
-      if (statusFilter === 'pending') {
-        return code === 'pending_manager';
+      if (isOwnerUser) {
+        // Owner: only final states
+        return code === 'approved' || code === 'rejected';
       }
 
-      if (statusFilter === 'awaiting_owner') {
-        return code === 'pending_admin';
+      if (isBranchManager) {
+        // BM: hide items awaiting their own approval
+        return code !== 'pending_manager';
       }
 
-      return code === statusFilter;
+      return true;
     });
-  }, [combinedRequests, statusFilter, requestTypeFilter]);
+
+    // 2) Type filter (always enabled for BM/Owner; ignored for others because not shown)
+    const afterType = roleTrimmed.filter((req) => {
+      if (canSeeTypeFilter && requestTypeFilter && req.kind !== requestTypeFilter) return false;
+      return true;
+    });
+
+    // 3) Status chip (if any chip is selected)
+    const afterStatus = afterType.filter((req) => {
+      if (!statusFilter) return true;
+      const code = req?.status_detail?.code;
+      if (!code) return false;
+      if (statusFilter === 'pending') {
+        return code === 'pending_manager' || code === 'pending_admin' || code === 'pending';
+      }
+      return code === statusFilter; // approved / rejected
+    });
+
+    return afterStatus;
+  }, [
+    combinedRequests,
+    isOwnerUser,
+    isBranchManager,
+    canSeeTypeFilter,
+    requestTypeFilter,
+    statusFilter
+  ]);
 
   const visibleRequests = useMemo(() => {
-    if (filteredRequests.length === 0) {
-      return filteredRequests;
-    }
-
+    if (filteredRequests.length === 0) return filteredRequests;
     const limit = Math.min(visibleCount, filteredRequests.length);
     return filteredRequests.slice(0, limit);
   }, [filteredRequests, visibleCount]);
 
   const hasMore = visibleCount < filteredRequests.length;
 
-  const handleScroll = (event) => {
+  const handleScroll = (e) => {
     if (!hasMore) return;
-
-    const target = event.currentTarget;
-    if (!target) return;
-
-    const { scrollTop, clientHeight, scrollHeight } = target;
+    const t = e.currentTarget; if (!t) return;
+    const { scrollTop, clientHeight, scrollHeight } = t;
     if (scrollHeight - scrollTop - clientHeight < 120) {
-      setVisibleCount((prev) => {
-        if (prev >= filteredRequests.length) return prev;
-        return Math.min(prev + PAGE_SIZE, filteredRequests.length);
-      });
+      setVisibleCount((prev) => (prev >= filteredRequests.length ? prev : Math.min(prev + PAGE_SIZE, filteredRequests.length)));
     }
   };
 
-  // Hide the scope switcher for owners/admins — owners should always be able
-  // to filter by branch and don't need to switch scopes in this dialog.
-  const showScopeSwitcher = availableScopes.length > 1 && !canViewAdminScope;
-
-  // Show the branch selector only for owners/admins. Branch managers should
-  // not see the selector because they only view requests for their own branch.
-  const showBranchFilter = canViewAdminScope;
-
-  if (!open) {
-    return null;
-  }
-
-  const handleRefresh = () => setRefreshIndex((prev) => prev + 1);
+  if (!open) return null;
+  const handleRefresh = () => setRefreshIndex((p) => p + 1);
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="relative flex h-[90vh] w-full max-w-4xl mx-2 lg:mx-4 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-  <div className="sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-6 py-4">
-          <div className="flex items-start justify-between gap-4">
+        {/* Header: overflow-visible so dropdown menus aren't clipped on mobile */}
+        <div className="sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 sm:px-6 py-4 overflow-visible">
+          <div className="flex items-start justify-between gap-3 sm:gap-4">
             <div>
               <h2 className="text-xl font-semibold text-gray-800">Request Status</h2>
-              <p className="text-sm text-gray-500">
-                Review pending user accounts and inventory requests that need action.
-              </p>
+              <p className="text-sm text-gray-500">Review user accounts and inventory requests that need action.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
-                onClick={handleRefresh}
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none"
+                aria-label="Refresh"
+                title="Refresh"
               >
-                Refresh
+                <MdRefresh className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
               </button>
               <button
-                className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
                 onClick={onClose}
                 aria-label="Close request status dialog"
               >
-                X
+                <IoMdClose className='w-5 h-5 sm:w-6 sm:h-6' />
               </button>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3">
-            {showScopeSwitcher && (
-              <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 sm:col-span-2 lg:col-span-1">
-                <span className="text-xs font-semibold uppercase text-gray-500">View Scope</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {availableScopes.map((option) => {
-                    const isActive = scope === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                          isActive ? 'bg-green-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                        onClick={() => setScope(option.id)}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {showBranchFilter && (
-              <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 sm:col-span-2 lg:col-span-1">
-                <span className="text-xs font-semibold uppercase text-gray-500">Branch</span>
-                <select
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {/* Branch filter — Owner/Admin only; full width on mobile, high z-index */}
+            {canViewAdmin && (
+              <div className="order-1 col-span-full sm:col-span-1 rounded-xl border border-gray-200 bg-gray-50 p-3 z-30">
+                <DropdownCustom
+                  label="Branch"
                   value={branchFilter}
-                  onChange={(event) => setBranchFilter(event.target.value)}
-                >
-                  <option value="">All Branches</option>
-                  {branches.map((branch) => (
-                    <option key={branch.branch_id} value={branch.branch_id}>
-                      {branch.branch_name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(e) => setBranchFilter(e.target.value)}
+                  options={branchOptions}
+                  variant="default"
+                  size="md"
+                />
               </div>
             )}
 
-            <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+            {/* Status chips (Pending removed for Owner via statusFilterOptions) */}
+            <div className="order-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
               <span className="text-xs font-semibold uppercase text-gray-500">Status</span>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 {statusFilterOptions.map((filter) => {
                   const isActive = statusFilter === filter.id;
                   return (
@@ -686,7 +422,7 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                           ? 'bg-green-100 text-green-700 ring-1 ring-green-600/40'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
-                      onClick={() => setStatusFilter(filter.id)}
+                      onClick={() => setStatusFilter(isActive ? '' : filter.id)}
                     >
                       {filter.label}
                     </button>
@@ -695,39 +431,38 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <span className="text-xs font-semibold uppercase text-gray-500">Type</span>
-              <div className="flex flex-wrap items-center gap-2">
-                {requestTypeFilters.map((filter) => {
-                  const isActive = requestTypeFilter === filter.id;
-                  return (
-                    <button
-                      key={filter.id}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                        isActive
-                          ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-500/50'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                      onClick={() => setRequestTypeFilter(filter.id)}
-                    >
-                      {filter.label}
-                    </button>
-                  );
-                })}
+            {/* Type chips — BM & Owner only; ALWAYS enabled */}
+            {canSeeTypeFilter && (
+              <div className="order-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <span className="text-xs font-semibold uppercase text-gray-500">Type</span>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {requestTypeFilters.map((filter) => {
+                    const isActive = requestTypeFilter === filter.id;
+                    return (
+                      <button
+                        key={filter.id}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                          isActive
+                            ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-500/50'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        onClick={() => setRequestTypeFilter(isActive ? '' : filter.id)}
+                      >
+                        {filter.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4" onScroll={handleScroll}>
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4" onScroll={handleScroll}>
           {loading ? (
-            <div className="py-12">
-              <ChartLoading message="Loading request history..." />
-            </div>
+            <div className="py-12"><ChartLoading message="Loading request history..." /></div>
           ) : error ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
           ) : filteredRequests.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-center text-sm text-gray-500">
               <p>No requests match this filter yet.</p>
@@ -739,9 +474,7 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                 const toneClass = toneStyles[tone] || toneStyles.slate;
 
                 if (request.kind === 'user') {
-                  const rolesLabel = Array.isArray(request.summary?.roles)
-                    ? request.summary.roles.join(', ')
-                    : '';
+                  const rolesLabel = Array.isArray(request.summary?.roles) ? request.summary.roles.join(', ') : '';
                   const branchName = request.branch_name || findBranchName(branches, request.branch_id) || '—';
                   const requestedBy = request.created_by_name || 'Branch Manager';
                   const submittedAt = formatDateTime(request.created_at);
@@ -750,27 +483,17 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                   const userStatus = request.user_status || 'pending';
                   const decisionAt = request.decision_at;
                   const ownerStageDescription = (() => {
-                    if (userStatus === 'approved') {
-                      const stamp = decisionAt ? ` on ${formatDateTime(decisionAt)}` : '';
-                      return `Approved${stamp}`;
-                    }
-                    if (userStatus === 'rejected') {
-                      const stamp = decisionAt ? ` on ${formatDateTime(decisionAt)}` : '';
-                      return `Rejected${stamp}`;
-                    }
-                    return 'Awaiting owner approval';
+                    if (userStatus === 'approved') return `Approved${decisionAt ? ` on ${formatDateTime(decisionAt)}` : ''}`;
+                    if (userStatus === 'rejected') return `Rejected${decisionAt ? ` on ${formatDateTime(decisionAt)}` : ''}`;
+                    return 'Pending';
                   })();
                   const rejectionReason = request.rejection_reason;
                   const borderToneClass = (() => {
                     switch (request.status_detail?.tone) {
-                      case 'emerald':
-                        return 'border-emerald-200';
-                      case 'rose':
-                        return 'border-rose-200';
-                      case 'blue':
-                        return 'border-blue-200';
-                      default:
-                        return 'border-amber-200';
+                      case 'emerald': return 'border-emerald-200';
+                      case 'rose':    return 'border-rose-200';
+                      case 'blue':    return 'border-blue-200';
+                      default:        return 'border-amber-200';
                     }
                   })();
 
@@ -786,21 +509,12 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                             {request.summary?.product_name || 'User account'}
                           </h3>
                           <div className="flex flex-wrap gap-3 text-sm text-gray-500">
-                            <span>
-                              Branch:{' '}
-                              <span className="font-medium text-gray-700">{branchName}</span>
-                            </span>
-                            <span>
-                              Submitted:{' '}
-                              <span className="font-medium text-gray-700">{submittedAt}</span>
-                            </span>
-                            <span>
-                              Requested by:{' '}
-                              <span className="font-medium text-gray-700">{requestedBy}</span>
-                            </span>
+                            <span>Branch: <span className="font-medium text-gray-700">{branchName}</span></span>
+                            <span>Submitted: <span className="font-medium text-gray-700">{submittedAt}</span></span>
+                            <span>Requested by: <span className="font-medium text-gray-700">{requestedBy}</span></span>
                           </div>
                         </div>
-                        <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${toneClass.badge}`}>
+                        <span className={`inline-flex items-center gap-2 rounded-full  border px-3 py-1 text-sm font-semibold whitespace-nowrap ${toneClass.badge}`}>
                           <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
                           {request.status_detail?.label || 'Pending'}
                         </span>
@@ -833,15 +547,16 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                 }
 
                 const manager = request.timeline?.manager || {};
-                const admin = request.timeline?.admin || null;
-                const final = request.timeline?.final || {};
+                const admin   = request.timeline?.admin || null;
+                const final   = request.timeline?.final || {};
                 const summary = request.summary || {};
                 const statusLabel = request.status_detail?.label || request.status;
                 const branchName = request.branch_name || findBranchName(branches, request.branch_id) || 'N/A';
 
-                const managerDescription = manager.status === 'completed'
-                  ? `Approved by ${manager.approver_name || 'Branch Manager'} on ${formatDateTime(manager.acted_at)}`
-                  : 'Awaiting branch manager decision';
+                const managerDescription =
+                  manager.status === 'completed'
+                    ? `Approved by ${manager.approver_name || 'Branch Manager'} on ${formatDateTime(manager.acted_at)}`
+                    : 'Awaiting branch manager decision';
 
                 const adminDescription = !request.requires_admin_review
                   ? 'Owner confirmation not required'
@@ -849,11 +564,12 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                     ? `Approved by ${admin.approver_name || 'Owner'} on ${formatDateTime(admin.acted_at)}`
                     : 'Awaiting owner decision';
 
-                const finalDescription = final.status === 'approved'
-                  ? `Completed on ${formatDateTime(final.acted_at)}`
-                  : final.status === 'rejected'
-                    ? `Rejected on ${formatDateTime(final.acted_at)}`
-                    : 'In progress';
+                const finalDescription =
+                  final.status === 'approved'
+                    ? `Completed on ${formatDateTime(final.acted_at)}`
+                    : final.status === 'rejected'
+                      ? `Rejected on ${formatDateTime(final.acted_at)}`
+                      : 'In progress';
 
                 return (
                   <div key={request.pending_id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
@@ -862,16 +578,14 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                           {summary.action_label || 'Inventory Request'}
                         </p>
-                        <h3 className="text-lg font-semibold text-gray-800">
-                          {summary.product_name || 'Inventory item'}
-                        </h3>
+                        <h3 className="text-lg font-semibold text-gray-800">{summary.product_name || 'Inventory item'}</h3>
                         <div className="flex flex-wrap gap-3 text-sm text-gray-500">
                           <span>Branch: <span className="font-medium text-gray-700">{branchName}</span></span>
                           <span>Submitted: <span className="font-medium text-gray-700">{formatDateTime(request.created_at)}</span></span>
                           <span>Requested by: <span className="font-medium text-gray-700">{request.created_by_name || 'Unknown user'}</span></span>
                         </div>
                       </div>
-                      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${toneClass.badge}`}>
+                      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold whitespace-nowrap ${toneClass.badge}`}>
                         <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
                         {statusLabel}
                       </span>
@@ -915,9 +629,7 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                       </div>
                       <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 md:col-span-2">
                         <p className="text-xs font-semibold uppercase text-gray-500">Overall Status</p>
-                        <p className="text-sm text-gray-700">
-                          {finalDescription}
-                        </p>
+                        <p className="text-sm text-gray-700">{finalDescription}</p>
                       </div>
                     </div>
 
@@ -930,25 +642,17 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                   </div>
                 );
               })}
-              {hasMore && (
+              {hasMore ? (
                 <div className="flex flex-col items-center gap-2 pt-2">
                   <button
                     className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
-                    onClick={() =>
-                      setVisibleCount((prev) => {
-                        if (prev >= filteredRequests.length) return prev;
-                        return Math.min(prev + PAGE_SIZE, filteredRequests.length);
-                      })
-                    }
+                    onClick={() => setVisibleCount((prev) => (prev >= filteredRequests.length ? prev : Math.min(prev + PAGE_SIZE, filteredRequests.length)))}
                   >
                     Load more
                   </button>
-                  <p className="text-xs text-gray-400">
-                    Showing {visibleRequests.length} of {filteredRequests.length} requests
-                  </p>
+                  <p className="text-xs text-gray-400">Showing {visibleRequests.length} of {filteredRequests.length} requests</p>
                 </div>
-              )}
-              {!hasMore && (
+              ) : (
                 <p className="text-center text-xs text-gray-400">
                   Showing all {visibleRequests.length} request{visibleRequests.length === 1 ? '' : 's'}
                 </p>
@@ -956,7 +660,6 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

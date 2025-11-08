@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import { TbFileExport } from "react-icons/tb";
+import { MdRefresh } from "react-icons/md";
+import { IoMdClose } from "react-icons/io";
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 import { useAuth } from '../authentication/Authentication';
 import { currencyFormat } from '../utils/formatCurrency.js';
@@ -9,7 +11,6 @@ import ChartLoading from '../components/common/ChartLoading.jsx';
 import { FaBoxOpen } from "react-icons/fa6";
 import RejectionReasonDialog from '../components/dialogs/RejectionReasonDialog.jsx';
 import DropdownCustom from '../components/DropdownCustom';
-
 
 function ProductInventory({
   branches,
@@ -135,7 +136,6 @@ function ProductInventory({
     setSelectedItem(null);
   };
 
-
   //CONTAINS ALL AVAILABLE PRODUCTS WHEN LOADED
   let filteredProducts = productsData;
 
@@ -148,8 +148,6 @@ function ProductInventory({
   filteredProducts = selectedBranch
     ? filteredProducts.filter(item => item.branch_id === Number(selectedBranch))
     : filteredProducts;
-
-
 
   //FILTER BY SEARCH
   const filteredData = filteredProducts.filter(product =>
@@ -263,7 +261,6 @@ function ProductInventory({
     }
   };
 
-
   return (
 
     <div className="pt-20 lg:pt-8 px-4 lg:px-8 pb-6">
@@ -278,27 +275,22 @@ function ProductInventory({
         confirmLabel="Submit Rejection"
       />
 
-
       {/* DETAILS DIALOG */}
       <InventoryItemDetailsDialog
         open={isDetailsOpen}
         onClose={closeDetails}
         user={user}
         item={selectedItem}
-
       />
 
       <div className='flex items-center justify-between'>
         {/*TITLE*/}
-        <h1 className=' text-[35px] leading-[36px] font-bold text-green-900'>
+        <h1 className=' text-[33px] leading-[36px] font-bold text-green-900'>
           INVENTORY
         </h1>
-
-
       </div>
 
       <hr className="mt-3 mb-6 border-t-4 border-green-800 rounded-lg" />
-
 
       {displayPendingApprovals && isPendingDialogOpen && (
         <div className="fixed inset-0 z-[100] backdrop-blur-sm transition-opacity flex items-center justify-center bg-black/50 p-4">
@@ -316,18 +308,23 @@ function ProductInventory({
               <div className="flex items-center gap-2">
                 {typeof refreshPendingRequests === 'function' && (
                   <button
-                    className="px-3 py-1.5 text-xs md:text-sm border border-amber-500 text-amber-600 rounded-md hover:bg-amber-100 transition"
+                    type="button"
+                    className="inline-flex items-center justify-center w-9 h-9 rounded-lg  text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={refreshPendingRequests}
+                    disabled={pendingRequestsLoading}
+                    aria-label="Refresh pending inventory requests"
+                    title="Refresh pending inventory requests"
                   >
-                    Refresh
+                    <MdRefresh className={`text-xl ${pendingRequestsLoading ? "animate-spin" : ""}`} />
+                    <span className="sr-only">Refresh</span>
                   </button>
                 )}
                 <button
-                  className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-full transition"
+                  className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-lg transition"
                   onClick={() => setIsPendingDialogOpen(false)}
                   aria-label="Close"
                 >
-                  &#10005;
+                 <IoMdClose className='w-5 h-5 sm:w-6 sm:h-6' />
                 </button>
               </div>
             </div>
@@ -360,9 +357,7 @@ function ProductInventory({
                       <div
                         key={request.pending_id}
                         ref={(node) => setPendingRequestRef(request.pending_id, node)}
-                        className={`border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition ${
-                          isHighlighted ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse' : ''
-                        }`}
+                        className={`border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition ${isHighlighted ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse' : ''}`}
                       >
                         {/* Header Info */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-2">
@@ -523,127 +518,125 @@ function ProductInventory({
         </div>
       )}
 
-{/* SEARCH + FILTERS + ACTIONS */}
-<div className="w-full lg:flex lg:items-center lg:gap-6">
-  {/* LEFT: search + filters */}
-  <div className="flex flex-col lg:flex-row gap-2 lg:gap-6 flex-1 min-w-0">
-    {/* Search */}
-    <div className="w-full lg:w-[400px] text-sm lg:text-sm">
-      <input
-        type="text"
-        placeholder="Search Item Name..."
-        className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all px-3 py-0 mb-2 lg:mb-0 rounded-lg w-full h-9 leading-none"
-        onChange={handleSearch}
-      />
-    </div>
+      {/* SEARCH + FILTERS + ACTIONS */}
+      <div className="w-full lg:flex lg:items-center lg:gap-6">
+        {/* LEFT: search + filters */}
+        <div className="flex flex-col lg:flex-row gap-2 lg:gap-6 flex-1 min-w-0">
+          {/* Search */}
+          <div className="w-full lg:w-[400px] text-sm lg:text-sm">
+            <input
+              type="text"
+              placeholder="Search Item Name..."
+              className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all px-3 py-0 mb-2 lg:mb-0 rounded-lg w-full h-9 leading-none"
+              onChange={handleSearch}
+            />
+          </div>
 
-    {/* Category */}
-    <div className="w-full lg:w-auto py-2 lg:py-0">
-      <DropdownCustom
-        value={selectedCategory}
-        onChange={e => setSelectedCategory(e.target.value)}
-        label="Filter by Category:"
-        variant="floating"
-        size="sm"
-        options={[
-          { value: '', label: 'All Categories' },
-          ...listCategories.map(cat => ({
-            value: cat.category_id,
-            label: cat.category_name
-          }))
-        ]}
-      />
-    </div>
+          {/* Category */}
+          <div className="w-full lg:w-auto py-2 lg:py-0">
+            <DropdownCustom
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              label="Filter by Category:"
+              variant="floating"
+              size="sm"
+              options={[
+                { value: '', label: 'All Categories' },
+                ...listCategories.map(cat => ({
+                  value: cat.category_id,
+                  label: cat.category_name
+                }))
+              ]}
+            />
+          </div>
 
-    {/* Branch (if allowed) */}
-    {(user && user.role && user.role.some(r => ['Branch Manager', 'Owner'].includes(r))) && (
-      <div className="w-full lg:w-auto">
-        <DropdownCustom
-          value={selectedBranch}
-          onChange={e => setSelectedBranch(e.target.value)}
-          label="Filter by Branch:"
-          variant="floating"
-          size="sm"
-          options={[
-            ...(user.role.some(r => r === 'Owner')
-              ? [{ value: '', label: 'All Branch' }]
-              : branches.length !== 0 ? [] : [{ value: '', label: `${user.branch_name} (Your Branch)` }]),
-            ...branches.map(b => ({
-              value: b.branch_id,
-              label: `${b.branch_name}${b.branch_id === user.branch_id ? ' (Your Branch)' : ''}`
-            }))
-          ]}
-        />
+          {/* Branch (if allowed) */}
+          {(user && user.role && user.role.some(r => ['Branch Manager', 'Owner'].includes(r))) && (
+            <div className="w-full lg:w-auto">
+              <DropdownCustom
+                value={selectedBranch}
+                onChange={e => setSelectedBranch(e.target.value)}
+                label="Filter by Branch:"
+                variant="floating"
+                size="sm"
+                options={[
+                  ...(user.role.some(r => r === 'Owner')
+                    ? [{ value: '', label: 'All Branch' }]
+                    : branches.length !== 0 ? [] : [{ value: '', label: `${user.branch_name} (Your Branch)` }]),
+                  ...branches.map(b => ({
+                    value: b.branch_id,
+                    label: `${b.branch_name}${b.branch_id === user.branch_id ? ' (Your Branch)' : ''}`
+                  }))
+                ]}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: actions */}
+        {/* Base: grid with 2 columns so Export spans full width and the other two sit side-by-side.
+            Desktop (≥lg): switches to a single flex row aligned right. */}
+        <div className="mt-3 lg:mt-0 ml-0 lg:ml-auto grid grid-cols-2 gap-3 items-center w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 shrink-0">
+          {/* Export (full width on mobile) */}
+          <div className="relative group col-span-2 lg:col-span-1">
+            <button className="w-full text-sm lg:w-auto bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center justify-center gap-2">
+              <TbFileExport />
+              <span className="leading-none">EXPORT</span>
+            </button>
+            <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+              <button
+                onClick={() => handleExportInventory('csv')}
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-[13px] whitespace-nowrap"
+              >
+                Export as CSV
+              </button>
+              <button
+                onClick={() => handleExportInventory('pdf')}
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-[13px] whitespace-nowrap"
+              >
+                Export as PDF
+              </button>
+            </div>
+          </div>
+
+          {/* Inventory Staff only */}
+          {user && user.role && user.role.some(r => r === 'Inventory Staff') && (
+            <>
+              <button
+                className="col-span-1 bg-[#007278] text-sm text-white font-medium hover:bg-[#009097] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+                onClick={() => setIsCategory(true)}
+              >
+                CATEGORIES
+              </button>
+
+              <button
+                className="col-span-1 bg-[#119200] text-sm text-white font-medium hover:bg-[#56be48] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+                onClick={() => handleOpen('add')}
+              >
+                ADD ITEMS
+              </button>
+            </>
+          )}
+
+          {/* (Optional) Pendings */}
+          {displayPendingApprovals && (
+            <div className="col-span-2 lg:col-span-1">
+              <button
+                className="w-full lg:w-auto inline-flex items-center justify-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
+                onClick={() => setIsPendingDialogOpen(true)}
+                aria-label="Open pending inventory requests"
+              >
+                <span className="whitespace-nowrap">Pendings</span>
+                <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-white text-amber-700 rounded-full">
+                  {pendingRequests?.length ?? 0}
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    )}
-  </div>
-
-  {/* RIGHT: actions */}
-  {/* Base: grid with 2 columns so Export spans full width and the other two sit side-by-side.
-      Desktop (≥lg): switches to a single flex row aligned right. */}
-  <div className="mt-3 lg:mt-0 ml-0 lg:ml-auto grid grid-cols-2 gap-3 items-center w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 shrink-0">
-    {/* Export (full width on mobile) */}
-    <div className="relative group col-span-2 lg:col-span-1">
-      <button className="w-full text-sm lg:w-auto bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center justify-center gap-2">
-        <TbFileExport />
-        <span className="leading-none">EXPORT</span>
-      </button>
-      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-        <button
-          onClick={() => handleExportInventory('csv')}
-          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-        >
-          Export as CSV
-        </button>
-        <button
-          onClick={() => handleExportInventory('pdf')}
-          className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-        >
-          Export as PDF
-        </button>
-      </div>
-    </div>
-
-    {/* Inventory Staff only */}
-    {user && user.role && user.role.some(r => r === 'Inventory Staff') && (
-      <>
-        <button
-          className="col-span-1 bg-[#007278] text-sm text-white font-medium hover:bg-[#009097] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
-          onClick={() => setIsCategory(true)}
-        >
-          CATEGORIES
-        </button>
-
-        <button
-          className="col-span-1 bg-[#119200] text-sm text-white font-medium hover:bg-[#56be48] px-5 h-10 rounded-lg transition-all flex items-center justify-center"
-          onClick={() => handleOpen('add')}
-        >
-          ADD ITEMS
-        </button>
-      </>
-    )}
-
-    {/* (Optional) Pendings */}
-    {displayPendingApprovals && (
-  <div className="col-span-2 lg:col-span-1">
-    <button
-      className="w-full lg:w-auto inline-flex items-center justify-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
-      onClick={() => setIsPendingDialogOpen(true)}
-      aria-label="Open pending inventory requests"
-    >
-      <span className="whitespace-nowrap">Pendings</span>
-      <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-white text-amber-700 rounded-full">
-        {pendingRequests?.length ?? 0}
-      </span>
-    </button>
-  </div>
-)}
-  </div>
-</div>
-
 
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
-
 
       {/*TABLE */}
       <div className="overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
@@ -757,7 +750,6 @@ function ProductInventory({
         {error && <div className="flex font-bold justify-center px-4 py-4">{error}</div>}
       </div>
 
-
       {/*PAGINATION AND CONTROLS */}
       <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
         {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
@@ -797,7 +789,7 @@ function ProductInventory({
 
         {/* DESKTOP LAYOUT: THREE COLUMNS */}
         {/* LEFT: ITEM COUNT (DESKTOP) */}
-        <div className='hidden sm:block text-sm lg:text-sm text-gray-600 sm:flex-1'>
+        <div className='hidden sm:block text-[13px] text-gray-600 sm:flex-1'>
           {filteredData.length > 0 ? (
             <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
           ) : (
@@ -812,17 +804,17 @@ function ProductInventory({
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className='px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className='px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
               >
                 Previous
               </button>
-              <span className='text-sm text-gray-600 whitespace-nowrap'>
+              <span className='text-[13px] text-gray-600 whitespace-nowrap'>
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className='px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className='px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
               >
                 Next
               </button>
@@ -833,7 +825,7 @@ function ProductInventory({
         {/* RIGHT: INVENTORY HISTORY BUTTON (BOTH MOBILE & DESKTOP) */}
         <div className='flex justify-end sm:flex-1'>
           <button
-            className='bg-white hover:bg-gray-200 rounded-lg border  transition-all py-2 px-3 lg:px-5 text-sm whitespace-nowrap w-full sm:w-auto'
+            className='bg-white hover:bg-gray-200 rounded-lg border transition-all py-2 px-3 lg:px-5 text-[13px] whitespace-nowrap w-full sm:w-auto'
             onClick={() => setIsProductTransactOpen(true)}
           >
             Show Inventory History
@@ -843,11 +835,7 @@ function ProductInventory({
 
     </div>
 
-
-
-
   )
-
 }
 
 export default ProductInventory;

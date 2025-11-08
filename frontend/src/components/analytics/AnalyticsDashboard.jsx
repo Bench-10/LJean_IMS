@@ -411,8 +411,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     }
   }, [branchId, categoryFilter, productIdFilter, resolvedRange, user]);
 
-
-
   const fetchDeliveryData = useCallback(async (signal) => {
     if (!user) return;
     const params = { format: deliveryInterval, status: deliveryStatus };
@@ -570,7 +568,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
   /* ---------- UI ---------- */
   return (
-    <div className="flex flex-col gap-4 sm:gap-5 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 sm:gap-2 flex-1 min-h-0">
 
       <ExportReportDialog
         isOpen={showExportDialog}
@@ -593,71 +591,79 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         }, [currentCharts, branchId, isOwner])}
       />
 
-      {/* Outside: View Branch Analytics stays here */}
-      <div className="w-full flex justify-end px-3 sm:px-5">
-        {!branchId && (
-          <NavLink
-            to="/branches"
-            className="px-3 lg:px-4 py-1 lg:py-2 text-sm lg:text-base border-2 bg-white font-medium rounded-md text-green-800 border-gray-200 hover:bg-green-100 transition"
-          >
-            View Branch Analytics
-          </NavLink>
-        )}
-      </div>
-
-      {/* Sticky tabs + filters (Export on the right) */}
+      {/* Sticky header: View Branch Analytics (mobile top) + Tabs + Export */}
       <div className="sticky top-0 z-30 bg-white/95 supports-[backdrop-filter]:bg-white/60 backdrop-blur border-b py-3 px-3 sm:px-5 rounded-md">
 
-        {/* Row 1: Tabs + Export */}
-{/* Row 1: Tabs + Export */}
-<div className="flex items-center gap-3 -mx-2 px-2 overflow-x-auto hide-scrollbar">
-  {(branchId || (!branchId && isOwner)) && (
-    <div className="flex w-full sm:w-auto sm:min-w-max border-2 rounded-full bg-gray-50 shadow-sm overflow-hidden transition-all duration-200">
-      {!branchId && isOwner && (
-        <button
-          className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "branch" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
-          aria-selected={currentCharts === "branch"}
-          onClick={() => { setCurrentCharts("branch"); setProductIdFilter(''); }}
-        >
-          <HiOutlineBuildingOffice2 />
-          Branch
-        </button>
-      )}
-      <button
-        className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "sale" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
-        aria-selected={currentCharts === "sale"}
-        onClick={() => setCurrentCharts("sale")}
-      >
-        <FaRegMoneyBillAlt />
-        Sales
-      </button>
-      {branchId && (
-        <button
-          className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "delivery" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
-          aria-selected={currentCharts === "delivery"}
-          onClick={() => setCurrentCharts("delivery")}
-        >
-          <TbTruckDelivery />
-          Delivery
-        </button>
-      )}
-    </div>
-  )}
+        {/* Mobile: View Branch Analytics at the very top */}
+        {!branchId && (
+          <div className="md:hidden mb-3">
+            <NavLink
+              to="/branches"
+              className="w-full inline-flex items-center justify-center px-4 py-2 text-sm border bg-white font-medium rounded-md text-green-800 border-gray-200 hover:bg-green-100 transition"
+            >
+              View Branch Analytics
+            </NavLink>
+          </div>
+        )}
 
-  {/* Desktop/Tablet Export (right side) */}
-  <div className="ml-auto shrink-0 hidden md:block">
-    <button
-      onClick={() => setShowExportDialog(true)}
-      className="inline-flex items-center justify-center gap-2 py-2 px-4 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-all shadow-sm"
-    >
-      <FaFileExport />
-      <span className="text-sm">Export Report</span>
-    </button>
-  </div>
-</div>
+        {/* Row 1: Tabs + Export (desktop) + View Branch Analytics (desktop, spaced) */}
+        <div className="flex items-center gap-3 -mx-2 px-2 overflow-x-auto hide-scrollbar">
+          {(branchId || (!branchId && isOwner)) && (
+            <div className="flex w-full sm:w-auto sm:min-w-max border-2 rounded-lg bg-gray-50 shadow-sm overflow-hidden transition-all duration-200">
+              {!branchId && isOwner && (
+                <button
+                  className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "branch" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
+                  aria-selected={currentCharts === "branch"}
+                  onClick={() => { setCurrentCharts("branch"); setProductIdFilter(''); }}
+                >
+                  <HiOutlineBuildingOffice2 />
+                  Branch
+                </button>
+              )}
+              <button
+                className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "sale" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
+                aria-selected={currentCharts === "sale"}
+                onClick={() => setCurrentCharts("sale")}
+              >
+                <FaRegMoneyBillAlt />
+                Sales
+              </button>
+              {branchId && (
+                <button
+                  className={`inline-flex items-center justify-center gap-2 py-2 px-5 sm:px-7 font-semibold text-sm flex-1 sm:flex-initial ${currentCharts === "delivery" ? "bg-green-800 text-white scale-105 shadow-md" : "text-green-800 hover:bg-green-100 "}`}
+                  aria-selected={currentCharts === "delivery"}
+                  onClick={() => setCurrentCharts("delivery")}
+                >
+                  <TbTruckDelivery />
+                  Delivery
+                </button>
+              )}
+            </div>
+          )}
 
+          {/* Right controls (desktop): Export + View Branch Analytics with spacing */}
+          <div className="ml-auto shrink-0 hidden md:flex items-center">
+            {!branchId && (
+              <NavLink
+                to="/branches"
+                className="inline-flex items-center justify-center px-4 py-2 text-sm border bg-white font-medium rounded-md text-green-800 border-gray-200 hover:bg-green-100 transition"
+              >
+                View Branch Analytics
+              </NavLink>
+            )}
+            
+            <button
+              onClick={() => setShowExportDialog(true)}
+              className="md:ml-4 inline-flex items-center justify-center gap-2 py-2 px-4 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-all shadow-sm"
+            >
+              <FaFileExport />
+              <span className="text-sm">Export Report</span>
+            </button>
 
-        {/* Row 2: Filters — single line on md+, stacked on mobile; Start/End aligned */}
+            
+          </div>
+        </div>
+
         {/* Row 2: Filters — equal width based on mode */}
         <div className={`mt-5 grid grid-cols-1 gap-4 sm:gap-4 items-start ${rangeMode === 'preset' ? 'md:grid-cols-3' : 'md:grid-cols-4'}`}>
           {/* Category */}
@@ -683,7 +689,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
             />
           </div>
 
-          {/* PRESET (takes one column in 3-col grid) */}
+          {/* PRESET */}
           {rangeMode === 'preset' && (
             <div className="min-w-0">
               <DropdownCustom
@@ -701,7 +707,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
             </div>
           )}
 
-          {/* CUSTOM (Start and End each take one column in 4-col grid) */}
+          {/* CUSTOM */}
           {rangeMode === 'custom' && (
             <>
               <div className="min-w-0">
@@ -729,27 +735,23 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
             </>
           )}
 
+          {/* Mobile Export button (kept below filters); View Branch Analytics is already on top (mobile) */}
           <div className="mt-3 md:hidden">
-  <button
-    onClick={() => setShowExportDialog(true)}
-    className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-all shadow-sm"
-  >
-    <FaFileExport />
-    <span className="text-sm">Export Report</span>
-  </button>
-</div>
-
-
-
+            <button
+              onClick={() => setShowExportDialog(true)}
+              className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-all shadow-sm"
+            >
+              <FaFileExport />
+              <span className="text-sm">Export Report</span>
+            </button>
+          </div>
         </div>
-
-
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 min-h-0 overflow-y-auto min-w-0 pt-3 pb-16 px-2 sm:px-0 hide-scrollbar">
+      <div className="flex-1 min-h-0 overflow-y-auto min-w-0 pb-16 px-2 sm:px-0 hide-scrollbar">
 
-        {/* KPI CARDS (responsive, equal height) */}
+        {/* KPI CARDS */}
         <div
           ref={kpiRef}
           className="grid w-full gap-3 sm:gap-4 lg:gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-4 auto-rows-fr relative mb-4 sm:mb-2"
@@ -845,7 +847,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
                 branchPerformanceRef={branchPerformanceRef}
                 revenueDistributionRef={revenueDistributionRef}
               />
-              <div className="col-span-12 mt-5 min-h-[420px] mb-8">
+              <div className="col-span-12 mt-5 lg:mt-0 min-h-[420px] mb-8">
                 <BranchTimeline
                   Card={Card}
                   categoryFilter={categoryFilter}

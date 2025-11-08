@@ -166,7 +166,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
             )}
 
             {roles.some(r => ['Owner'].includes(r)) && (
-              <NavLink to="/approvals" className={({ isActive }) => (isActive ? "border-l-8 bg-[#254717] border-l-green-400" : "")}>
+              <NavLink to="/approvals" className={({ isActive }) => (isActive ? "border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
                 <FaClipboardCheck />Approvals
               </NavLink>
             )}
@@ -177,7 +177,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
 <div className="sticky bottom-0 left-0 right-0 bg-navBackground/95 backdrop-blur pt-2
                 pb-[calc(env(safe-area-inset-bottom,0px)+10px)]">
   <button
-    className="w-full bg-green-600 py-2 px-2 rounded-md flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
+    className="w-full text-[13px] bg-green-600 py-2 px-2 rounded-md flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
     onClick={() => {
       setShowLogoutDialog(true);
       setShowMobileMenu(false);
