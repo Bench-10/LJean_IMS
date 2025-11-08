@@ -262,7 +262,6 @@ function TopProducts({
                   <Tooltip
                     content={<TopBarTooltip />}
                     wrapperStyle={{ outline: 'none', zIndex: 20 }}
-                    allowEscapeViewBox={{ x: true, y: true }}
                     cursor={{ fill: 'rgba(0,0,0,0.04)' }}
                   />
 
