@@ -176,11 +176,10 @@ export const numberOfDeliveriesByDate = async (req, res) => {
     
     console.log('Delivery request params:', { branch_id, format, start_date, end_date, status });
     
-    const rows = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id, start_date, end_date, status);
+  const result = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id, start_date, end_date, status);
+
     
-    console.log('Delivery response data:', rows);
-    
-    res.json(rows);
+  res.json(result);
 
   } catch (err) {
     console.error('Delivery analytics error', err);

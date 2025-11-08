@@ -24,6 +24,103 @@ import DropdownCustom from '../DropdownCustom.jsx';
 import DatePickerCustom from '../DatePickerCustom.jsx';
 
 const FETCH_DEBOUNCE_MS = 150;
+const DELIVERY_WINDOW_SIZES = { daily: 30, monthly: 12, yearly: 5 };
+const DELIVERY_META_DEFAULT = {
+  min_bucket: null,
+  max_bucket: null,
+  min_reference: null,
+  max_reference: null,
+  step: 'day'
+};
+
+const normalizeDeliveryEntry = (entry) => {
+  if (!entry || entry.date == null) return null;
+  const dateKey = String(entry.date);
+  if (!dateKey) return null;
+  return {
+    date: dateKey,
+    number_of_deliveries: Number(entry.number_of_deliveries) || 0
+  };
+};
+
+const fillDeliverySeries = (data, interval, startISO, endISO) => {
+  const start = dayjs(startISO, 'YYYY-MM-DD');
+  const end = dayjs(endISO, 'YYYY-MM-DD');
+  const source = Array.isArray(data) ? data : [];
+
+  if (!start.isValid() || !end.isValid() || end.isBefore(start)) {
+    return source
+      .map(normalizeDeliveryEntry)
+      .filter(Boolean);
+  }
+
+  const mapped = new Map();
+  source
+    .map(normalizeDeliveryEntry)
+    .filter(Boolean)
+    .forEach((item) => {
+      mapped.set(item.date, item);
+    });
+
+  const series = [];
+
+  if (interval === 'yearly') {
+    let cursor = start.startOf('year');
+    const limit = end.startOf('year');
+    while (cursor.isBefore(limit) || cursor.isSame(limit)) {
+      const key = cursor.format('YYYY');
+      const existing = mapped.get(key);
+      series.push({ date: key, number_of_deliveries: existing?.number_of_deliveries ?? 0 });
+      cursor = cursor.add(1, 'year');
+    }
+    return series;
+  }
+
+  if (interval === 'monthly') {
+    let cursor = start.startOf('month');
+    const limit = end.startOf('month');
+    while (cursor.isBefore(limit) || cursor.isSame(limit)) {
+      const key = cursor.format('YYYY-MM');
+      const existing = mapped.get(key);
+      series.push({ date: key, number_of_deliveries: existing?.number_of_deliveries ?? 0 });
+      cursor = cursor.add(1, 'month');
+    }
+    return series;
+  }
+
+  let cursor = start.startOf('day');
+  const limit = end.startOf('day');
+  while (cursor.isBefore(limit) || cursor.isSame(limit)) {
+    const key = cursor.format('YYYY-MM-DD');
+    const existing = mapped.get(key);
+    series.push({ date: key, number_of_deliveries: existing?.number_of_deliveries ?? 0 });
+    cursor = cursor.add(1, 'day');
+  }
+
+  return series;
+};
+
+const mergeDeliverySeries = (older, current) => {
+  const merged = new Map();
+
+  (Array.isArray(older) ? older : [])
+    .map(normalizeDeliveryEntry)
+    .filter(Boolean)
+    .forEach((item) => {
+      merged.set(item.date, item);
+    });
+
+  (Array.isArray(current) ? current : [])
+    .map(normalizeDeliveryEntry)
+    .filter(Boolean)
+    .forEach((item) => {
+      merged.set(item.date, item);
+    });
+
+  return Array.from(merged.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([, value]) => value);
+};
 
 /* ---------- Small utility card ---------- */
 const Card = ({ title, children, className = '', exportRef, bodyClassName = '' }) => {
@@ -122,6 +219,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const revenueDistributionRef = useRef(null);
   const branchTimelineRef = useRef(null);
   const kpiRef = useRef(null);
+  const deliveryRequestIdRef = useRef(0);
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   const [salesPerformance, setSalesPerformance] = useState({ history: [], forecast: [], series: [] });
@@ -162,6 +260,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   });
   const [categoryName, setCategoryName] = useState('All Products');
   const [deliveryData, setDeliveryData] = useState([]);
+  const [deliveryOldestCursor, setDeliveryOldestCursor] = useState(0);
+  const [deliveryMeta, setDeliveryMeta] = useState(() => ({ ...DELIVERY_META_DEFAULT }));
 
   const dateRangeDisplay = useMemo(() => {
     if (rangeMode !== 'preset') return null;
@@ -212,6 +312,12 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
   const [allBranches, setAllBranches] = useState([]);
 
+  useEffect(() => {
+    setDeliveryData([]);
+    setDeliveryOldestCursor(0);
+    setDeliveryMeta({ ...DELIVERY_META_DEFAULT });
+  }, [deliveryInterval, deliveryStatus, branchId]);
+
   const shouldLoadBranches = useMemo(
     () => canSelectBranch || (!branchId && isOwner),
     [canSelectBranch, branchId, isOwner]
@@ -243,6 +349,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       inventory_count: 0
     });
     setDeliveryData([]);
+    setDeliveryOldestCursor(0);
+  setDeliveryMeta({ ...DELIVERY_META_DEFAULT });
+    deliveryRequestIdRef.current = 0;
     setLoadingSalesPerformance(false);
     setLoadingTopProducts(false);
     setLoadingDelivery(false);
@@ -411,27 +520,165 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     }
   }, [branchId, categoryFilter, productIdFilter, resolvedRange, user]);
 
+  const computeDeliveryRange = useCallback((cursor = 0) => {
+    const windowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
+    if (!windowSize) return null;
 
+    const todayEnd = dayjs().endOf('day');
 
-  const fetchDeliveryData = useCallback(async (signal) => {
+    if (deliveryInterval === 'yearly') {
+      const endAnchor = dayjs().endOf('year').subtract(cursor * windowSize, 'year');
+      const startAnchor = endAnchor.subtract(windowSize - 1, 'year');
+      const end = cursor === 0 ? todayEnd : endAnchor.endOf('year');
+      const start = startAnchor.startOf('year');
+      return {
+        start_date: start.format('YYYY-MM-DD'),
+        end_date: end.format('YYYY-MM-DD'),
+        windowSize
+      };
+    }
+
+    if (deliveryInterval === 'monthly') {
+      const endAnchor = dayjs().endOf('month').subtract(cursor * windowSize, 'month');
+      const startAnchor = endAnchor.subtract(windowSize - 1, 'month');
+      const end = cursor === 0 ? todayEnd : endAnchor.endOf('month');
+      const start = startAnchor.startOf('month');
+      return {
+        start_date: start.format('YYYY-MM-DD'),
+        end_date: end.format('YYYY-MM-DD'),
+        windowSize
+      };
+    }
+
+    const end = dayjs().endOf('day').subtract(cursor * windowSize, 'day');
+    const start = end.subtract(windowSize - 1, 'day');
+    return {
+      start_date: start.format('YYYY-MM-DD'),
+      end_date: end.format('YYYY-MM-DD'),
+      windowSize
+    };
+  }, [deliveryInterval]);
+
+  const loadDeliveryChunk = useCallback(async ({ cursor = 0, mode = 'replace', signal } = {}) => {
     if (!user) return;
-    const params = { format: deliveryInterval, status: deliveryStatus };
+    const range = computeDeliveryRange(cursor);
+    if (!range) return;
+
+    const params = {
+      format: deliveryInterval,
+      status: deliveryStatus,
+      start_date: range.start_date,
+      end_date: range.end_date
+    };
+
     if (branchId) params.branch_id = branchId;
 
+    const requestId = deliveryRequestIdRef.current + 1;
+    deliveryRequestIdRef.current = requestId;
     setLoadingDelivery(true);
+
     try {
       const response = await api.get(`/api/analytics/delivery`, { params, signal });
-      const rows = Array.isArray(response.data)
-        ? response.data.map(d => ({ ...d, number_of_deliveries: Number(d.number_of_deliveries) }))
-        : [];
-      setDeliveryData(rows);
+      const payload = response.data;
+      const rawRows = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload)
+          ? payload
+          : [];
+
+      const normalized = rawRows
+        .map(normalizeDeliveryEntry)
+        .filter(Boolean);
+
+      const filled = fillDeliverySeries(normalized, deliveryInterval, range.start_date, range.end_date);
+
+      setDeliveryData((prev) => (mode === 'prepend' ? mergeDeliverySeries(filled, prev) : filled));
+
+      if (mode === 'prepend') {
+        setDeliveryOldestCursor((prev) => Math.max(prev, cursor));
+      } else {
+        setDeliveryOldestCursor(cursor);
+      }
+
+      if (payload?.meta) {
+        setDeliveryMeta({
+          min_bucket: payload.meta.min_bucket ?? null,
+          max_bucket: payload.meta.max_bucket ?? null,
+          min_reference: payload.meta.min_reference ?? null,
+          max_reference: payload.meta.max_reference ?? null,
+          step: payload.meta.step ?? 'day'
+        });
+      } else if (mode === 'replace') {
+        setDeliveryMeta({ ...DELIVERY_META_DEFAULT });
+      }
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Delivery analytics fetch error', e);
-      setDeliveryData([]);
+      if (mode === 'replace') setDeliveryData([]);
     } finally {
-      setLoadingDelivery(false);
+      if (deliveryRequestIdRef.current === requestId) {
+        setLoadingDelivery(false);
+      }
     }
-  }, [branchId, deliveryInterval, deliveryStatus, user]);
+  }, [branchId, computeDeliveryRange, deliveryInterval, deliveryStatus, user]);
+
+  const deliveryWindowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
+
+  const deliveryWindowLabel = useMemo(() => {
+    if (!deliveryWindowSize) return '';
+    if (deliveryInterval === 'yearly') return `Shows ${deliveryWindowSize} years per request`;
+    if (deliveryInterval === 'monthly') return `Shows ${deliveryWindowSize} months per request`;
+    return `Shows ${deliveryWindowSize} days per request`;
+  }, [deliveryInterval, deliveryWindowSize]);
+
+  const deliveryRangeLabel = useMemo(() => {
+    if (!deliveryData.length) return '';
+    const first = deliveryData[0]?.date ? String(deliveryData[0].date) : '';
+    const last = deliveryData[deliveryData.length - 1]?.date ? String(deliveryData[deliveryData.length - 1].date) : '';
+    if (!first || !last) return '';
+
+    if (deliveryInterval === 'yearly') {
+      return first === last ? first : `${first} - ${last}`;
+    }
+
+    if (deliveryInterval === 'monthly') {
+      const start = dayjs(`${first}-01`, 'YYYY-MM-DD');
+      const end = dayjs(`${last}-01`, 'YYYY-MM-DD');
+      if (!start.isValid() || !end.isValid()) return `${first} - ${last}`;
+      const startStr = start.format('MMM YYYY');
+      const endStr = end.format('MMM YYYY');
+      return startStr === endStr ? startStr : `${startStr} - ${endStr}`;
+    }
+
+    const start = dayjs(first, 'YYYY-MM-DD');
+    const end = dayjs(last, 'YYYY-MM-DD');
+    if (!start.isValid() || !end.isValid()) return `${first} - ${last}`;
+    const startStr = start.format('MMM D, YYYY');
+    const endStr = end.format('MMM D, YYYY');
+    return startStr === endStr ? startStr : `${startStr} - ${endStr}`;
+  }, [deliveryData, deliveryInterval]);
+
+  const canLoadOlder = useMemo(() => {
+    if (loadingDelivery) return false;
+    if (!deliveryMeta?.min_reference) return true;
+    const nextRange = computeDeliveryRange(deliveryOldestCursor + 1);
+    if (!nextRange) return false;
+    const earliest = dayjs(deliveryMeta.min_reference, 'YYYY-MM-DD');
+    if (!earliest.isValid()) return true;
+    const nextEnd = dayjs(nextRange.end_date, 'YYYY-MM-DD');
+    return nextEnd.isSame(earliest) || nextEnd.isAfter(earliest);
+  }, [loadingDelivery, deliveryMeta, deliveryOldestCursor, computeDeliveryRange]);
+  const hasExtendedDeliveryRange = deliveryOldestCursor > 0;
+
+  const handleLoadOlder = useCallback(() => {
+    if (loadingDelivery || !canLoadOlder) return;
+    const nextCursor = deliveryOldestCursor + 1;
+    loadDeliveryChunk({ cursor: nextCursor, mode: 'prepend' });
+  }, [canLoadOlder, deliveryOldestCursor, loadDeliveryChunk, loadingDelivery]);
+
+  const handleResetDeliveryRange = useCallback(() => {
+    if (loadingDelivery || deliveryOldestCursor === 0) return;
+    loadDeliveryChunk({ cursor: 0, mode: 'replace' });
+  }, [deliveryOldestCursor, loadDeliveryChunk, loadingDelivery]);
 
   const fetchBranchPerformance = useCallback(async (signal) => {
     if (!user || !isOwner || branchId) {
@@ -506,10 +753,15 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
   useEffect(() => {
     if (!user) return;
-    const c = new AbortController();
-    const t = setTimeout(() => { fetchDeliveryData(c.signal); }, FETCH_DEBOUNCE_MS);
-    return () => { c.abort(); clearTimeout(t); };
-  }, [fetchDeliveryData, user]);
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      loadDeliveryChunk({ cursor: 0, mode: 'replace', signal: controller.signal });
+    }, FETCH_DEBOUNCE_MS);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [loadDeliveryChunk, user]);
 
   useEffect(() => {
     if (!user || branchId || !isOwner) return;
@@ -832,6 +1084,12 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
               setDeliveryStatus={setDeliveryStatus}
               loadingDelivery={loadingDelivery}
               deliveryChartRef={deliveryChartRef}
+              onLoadOlder={handleLoadOlder}
+              onResetRange={handleResetDeliveryRange}
+              canLoadOlder={canLoadOlder}
+              hasExtendedRange={hasExtendedDeliveryRange}
+              rangeLabel={deliveryRangeLabel}
+              windowLabel={deliveryWindowLabel}
             />
           )}
 

@@ -16,6 +16,12 @@ function Delivery({
   setDeliveryStatus,
   loadingDelivery,
   deliveryChartRef,
+  onLoadOlder = () => {},
+  onResetRange = () => {},
+  canLoadOlder = true,
+  hasExtendedRange = false,
+  rangeLabel = '',
+  windowLabel = ''
 }) {
   const normalizedData = useMemo(
     () => (Array.isArray(deliveryData) ? deliveryData : []),
@@ -60,6 +66,9 @@ function Delivery({
   const xAngle = manyTicks ? -35 : 0;
   const xAnchor = manyTicks ? 'end' : 'middle';
 
+  const loadOlderDisabled = loadingDelivery || !canLoadOlder;
+  const resetDisabled = loadingDelivery || !hasExtendedRange;
+
   return (
     <>
       <Card title="Delivery Analytics" className="col-span-full h-[500px]" exportRef={deliveryChartRef}>
@@ -69,37 +78,68 @@ function Delivery({
           {/* Controls */}
           <div
             data-export-exclude
-            className="flex flex-wrap items-end justify-end gap-3 mb-3"
+            className="flex flex-wrap items-end justify-between gap-3 mb-3"
           >
-            {/* Status */}
-            <div className="w-36">
-              <DropdownCustom
-                value={deliveryStatus}
-                onChange={(e) => setDeliveryStatus(e.target.value)}
-                label="Status"
-                variant="default"
-                size="xs"
-                options={[
-                  { value: 'delivered', label: 'Delivered' },
-                  { value: 'undelivered', label: 'Undelivered' },
-                ]}
-              />
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-36">
+                <DropdownCustom
+                  value={deliveryStatus}
+                  onChange={(e) => setDeliveryStatus(e.target.value)}
+                  label="Status"
+                  variant="default"
+                  size="xs"
+                  options={[
+                    { value: 'delivered', label: 'Delivered' },
+                    { value: 'undelivered', label: 'Undelivered' },
+                  ]}
+                />
+              </div>
+
+              <div className="w-36">
+                <DropdownCustom
+                  value={deliveryInterval}
+                  onChange={(e) => setDeliveryInterval(e.target.value)}
+                  label="Interval"
+                  variant="default"
+                  size="xs"
+                  options={[
+                    { value: 'daily', label: 'Daily' },
+                    { value: 'monthly', label: 'Monthly' },
+                    { value: 'yearly', label: 'Yearly' },
+                  ]}
+                />
+              </div>
             </div>
 
-            {/* Interval */}
-            <div className="w-36">
-              <DropdownCustom
-                value={deliveryInterval}
-                onChange={(e) => setDeliveryInterval(e.target.value)}
-                label="Interval"
-                variant="default"
-                size="xs"
-                options={[
-                  { value: 'daily', label: 'Daily' },
-                  { value: 'monthly', label: 'Monthly' },
-                  { value: 'yearly', label: 'Yearly' },
-                ]}
-              />
+            <div className="flex flex-wrap items-center justify-end gap-2 text-right">
+              {rangeLabel && (
+                <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
+                  {rangeLabel}
+                </span>
+              )}
+              {windowLabel && (
+                <span className="text-[11px] text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                  {windowLabel}
+                </span>
+              )}
+              {hasExtendedRange && (
+                <button
+                  type="button"
+                  onClick={onResetRange}
+                  disabled={resetDisabled}
+                  className="px-3 py-1.5 text-xs font-semibold text-green-700 border border-green-200 rounded-md bg-white hover:bg-green-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Latest
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onLoadOlder}
+                disabled={loadOlderDisabled}
+                className="px-3 py-1.5 text-xs font-semibold text-green-700 border border-green-200 rounded-md bg-white hover:bg-green-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Older Range
+              </button>
             </div>
           </div>
 
