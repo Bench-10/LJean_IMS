@@ -568,7 +568,9 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
   };
 
   const showScopeSwitcher = availableScopes.length > 1;
-  const showBranchFilter = !canViewAdminScope && scope === 'branch';
+  // Only show the branch selector to admins/owners. Branch managers should only
+  // view requests for their own branch so the selector is unnecessary.
+  const showBranchFilter = canViewAdminScope && scope === 'branch';
 
   if (!open) {
     return null;

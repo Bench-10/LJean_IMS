@@ -188,20 +188,12 @@ export const markAsRead = async (userAndAlertID) =>{
     return;
   }
 
-  const updateResult = await SQLquery(
-    `UPDATE user_notification
-     SET is_read = TRUE
-     WHERE user_id = $1 AND alert_id = $2`,
+  await SQLquery(
+    `INSERT INTO user_notification(user_id, alert_id, is_read)
+     VALUES ($1, $2, TRUE)
+     ON CONFLICT (user_id, alert_id) DO UPDATE SET is_read = TRUE`,
     [user_id, alert_id]
   );
-
-  if (updateResult.rowCount === 0) {
-    await SQLquery(
-      `INSERT INTO user_notification(user_id, alert_id, is_read)
-       VALUES($1, $2, TRUE)`,
-      [user_id, alert_id]
-    );
-  }
 };
 
 //MARKS ALL NOTIFICATIONS AS READ FOR A USER
@@ -262,20 +254,9 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
   }
 
   await SQLquery(
-    `UPDATE user_notification
-     SET is_read = TRUE
-     WHERE user_id = $1 AND alert_id = ANY($2::int[])`,
-    [userId, alertIds]
-  );
-
-  await SQLquery(
     `INSERT INTO user_notification(user_id, alert_id, is_read)
-     SELECT $1, alert_id, TRUE
-     FROM unnest($2::int[]) AS alert_id
-     WHERE NOT EXISTS (
-       SELECT 1 FROM user_notification existing
-       WHERE existing.user_id = $1 AND existing.alert_id = alert_id
-     )`,
+     SELECT $1, unnest($2::int[]), TRUE
+     ON CONFLICT (user_id, alert_id) DO UPDATE SET is_read = TRUE`,
     [userId, alertIds]
   );
 

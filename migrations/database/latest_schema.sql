@@ -138,6 +138,7 @@ CREATE TABLE user_notification (
     user_id INT,
     alert_id INT,
     is_read BOOLEAN DEFAULT TRUE,
+    PRIMARY KEY (user_id, alert_id),
     FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (alert_id) REFERENCES Inventory_Alerts(alert_id)
 );

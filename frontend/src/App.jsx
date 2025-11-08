@@ -293,6 +293,7 @@ function App() {
   const userActivityTimeoutRef = useRef(null);
   const lastActivityStateRef = useRef(true);
   const hiddenActivityTimeoutRef = useRef(null);
+  const notificationFetchLockRef = useRef(false);
 
   // ACCOUNT STATUS STATES
   const [showAccountDisabledPopup, setShowAccountDisabledPopup] = useState(false);
@@ -1621,11 +1622,18 @@ function App() {
 
   //FOR NOTIFICATION DATA
   const getTime = useCallback(async () =>{
+    // Prevent concurrent fetches while mark-as-read is in progress
+    if (notificationFetchLockRef.current) {
+      return;
+    }
+
     try {
       if (!user || userRoles.length === 0) {
         setNotify([]);
         return;
       }
+
+      notificationFetchLockRef.current = true;
 
       const params = new URLSearchParams();
 
@@ -1642,6 +1650,7 @@ function App() {
         }
       } else {
         if (!user.branch_id || !user.user_id || !user.hire_date) {
+          notificationFetchLockRef.current = false;
           return;
         }
 
@@ -1652,12 +1661,17 @@ function App() {
 
       const queryString = params.toString();
       const endpoint = `/api/notifications${queryString ? `?${queryString}` : ''}`;
-  const time = await api.get(endpoint);
-  const fetchedNotifications = Array.isArray(time.data) ? time.data : [];
-  setNotify(dedupeNotifications(fetchedNotifications));
+      const time = await api.get(endpoint);
+      const fetchedNotifications = Array.isArray(time.data) ? time.data : [];
+      setNotify(dedupeNotifications(fetchedNotifications));
     } catch (error) {
       console.log(error.message);
-    } 
+    } finally {
+      // Add small delay before allowing next fetch to ensure DB writes complete
+      setTimeout(() => {
+        notificationFetchLockRef.current = false;
+      }, 100);
+    }
   }, [user, userRoles, isOwner]);
 
 

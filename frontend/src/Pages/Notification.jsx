@@ -113,11 +113,20 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
       n.alert_id === alert_id ? { ...n, is_read: true } : n
     ));
 
-    const body = isAdminUser ? { alert_id: alert_id, user_type: 'admin',  admin_id: principalId } : { alert_id: alert_id, user_type: 'user',  user_id: principalId }
+    const body = isAdminUser 
+      ? { alert_id: alert_id, user_type: 'admin', admin_id: principalId } 
+      : { alert_id: alert_id, user_type: 'user', user_id: principalId };
 
-
-    //UPDATES THE BACKEND
-    await api.post(`/api/notifications`, body);
+    try {
+      //UPDATES THE BACKEND
+      await api.post(`/api/notifications`, body);
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      // Revert optimistic update on error
+      setNotify(notify => notify.map(n =>
+        n.alert_id === alert_id ? { ...n, is_read: false } : n
+      ));
+    }
   };
 
   const handleNotificationClick = (notification) => {
@@ -131,9 +140,11 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
 
   //FUNCTION THAT MARKS ALL NOTIFICATIONS AS READ
   const markAllAsRead = async () => {
-    try {
+    // Capture current state for potential rollback
+    const previousNotifications = notify;
 
-      //UPDATES THE UI
+    try {
+      //UPDATES THE UI OPTIMISTICALLY
       setNotify(notify => notify.map(n => ({ ...n, is_read: true })));
 
       // Build top-level body fields expected by the server
@@ -142,10 +153,10 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
         : { user_type: 'user', user_id: principalId, branch_id: user.branch_id, hire_date: user.hire_date };
 
       await api.post(`/api/notifications/mark-all-read`, body);
-
-      
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Failed to mark all notifications as read:', error);
+      // Revert to previous state on error
+      setNotify(previousNotifications);
     }
   };
 
