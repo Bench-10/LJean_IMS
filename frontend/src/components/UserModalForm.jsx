@@ -83,6 +83,15 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
     }
   }, [openUserModal, user]);
 
+  // Close on ESC like the other modal
+  useEffect(() => {
+    if (!openUserModal) return;
+    const onKey = (e) => { if (e.key === 'Escape') handleClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openUserModal]);
+
   if (!user || !user.role) return null;
 
   const passwordStrength = (value) => {
@@ -93,8 +102,13 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
   };
 
   const validateInputs = async () => {
+    // show loading as soon as the button is clicked
+    setButtonLoading(true);
+
     const isEmptyField = {};
     setCellCheck(false);
+    setInvalidEmail(false);
+    setUsernameExisting(false);
 
     if (!String(first_name).trim()) isEmptyField.first_name = true;
     if (!String(last_name).trim()) isEmptyField.last_name = true;
@@ -110,36 +124,50 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
     const firstTwo = cell_number.substring(0, 2);
     if (cell_number.length !== 11 || firstTwo !== "09" || /[a-zA-Z]/.test(cell_number)) {
       setCellCheck(true);
+      setButtonLoading(false);
       return;
     }
 
-    if (Object.keys(isEmptyField).length > 0) return;
+    if (Object.keys(isEmptyField).length > 0) {
+      setButtonLoading(false);
+      return;
+    }
 
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!(re.test(username.trim()))) {
+    if (!re.test(username.trim())) {
       setInvalidEmail(true);
+      setButtonLoading(false);
       return;
     }
 
-    if (passwordCheck && passwordCheck.length !== 0) return;
-
-    if (mode === 'add' || (userDetailes.username !== username)) {
-      const response = await api.get(`/api/existing_account`, { params: { username } });
-      if (response.data.result) {
-        setUsernameExisting(true);
-        return;
-      } else {
-        setUsernameExisting(false);
-      }
+    if (passwordCheck && passwordCheck.length !== 0) {
+      setButtonLoading(false);
+      return;
     }
 
-    setDialog(true);
-    setButtonLoading(true);
+    try {
+      if (mode === 'add' || (userDetailes?.username !== username)) {
+        const response = await api.get(`/api/existing_account`, { params: { username } });
+        if (response.data.result) {
+          setUsernameExisting(true);
+          setButtonLoading(false);
+          return;
+        }
+      }
+
+      // open confirmation dialog and keep the button in "loading"
+      setDialog(true);
+    } catch (e) {
+      console.error(e);
+      setButtonLoading(false);
+    }
   };
 
   const submitUserConfirmation = async () => {
     try {
-      setLoading(true);
+      setLoading(true);        // full-screen overlay
+      setButtonLoading(true);  // keep the button spinning too
+
       const userData = {
         first_name, last_name, branch, role, cell_number, address, username, password,
         created_by_id: user.role.some(role => ['Owner'].includes(role)) ? user.admin_id : user.user_id,
@@ -159,6 +187,7 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
       console.error('Error submitting user:', error);
     } finally {
       setLoading(false);
+      setButtonLoading(false); // ensure spinner stops even if there was an error
     }
   };
 
@@ -212,7 +241,6 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
     });
   };
 
-
   return (
     <div>
       {loading && (
@@ -229,165 +257,169 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
       }
 
       {openUserModal && (
-        <>
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999]" onClick={handleClose} />
-          <div className="fixed inset-0 flex items-center justify-center z-[9999] p-2 animate-popup">
-            <div
-              className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] overflow-y-auto hide-scrollbar flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-start sm:items-center gap-3 flex-shrink-0 sticky top-0 z-10">
-                <h1 className="text-white font-bold text-2xl">
-                  {mode === 'add' ? 'ADD NEW USER' : 'Edit User Information'}
-                </h1>
-                <button
-                  onClick={handleClose}
-                  className="text-white hover:bg-green-600 p-1.5 rounded-full transition-colors"
-                >
-                  <RxCross2 className="text-xl" />
-                </button>
-              </div>
+        // Backdrop container catches outside clicks
+        <div
+          className="fixed inset-0 z-[9999] p-2 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-popup"
+          onClick={handleClose}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-modal-title"
+        >
+          {/* Modal card; stop propagation so inside clicks don't close */}
+          <div
+            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] overflow-y-auto hide-scrollbar flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-start sm:items-center gap-3 flex-shrink-0 sticky top-0 z-10">
+              <h1 id="user-modal-title" className="text-white font-bold text-2xl">
+                {mode === 'add' ? 'ADD NEW USER' : 'Edit User Information'}
+              </h1>
+              <button
+                onClick={handleClose}
+                className="text-white hover:bg-green-600 p-1.5 rounded-full transition-colors"
+              >
+                <RxCross2 className="text-xl" />
+              </button>
+            </div>
 
-              {/* Body */}
-              <div className="p-6 space-y-5">
-                <form onSubmit={(e) => { e.preventDefault(); validateInputs(); }}>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-green-50/30 p-5 rounded-xl shadow-inner">
-                    {/* First Name */}
-                    <div className="relative">
-                      <h2 className="font-medium text-green-900 mb-2">First Name</h2>
-                      <input
-                        type="text"
-                        className={inputDesign('first_name')}
-                        value={first_name}
-                        onChange={(e) => setFirstName(e.target.value)}
-                      />
-                      {errorflag('first_name', 'First Name')}
-                    </div>
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              <form onSubmit={(e) => { e.preventDefault(); validateInputs(); }}>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-green-50/30 p-5 rounded-xl shadow-inner">
+                  {/* First Name */}
+                  <div className="relative">
+                    <h2 className="font-medium text-green-900 mb-2">First Name</h2>
+                    <input
+                      type="text"
+                      className={inputDesign('first_name')}
+                      value={first_name}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                    {errorflag('first_name', 'First Name')}
+                  </div>
 
-                    {/* Last Name */}
-                    <div className="relative">
-                      <h2 className="font-medium text-green-900 mb-2">Last Name</h2>
-                      <input
-                        type="text"
-                        className={inputDesign('last_name')}
-                        value={last_name}
-                        onChange={(e) => setLastname(e.target.value)}
-                      />
-                      {errorflag('last_name', 'Last Name')}
-                    </div>
+                  {/* Last Name */}
+                  <div className="relative">
+                    <h2 className="font-medium text-green-900 mb-2">Last Name</h2>
+                    <input
+                      type="text"
+                      className={inputDesign('last_name')}
+                      value={last_name}
+                      onChange={(e) => setLastname(e.target.value)}
+                    />
+                    {errorflag('last_name', 'Last Name')}
+                  </div>
 
-                    {/* Branch - Using DropdownCustom */}
-                    <div className="relative">
-                      {user.role.some(role => ['Branch Manager'].includes(role)) ? (
-                        <>
-                          <h2 className="font-medium text-green-900 mb-2">Branch</h2>
-                          <input
-                            type="text"
-                            className={inputDesign('branch')}
-                            value={branches.find(b => b.branch_id === branch)?.branch_name || ''}
-                            readOnly
-                          />
-                        </>
-                      ) : (
-                        <DropdownCustom
-                          label="Branch"
-                          value={branch}
-                          onChange={(e) => setBranch(e.target.value)}
-                          options={branchOptions}
-                          variant="simple"
-                          error={emptyField.branch}
-                          labelClassName="block font-medium text-green-900 mb-2"
+                  {/* Branch */}
+                  <div className="relative">
+                    {user.role.some(role => ['Branch Manager'].includes(role)) ? (
+                      <>
+                        <h2 className="font-medium text-green-900 mb-2">Branch</h2>
+                        <input
+                          type="text"
+                          className={inputDesign('branch')}
+                          value={branches.find(b => b.branch_id === branch)?.branch_name || ''}
+                          readOnly
                         />
-                      )}
-                      {errorflag('branch', 'Branch')}
-                    </div>
-
-                    {/* User Role */}
-
-                    <div className="relative">
-                      <DropdownCheckbox
-                        label="User Role"
-                        values={selectedRoles}
-                        options={roleOptions}
-                        onChange={handleRoleChange}
-                        error={emptyField.role}
+                      </>
+                    ) : (
+                      <DropdownCustom
+                        label="Branch"
+                        value={branch}
+                        onChange={(e) => setBranch(e.target.value)}
+                        options={branchOptions}
+                        variant="simple"
+                        error={emptyField.branch}
+                        labelClassName="block font-medium text-green-900 mb-2"
                       />
-                      {errorflag('role', 'User Role')}
-                    </div>
-
-
-                    {/* Cell Number */}
-                    <div className="relative">
-                      <h2 className="font-medium text-green-900 mb-2">Cellphone Number</h2>
-                      <input
-                        type="text"
-                        className={inputDesign('cell_number')}
-                        value={cell_number}
-                        onChange={(e) => setCellNumber(e.target.value)}
-                      />
-                      {errorflag('cell_number', 'Cellphone Number')}
-                    </div>
-
-                    {/* Address */}
-                    <div className="relative">
-                      <h2 className="font-medium text-green-900 mb-2">Address</h2>
-                      <input
-                        type="text"
-                        className={inputDesign('address')}
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                      />
-                      {errorflag('address', 'Address')}
-                    </div>
-
-                    {/* Email */}
-                    <div className="relative">
-                      <h2 className="font-medium text-green-900 mb-2">Email</h2>
-                      <input
-                        type="text"
-                        className={inputDesign('username')}
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                      />
-                      {errorflag('username', 'Email')}
-                    </div>
-
-                    {/* Password */}
-                    <div className="relative">
-                      <h2 className="font-medium text-green-900 mb-2">Password</h2>
-                      <input
-                        type="text"
-                        className={inputDesign('password')}
-                        value={password}
-                        onChange={(e) => { setPassword(e.target.value); passwordStrength(e.target.value); }}
-                      />
-                      {errorflag('password', 'Password')}
-                    </div>
+                    )}
+                    {errorflag('branch', 'Branch')}
                   </div>
 
-                  {/* Submit Button */}
-                  <div className="flex justify-center mt-8">
-                    <button
-                      type="submit"
-                      className="flex items-center justify-center gap-2 px-8 py-2.5 bg-green-700 hover:bg-green-800 text-white font-medium rounded-lg shadow-md transition-all duration-200 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
-                      disabled={buttonLoading}
-                    >
-                      {buttonLoading ? (
-                        <>
-                          <FaSpinner className="animate-spin" />
-                          <span>{mode === 'add' ? 'Creating...' : 'Updating...'}</span>
-                        </>
-                      ) : (
-                        <span>{mode === 'add' ? 'Register User' : 'Update User'}</span>
-                      )}
-                    </button>
+                  {/* User Role */}
+                  <div className="relative">
+                    <DropdownCheckbox
+                      label="User Role"
+                      values={selectedRoles}
+                      options={roleOptions}
+                      onChange={handleRoleChange}
+                      error={emptyField.role}
+                    />
+                    {errorflag('role', 'User Role')}
                   </div>
-                </form>
-              </div>
+
+                  {/* Cell Number */}
+                  <div className="relative">
+                    <h2 className="font-medium text-green-900 mb-2">Cellphone Number</h2>
+                    <input
+                      type="text"
+                      className={inputDesign('cell_number')}
+                      value={cell_number}
+                      onChange={(e) => setCellNumber(e.target.value)}
+                    />
+                    {errorflag('cell_number', 'Cellphone Number')}
+                  </div>
+
+                  {/* Address */}
+                  <div className="relative">
+                    <h2 className="font-medium text-green-900 mb-2">Address</h2>
+                    <input
+                      type="text"
+                      className={inputDesign('address')}
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
+                    {errorflag('address', 'Address')}
+                  </div>
+
+                  {/* Email */}
+                  <div className="relative">
+                    <h2 className="font-medium text-green-900 mb-2">Email</h2>
+                    <input
+                      type="text"
+                      className={inputDesign('username')}
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                    />
+                    {errorflag('username', 'Email')}
+                  </div>
+
+                  {/* Password */}
+                  <div className="relative">
+                    <h2 className="font-medium text-green-900 mb-2">Password</h2>
+                    <input
+                      type="text"
+                      className={inputDesign('password')}
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); passwordStrength(e.target.value); }}
+                    />
+                    {errorflag('password', 'Password')}
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex justify-center mt-8">
+                  <button
+                    type="submit"
+                    className="flex items-center justify-center gap-2 px-8 py-2.5 bg-green-700 hover:bg-green-800 text-white font-medium rounded-lg shadow-md transition-all duration-200 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={buttonLoading || loading}
+                    aria-busy={buttonLoading || loading}
+                  >
+                    {buttonLoading || loading ? (
+                      <>
+                        <FaSpinner className="animate-spin" />
+                        <span>{mode === 'add' ? 'Creating...' : 'Updating...'}</span>
+                      </>
+                    ) : (
+                      <span>{mode === 'add' ? 'Register User' : 'Update User'}</span>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import React from 'react';
 import { currencyFormat } from '../utils/formatCurrency';
+import { IoMdClose } from "react-icons/io";
 
 function InventoryItemDetailsDialog({ open, onClose, user, item }) {
   if (!open || !item) return null;
@@ -34,10 +35,10 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
         >
           <button
             type="button"
-            className="btn-sm btn-circle btn-ghost absolute right-2 top-2"
-            onClick={onClose}
+            className="btn-sm btn-circle btn-ghost absolute right-5 top-5 rounded-lg text-gray-500 transition hover:bg-gray-100"
+            onClick={onClose} 
           >
-            ✕
+            <IoMdClose className='sm:w-6 sm:h-6' />
           </button>
 
           <div className="pt-2 px-2 lg:px-8 w-full flex-1 flex flex-col">

@@ -215,7 +215,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   return (
     <div className="pt-20 lg:pt-8 px-4 lg:px-8" >
       {/*TITLE*/}
-      <h1 className='text-[35px] leading-[36px] font-bold text-green-900'>
+      <h1 className='text-[33px] leading-[36px] font-bold text-green-900'>
         PRODUCT VALIDITY
       </h1>
 
@@ -500,7 +500,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
         {/* DESKTOP LAYOUT: THREE COLUMNS */}
         {/* LEFT: ITEM COUNT (DESKTOP) */}
-        <div className='hidden sm:block text-sm lg:text-sm text-gray-600 sm:flex-1'>
+        <div className='hidden sm:block text-[13px] text-gray-600 sm:flex-1'>
           {filteredValidityData.length > 0 ? (
             <>Showing {startIndex + 1} to {Math.min(endIndex, filteredValidityData.length)} of {filteredValidityData.length} items</>
           ) : (
@@ -515,17 +515,17 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className='px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className='px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
               >
                 Previous
               </button>
-              <span className='text-sm text-gray-600 whitespace-nowrap'>
+              <span className='text-[13px] text-gray-600 whitespace-nowrap'>
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className='px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-200  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className='px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
               >
                 Next
               </button>
@@ -536,19 +536,19 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
         {/* RIGHT: EXPORT DROPDOWN */}
         <div className='flex justify-center sm:justify-end w-full sm:flex-1'>
           <div className="relative group w-full sm:w-auto">
-            <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 lg:px-5 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-sm lg:text-base w-full sm:w-auto'>
+            <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 lg:px-5 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-[13px] w-full sm:w-auto'>
               <TbFileExport />EXPORT
             </button>
             <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 bottom-full mb-2 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
               <button
                 onClick={() => handleExportValidity('csv')}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-[13px] whitespace-nowrap"
               >
                 Export as CSV
               </button>
               <button
                 onClick={() => handleExportValidity('pdf')}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-[13px] whitespace-nowrap"
               >
                 Export as PDF
               </button>

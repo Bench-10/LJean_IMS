@@ -92,7 +92,7 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
       }
 
       {/*TITLE*/}
-      <h1 className='text-2xl md:text-[35px] leading-[36px] font-bold text-green-900'>
+      <h1 className='text-2xl md:text-[33px] leading-[36px] font-bold text-green-900'>
         USER MANAGEMENT
       </h1>
 
@@ -130,7 +130,7 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
   <button
     className="w-full lg:w-auto inline-flex items-center justify-center border 
                bg-[#119200] font-medium hover:bg-[#56be48] text-white px-5 py-2 
-               rounded-lg transition-all text-sm sm:text-base whitespace-nowrap"
+               rounded-lg transition-all text-sm whitespace-nowrap"
     onClick={() => handleUserModalOpen('add')}
   >
     <MdGroupAdd className="mr-2" />
