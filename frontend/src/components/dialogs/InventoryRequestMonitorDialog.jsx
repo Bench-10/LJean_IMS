@@ -257,6 +257,20 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
     };
   }, [open, scope, branchFilter, refreshIndex]);
 
+  // Ensure branch managers always have their branch set as the active filter
+  // so that requests for their branch are fetched even though they don't see
+  // the branch selector UI. Without this, `scope === 'branch'` and an empty
+  // branchFilter will cause the fetch to exit early and show no requests.
+  useEffect(() => {
+    if (!open) return;
+    if (!roleList.includes('Branch Manager')) return;
+    if (scope !== 'branch') return;
+    if (branchFilter) return;
+    if (user?.branch_id) {
+      setBranchFilter(String(user.branch_id));
+    }
+  }, [open, roleList, scope, branchFilter, user]);
+
   useEffect(() => {
     if (!open) {
       setRequests([]);
@@ -275,7 +289,10 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
 
   const availableScopes = useMemo(() => {
     if (canViewAdminScope) {
-      return [{ id: 'admin', label: 'All Branches' }];
+      return [
+        { id: 'admin', label: 'All Branches' },
+        { id: 'branch', label: 'Branch' }
+      ];
     }
 
     const options = [{ id: 'user', label: 'My Requests' }];
@@ -450,20 +467,26 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
   }, [userRequests, branches]);
 
   const scopedUserRequests = useMemo(() => {
+    const parseBranchId = (value) => {
+      if (value === null || value === undefined || value === '') {
+        return null;
+      }
+
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    // If admin scope (owner) and a branch is selected, apply the branch filter
+    // to user requests as well. Previously admin returned all user requests
+    // ignoring the branchFilter which caused requests from one branch to be
+    // visible when another branch was selected.
     if (scope === 'admin') {
-      return normalizedUserRequests;
+      const explicitBranch = parseBranchId(branchFilter);
+      if (explicitBranch === null) return normalizedUserRequests;
+      return normalizedUserRequests.filter((request) => parseBranchId(request.branch_id) === explicitBranch);
     }
 
     if (scope === 'branch') {
-      const parseBranchId = (value) => {
-        if (value === null || value === undefined || value === '') {
-          return null;
-        }
-
-        const numeric = Number(value);
-        return Number.isFinite(numeric) ? numeric : null;
-      };
-
       const explicitBranch = parseBranchId(branchFilter);
       const fallbackBranch = parseBranchId(user?.branch_id);
       const targetBranch = explicitBranch ?? fallbackBranch;
@@ -567,10 +590,13 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
     }
   };
 
-  const showScopeSwitcher = availableScopes.length > 1;
-  // Only show the branch selector to admins/owners. Branch managers should only
-  // view requests for their own branch so the selector is unnecessary.
-  const showBranchFilter = canViewAdminScope && scope === 'branch';
+  // Hide the scope switcher for owners/admins — owners should always be able
+  // to filter by branch and don't need to switch scopes in this dialog.
+  const showScopeSwitcher = availableScopes.length > 1 && !canViewAdminScope;
+
+  // Show the branch selector only for owners/admins. Branch managers should
+  // not see the selector because they only view requests for their own branch.
+  const showBranchFilter = canViewAdminScope;
 
   if (!open) {
     return null;
