@@ -1243,6 +1243,24 @@ function App() {
           });
         }
       }
+      // If a request was cancelled, remove it from local state immediately so
+      // Owners' approval list doesn't show a cancelled request (prevents
+      // approving a request that was cancelled by a manager).
+      if (nextStatus === 'cancelled') {
+        setUserCreationRequests((prev) => {
+          if (!Array.isArray(prev)) return prev;
+          return prev.filter((request) => {
+            const candidateId = Number(request?.pending_user_id ?? request?.user_id);
+            return !(Number.isFinite(candidateId) && candidateId === targetId);
+          });
+        });
+
+        // bump the refresh key so any dialogs depending on it refresh
+        setRequestStatusRefreshKey((prev) => prev + 1);
+        // No need to continue with the regular merge logic for cancelled
+        // events since we've removed the request locally.
+        return;
+      }
       const resolvedAt = incoming?.request_resolved_at
         ?? incoming?.resolved_at
         ?? payload.resolved_at
@@ -1472,6 +1490,23 @@ function App() {
           prevUsers.filter(user => user.user_id !== userData.user_id)
         );
         
+        // Also remove any pending user-creation request that corresponds to
+        // this deleted/cancelled user so it doesn't remain in the Owner
+        // Approvals list. Some server paths emit a `user-update` with
+        // action:'delete' for cancellations (reason:'cancelled'), so we
+        // defensively remove matching pending requests here.
+        setUserCreationRequests((prev) => {
+          if (!Array.isArray(prev)) return prev;
+          return prev.filter((request) => {
+            const candidateId = Number(request?.pending_user_id ?? request?.user_id);
+            return !(Number.isFinite(candidateId) && Number(candidateId) === Number(userData.user_id));
+          });
+        });
+
+        // Bump the refresh key so any open dialogs or monitors refresh
+        // their data sources.
+        setRequestStatusRefreshKey((prev) => prev + 1);
+
         // Don't show "user deleted successfully" to other users
         // This WebSocket event just updates the data silently for other users
       }

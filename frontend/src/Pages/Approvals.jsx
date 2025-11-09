@@ -99,7 +99,12 @@ function Approvals({
     const normalizedSearch = searchItem.toLowerCase();
 
     return userRequests
-      .filter((request) => String(request?.request_status ?? request?.status ?? '').toLowerCase() === 'pending')
+      .filter((request) => {
+        // Consider multiple possible status fields (request_status, status, resolution_status)
+        // and ensure only truly pending requests appear in the Owner approvals list.
+        const status = String(request?.request_status ?? request?.status ?? request?.resolution_status ?? '').toLowerCase();
+        return status === 'pending';
+      })
       .filter((request) => {
         if (!normalizedSearch) return true;
 
@@ -135,7 +140,11 @@ function Approvals({
     const normalizedSearch = searchItem.toLowerCase();
 
     return inventoryRequests
-      .filter((request) => request.current_stage === "admin_review" && request.status === "pending")
+      .filter((request) => {
+        // Normalize various possible status fields so cancelled/rejected items are excluded.
+        const status = String(request?.status ?? request?.request_status ?? request?.resolution_status ?? '').toLowerCase();
+        return request.current_stage === "admin_review" && status === "pending";
+      })
       .filter((request) => {
         if (!normalizedSearch) return true;
 
