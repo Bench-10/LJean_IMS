@@ -259,7 +259,7 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
       {openUserModal && (
         // Backdrop container catches outside clicks
         <div
-          className="fixed inset-0 z-[9999] p-2 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-popup"
+          className="fixed inset-0 z-[9999] p-2 flex items-center justify-center bg-black/40 backdrop-blur-sm"
           onClick={handleClose}
           role="dialog"
           aria-modal="true"
@@ -267,7 +267,7 @@ function UserModalForm({ branches, openUserModal, onClose, mode, fetchUsersinfo,
         >
           {/* Modal card; stop propagation so inside clicks don't close */}
           <div
-            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] overflow-y-auto hide-scrollbar flex flex-col"
+            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] overflow-y-auto hide-scrollbar flex flex-col  animate-popup"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

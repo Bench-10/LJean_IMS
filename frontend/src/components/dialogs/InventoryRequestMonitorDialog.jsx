@@ -4,7 +4,6 @@ import { currencyFormat } from '../../utils/formatCurrency.js';
 import ChartLoading from '../common/ChartLoading.jsx';
 // Adjust path if needed
 import DropdownCustom from '../DropdownCustom';
-import { MdRefresh } from 'react-icons/md';
 import { IoMdClose } from "react-icons/io";
 
 const toneStyles = {
@@ -258,12 +257,13 @@ const InventoryRequestMonitorDialog = ({
 
       let statusDetail;
       if (normalizedStatus === 'pending') {
-        // For user account flows, this effectively means "awaiting owner"; keep code generic 'pending'
         statusDetail = { code: 'pending', label: 'Pending', tone: 'amber', is_final: false, stage: 'review' };
       } else if (normalizedStatus === 'approved') {
         statusDetail = { code: 'approved', label: 'Approved', tone: 'emerald', is_final: true, stage: 'review' };
       } else if (normalizedStatus === 'cancelled') {
         statusDetail = { code: 'cancelled', label: 'Cancelled', tone: 'slate', is_final: true, stage: 'review' };
+      } else if (normalizedStatus === 'deleted') {
+        statusDetail = { code: 'deleted', label: 'Deleted', tone: 'slate', is_final: true, stage: 'review' };
       } else {
         statusDetail = { code: 'rejected', label: 'Rejected', tone: 'rose', is_final: true, stage: 'review' };
       }
@@ -361,9 +361,12 @@ const InventoryRequestMonitorDialog = ({
       const code = req?.status_detail?.code;
       if (!code) return false;
 
+      // Hide cancelled and deleted requests from all users
+      if (code === 'cancelled' || code === 'deleted') return false;
+
       if (isOwnerUser) {
-        // Owner: only final states
-        return code === 'approved' || code === 'rejected' || code === 'cancelled';
+        // Owner: only final states (approved/rejected)
+        return code === 'approved' || code === 'rejected';
       }
 
       if (isBranchManager) {
@@ -492,16 +495,6 @@ const InventoryRequestMonitorDialog = ({
               <p className="text-sm text-gray-500">Review user accounts and inventory requests that need action.</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                aria-label="Refresh"
-                title="Refresh"
-                onClick={triggerRefresh}
-                disabled={combinedLoading}
-              >
-                <MdRefresh className={`h-5 w-5 ${combinedLoading ? 'animate-spin' : ''}`} />
-              </button>
               <button
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
                 onClick={onClose}

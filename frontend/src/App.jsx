@@ -35,7 +35,6 @@ const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 const TAB_HIDDEN_GRACE_MS = 20 * 1000;
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'touchmove'];
 
-
 const normalizeAlertId = (value) => {
   if (value === null || value === undefined) {
     return null;
@@ -76,7 +75,6 @@ const dedupeNotifications = (notifications) => {
   return result;
 };
 
-
 const createDeleteGuardState = () => ({
   open: false,
   message: '',
@@ -90,6 +88,41 @@ const createDeleteGuardState = () => ({
   highlightFocus: null,
   targetPendingIds: []
 });
+
+const dedupeUserRequestList = (records) => {
+  if (!Array.isArray(records)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const deduped = [];
+
+  for (const record of records) {
+    if (!record || typeof record !== 'object') {
+      continue;
+    }
+
+    const rawId = record.pending_user_id ?? record.user_id ?? record.request_id ?? null;
+    const numericId = Number(rawId);
+    const key = Number.isFinite(numericId)
+      ? `id:${numericId}`
+      : rawId !== null && rawId !== undefined
+        ? `key:${String(rawId).toLowerCase()}`
+        : null;
+
+    if (key && seen.has(key)) {
+      continue;
+    }
+
+    if (key) {
+      seen.add(key);
+    }
+
+    deduped.push(record);
+  }
+
+  return deduped;
+};
 
 
 
@@ -1155,12 +1188,12 @@ function App() {
       setUserCreationRequests((prev) => {
         if (!Array.isArray(prev)) {
           const normalizedStatus = resolvedStatus ?? 'pending';
-          return [{
+          return dedupeUserRequestList([{
             ...incoming,
             status: normalizedStatus,
             request_status: normalizedStatus,
             resolution_status: incoming?.resolution_status ?? normalizedStatus
-          }];
+          }]);
         }
 
         let matched = false;
@@ -1186,7 +1219,7 @@ function App() {
         });
 
         if (matched) {
-          return mapped;
+          return dedupeUserRequestList(mapped);
         }
 
         const normalizedStatus = resolvedStatus ?? 'pending';
@@ -1197,7 +1230,7 @@ function App() {
           resolution_status: incoming?.resolution_status ?? normalizedStatus
         };
 
-        return [enriched, ...mapped];
+        return dedupeUserRequestList([enriched, ...mapped]);
       });
 
       setRequestStatusRefreshKey((prev) => prev + 1);
@@ -1275,7 +1308,7 @@ function App() {
           }
 
           const normalizedStatus = nextStatus ?? 'pending';
-          return [{
+          return dedupeUserRequestList([{
             ...incoming,
             status: normalizedStatus,
             request_status: normalizedStatus,
@@ -1284,7 +1317,7 @@ function App() {
             request_decision_at: decisionAt,
             request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
             resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
-          }];
+          }]);
         }
 
         let matched = false;
@@ -1327,14 +1360,23 @@ function App() {
           return request;
         });
 
+        // If we matched an existing request, return the updated array
         if (matched) {
-          return mapped;
+          return dedupeUserRequestList(mapped);
         }
 
+        // For status updates (approved/rejected), don't add new entries if no match found
+        // Only add new entries for new pending requests
+        if (nextStatus && nextStatus !== 'pending') {
+          return dedupeUserRequestList(mapped);
+        }
+
+        // If no match and no incoming data, return original array
         if (!incoming) {
-          return mapped;
+          return dedupeUserRequestList(mapped);
         }
 
+        // Add new pending request
         const normalizedStatus = nextStatus ?? incoming?.resolution_status ?? incoming?.request_status ?? incoming?.status ?? 'pending';
 
         const enriched = {
@@ -1348,7 +1390,7 @@ function App() {
           resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
         };
 
-        return [enriched, ...mapped];
+        return dedupeUserRequestList([...mapped, enriched]);
       });
 
       setRequestStatusRefreshKey((prev) => prev + 1);
@@ -1612,9 +1654,9 @@ function App() {
     try {
       setUserCreationLoading(true);
       const response = await api.get('/api/users/pending');
-      const payload = response.data ?? [];
-      const requests = Array.isArray(payload?.requests) ? payload.requests : (Array.isArray(payload) ? payload : []);
-      setUserCreationRequests(requests);
+  const payload = response.data ?? [];
+  const requests = Array.isArray(payload?.requests) ? payload.requests : (Array.isArray(payload) ? payload : []);
+  setUserCreationRequests(dedupeUserRequestList(requests));
     } catch (error) {
       console.error('Error fetching user creation requests:', error);
     } finally {
@@ -1817,7 +1859,7 @@ function App() {
           return request;
         });
 
-        return changed ? mapped : prev;
+        return changed ? dedupeUserRequestList(mapped) : prev;
       });
 
       setRequestStatusRefreshKey((prev) => prev + 1);
@@ -1827,13 +1869,13 @@ function App() {
         title: 'Request cancelled'
       });
 
-      // Fetch latest data to ensure UI is in sync (WebSocket updates may have timing delays)
-      await fetchUserCreationRequests();
+      // Don't fetch - let WebSocket handle the update to avoid conflicts
+      // await fetchUserCreationRequests();
     } catch (error) {
       console.error('Error cancelling user request:', error);
       throw error;
     }
-  }, [user, addToNotificationQueue, fetchUserCreationRequests]);
+  }, [user, addToNotificationQueue]);
 
   //RENDERS THE TABLE
   useEffect(() =>{
@@ -2265,6 +2307,7 @@ function App() {
           targetPendingIds
         });
         return;
+
       }
 
       toast.error(serverMessage || fallbackMessage);
@@ -2332,6 +2375,37 @@ function App() {
     if (!user || !user.role || !user.role.some(role => role === 'Owner')) return;
 
     try {
+      // Update local state immediately for better UX
+      const targetId = Number(userId);
+      const decisionTimestamp = new Date().toISOString();
+
+      setUserCreationRequests((prev) => {
+        if (!Array.isArray(prev)) return prev;
+
+        let changed = false;
+
+        const mapped = prev.map((request) => {
+          const candidateId = Number(request?.pending_user_id ?? request?.user_id);
+          if (Number.isFinite(targetId) && Number.isFinite(candidateId) && candidateId === targetId) {
+            changed = true;
+            return {
+              ...request,
+              status: 'rejected',
+              request_status: 'rejected',
+              resolution_status: 'rejected',
+              request_decision_at: decisionTimestamp,
+              request_resolved_at: decisionTimestamp,
+              request_approved_at: request?.request_approved_at ?? null,
+              request_rejection_reason: reason || request?.request_rejection_reason || null,
+              resolution_reason: reason || request?.resolution_reason || null
+            };
+          }
+          return request;
+        });
+
+        return changed ? dedupeUserRequestList(mapped) : prev;
+      });
+
       await api.patch(`/api/users/${userId}/rejection`, {
         admin_id: user.admin_id ?? null,
         approver_roles: user.role || [],
@@ -2343,8 +2417,7 @@ function App() {
         title: 'Account rejected'
       });
 
-      // Fetch latest data to ensure UI is in sync (WebSocket updates may have timing delays)
-      await fetchUserCreationRequests();
+      // WebSocket will update again if needed, but local update provides immediate feedback
       setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error('Error rejecting user:', error);
