@@ -121,6 +121,9 @@ function App() {
   const [adminInventoryRequests, setAdminInventoryRequests] = useState([]);
   const [adminInventoryLoading, setAdminInventoryLoading] = useState(false);
   const [isRequestMonitorOpen, setIsRequestMonitorOpen] = useState(false);
+  const [userCreationRequests, setUserCreationRequests] = useState([]);
+  const [userCreationLoading, setUserCreationLoading] = useState(false);
+  const [requestStatusRefreshKey, setRequestStatusRefreshKey] = useState(0);
 
   const normalizePendingId = (value) => (value === null || value === undefined ? '' : String(value));
 
@@ -129,11 +132,17 @@ function App() {
     return String(value).replace(/\s+/g, ' ').trim().toLowerCase();
   };
 
-  const pendingUserRequests = useMemo(() => {
-    if (!Array.isArray(users)) return [];
+  const normalizeRoleList = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    const normalized = String(value).trim();
+    return normalized ? [normalized] : [];
+  };
 
-    const relevantStatuses = new Set(['pending', 'approved', 'active', 'rejected']);
-    const recencyWindowMs = 1000 * 60 * 60 * 24 * 7; // 7 days
+  const userRequestHistory = useMemo(() => {
+    if (!Array.isArray(userCreationRequests)) {
+      return [];
+    }
 
     const toIsoString = (value) => {
       if (!value) return null;
@@ -148,33 +157,21 @@ function App() {
       return null;
     };
 
-    const nowMs = Date.now();
-
-    return users
+    return userCreationRequests
       .map((record) => {
-        const rawStatus = String(record?.status || '').toLowerCase();
-        if (!relevantStatuses.has(rawStatus)) {
+        if (!record) {
           return null;
         }
 
-        const trimmedCreator = typeof record?.created_by === 'string'
-          ? record.created_by.replace(/\s+/g, ' ').trim()
-          : record?.created_by ?? null;
-
-        let createdById = null;
-        if (record?.created_by_id !== null && record?.created_by_id !== undefined) {
-          const explicitCreator = Number(record.created_by_id);
-          if (Number.isFinite(explicitCreator)) {
-            createdById = explicitCreator;
-          }
-        }
-
-        if (createdById === null && trimmedCreator) {
-          const numericCreatorFromName = Number(trimmedCreator);
-          if (Number.isFinite(numericCreatorFromName)) {
-            createdById = numericCreatorFromName;
-          }
-        }
+        const normalizedStatusRaw = String(record?.request_status ?? record?.status ?? 'pending').toLowerCase().trim();
+        const normalizedStatus = (() => {
+          if (!normalizedStatusRaw) return 'pending';
+          if (normalizedStatusRaw.startsWith('pending')) return 'pending';
+          if (normalizedStatusRaw === 'inactive') return 'pending';
+          if (normalizedStatusRaw === 'active') return 'approved';
+          if (normalizedStatusRaw === 'deleted' || normalizedStatusRaw === 'cancelled') return 'cancelled';
+          return normalizedStatusRaw;
+        })();
 
         const createdAtIso = toIsoString(
           record?.request_created_at
@@ -182,68 +179,63 @@ function App() {
             ?? record?.createdAt
             ?? (typeof record?.formated_hire_date === 'string' ? record.formated_hire_date.trim() : record?.formated_hire_date)
         );
+        const resolvedAtIso = toIsoString(record?.request_resolved_at ?? record?.resolved_at ?? record?.request_decision_at);
+        const approvedAtIso = toIsoString(record?.request_approved_at ?? record?.approved_at ?? record?.approvedAt ?? resolvedAtIso);
 
-        const approvedAtIso = toIsoString(record?.request_approved_at ?? record?.approved_at ?? record?.approvedAt);
-        const decisionAtIso = toIsoString(
-          record?.request_decision_at
-            ?? record?.approved_at
-            ?? record?.approvedAt
-            ?? record?.updated_at
-            ?? record?.status_updated_at
-        );
-
-        const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
-
-        const rejectionReason = record?.request_rejection_reason
-          ?? record?.rejection_reason
-          ?? record?.status_reason
+        const createdByName = record?.created_by_name
+          ?? (typeof record?.created_by === 'string' ? record.created_by.replace(/\s+/g, ' ').trim() : null)
           ?? null;
-        const approvedBy = record?.request_approved_by ?? record?.approved_by ?? null;
+
+        const creatorIdCandidate = Number(record?.created_by_id ?? record?.created_by);
+        const createdById = Number.isFinite(creatorIdCandidate) ? creatorIdCandidate : null;
+
+        const normalizedRoles = normalizeRoleList(record?.role);
+
+        const allowedStatuses = new Set(['pending', 'approved', 'rejected', 'cancelled']);
+        if (!allowedStatuses.has(normalizedStatus)) {
+          return null;
+        }
 
         return {
           ...record,
-          created_by_display: trimmedCreator,
-          created_by_id: createdById,
-          request_created_at: createdAtIso,
+          status: normalizedStatus,
           request_status: normalizedStatus,
+          normalized_status: normalizedStatus,
+          created_by_id: createdById,
+          created_by_display: createdByName,
+          created_by_name: createdByName,
+          request_created_at: createdAtIso,
+          request_decision_at: resolvedAtIso,
           request_approved_at: approvedAtIso,
-          request_decision_at: decisionAtIso,
-          request_rejection_reason: rejectionReason,
-          request_approved_by: approvedBy
+          request_rejection_reason: record?.request_rejection_reason ?? record?.resolution_reason ?? null,
+          request_approved_by: record?.request_approved_by ?? record?.owner_resolved_by ?? null,
+          branch: record?.branch ?? record?.branch_name ?? null,
+          branch_name: record?.branch_name ?? record?.branch ?? null,
+          full_name: record?.full_name ?? record?.target_full_name ?? record?.username ?? 'User account',
+          role: normalizedRoles
         };
       })
       .filter((record) => {
-        if (!record) return false;
+        if (!record) {
+          return false;
+        }
 
         const hasCreatorReference = record.created_by_id !== null
           || (typeof record.created_by_display === 'string' && record.created_by_display.trim() !== '');
 
         if (!hasCreatorReference) {
-          return false;
+          const status = String(record.normalized_status ?? record.status ?? '').toLowerCase();
+          return status === 'pending';
         }
 
-        const status = record.request_status;
-        if (status === 'pending') {
-          return true;
-        }
-
-        if (status === 'approved') {
-          const approvedAt = record.request_approved_at;
-          if (!approvedAt) return false;
-          const approvedMs = Date.parse(approvedAt);
-          return Number.isFinite(approvedMs) && nowMs - approvedMs <= recencyWindowMs;
-        }
-
-        if (status === 'rejected') {
-          const decisionAt = record.request_decision_at;
-          if (!decisionAt) return false;
-          const decisionMs = Date.parse(decisionAt);
-          return Number.isFinite(decisionMs) && nowMs - decisionMs <= recencyWindowMs;
-        }
-
-        return false;
+        return true;
       });
-  }, [users]);
+  }, [userCreationRequests]);
+
+  const pendingUserRequests = useMemo(
+    () => userRequestHistory.filter((record) => String(record?.normalized_status ?? '').toLowerCase() === 'pending'),
+    [userRequestHistory]
+  );
 
   // NOTIFICATION QUEUE SYSTEM
   const addToNotificationQueue = useCallback((message, options = {}) => {
@@ -325,6 +317,11 @@ function App() {
     if (Array.isArray(user.role)) return user.role;
     return user.role ? [user.role] : [];
   }, [user]);
+
+  const canAccessUserRequestFeed = useMemo(
+    () => userRoles.some((role) => ['Owner', 'Branch Manager', 'Inventory Staff'].includes(role)),
+    [userRoles]
+  );
 
   const isOwner = useMemo(() => userRoles.includes('Owner'), [userRoles]);
   const isBranchManager = useMemo(() => userRoles.includes('Branch Manager'), [userRoles]);
@@ -1043,6 +1040,7 @@ function App() {
         const exists = prev.some(req => normalizePendingId(req.pending_id) === normalizePendingId(payload.request.pending_id));
         return exists ? prev : [...prev, payload.request];
       });
+      setRequestStatusRefreshKey((prev) => prev + 1);
     });
 
     newSocket.on('inventory-approval-request-admin', (payload) => {
@@ -1059,6 +1057,7 @@ function App() {
         }
         return [...prev, payload.request];
       });
+      setRequestStatusRefreshKey((prev) => prev + 1);
     });
 
     // LISTEN FOR INVENTORY APPROVAL RESOLUTIONS
@@ -1072,8 +1071,11 @@ function App() {
       const isBranchManager = user.role && user.role.some(role => ['Branch Manager'].includes(role));
       const isOwner = user.role && user.role.some(role => ['Owner'].includes(role));
 
+      let affectedMonitor = false;
+
       if (isBranchManager && payload.branch_id && payload.branch_id === user.branch_id) {
         setPendingInventoryRequests(prev => prev.filter(req => normalizePendingId(req.pending_id) !== normalizePendingId(payload.pending_id)));
+        affectedMonitor = true;
 
         if (payload.status === 'approved' && payload.product) {
           setProductsData(prevData => {
@@ -1122,7 +1124,7 @@ function App() {
 
       if (isOwner) {
         setAdminInventoryRequests(prev => {
-          if (payload.status === 'approved' || payload.status === 'rejected') {
+          if (['approved', 'rejected', 'deleted'].includes(payload.status)) {
             return prev.filter(req => normalizePendingId(req.pending_id) !== normalizePendingId(payload.pending_id));
           }
 
@@ -1136,7 +1138,188 @@ function App() {
 
           return prev;
         });
+        affectedMonitor = true;
       }
+
+      if (affectedMonitor) {
+        setRequestStatusRefreshKey((prev) => prev + 1);
+      }
+    });
+
+    newSocket.on('user-approval-request', (payload) => {
+      if (!payload || !payload.request) return;
+      if (!canAccessUserRequestFeed) return;
+
+      const incoming = payload.request;
+      const targetId = Number(incoming?.pending_user_id ?? incoming?.user_id);
+
+      if (!Number.isFinite(targetId)) {
+        return;
+      }
+
+      const resolvedStatusRaw = incoming?.request_status ?? incoming?.status ?? null;
+      const resolvedStatus = typeof resolvedStatusRaw === 'string' ? resolvedStatusRaw.toLowerCase() : null;
+
+      setUserCreationRequests((prev) => {
+        if (!Array.isArray(prev)) {
+          const normalizedStatus = resolvedStatus ?? 'pending';
+          return [{
+            ...incoming,
+            status: normalizedStatus,
+            request_status: normalizedStatus,
+            resolution_status: incoming?.resolution_status ?? normalizedStatus
+          }];
+        }
+
+        let matched = false;
+
+        const mapped = prev.map((request) => {
+          const candidateId = Number(request?.pending_user_id ?? request?.user_id);
+          if (Number.isFinite(candidateId) && candidateId === targetId) {
+            matched = true;
+            const merged = {
+              ...request,
+              ...incoming
+            };
+
+            if (resolvedStatus) {
+              merged.status = resolvedStatus;
+              merged.request_status = resolvedStatus;
+              merged.resolution_status = incoming?.resolution_status ?? resolvedStatus;
+            }
+
+            return merged;
+          }
+          return request;
+        });
+
+        if (matched) {
+          return mapped;
+        }
+
+        const normalizedStatus = resolvedStatus ?? 'pending';
+        const enriched = {
+          ...incoming,
+          status: normalizedStatus,
+          request_status: normalizedStatus,
+          resolution_status: incoming?.resolution_status ?? normalizedStatus
+        };
+
+        return [enriched, ...mapped];
+      });
+
+      setRequestStatusRefreshKey((prev) => prev + 1);
+    });
+
+    newSocket.on('user-approval-updated', (payload) => {
+      if (!payload) return;
+      if (!canAccessUserRequestFeed) return;
+
+      const incoming = payload.request ?? null;
+      const targetId = Number(
+        payload.pending_user_id
+          ?? payload.user_id
+          ?? incoming?.pending_user_id
+          ?? incoming?.user_id
+      );
+
+      if (!Number.isFinite(targetId)) {
+        return;
+      }
+
+      const statusRaw = payload.status ?? incoming?.request_status ?? incoming?.status ?? null;
+      const nextStatus = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : null;
+      const resolvedAt = incoming?.request_resolved_at
+        ?? incoming?.resolved_at
+        ?? payload.resolved_at
+        ?? (nextStatus && nextStatus !== 'pending' ? new Date().toISOString() : null);
+      const decisionAt = incoming?.request_decision_at ?? resolvedAt;
+      const reasonPayload = payload.reason ?? payload.resolution_reason;
+
+      setUserCreationRequests((prev) => {
+        if (!Array.isArray(prev) || prev.length === 0) {
+          if (!incoming) {
+            return prev;
+          }
+
+          const normalizedStatus = nextStatus ?? 'pending';
+          return [{
+            ...incoming,
+            status: normalizedStatus,
+            request_status: normalizedStatus,
+            resolution_status: incoming?.resolution_status ?? normalizedStatus,
+            request_resolved_at: resolvedAt,
+            request_decision_at: decisionAt,
+            request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
+            resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
+          }];
+        }
+
+        let matched = false;
+
+        const mapped = prev.map((request) => {
+          const candidateId = Number(request?.pending_user_id ?? request?.user_id);
+          if (Number.isFinite(candidateId) && candidateId === targetId) {
+            matched = true;
+            const merged = { ...request };
+
+            if (incoming) {
+              Object.assign(merged, incoming);
+            }
+
+            if (nextStatus) {
+              merged.status = nextStatus;
+              merged.request_status = nextStatus;
+              merged.resolution_status = incoming?.resolution_status ?? nextStatus;
+            }
+
+            if (resolvedAt) {
+              merged.request_resolved_at = resolvedAt;
+            }
+
+            if (decisionAt) {
+              merged.request_decision_at = decisionAt;
+            }
+
+            if (reasonPayload !== undefined) {
+              merged.request_rejection_reason = reasonPayload || null;
+              merged.resolution_reason = reasonPayload || null;
+            } else if (incoming?.request_rejection_reason || incoming?.resolution_reason) {
+              merged.request_rejection_reason = incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? merged.request_rejection_reason ?? null;
+              merged.resolution_reason = incoming?.resolution_reason ?? incoming?.request_rejection_reason ?? merged.resolution_reason ?? null;
+            }
+
+            return merged;
+          }
+
+          return request;
+        });
+
+        if (matched) {
+          return mapped;
+        }
+
+        if (!incoming) {
+          return mapped;
+        }
+
+        const normalizedStatus = nextStatus ?? incoming?.resolution_status ?? incoming?.request_status ?? incoming?.status ?? 'pending';
+
+        const enriched = {
+          ...incoming,
+          status: normalizedStatus,
+          request_status: normalizedStatus,
+          resolution_status: incoming?.resolution_status ?? normalizedStatus,
+          request_resolved_at: resolvedAt,
+          request_decision_at: decisionAt,
+          request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
+          resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
+        };
+
+        return [enriched, ...mapped];
+      });
+
+      setRequestStatusRefreshKey((prev) => prev + 1);
     });
 
     // LISTEN FOR PRODUCT VALIDITY UPDATES
@@ -1308,7 +1491,7 @@ function App() {
       newSocket.close();
       toast.dismiss();
     };
-  }, [user, addToNotificationQueue]);
+  }, [user, addToNotificationQueue, canAccessUserRequestFeed]);
 
 
 
@@ -1371,6 +1554,26 @@ function App() {
   }, [user, isOwner]);
 
 
+  const fetchUserCreationRequests = useCallback(async () => {
+    if (!user || !canAccessUserRequestFeed) {
+      setUserCreationRequests([]);
+      return;
+    }
+
+    try {
+      setUserCreationLoading(true);
+      const response = await api.get('/api/users/pending');
+      const payload = response.data ?? [];
+      const requests = Array.isArray(payload?.requests) ? payload.requests : (Array.isArray(payload) ? payload : []);
+      setUserCreationRequests(requests);
+    } catch (error) {
+      console.error('Error fetching user creation requests:', error);
+    } finally {
+      setUserCreationLoading(false);
+    }
+  }, [user, canAccessUserRequestFeed]);
+
+
   const handleApprovePendingInventory = async (pendingId) => {
     if (!user) return;
 
@@ -1385,6 +1588,7 @@ function App() {
           isLocal: true,
           title: 'Approval for Admin'
         });
+        setRequestStatusRefreshKey((prev) => prev + 1);
         return;
       }
 
@@ -1406,6 +1610,7 @@ function App() {
   setPendingInventoryRequests(prev => prev.filter(request => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId)));
       addToNotificationQueue('Inventory request approved and applied.', true);
       await fetchProductsData();
+      setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error('Error approving inventory request:', error);
     }
@@ -1428,6 +1633,7 @@ function App() {
       addToNotificationQueue('Inventory request approved.', true);
       await fetchProductsData();
       await fetchAdminPendingInventoryRequests();
+      setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error('Error approving inventory request as owner:', error);
     }
@@ -1459,6 +1665,7 @@ function App() {
         title: 'Inventory Rejection',
         dedupeKey: rejectionKey
       });
+      setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
       handledInventoryActionsRef.current.delete(rejectionKey);
       const existingTimer = handledInventoryCleanupRef.current.get(rejectionKey);
@@ -1487,10 +1694,96 @@ function App() {
   setAdminInventoryRequests(prev => prev.filter(request => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId)));
       addToNotificationQueue('Inventory request rejected.', true);
       await fetchAdminPendingInventoryRequests();
+      setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error('Error rejecting inventory request as owner:', error);
     }
   };
+
+
+  const handleCancelInventoryRequest = useCallback(async (pendingId, reason = '') => {
+    if (!user) return;
+
+    const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+    const payload = trimmedReason ? { reason: trimmedReason } : {};
+
+    try {
+      await api.patch(`/api/items/pending/${pendingId}/cancel`, payload);
+
+      setPendingInventoryRequests((prev) =>
+        prev.filter((request) => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId))
+      );
+
+      setAdminInventoryRequests((prev) =>
+        prev.filter((request) => normalizePendingId(request.pending_id) !== normalizePendingId(pendingId))
+      );
+
+      setRequestStatusRefreshKey((prev) => prev + 1);
+
+      addToNotificationQueue('Inventory request cancelled.', {
+        isLocal: true,
+        title: 'Request cancelled'
+      });
+
+      await fetchPendingInventoryRequests();
+    } catch (error) {
+      console.error('Error cancelling inventory request:', error);
+      throw error;
+    }
+  }, [user, addToNotificationQueue, fetchPendingInventoryRequests]);
+
+  const handleCancelUserCreationRequest = useCallback(async (pendingUserId, reason = '') => {
+    if (!user) return;
+
+    const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+    const payload = trimmedReason ? { reason: trimmedReason } : {};
+    const targetId = Number(pendingUserId);
+
+    try {
+      await api.patch(`/api/users/${pendingUserId}/cancel`, payload);
+
+      const decisionTimestamp = new Date().toISOString();
+
+      setUserCreationRequests((prev) => {
+        if (!Array.isArray(prev)) return prev;
+
+        let changed = false;
+
+        const mapped = prev.map((request) => {
+          const candidateId = Number(request?.pending_user_id ?? request?.user_id);
+          if (Number.isFinite(targetId) && Number.isFinite(candidateId) && candidateId === targetId) {
+            changed = true;
+            return {
+              ...request,
+              status: 'cancelled',
+              request_status: 'cancelled',
+              resolution_status: 'cancelled',
+              request_decision_at: decisionTimestamp,
+              request_resolved_at: decisionTimestamp,
+              request_approved_at: request?.request_approved_at ?? null,
+              request_rejection_reason: trimmedReason || request?.request_rejection_reason || null,
+              resolution_reason: trimmedReason || request?.resolution_reason || null
+            };
+          }
+          return request;
+        });
+
+        return changed ? mapped : prev;
+      });
+
+      setRequestStatusRefreshKey((prev) => prev + 1);
+
+      addToNotificationQueue('User request cancelled.', {
+        isLocal: true,
+        title: 'Request cancelled'
+      });
+
+      await fetchUserCreationRequests();
+    } catch (error) {
+      console.error('Error cancelling user request:', error);
+      throw error;
+    }
+  }, [user, addToNotificationQueue, fetchUserCreationRequests]);
 
   //RENDERS THE TABLE
   useEffect(() =>{
@@ -1505,6 +1798,10 @@ function App() {
   useEffect(() => {
     fetchAdminPendingInventoryRequests();
   }, [fetchAdminPendingInventoryRequests]);
+
+  useEffect(() => {
+    fetchUserCreationRequests();
+  }, [fetchUserCreationRequests]);
 
 
   //HANDLES OPENING ADD OR EDIT MODAL
@@ -1524,6 +1821,7 @@ function App() {
         if (response.status === 202 || response.data?.status === 'pending') {
           addToNotificationQueue('Inventory request submitted for branch manager approval.', true);
           await fetchPendingInventoryRequests();
+          setRequestStatusRefreshKey((prev) => prev + 1);
         } else {
           const addedProduct = response.data?.product || response.data;
           setProductsData((prevData) => [...prevData, addedProduct]);
@@ -1554,6 +1852,7 @@ function App() {
         if (response.status === 202 || response.data?.status === 'pending') {
           addToNotificationQueue('Inventory update sent for branch manager approval.', true);
           await fetchPendingInventoryRequests();
+          setRequestStatusRefreshKey((prev) => prev + 1);
         } else {
           const updatedProduct = response.data?.product || response.data;
           setProductsData((prevData) => 
@@ -1964,8 +2263,39 @@ function App() {
         approverName: user.full_name ?? null,
         approver_roles: user.role || []
       });
+      addToNotificationQueue('User account approved.', {
+        isLocal: true,
+        title: 'Account approved'
+      });
+      await fetchUserCreationRequests();
+      setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error('Error approving user:', error);
+      throw error;
+    }
+  };
+
+
+  const rejectPendingAccount = async (userId, reason = '') => {
+    if (!user || !user.role || !user.role.some(role => role === 'Owner')) return;
+
+    try {
+      await api.patch(`/api/users/${userId}/rejection`, {
+        admin_id: user.admin_id ?? null,
+        approver_roles: user.role || [],
+        reason
+      });
+
+      addToNotificationQueue('User account request rejected.', {
+        isLocal: true,
+        title: 'Account rejected'
+      });
+
+      await fetchUserCreationRequests();
+      setRequestStatusRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      console.error('Error rejecting user:', error);
+      throw error;
     }
   };
 
@@ -2147,7 +2477,11 @@ function App() {
         onClose={() => setIsRequestMonitorOpen(false)}
         user={user}
         branches={branches}
-        userRequests={pendingUserRequests}
+        userRequests={userRequestHistory}
+        userRequestsLoading={userCreationLoading}
+        refreshToken={requestStatusRefreshKey}
+        onCancelInventoryRequest={canOpenRequestMonitor ? handleCancelInventoryRequest : undefined}
+        onCancelUserRequest={canOpenRequestMonitor ? handleCancelUserCreationRequest : undefined}
       />
 
   
@@ -2268,15 +2602,17 @@ function App() {
             <RouteProtection allowedRoles={['Owner']}>
 
               <Approvals
-                users={users}
-                usersLoading={usersLoading}
+                userRequests={pendingUserRequests}
+                userRequestsLoading={userCreationLoading}
                 approvePendingAccount={approvePendingAccount}
+                rejectPendingAccount={rejectPendingAccount}
                 sanitizeInput={sanitizeInput}
                 inventoryRequests={adminInventoryRequests}
                 inventoryRequestsLoading={adminInventoryLoading}
                 approveInventoryRequest={handleOwnerApprovePendingInventory}
                 rejectInventoryRequest={handleOwnerRejectPendingInventory}
                 refreshInventoryRequests={fetchAdminPendingInventoryRequests}
+                refreshUserRequests={fetchUserCreationRequests}
                 onOpenRequestMonitor={handleRequestMonitorOpen}
                 highlightDirective={highlightDirective?.type === 'owner-approvals' ? highlightDirective : null}
                 onHighlightConsumed={handleHighlightConsumed}

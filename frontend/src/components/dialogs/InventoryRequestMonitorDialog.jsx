@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../utils/api';
 import { currencyFormat } from '../../utils/formatCurrency.js';
 import ChartLoading from '../common/ChartLoading.jsx';
@@ -19,7 +19,8 @@ const toneStyles = {
 const statusFilters = [
   { id: 'pending',  label: 'Pending' },
   { id: 'approved', label: 'Approved' },
-  { id: 'rejected', label: 'Rejected' }
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'cancelled', label: 'Cancelled' }
 ];
 
 const requestTypeFilters = [
@@ -51,7 +52,17 @@ const findBranchName = (branches, branchId) => {
   return branches.find((b) => Number(b.branch_id) === numeric)?.branch_name || null;
 };
 
-const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], userRequests = [] }) => {
+const InventoryRequestMonitorDialog = ({
+  open,
+  onClose,
+  user,
+  branches = [],
+  userRequests = [],
+  userRequestsLoading = false,
+  refreshToken = 0,
+  onCancelInventoryRequest,
+  onCancelUserRequest
+}) => {
   const roleList = useMemo(() => {
     if (!user || !user.role) return [];
     return Array.isArray(user.role) ? user.role : [user.role];
@@ -62,6 +73,10 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
   const canViewAdmin    = isOwnerUser;                 // Owner can filter by branch
   const canSeeTypeFilter = isBranchManager || isOwnerUser; // Type visible to BM & Owner
   const typeEnabled = canSeeTypeFilter;                // ALWAYS enabled when visible
+  const currentUserId = useMemo(() => {
+    const candidate = Number(user?.user_id);
+    return Number.isFinite(candidate) ? candidate : null;
+  }, [user]);
 
   // Internal scope (no UI)
   const defaultScope = useMemo(() => (isOwnerUser ? 'admin' : (isBranchManager ? 'branch' : 'user')), [isOwnerUser, isBranchManager]);
@@ -85,6 +100,13 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
   const [error, setError] = useState(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [cancelError, setCancelError] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
+  const lastRefreshTokenRef = useRef(refreshToken);
+
+  const triggerRefresh = useCallback(() => {
+    setRefreshIndex((prev) => prev + 1);
+  }, []);
 
   // On open: do NOT preselect any status
   useEffect(() => {
@@ -96,6 +118,22 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
     if (!open) { setVisibleCount(PAGE_SIZE); return; }
     setScope((prev) => (prev === defaultScope ? prev : defaultScope));
   }, [defaultScope, open]);
+
+  useEffect(() => {
+    if (!open) {
+      lastRefreshTokenRef.current = refreshToken;
+      return;
+    }
+
+    if (refreshToken === undefined || refreshToken === null) {
+      return;
+    }
+
+    if (lastRefreshTokenRef.current !== refreshToken) {
+      lastRefreshTokenRef.current = refreshToken;
+      triggerRefresh();
+    }
+  }, [refreshToken, open, triggerRefresh]);
 
   useEffect(() => {
     if (!open) return;
@@ -160,6 +198,13 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      setCancelError(null);
+      setCancellingId(null);
+    }
+  }, [open]);
+
   // Reset paging when inputs change
   useEffect(() => {
     if (!open) return;
@@ -193,9 +238,9 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
   const normalizedUserRequests = useMemo(() => {
     if (!Array.isArray(userRequests)) return [];
     return userRequests.map((record) => {
-      const rawStatus = String(record?.request_status || record?.status || '').toLowerCase();
-      const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
-      if (!['pending', 'approved', 'rejected'].includes(normalizedStatus)) return null;
+  const rawStatus = String(record?.request_status || record?.status || '').toLowerCase();
+  const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
+  if (!['pending', 'approved', 'rejected', 'cancelled'].includes(normalizedStatus)) return null;
 
       const branchName    = record?.branch || findBranchName(branches, record?.branch_id) || null;
       const createdAtIso  = toISOStringSafe(record?.request_created_at || record?.created_at || record?.createdAt || record?.formated_hire_date || null);
@@ -210,7 +255,7 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
         ? Number(creatorIdValue) : null;
       const creatorNormalized = normalizeComparableString(creatorName);
       const approverName = record?.request_approved_by || record?.approved_by || null;
-      const rejectionReason = record?.request_rejection_reason || record?.rejection_reason || null;
+      const resolutionReason = record?.request_rejection_reason || record?.rejection_reason || record?.resolution_reason || null;
 
       let statusDetail;
       if (normalizedStatus === 'pending') {
@@ -218,17 +263,29 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
         statusDetail = { code: 'pending', label: 'Pending', tone: 'amber', is_final: false, stage: 'review' };
       } else if (normalizedStatus === 'approved') {
         statusDetail = { code: 'approved', label: 'Approved', tone: 'emerald', is_final: true, stage: 'review' };
+      } else if (normalizedStatus === 'cancelled') {
+        statusDetail = { code: 'cancelled', label: 'Cancelled', tone: 'slate', is_final: true, stage: 'review' };
       } else {
         statusDetail = { code: 'rejected', label: 'Rejected', tone: 'rose', is_final: true, stage: 'review' };
       }
 
       const adminTimeline = normalizedStatus === 'pending'
         ? { status: 'pending', acted_at: null, approver_id: null, approver_name: null }
-        : { status: normalizedStatus === 'approved' ? 'completed' : 'rejected', acted_at: decisionAtIso, approver_id: null, approver_name: approverName };
+        : {
+            status: normalizedStatus === 'approved' ? 'completed' : normalizedStatus,
+            acted_at: decisionAtIso,
+            approver_id: null,
+            approver_name: approverName
+          };
 
       const finalTimeline = normalizedStatus === 'pending'
-        ? { status: 'pending', acted_at: null, rejection_reason: null }
-        : { status: normalizedStatus, acted_at: decisionAtIso, rejection_reason: normalizedStatus === 'rejected' ? (rejectionReason || null) : null };
+        ? { status: 'pending', acted_at: null, rejection_reason: null, cancellation_reason: null }
+        : {
+            status: normalizedStatus,
+            acted_at: decisionAtIso,
+            rejection_reason: normalizedStatus === 'rejected' ? (resolutionReason || null) : null,
+            cancellation_reason: normalizedStatus === 'cancelled' ? (resolutionReason || null) : null
+          };
 
       return {
         kind: 'user',
@@ -248,7 +305,8 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
         metadata: { email: record?.username || null, phone: record?.cell_number || null, requested_roles: roles },
         user_status: normalizedStatus,
         decision_at: decisionAtIso,
-        rejection_reason: rejectionReason
+        rejection_reason: normalizedStatus === 'rejected' ? resolutionReason : null,
+        cancellation_reason: normalizedStatus === 'cancelled' ? resolutionReason : null
       };
     }).filter(Boolean);
   }, [userRequests, branches]);
@@ -306,7 +364,7 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
 
       if (isOwnerUser) {
         // Owner: only final states
-        return code === 'approved' || code === 'rejected';
+        return code === 'approved' || code === 'rejected' || code === 'cancelled';
       }
 
       if (isBranchManager) {
@@ -363,8 +421,66 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
     }
   };
 
+  const combinedLoading = loading || userRequestsLoading;
+
+  const handleCancelInventory = useCallback(async (pendingId) => {
+    if (typeof onCancelInventoryRequest !== 'function') {
+      return;
+    }
+
+    let confirmed = true;
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      confirmed = window.confirm('Cancel this inventory request? This action cannot be undone.');
+    }
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setCancelError(null);
+      const identifier = `inventory-${pendingId}`;
+      setCancellingId(identifier);
+      await onCancelInventoryRequest(pendingId);
+      triggerRefresh();
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to cancel the request. Please try again.';
+      setCancelError(message);
+    } finally {
+      setCancellingId(null);
+    }
+  }, [onCancelInventoryRequest, triggerRefresh]);
+
+  const handleCancelUserRequest = useCallback(async (pendingUserId) => {
+    if (typeof onCancelUserRequest !== 'function') {
+      return;
+    }
+
+    let confirmed = true;
+
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      confirmed = window.confirm('Cancel this user request? This action cannot be undone.');
+    }
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setCancelError(null);
+      const identifier = `user-${pendingUserId}`;
+      setCancellingId(identifier);
+      await onCancelUserRequest(pendingUserId);
+      triggerRefresh();
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to cancel the request. Please try again.';
+      setCancelError(message);
+    } finally {
+      setCancellingId(null);
+    }
+  }, [onCancelUserRequest, triggerRefresh]);
+
   if (!open) return null;
-  const handleRefresh = () => setRefreshIndex((p) => p + 1);
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -379,11 +495,13 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Refresh"
                 title="Refresh"
+                onClick={triggerRefresh}
+                disabled={combinedLoading}
               >
-                <MdRefresh className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                <MdRefresh className={`h-5 w-5 ${combinedLoading ? 'animate-spin' : ''}`} />
               </button>
               <button
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
@@ -458,10 +576,16 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
               </div>
             )}
           </div>
+
+          {cancelError && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {cancelError}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4" onScroll={handleScroll}>
-          {loading ? (
+          {combinedLoading ? (
             <div className="py-12"><ChartLoading message="Loading request history..." /></div>
           ) : error ? (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
@@ -485,11 +609,24 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                   const userStatus = request.user_status || 'pending';
                   const decisionAt = request.decision_at;
                   const ownerStageDescription = (() => {
-                    if (userStatus === 'approved') return `Approved${decisionAt ? ` on ${formatDateTime(decisionAt)}` : ''}`;
-                    if (userStatus === 'rejected') return `Rejected${decisionAt ? ` on ${formatDateTime(decisionAt)}` : ''}`;
+                      if (userStatus === 'approved') return `Approved${decisionAt ? ` on ${formatDateTime(decisionAt)}` : ''}`;
+                      if (userStatus === 'rejected') return `Rejected${decisionAt ? ` on ${formatDateTime(decisionAt)}` : ''}`;
+                      if (userStatus === 'cancelled') return `Cancelled${decisionAt ? ` on ${formatDateTime(decisionAt)}` : ''}`;
                     return 'Pending';
                   })();
+                  const cancellationReason = request.cancellation_reason;
                   const rejectionReason = request.rejection_reason;
+                  const resolutionReason = userStatus === 'cancelled' ? cancellationReason : rejectionReason;
+                  const reasonLabel = userStatus === 'cancelled' ? 'Cancellation reason' : 'Reason';
+                  const reasonToneClass = userStatus === 'cancelled' ? 'text-slate-600' : 'text-rose-600';
+                  const canCancelUser = typeof onCancelUserRequest === 'function'
+                    && currentUserId !== null
+                    && Number.isFinite(Number(request.created_by_id ?? request.created_by))
+                    && Number(request.created_by_id ?? request.created_by) === currentUserId
+                    && request.status_detail
+                    && !request.status_detail.is_final;
+                  const cancelKey = `user-${request.user_id}`;
+                  const isCancellingUser = cancellingId === cancelKey;
                   const borderToneClass = (() => {
                     switch (request.status_detail?.tone) {
                       case 'emerald': return 'border-emerald-200';
@@ -516,10 +653,22 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                             <span>Requested by: <span className="font-medium text-gray-700">{requestedBy}</span></span>
                           </div>
                         </div>
-                        <span className={`inline-flex items-center gap-2 rounded-full  border px-3 py-1 text-sm font-semibold whitespace-nowrap ${toneClass.badge}`}>
-                          <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
-                          {request.status_detail?.label || 'Pending'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-2 rounded-full  border px-3 py-1 text-sm font-semibold whitespace-nowrap ${toneClass.badge}`}>
+                            <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
+                            {request.status_detail?.label || 'Pending'}
+                          </span>
+                          {canCancelUser && (
+                            <button
+                              type="button"
+                              className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => handleCancelUserRequest(request.user_id)}
+                              disabled={isCancellingUser}
+                            >
+                              {isCancellingUser ? 'Cancelling…' : 'Cancel'}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -540,8 +689,8 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                       <div className="mt-4 rounded-lg border border-gray-200 bg-white px-3 py-3">
                         <p className="text-xs font-semibold uppercase text-gray-500">Owner Stage</p>
                         <p className="text-sm text-gray-700">{ownerStageDescription}</p>
-                        {userStatus === 'rejected' && rejectionReason && (
-                          <p className="mt-2 text-sm text-rose-600">Reason: {rejectionReason}</p>
+                        {userStatus !== 'pending' && resolutionReason && (
+                          <p className={`mt-2 text-sm ${reasonToneClass}`}>{reasonLabel}: {resolutionReason}</p>
                         )}
                       </div>
                     </div>
@@ -554,6 +703,17 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                 const summary = request.summary || {};
                 const statusLabel = request.status_detail?.label || request.status;
                 const branchName = request.branch_name || findBranchName(branches, request.branch_id) || 'N/A';
+                const creatorIdRaw = request.created_by ?? null;
+                const creatorId = creatorIdRaw === null ? NaN : Number(creatorIdRaw);
+                const canCancelInventory = typeof onCancelInventoryRequest === 'function'
+                  && currentUserId !== null
+                  && Number.isFinite(creatorId)
+                  && creatorId === currentUserId
+                  && !request.cancelled_at
+                  && request.status_detail
+                  && !request.status_detail.is_final;
+                const inventoryCancelKey = `inventory-${request.pending_id}`;
+                const isCancelling = cancellingId === inventoryCancelKey;
 
                 const managerDescription =
                   manager.status === 'completed'
@@ -587,10 +747,22 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
                           <span>Requested by: <span className="font-medium text-gray-700">{request.created_by_name || 'Unknown user'}</span></span>
                         </div>
                       </div>
-                      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold whitespace-nowrap ${toneClass.badge}`}>
-                        <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
-                        {statusLabel}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold whitespace-nowrap ${toneClass.badge}`}>
+                          <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
+                          {statusLabel}
+                        </span>
+                        {canCancelInventory && (
+                          <button
+                            type="button"
+                            className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={() => handleCancelInventory(request.pending_id)}
+                            disabled={isCancelling}
+                          >
+                            {isCancelling ? 'Cancelling…' : 'Cancel'}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

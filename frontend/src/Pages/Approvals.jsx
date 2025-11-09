@@ -7,15 +7,17 @@ import { useAuth } from "../authentication/Authentication";
 import RejectionReasonDialog from "../components/dialogs/RejectionReasonDialog";
 
 function Approvals({
-  users = [],
-  usersLoading = false,
+  userRequests = [],
+  userRequestsLoading = false,
   approvePendingAccount,
+  rejectPendingAccount,
   sanitizeInput,
   inventoryRequests = [],
   inventoryRequestsLoading = false,
   approveInventoryRequest,
   rejectInventoryRequest,
   refreshInventoryRequests,
+  refreshUserRequests,
   onOpenRequestMonitor,
   highlightDirective = null,
   onHighlightConsumed
@@ -24,7 +26,9 @@ function Approvals({
   const [approvingUserId, setApprovingUserId] = useState(null);
   const [processingInventoryId, setProcessingInventoryId] = useState(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-  const [pendingRejectId, setPendingRejectId] = useState(null);
+  const [rejectDialogContext, setRejectDialogContext] = useState({ type: null, targetId: null });
+  const [rejectDialogLoading, setRejectDialogLoading] = useState(false);
+  const [rejectingUserId, setRejectingUserId] = useState(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const [highlightedInventoryIds, setHighlightedInventoryIds] = useState([]);
@@ -51,6 +55,15 @@ function Approvals({
     setSearchItem(sanitizeInput(event.target.value));
   };
 
+  const handleRefreshAll = useCallback(() => {
+    if (typeof refreshInventoryRequests === 'function') {
+      refreshInventoryRequests();
+    }
+    if (typeof refreshUserRequests === 'function') {
+      refreshUserRequests();
+    }
+  }, [refreshInventoryRequests, refreshUserRequests]);
+
   const formatDateTime = (value) => {
     if (!value) return "";
     try {
@@ -67,24 +80,26 @@ function Approvals({
   };
 
   const pendingUsers = useMemo(() => {
-    if (!Array.isArray(users)) return [];
+    if (!Array.isArray(userRequests)) return [];
 
     const normalizedSearch = searchItem.toLowerCase();
 
-    return users
-      .filter((user) => user.status === "pending")
-      .filter((user) => {
+    return userRequests
+      .filter((request) => String(request?.request_status ?? request?.status ?? '').toLowerCase() === 'pending')
+      .filter((request) => {
         if (!normalizedSearch) return true;
 
-        const nameMatch = user.full_name?.toLowerCase().includes(normalizedSearch);
-        const branchMatch = user.branch?.toLowerCase().includes(normalizedSearch);
-        const roleMatch = Array.isArray(user.role)
-          ? user.role.join(", ").toLowerCase().includes(normalizedSearch)
-          : String(user.role ?? "").toLowerCase().includes(normalizedSearch);
+        const fullName = String(request?.full_name ?? '').toLowerCase();
+        const branchName = String(request?.branch_name ?? request?.branch ?? '').toLowerCase();
+        const roleLabel = Array.isArray(request?.role)
+          ? request.role.join(', ').toLowerCase()
+          : String(request?.role ?? '').toLowerCase();
 
-        return nameMatch || branchMatch || roleMatch;
+        return fullName.includes(normalizedSearch)
+          || branchName.includes(normalizedSearch)
+          || roleLabel.includes(normalizedSearch);
       });
-  }, [users, searchItem]);
+  }, [userRequests, searchItem]);
 
   const handleApprove = async (event, pendingUser) => {
     event.stopPropagation();
@@ -130,7 +145,7 @@ function Approvals({
 
     const userEntries = pendingUsers.map((record) => ({
       kind: 'user',
-      createdAt: record.created_at ?? record.createdAt ?? null,
+      createdAt: record.request_created_at ?? record.created_at ?? record.createdAt ?? null,
       record
     }));
 
@@ -143,7 +158,7 @@ function Approvals({
     return [...userEntries, ...inventoryEntries].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
   }, [pendingUsers, pendingInventoryRequests]);
 
-  const combinedLoading = usersLoading || inventoryRequestsLoading;
+  const combinedLoading = userRequestsLoading || inventoryRequestsLoading;
 
   const setPendingRowRef = useCallback((pendingId, node) => {
     const map = pendingRowRefs.current;
@@ -195,7 +210,7 @@ function Approvals({
       return;
     }
 
-    if (usersLoading) {
+  if (userRequestsLoading) {
       return;
     }
 
@@ -286,7 +301,7 @@ function Approvals({
       clearTimeout(scrollTimer);
       clearTimeout(clearTimer);
     };
-  }, [highlightDirective, pendingUsers, usersLoading, onHighlightConsumed]);
+  }, [highlightDirective, pendingUsers, userRequestsLoading, onHighlightConsumed]);
 
   useEffect(() => {
     if (!highlightDirective || highlightDirective.type !== 'owner-approvals') {
@@ -407,29 +422,63 @@ function Approvals({
   const handleInventoryReject = (pendingId) => {
     if (!rejectInventoryRequest) return;
 
-    setPendingRejectId(pendingId);
+    setRejectDialogContext({ type: 'inventory', targetId: pendingId });
+    setRejectDialogOpen(true);
+  };
+
+  const handleUserReject = (event, pendingUser) => {
+    if (!rejectPendingAccount) return;
+    event?.stopPropagation?.();
+
+    const targetId = Number(pendingUser?.user_id);
+    if (!Number.isFinite(targetId)) return;
+
+    setRejectDialogContext({ type: 'user', targetId });
     setRejectDialogOpen(true);
   };
 
   const handleRejectDialogCancel = () => {
+    if (rejectDialogLoading) return;
     setRejectDialogOpen(false);
-    setPendingRejectId(null);
+    setRejectDialogContext({ type: null, targetId: null });
+    setRejectingUserId(null);
   };
 
   const handleRejectDialogConfirm = async (reason) => {
-    if (!rejectInventoryRequest || pendingRejectId === null) {
+    if (!rejectDialogContext.type || rejectDialogContext.targetId === null) {
       handleRejectDialogCancel();
       return;
     }
 
+    const targetId = rejectDialogContext.targetId;
+    setRejectDialogLoading(true);
+
     try {
-      setProcessingInventoryId(pendingRejectId);
-      await rejectInventoryRequest(pendingRejectId, reason);
-    } catch (error) {
-      console.error("Error rejecting inventory request:", error);
-    } finally {
-      setProcessingInventoryId(null);
+      if (rejectDialogContext.type === 'inventory') {
+        if (!rejectInventoryRequest) return;
+        setProcessingInventoryId(targetId);
+        await rejectInventoryRequest(targetId, reason);
+        if (typeof refreshInventoryRequests === 'function') {
+          await refreshInventoryRequests();
+        }
+        setProcessingInventoryId(null);
+      } else if (rejectDialogContext.type === 'user') {
+        if (!rejectPendingAccount) return;
+        setRejectingUserId(targetId);
+        await rejectPendingAccount(targetId, reason);
+        if (typeof refreshUserRequests === 'function') {
+          await refreshUserRequests();
+        }
+        setRejectingUserId(null);
+      }
+
       handleRejectDialogCancel();
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+    } finally {
+      setRejectDialogLoading(false);
+      setProcessingInventoryId(null);
+      setRejectingUserId(null);
     }
   };
 
@@ -460,16 +509,16 @@ function Approvals({
     typeof refreshInventoryRequests === "function") && (
     <div className="flex items-center gap-2 md:ml-auto">
 
-      {typeof refreshInventoryRequests === "function" && (
+      {(typeof refreshInventoryRequests === "function" || typeof refreshUserRequests === "function") && (
         <button
           type="button"
           className="inline-flex items-center justify-center px-2 w-9 h-9 rounded-md border border-gray-500 text-gray-600 hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={refreshInventoryRequests}
-          disabled={inventoryRequestsLoading}
+          onClick={handleRefreshAll}
+          disabled={inventoryRequestsLoading || userRequestsLoading}
           aria-label="Refresh inventory approvals"
           title="Refresh inventory approvals"
         >
-          <MdRefresh className={`text-xl ${inventoryRequestsLoading ? "animate-spin" : ""}`} />
+          <MdRefresh className={`text-xl ${(inventoryRequestsLoading || userRequestsLoading) ? "animate-spin" : ""}`} />
           <span className="sr-only">Refresh inventory approvals</span>
         </button>
       )}
@@ -525,18 +574,13 @@ function Approvals({
                     ? pendingUser.role.join(", ")
                     : pendingUser.role ?? "";
 
-                  const creatorName = pendingUser.created_by_name
-                    || (() => {
-                      if (!pendingUser.created_by) return "Branch Manager";
-                      const creator = Array.isArray(users)
-                        ? users.find((user) => user.user_id === pendingUser.created_by)
-                        : null;
-                      return creator?.full_name || "Branch Manager";
-                    })();
+                  const creatorName = pendingUser.created_by_name || 'Branch Manager';
 
                   const numericUserId = Number(pendingUser.user_id);
                   const hasNumericId = Number.isFinite(numericUserId);
                   const isUserHighlighted = hasNumericId && highlightedUserIds.includes(numericUserId);
+                  const approvingInProgress = hasNumericId && Number(approvingUserId) === numericUserId;
+                  const rejectingInProgress = hasNumericId && Number(rejectingUserId) === numericUserId;
 
                   return (
                     <tr
@@ -570,13 +614,22 @@ function Approvals({
                         </span>
                       </td>
                       <td className="px-4 py-4 text-center align-top">
-                        <button
-                          className="py-1 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium w-auto disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
-                          onClick={(e) => handleApprove(e, pendingUser)}
-                          disabled={approvingUserId === pendingUser.user_id}
-                        >
-                          {approvingUserId === pendingUser.user_id ? "Approving..." : "Approve account"}
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            className="py-1 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium w-auto disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                            onClick={(e) => handleApprove(e, pendingUser)}
+                            disabled={approvingInProgress || rejectingInProgress}
+                          >
+                            {approvingInProgress ? "Approving..." : "Approve account"}
+                          </button>
+                          <button
+                            className="py-1 px-4 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium w-auto disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                            onClick={(e) => handleUserReject(e, pendingUser)}
+                            disabled={approvingInProgress || rejectingInProgress}
+                          >
+                            {rejectingInProgress ? "Rejecting..." : "Reject"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -679,18 +732,13 @@ function Approvals({
                 ? pendingUser.role.join(", ")
                 : pendingUser.role ?? "";
 
-              const creatorName = pendingUser.created_by_name
-                || (() => {
-                  if (!pendingUser.created_by) return "Branch Manager";
-                  const creator = Array.isArray(users)
-                    ? users.find((user) => user.user_id === pendingUser.created_by)
-                    : null;
-                  return creator?.full_name || "Branch Manager";
-                })();
+              const creatorName = pendingUser.created_by_name || 'Branch Manager';
 
               const numericUserId = Number(pendingUser.user_id);
               const hasNumericId = Number.isFinite(numericUserId);
               const isUserHighlighted = hasNumericId && highlightedUserIds.includes(numericUserId);
+              const approvingInProgress = hasNumericId && Number(approvingUserId) === numericUserId;
+              const rejectingInProgress = hasNumericId && Number(rejectingUserId) === numericUserId;
 
               return (
                 <div
@@ -733,16 +781,23 @@ function Approvals({
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-gray-200">
+                    <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
                       <button
-                        className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                        className="py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleApprove(e, pendingUser);
                         }}
-                        disabled={approvingUserId === pendingUser.user_id}
+                        disabled={approvingInProgress || rejectingInProgress}
                       >
-                        {approvingUserId === pendingUser.user_id ? "Approving..." : "Approve account"}
+                        {approvingInProgress ? "Approving..." : "Approve"}
+                      </button>
+                      <button
+                        className="py-2.5 px-4 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                        onClick={(e) => handleUserReject(e, pendingUser)}
+                        disabled={approvingInProgress || rejectingInProgress}
+                      >
+                        {rejectingInProgress ? "Rejecting..." : "Reject"}
                       </button>
                     </div>
                   </div>

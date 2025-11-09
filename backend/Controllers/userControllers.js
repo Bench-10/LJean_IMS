@@ -204,6 +204,172 @@ export const approvePendingUser = async (req, res) => {
 };
 
 
+export const rejectPendingUser = async (req, res) => {
+    try {
+        const userID = req.params.id;
+        const { admin_id, approver_roles, reason } = req.body;
+
+        let isOwner = false;
+
+        if (admin_id) {
+            const approver = await SQLquery('SELECT role FROM administrator WHERE admin_id = $1', [admin_id]);
+            const rolesFromDb = approver.rows[0]?.role || [];
+            isOwner = Array.isArray(rolesFromDb) ? rolesFromDb.includes('Owner') : rolesFromDb === 'Owner';
+        }
+
+        if (!isOwner && Array.isArray(approver_roles)) {
+            isOwner = approver_roles.includes('Owner');
+        }
+
+        if (!isOwner) {
+            return res.status(403).json({ message: 'Only owners can reject accounts' });
+        }
+
+        const result = await userCreation.rejectPendingUser(userID, admin_id ?? null, { reason: reason ?? null });
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error rejecting user: ', error);
+        const statusCode = error.message === 'User not found or already processed' ? 400 : 500;
+        res.status(statusCode).json({ message: error.message || 'Internal Server Error' });
+    }
+};
+
+
+export const cancelPendingUserRequest = async (req, res) => {
+    try {
+        const userID = req.params.id;
+        const reason = req.body?.reason ?? null;
+
+        const actor = req.user;
+
+        if (!actor) {
+            return res.status(401).json({ message: 'Authentication required' });
+        }
+
+        const roles = Array.isArray(actor.role) ? actor.role : actor.role ? [actor.role] : [];
+        const isOwner = roles.includes('Owner');
+        const isBranchManager = roles.includes('Branch Manager');
+
+        if (!isOwner && !isBranchManager) {
+            return res.status(403).json({ message: 'Only branch managers can cancel requests' });
+        }
+
+        const cancellerId = isOwner && actor.user_type === 'admin'
+            ? Number(actor.admin_id)
+            : Number(actor.user_id);
+
+        if (!Number.isFinite(cancellerId)) {
+            return res.status(400).json({ message: 'Unable to resolve cancelling user' });
+        }
+
+        const result = await userCreation.cancelPendingUserRequest(
+            userID,
+            cancellerId,
+            {
+                reason,
+                actorType: isOwner ? 'admin' : 'user'
+            }
+        );
+
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error cancelling user request: ', error);
+        const statusMap = {
+            'User not found or already processed': 400,
+            'You can only cancel requests that you submitted': 403,
+            'Invalid user id': 400,
+            'Invalid canceller id': 400,
+            'Canceller id is required': 400
+        };
+        const statusCode = error?.statusCode ?? statusMap[error?.message] ?? 500;
+        res.status(statusCode).json({ message: error?.message || 'Internal Server Error' });
+    }
+};
+
+
+export const getUserCreationRequests = async (req, res) => {
+    try {
+        const rawRoles = req.user?.role;
+        const roles = Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : [];
+        const isOwner = roles.includes('Owner');
+        const isBranchManager = roles.includes('Branch Manager');
+        const isInventoryStaff = roles.includes('Inventory Staff');
+
+        if (!isOwner && !isBranchManager && !isInventoryStaff) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        let scope = 'user';
+        if (isOwner) {
+            scope = 'admin';
+        } else if (isBranchManager) {
+            scope = 'branch';
+        }
+
+        const parseNumberOrNull = (value) => {
+            if (value === undefined || value === null || value === '') return null;
+            const num = Number(value);
+            return Number.isFinite(num) ? num : null;
+        };
+
+        const branchId = parseNumberOrNull(req.query.branch_id);
+
+        const statusParam = req.query.status;
+        const statuses = Array.isArray(statusParam)
+            ? statusParam.map(status => status.trim().toLowerCase()).filter(Boolean)
+            : (typeof statusParam === 'string' && statusParam.trim().length > 0
+                ? statusParam
+                    .split(',')
+                    .map(status => status.trim().toLowerCase())
+                    .filter(Boolean)
+                : null);
+
+        const normalizeNameKey = (value) => {
+            if (!value) return null;
+            return value.replace(/\s+/g, ' ').trim().toLowerCase();
+        };
+
+        const requesterNameKey = scope === 'user'
+            ? normalizeNameKey([
+                req.user?.first_name,
+                req.user?.last_name
+            ].filter(Boolean).join(' '))
+            : null;
+
+        const branchIdFromUser = parseNumberOrNull(req.user?.branch_id);
+        const effectiveBranchId = scope === 'branch'
+            ? (branchIdFromUser ?? branchId)
+            : (scope === 'admin' ? branchId : null);
+
+        const safeRequesterId = parseNumberOrNull(req.user?.user_id);
+        const safeLimit = parseNumberOrNull(req.query.limit);
+        const safeOffset = parseNumberOrNull(req.query.offset);
+
+        const requests = await userCreation.getUserCreationRequests({
+            scope,
+            branchId: effectiveBranchId ?? null,
+            requesterId: safeRequesterId,
+            requesterNameKey,
+            statuses,
+            limit: safeLimit ?? undefined,
+            offset: safeOffset ?? undefined
+        });
+
+        res.status(200).json({
+            scope,
+            filters: {
+                branch_id: effectiveBranchId ?? null,
+                statuses
+            },
+            requests
+        });
+    } catch (error) {
+        console.error('Error fetching user creation requests: ', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
+
 
 //DELETING AN ACCOUNT
 export const userDeletionAccount = async (req, res) =>{
@@ -212,9 +378,21 @@ export const userDeletionAccount = async (req, res) =>{
         
         // GET USER'S BRANCH ID BEFORE DELETION FOR WEBSOCKET BROADCAST
         const { rows } = await SQLquery('SELECT branch_id FROM Users WHERE user_id = $1', [userID]);
-        const branchId = rows[0]?.branch_id;
-        
-        const user = await userCreation.deleteUser(userID, branchId);
+        if (!rows.length) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const branchId = rows[0].branch_id;
+
+        const performer = req.user || {};
+        const deletionOptions = {
+            deletedByUserId: performer.user_type === 'user' && performer.user_id ? Number(performer.user_id) : null,
+            deletedByAdminId: performer.user_type === 'admin' && performer.admin_id ? Number(performer.admin_id) : null,
+            deletedByName: [performer.first_name, performer.last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || null,
+            deletionReason: req.body?.reason ?? null
+        };
+
+        const user = await userCreation.deleteUser(userID, branchId, deletionOptions);
         res.status(200).json(user);
     } catch (error) {
         console.error('Error to delete a user: ', error);

@@ -548,6 +548,16 @@ export const broadcastInventoryApprovalUpdate = (branchId, payload) => {
   io.to('owners').emit('inventory-approval-updated', payload);
 };
 
+export const broadcastUserApprovalRequest = (branchId, payload) => {
+  io.to(`branch-${branchId}`).emit('user-approval-request', payload);
+  io.to('owners').emit('user-approval-request', payload);
+};
+
+export const broadcastUserApprovalUpdate = (branchId, payload) => {
+  io.to(`branch-${branchId}`).emit('user-approval-updated', payload);
+  io.to('owners').emit('user-approval-updated', payload);
+};
+
 
 
 

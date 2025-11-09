@@ -1,7 +1,7 @@
 import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
-import { broadcastUserUpdate, broadcastOwnerNotification } from "../../server.js";
+import { broadcastUserUpdate, broadcastOwnerNotification, broadcastUserApprovalRequest, broadcastUserApprovalUpdate } from "../../server.js";
 
 const getUserFullName = async (userId) => {
     if (!userId) return null;
@@ -11,6 +11,118 @@ const getUserFullName = async (userId) => {
     );
 
     return rows[0]?.full_name || null;
+};
+
+const normalizeRoleArray = (roles) => {
+    if (!roles) return [];
+    if (Array.isArray(roles)) return roles.filter(Boolean);
+    return [roles];
+};
+
+const mapUserCreationRequestRow = (row) => {
+    if (!row) {
+        return null;
+    }
+
+    const effectiveRoles = normalizeRoleArray(row.effective_roles);
+
+    return {
+        request_id: row.pending_user_id,
+        user_id: row.pending_user_id,
+        pending_user_id: row.pending_user_id,
+        status: row.effective_status,
+        request_status: row.resolution_status,
+        resolution_status: row.resolution_status,
+        created_at: row.created_at,
+        request_created_at: row.created_at,
+        resolved_at: row.resolved_at,
+        request_resolved_at: row.resolved_at,
+        request_decision_at: row.resolved_at,
+        request_approved_at: row.resolved_at,
+        request_rejection_reason: row.resolution_reason,
+        resolution_reason: row.resolution_reason,
+        deleted_at: row.deleted_at,
+        created_by_id: row.creator_user_id,
+        created_by: row.creator_user_id ?? row.creator_name,
+        created_by_name: row.creator_name,
+        created_by_roles: normalizeRoleArray(row.creator_roles),
+        manager_approver_id: row.manager_approver_id,
+        manager_approved_at: row.manager_approved_at,
+        owner_resolved_by: row.owner_resolved_by,
+        branch_id: row.effective_branch_id,
+        branch: row.effective_branch_name,
+        branch_name: row.effective_branch_name,
+        current_branch_id: row.current_branch_id,
+        current_branch_name: row.current_branch_name,
+        role: effectiveRoles,
+        target_roles: normalizeRoleArray(row.target_roles),
+        full_name: row.effective_full_name,
+        target_full_name: row.target_full_name,
+        username: row.effective_username,
+        target_username: row.target_username,
+        cell_number: row.effective_cell_number,
+        target_cell_number: row.target_cell_number,
+        current_status: row.current_status,
+        current_username: row.current_username,
+        current_cell_number: row.current_cell_number
+    };
+};
+
+const fetchUserCreationRequestById = async (pendingUserId) => {
+    const resolvedId = Number(pendingUserId);
+
+    if (!Number.isFinite(resolvedId)) {
+        return null;
+    }
+
+    const { rows } = await SQLquery(`
+        SELECT 
+            ucr.pending_user_id,
+            ucr.creator_user_id,
+            ucr.creator_name,
+            ucr.creator_roles,
+            ucr.resolution_status,
+            ucr.created_at,
+            ucr.resolved_at,
+            ucr.manager_approver_id,
+            ucr.manager_approved_at,
+            ucr.owner_resolved_by,
+            ucr.resolution_reason,
+            ucr.deleted_at,
+            ucr.deleted_by_user_id,
+            ucr.deleted_by_admin_id,
+            ucr.target_branch_id,
+            ucr.target_branch_name,
+            ucr.target_roles,
+            ucr.target_full_name,
+            ucr.target_username,
+            ucr.target_cell_number,
+            COALESCE(u.branch_id, ucr.target_branch_id) AS effective_branch_id,
+            COALESCE(b.branch_name, ucr.target_branch_name) AS effective_branch_name,
+            COALESCE(u.role, ucr.target_roles) AS effective_roles,
+            COALESCE(u.first_name || ' ' || u.last_name, ucr.target_full_name) AS effective_full_name,
+            COALESCE(lc.username, ucr.target_username) AS effective_username,
+            COALESCE(u.cell_number, ucr.target_cell_number) AS effective_cell_number,
+            COALESCE(u.status, ucr.resolution_status) AS effective_status,
+            u.branch_id AS current_branch_id,
+            b.branch_name AS current_branch_name,
+            u.role AS current_role,
+            u.status AS current_status,
+            u.cell_number AS current_cell_number,
+            lc.username AS current_username
+        FROM User_Creation_Requests ucr
+        LEFT JOIN Users u ON u.user_id = ucr.pending_user_id
+        LEFT JOIN Branch b ON b.branch_id = u.branch_id
+        LEFT JOIN Login_Credentials lc ON lc.user_id = u.user_id
+        WHERE ucr.pending_user_id = $1
+        LIMIT 1
+    `, [resolvedId]);
+
+    if (rows.length === 0) {
+        return null;
+    }
+
+    return mapUserCreationRequestRow(rows[0]);
 };
 
 
@@ -124,6 +236,20 @@ export const createUserAccount = async (UserData) => {
     const requestResolutionStatus = accountStatus === 'pending' ? 'pending' : 'approved';
     const resolvedAt = accountStatus === 'pending' ? null : approvedAt;
 
+    const { rows: branchRows } = await SQLquery('SELECT branch_name FROM Branch WHERE branch_id = $1 LIMIT 1', [branch]);
+    const targetBranchName = branchRows[0]?.branch_name || null;
+    const normalizedTargetFullName = [first_name, last_name]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim() || null;
+
+    const creatorIsBranchManager = creatorRoles.includes('Branch Manager');
+    const managerApproverId = creatorIsBranchManager ? creatorId : null;
+    const managerApprovedAt = managerApproverId ? new Date() : null;
+    const snapshotRoles = allowedRoles.length > 0 ? allowedRoles : null;
+    const sanitizedCreatorRoles = creatorRoles.length > 0 ? creatorRoles : null;
+
     await SQLquery('BEGIN');
 
     try {
@@ -140,15 +266,59 @@ export const createUserAccount = async (UserData) => {
         );
 
         await SQLquery(
-            `INSERT INTO User_Creation_Requests (pending_user_id, creator_user_id, creator_name, creator_roles, resolution_status, created_at, resolved_at)
-             VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+            `INSERT INTO User_Creation_Requests (
+                pending_user_id,
+                creator_user_id,
+                creator_name,
+                creator_roles,
+                resolution_status,
+                created_at,
+                resolved_at,
+                manager_approver_id,
+                manager_approved_at,
+                owner_resolved_by,
+                resolution_reason,
+                deleted_at,
+                deleted_by_user_id,
+                deleted_by_admin_id,
+                target_branch_id,
+                target_branch_name,
+                target_roles,
+                target_full_name,
+                target_username,
+                target_cell_number
+            )
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, NULL, NULL, NULL, NULL, NULL, $9, $10, $11, $12, $13, $14)
              ON CONFLICT (pending_user_id) DO UPDATE
              SET creator_user_id = EXCLUDED.creator_user_id,
                  creator_name = EXCLUDED.creator_name,
                  creator_roles = EXCLUDED.creator_roles,
                  resolution_status = EXCLUDED.resolution_status,
-                 resolved_at = EXCLUDED.resolved_at`,
-            [user_id, creatorId, creatorName || null, creatorRoles.length > 0 ? creatorRoles : null, requestResolutionStatus, resolvedAt]
+                 resolved_at = EXCLUDED.resolved_at,
+                 manager_approver_id = EXCLUDED.manager_approver_id,
+                 manager_approved_at = EXCLUDED.manager_approved_at,
+                 target_branch_id = EXCLUDED.target_branch_id,
+                 target_branch_name = EXCLUDED.target_branch_name,
+                 target_roles = EXCLUDED.target_roles,
+                 target_full_name = EXCLUDED.target_full_name,
+                 target_username = EXCLUDED.target_username,
+                 target_cell_number = EXCLUDED.target_cell_number`,
+            [
+                user_id,
+                creatorId,
+                creatorName || null,
+                sanitizedCreatorRoles,
+                requestResolutionStatus,
+                resolvedAt,
+                managerApproverId,
+                managerApprovedAt,
+                branch,
+                targetBranchName,
+                snapshotRoles,
+                normalizedTargetFullName,
+                username,
+                cell_number
+            ]
         );
 
         await SQLquery('COMMIT');
@@ -219,6 +389,18 @@ export const createUserAccount = async (UserData) => {
                 }, {
                     branchId: userWithDecryptedPassword.branch_id,
                     targetRoles: ['Owner']
+                });
+            }
+        }
+
+        if (accountStatus === 'pending') {
+            const requestSnapshot = await fetchUserCreationRequestById(user_id);
+
+            if (requestSnapshot) {
+                broadcastUserApprovalRequest(branch, {
+                    request: requestSnapshot,
+                    pending_user_id: user_id,
+                    branch_id: requestSnapshot.branch_id ?? requestSnapshot.effective_branch_id ?? branch
                 });
             }
         }
@@ -324,7 +506,7 @@ export const updateUserAccount = async (UserID, UserData) =>{
 
 
 
-export const deleteUser = async (userID, branchId) =>{
+export const deleteUser = async (userID, branchId, options = {}) =>{
 
     // ENSURE userID IS AN INTEGER
     const userIdInt = parseInt(userID, 10);
@@ -334,6 +516,21 @@ export const deleteUser = async (userID, branchId) =>{
     }
 
     console.log(`Deleting user ${userIdInt} from branch ${branchId}`);
+
+    const {
+        deletedByUserId = null,
+        deletedByAdminId = null,
+        deletedByName = null,
+        deletionReason = null
+    } = options || {};
+
+    const normalizedDeletionReason = typeof deletionReason === 'string'
+        ? deletionReason.trim()
+        : '';
+
+    const resolvedDeletionReason = normalizedDeletionReason
+        ? normalizedDeletionReason
+        : (deletedByName ? `Deleted by ${deletedByName}` : null);
 
     const { rows: userRows } = await SQLquery(
         `SELECT first_name, last_name, role
@@ -416,6 +613,23 @@ export const deleteUser = async (userID, branchId) =>{
         [userIdInt]
     );
 
+    await SQLquery(
+        `UPDATE User_Creation_Requests
+         SET resolution_status = 'deleted',
+             resolved_at = NOW(),
+             deleted_at = NOW(),
+             deleted_by_user_id = COALESCE($2, deleted_by_user_id),
+             deleted_by_admin_id = COALESCE($3, deleted_by_admin_id),
+             resolution_reason = COALESCE($4, resolution_reason)
+         WHERE pending_user_id = $1`,
+        [
+            userIdInt,
+            deletedByUserId,
+            deletedByAdminId,
+            resolvedDeletionReason
+        ]
+    );
+
     await SQLquery('DELETE FROM Users WHERE user_id = $1', [userIdInt]);
 
     console.log(`Broadcasting user deletion for user ${userIdInt} in branch ${branchId}`);
@@ -453,9 +667,11 @@ export const approvePendingUser = async (userId, approverId, approverName) => {
     if (approvalResult.rowCount > 0) {
         await SQLquery(
             `UPDATE User_Creation_Requests
-             SET resolution_status = 'approved', resolved_at = NOW()
+             SET resolution_status = 'approved',
+                 resolved_at = NOW(),
+                 owner_resolved_by = COALESCE($2, owner_resolved_by)
              WHERE pending_user_id = $1`,
-            [userIdInt]
+            [userIdInt, approverIdInt]
         );
     }
 
@@ -486,9 +702,350 @@ export const approvePendingUser = async (userId, approverId, approverName) => {
             action: 'update',
             user: approvedUser
         });
+
+        const requestSnapshot = await fetchUserCreationRequestById(userIdInt);
+
+        if (requestSnapshot) {
+            broadcastUserApprovalUpdate(approvedUser.branch_id, {
+                pending_user_id: userIdInt,
+                status: 'approved',
+                branch_id: approvedUser.branch_id,
+                request: requestSnapshot
+            });
+        }
     }
 
     return approvedUser;
+};
+
+
+export const rejectPendingUser = async (userId, approverId, options = {}) => {
+    const userIdInt = parseInt(userId, 10);
+    const approverIdInt = approverId !== null && approverId !== undefined ? parseInt(approverId, 10) : null;
+
+    if (Number.isNaN(userIdInt)) {
+        throw new Error('Invalid user id');
+    }
+
+    if (approverId !== null && approverId !== undefined && Number.isNaN(approverIdInt)) {
+        throw new Error('Invalid approver id');
+    }
+
+    const normalizedReason = typeof options?.reason === 'string' ? options.reason.trim() : '';
+    const resolvedReason = normalizedReason.length > 0 ? normalizedReason : null;
+
+    await SQLquery('BEGIN');
+
+    let branchId = null;
+    let rejectedUser = null;
+
+    try {
+        const { rows } = await SQLquery(`
+    SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, Users.is_disabled, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password, status, Users.created_by, Users.approved_by, Users.approved_at, ucr.creator_user_id AS created_by_id, ucr.resolution_status AS creator_request_status, ucr.resolved_at AS creator_request_resolved_at, ucr.resolution_reason AS creator_request_reason
+        FROM Users
+        JOIN Branch ON Branch.branch_id = Users.branch_id
+        JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
+        LEFT JOIN User_Creation_Requests ucr ON ucr.pending_user_id = Users.user_id
+        WHERE Users.user_id = $1
+        FOR UPDATE OF Users, Login_Credentials
+    `, [userIdInt]);
+
+        if (rows.length === 0) {
+            await SQLquery('ROLLBACK');
+            throw new Error('User not found or already processed');
+        }
+
+        const pendingRecord = rows[0];
+        const currentStatus = typeof pendingRecord.status === 'string' ? pendingRecord.status.toLowerCase() : pendingRecord.status;
+
+        if (currentStatus !== 'pending') {
+            await SQLquery('ROLLBACK');
+            throw new Error('User not found or already processed');
+        }
+
+        branchId = pendingRecord.branch_id;
+
+        await SQLquery(
+            `UPDATE User_Creation_Requests
+             SET resolution_status = 'rejected',
+                 resolved_at = NOW(),
+                 owner_resolved_by = COALESCE($2, owner_resolved_by),
+                 resolution_reason = COALESCE($3, resolution_reason)
+             WHERE pending_user_id = $1`,
+            [userIdInt, approverIdInt, resolvedReason]
+        );
+
+        const decryptedPassword = await passwordEncryption.decryptPassword(pendingRecord.password);
+
+        rejectedUser = {
+            ...pendingRecord,
+            password: decryptedPassword,
+            status: 'rejected',
+            creator_request_status: 'rejected',
+            creator_request_resolved_at: new Date().toISOString(),
+            creator_request_reason: resolvedReason ?? pendingRecord.creator_request_reason
+        };
+
+        await SQLquery('DELETE FROM Login_Credentials WHERE user_id = $1', [userIdInt]);
+        await SQLquery('DELETE FROM Users WHERE user_id = $1', [userIdInt]);
+
+        await SQLquery('COMMIT');
+    } catch (error) {
+        await SQLquery('ROLLBACK');
+        throw error;
+    }
+
+    broadcastUserUpdate(branchId, {
+        action: 'delete',
+        user_id: userIdInt,
+        reason: resolvedReason || 'rejected'
+    });
+
+    const requestSnapshot = await fetchUserCreationRequestById(userIdInt);
+
+    if (requestSnapshot) {
+        broadcastUserApprovalUpdate(branchId, {
+            pending_user_id: userIdInt,
+            status: 'rejected',
+            branch_id: branchId,
+            reason: resolvedReason || null,
+            request: requestSnapshot
+        });
+    }
+
+    return rejectedUser;
+};
+
+
+export const cancelPendingUserRequest = async (userId, cancellerId, options = {}) => {
+    const userIdInt = parseInt(userId, 10);
+    const cancellerIdInt = cancellerId !== null && cancellerId !== undefined ? parseInt(cancellerId, 10) : null;
+
+    if (Number.isNaN(userIdInt)) {
+        throw new Error('Invalid user id');
+    }
+
+    if (cancellerId !== null && cancellerId !== undefined && Number.isNaN(cancellerIdInt)) {
+        throw new Error('Invalid canceller id');
+    }
+
+    const normalizedReason = typeof options?.reason === 'string' ? options.reason.trim() : '';
+    const resolvedReason = normalizedReason.length > 0 ? normalizedReason : null;
+    const actorType = options?.actorType === 'admin' ? 'admin' : 'user';
+
+    await SQLquery('BEGIN');
+
+    let branchId = null;
+    let cancelledUser = null;
+
+    try {
+        const { rows } = await SQLquery(`
+    SELECT Users.user_id, Branch.branch_name as branch, Branch.branch_id, first_name || ' ' || last_name AS full_name, first_name, last_name, role, cell_number, is_active, Users.is_disabled, ${correctDateFormat('hire_date')}, last_login, permissions, Users.address, username, password, status, Users.created_by, Users.approved_by, Users.approved_at, ucr.creator_user_id AS created_by_id, ucr.creator_roles, ucr.resolution_status AS creator_request_status, ucr.resolved_at AS creator_request_resolved_at, ucr.resolution_reason AS creator_request_reason
+        FROM Users
+        JOIN Branch ON Branch.branch_id = Users.branch_id
+        JOIN Login_Credentials ON Login_Credentials.user_id = Users.user_id
+        JOIN User_Creation_Requests ucr ON ucr.pending_user_id = Users.user_id
+        WHERE Users.user_id = $1
+        FOR UPDATE OF Users, Login_Credentials
+    `, [userIdInt]);
+
+        if (rows.length === 0) {
+            await SQLquery('ROLLBACK');
+            throw new Error('User not found or already processed');
+        }
+
+        const pendingRecord = rows[0];
+        const currentStatus = typeof pendingRecord.status === 'string' ? pendingRecord.status.toLowerCase() : pendingRecord.status;
+        const requestStatus = typeof pendingRecord.creator_request_status === 'string' ? pendingRecord.creator_request_status.toLowerCase() : pendingRecord.creator_request_status;
+
+        if (currentStatus !== 'pending' || requestStatus !== 'pending') {
+            await SQLquery('ROLLBACK');
+            throw new Error('User not found or already processed');
+        }
+
+        if (actorType !== 'admin') {
+            if (!Number.isFinite(cancellerIdInt)) {
+                await SQLquery('ROLLBACK');
+                throw new Error('Canceller id is required');
+            }
+
+            if (Number(pendingRecord.created_by_id) !== cancellerIdInt) {
+                await SQLquery('ROLLBACK');
+                throw new Error('You can only cancel requests that you submitted');
+            }
+        }
+
+        branchId = pendingRecord.branch_id;
+
+        await SQLquery(
+            `UPDATE User_Creation_Requests
+             SET resolution_status = 'cancelled',
+                 resolved_at = NOW(),
+                 resolution_reason = COALESCE($3, resolution_reason),
+                 deleted_at = NOW(),
+                 deleted_by_user_id = CASE WHEN $4 = 'user' THEN $2 ELSE deleted_by_user_id END,
+                 deleted_by_admin_id = CASE WHEN $4 = 'admin' THEN $2 ELSE deleted_by_admin_id END
+             WHERE pending_user_id = $1`,
+            [userIdInt, cancellerIdInt, resolvedReason, actorType]
+        );
+
+        const decryptedPassword = await passwordEncryption.decryptPassword(pendingRecord.password);
+
+        cancelledUser = {
+            ...pendingRecord,
+            password: decryptedPassword,
+            status: 'cancelled',
+            creator_request_status: 'cancelled',
+            creator_request_resolved_at: new Date().toISOString(),
+            creator_request_reason: resolvedReason ?? pendingRecord.creator_request_reason
+        };
+
+        await SQLquery('DELETE FROM Login_Credentials WHERE user_id = $1', [userIdInt]);
+        await SQLquery('DELETE FROM Users WHERE user_id = $1', [userIdInt]);
+
+        await SQLquery('COMMIT');
+    } catch (error) {
+        await SQLquery('ROLLBACK');
+        throw error;
+    }
+
+    broadcastUserUpdate(branchId, {
+        action: 'delete',
+        user_id: userIdInt,
+        reason: resolvedReason || 'cancelled'
+    });
+
+    const requestSnapshot = await fetchUserCreationRequestById(userIdInt);
+
+    if (requestSnapshot) {
+        broadcastUserApprovalUpdate(branchId, {
+            pending_user_id: userIdInt,
+            status: 'cancelled',
+            branch_id: branchId,
+            reason: resolvedReason || null,
+            request: requestSnapshot
+        });
+    }
+
+    return cancelledUser;
+};
+
+export const getUserCreationRequests = async (options = {}) => {
+    const {
+        scope = 'user',
+        branchId = null,
+        requesterId = null,
+        requesterNameKey = null,
+        statuses = null,
+        limit = 100,
+        offset = 0
+    } = options;
+
+    const filters = [];
+    const params = [];
+    let paramIndex = 1;
+
+    const resolvedScope = ['user', 'branch', 'admin'].includes(scope) ? scope : 'user';
+
+    if (resolvedScope === 'user') {
+        const userConditions = [];
+
+        if (Number.isFinite(requesterId)) {
+            userConditions.push(`ucr.creator_user_id = $${paramIndex++}`);
+            params.push(requesterId);
+        }
+
+        if (requesterNameKey) {
+            userConditions.push(`(
+                ucr.creator_user_id IS NULL
+                AND ucr.creator_name IS NOT NULL
+                AND LOWER(regexp_replace(TRIM(ucr.creator_name), '\\s+', ' ', 'g')) = $${paramIndex}
+            )`);
+            params.push(requesterNameKey);
+            paramIndex += 1;
+        }
+
+        if (userConditions.length === 0) {
+            throw new Error('Unable to resolve requester for user-scoped creation requests');
+        }
+
+        filters.push(`(${userConditions.join(' OR ')})`);
+    } else if (resolvedScope === 'branch') {
+        if (!Number.isFinite(branchId)) {
+            throw new Error('branchId is required for branch scope');
+        }
+
+        filters.push(`COALESCE(u.branch_id, ucr.target_branch_id) = $${paramIndex++}`);
+        params.push(branchId);
+    } else if (resolvedScope === 'admin' && Number.isFinite(branchId)) {
+        filters.push(`COALESCE(u.branch_id, ucr.target_branch_id) = $${paramIndex++}`);
+        params.push(branchId);
+    }
+
+    if (Array.isArray(statuses) && statuses.length > 0) {
+        const normalized = statuses
+            .map(status => String(status || '').toLowerCase())
+            .filter(Boolean);
+
+        if (normalized.length > 0) {
+            filters.push(`LOWER(ucr.resolution_status) = ANY($${paramIndex++})`);
+            params.push(normalized);
+        }
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+
+    const numericLimit = Math.max(1, Math.min(Number(limit) || 100, 200));
+    const numericOffset = Math.max(0, Number(offset) || 0);
+
+    params.push(numericLimit, numericOffset);
+
+    const query = `
+        SELECT 
+            ucr.pending_user_id,
+            ucr.creator_user_id,
+            ucr.creator_name,
+            ucr.creator_roles,
+            ucr.resolution_status,
+            ucr.created_at,
+            ucr.resolved_at,
+            ucr.manager_approver_id,
+            ucr.manager_approved_at,
+            ucr.owner_resolved_by,
+            ucr.resolution_reason,
+            ucr.deleted_at,
+            ucr.deleted_by_user_id,
+            ucr.deleted_by_admin_id,
+            ucr.target_branch_id,
+            ucr.target_branch_name,
+            ucr.target_roles,
+            ucr.target_full_name,
+            ucr.target_username,
+            ucr.target_cell_number,
+            COALESCE(u.branch_id, ucr.target_branch_id) AS effective_branch_id,
+            COALESCE(b.branch_name, ucr.target_branch_name) AS effective_branch_name,
+            COALESCE(u.role, ucr.target_roles) AS effective_roles,
+            COALESCE(u.first_name || ' ' || u.last_name, ucr.target_full_name) AS effective_full_name,
+            COALESCE(lc.username, ucr.target_username) AS effective_username,
+            COALESCE(u.cell_number, ucr.target_cell_number) AS effective_cell_number,
+            COALESCE(u.status, ucr.resolution_status) AS effective_status,
+            u.branch_id AS current_branch_id,
+            b.branch_name AS current_branch_name,
+            u.role AS current_role,
+            u.status AS current_status,
+            u.cell_number AS current_cell_number,
+            lc.username AS current_username
+        FROM User_Creation_Requests ucr
+        LEFT JOIN Users u ON u.user_id = ucr.pending_user_id
+        LEFT JOIN Branch b ON b.branch_id = u.branch_id
+        LEFT JOIN Login_Credentials lc ON lc.user_id = u.user_id
+        ${whereClause}
+        ORDER BY ucr.created_at DESC
+        LIMIT $${paramIndex++}
+        OFFSET $${paramIndex++}`;
+
+    const { rows } = await SQLquery(query, params);
+    return rows.map(mapUserCreationRequestRow).filter(Boolean);
 };
 
 

@@ -284,6 +284,35 @@ export const rejectPendingInventoryRequest = async (req, res) => {
 };
 
 
+export const cancelPendingInventoryRequest = async (req, res) => {
+    try {
+        const pendingId = req.params.id;
+
+        if (!pendingId) {
+            return res.status(400).json({ message: 'pending_id is required' });
+        }
+
+        const requesterContext = req.user;
+
+        if (!requesterContext || requesterContext.user_type !== 'user' || !requesterContext.user_id) {
+            return res.status(403).json({ message: 'Only inventory users can cancel their requests' });
+        }
+
+        const result = await inventoryServices.cancelPendingInventoryRequest(
+            Number(pendingId),
+            Number(requesterContext.user_id),
+            req.body?.reason ?? null
+        );
+
+        res.status(200).json(result);
+    } catch (error) {
+        const statusCode = error?.statusCode ?? (error?.message === 'Pending inventory request not found' ? 404 : 500);
+        console.error('Error cancelling inventory request: ', error);
+        res.status(statusCode).json({ message: error.message || 'Internal Server Error' });
+    }
+};
+
+
 
 
 

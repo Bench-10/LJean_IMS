@@ -39,6 +39,18 @@ router.put("/update_account/:id", authenticate, requireRole('Owner', 'Branch Man
 router.patch("/users/:id/approval", authenticate, requireRole('Owner'), userControllers.approvePendingUser);
 
 
+//REJECT PENDING USER ACCOUNT
+router.patch("/users/:id/rejection", authenticate, requireRole('Owner'), userControllers.rejectPendingUser);
+
+
+//CANCEL PENDING USER ACCOUNT
+router.patch("/users/:id/cancel", authenticate, requireRole('Owner', 'Branch Manager'), userControllers.cancelPendingUserRequest);
+
+
+//LIST USER CREATION REQUESTS
+router.get("/users/pending", authenticate, requireRole('Owner', 'Branch Manager', 'Inventory Staff'), userControllers.getUserCreationRequests);
+
+
 //USER DELETION
 router.delete("/delete_account/:id", authenticate, requireRole('Owner', 'Branch Manager'), userControllers.userDeletionAccount);
 

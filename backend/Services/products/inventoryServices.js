@@ -400,12 +400,15 @@ const mapPendingRequest = (row) => {
         created_by_roles: row.created_by_roles,
         manager_approver_id: row.manager_approver_id,
         manager_approved_at: row.manager_approved_at,
-    manager_approver_name: row.manager_approver_name,
+        manager_approver_name: row.manager_approver_name,
         admin_approver_id: row.admin_approver_id,
         admin_approved_at: row.admin_approved_at,
         approved_by: row.approved_by,
         approved_at: row.approved_at,
         rejection_reason: row.rejection_reason,
+        cancelled_by: row.cancelled_by,
+        cancelled_at: row.cancelled_at,
+        cancelled_reason: row.cancelled_reason,
         created_at: row.created_at,
         payload: row.payload,
     };
@@ -445,6 +448,16 @@ const deriveRequestStatusDetail = (row) => {
             code: 'rejected',
             label: 'Rejected',
             tone: 'rose',
+            is_final: true,
+            stage: row.current_stage
+        };
+    }
+
+    if (row.status === 'deleted') {
+        return {
+            code: 'deleted',
+            label: 'Deleted',
+            tone: 'slate',
             is_final: true,
             stage: row.current_stage
         };
@@ -511,7 +524,7 @@ const mapRequestStatusRow = (row, options = {}) => {
     const summary = buildRequestSummary(row);
     const finalDecisionAt = row.status === 'pending'
         ? null
-        : (row.admin_approved_at || row.approved_at || row.manager_approved_at || null);
+        : (row.cancelled_at || row.admin_approved_at || row.approved_at || row.manager_approved_at || null);
 
     const managerTimeline = {
         status: row.manager_approved_at ? 'completed' : 'pending',
@@ -528,6 +541,7 @@ const mapRequestStatusRow = (row, options = {}) => {
     } : null;
 
     const lastActivity = finalDecisionAt
+        || row.cancelled_at
         || (adminTimeline?.acted_at ?? null)
         || (managerTimeline.acted_at ?? null)
         || row.created_at
@@ -554,6 +568,9 @@ const mapRequestStatusRow = (row, options = {}) => {
         approved_by: row.approved_by,
         approved_at: row.approved_at,
         rejection_reason: row.rejection_reason,
+        cancelled_by: row.cancelled_by,
+        cancelled_at: row.cancelled_at,
+        cancelled_reason: row.cancelled_reason,
         created_at: row.created_at,
         last_activity_at: lastActivity,
         status_detail: statusDetail,
@@ -565,7 +582,9 @@ const mapRequestStatusRow = (row, options = {}) => {
             final: {
                 status: row.status,
                 acted_at: finalDecisionAt,
-                rejection_reason: row.rejection_reason || null
+                rejection_reason: row.status === 'deleted'
+                    ? (row.cancelled_reason || row.rejection_reason || null)
+                    : (row.rejection_reason || null)
             }
         },
         payload: includePayload ? row.payload : undefined
@@ -2083,4 +2102,94 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
     }
 
     return mapPendingRequest(updated);
+};
+
+
+export const cancelPendingInventoryRequest = async (pendingId, requesterId, reason = null) => {
+    const resolvedPendingId = Number(pendingId);
+    const resolvedRequesterId = Number(requesterId);
+
+    if (!Number.isFinite(resolvedPendingId)) {
+        const error = new Error('Invalid pending inventory request id');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (!Number.isFinite(resolvedRequesterId)) {
+        const error = new Error('Invalid requester id');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const { rows: existingRows } = await SQLquery(
+        `SELECT ipa.*, b.branch_name,
+                (manager.first_name || ' ' || manager.last_name) AS manager_approver_name
+         FROM Inventory_Pending_Actions ipa
+         LEFT JOIN Branch b ON b.branch_id = ipa.branch_id
+         LEFT JOIN Users manager ON manager.user_id = ipa.manager_approver_id
+         WHERE ipa.pending_id = $1`,
+        [resolvedPendingId]
+    );
+
+    if (existingRows.length === 0) {
+        const error = new Error('Pending inventory request not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const pending = existingRows[0];
+
+    if (pending.status !== 'pending') {
+        const error = new Error('Only pending inventory requests can be cancelled');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    if (Number(pending.created_by) !== resolvedRequesterId) {
+        const error = new Error('You can only cancel requests that you submitted');
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const trimmedReason = typeof reason === 'string' ? reason.trim() : null;
+    const normalizedReason = trimmedReason && trimmedReason.length > 0 ? trimmedReason : null;
+
+    await SQLquery('BEGIN');
+
+    try {
+        const { rows: updatedRows } = await SQLquery(
+            `UPDATE Inventory_Pending_Actions
+             SET status = 'deleted',
+                 current_stage = 'cancelled',
+                 cancelled_by = $2,
+                 cancelled_at = NOW(),
+                 cancelled_reason = $3
+             WHERE pending_id = $1
+             RETURNING *`,
+            [resolvedPendingId, resolvedRequesterId, normalizedReason]
+        );
+
+        await SQLquery('COMMIT');
+
+        const updatedRaw = updatedRows[0] ? {
+            ...pending,
+            ...updatedRows[0],
+            branch_name: pending.branch_name,
+            manager_approver_name: pending.manager_approver_name
+        } : pending;
+
+        broadcastInventoryApprovalUpdate(pending.branch_id, {
+            pending_id: resolvedPendingId,
+            status: 'deleted',
+            action: pending.action_type,
+            branch_id: pending.branch_id,
+            cancelled_by: resolvedRequesterId,
+            reason: normalizedReason
+        });
+
+        return mapPendingRequest(updatedRaw);
+    } catch (error) {
+        await SQLquery('ROLLBACK');
+        throw error;
+    }
 };
