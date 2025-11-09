@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
-import api from '../utils/api';
+import { analyticsApi } from '../utils/api';
 
 // 👇 import your six images from src/assets/images
 import img1 from '../assets/images/camsbranch.png';
@@ -26,7 +26,7 @@ function BranchAnalyticsCards() {
   async function loadBranches() {
     try {
       setLoading(true); setError(null);
-      const res = await api.get(`/api/analytics/branches`);
+  const res = await analyticsApi.get(`/api/analytics/branches`);
       setBranches(res.data);
     } catch (e) { setError('Failed to load branches'); }
     finally { setLoading(false); }

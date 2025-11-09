@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../utils/api.js';
+import { analyticsApi } from '../utils/api.js';
 import { currencyFormat } from '../utils/formatCurrency.js';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -57,8 +57,8 @@ export default function OwnerAnalytics(){
 
       const range = '6m';
       const [kpiRes, salesRes] = await Promise.all([
-        api.get(`/api/analytics/kpis`, { params: { start_date, end_date } }),
-        api.get(`/api/analytics/sales-performance`, { params: { interval, range, start_date, end_date } })
+        analyticsApi.get(`/api/analytics/kpis`, { params: { start_date, end_date } }),
+        analyticsApi.get(`/api/analytics/sales-performance`, { params: { interval, range, start_date, end_date } })
       ]);
 
       setKpis(kpiRes.data);

@@ -1,4 +1,4 @@
-import api from '../utils/api';
+import { notificationApi } from '../utils/api';
 import { useEffect, useState, useRef } from 'react';
 import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
@@ -119,7 +119,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
 
     try {
       //UPDATES THE BACKEND
-      await api.post(`/api/notifications`, body);
+      await notificationApi.post(`notifications`, body);
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
       // Revert optimistic update on error
@@ -152,7 +152,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
         ? { user_type: 'admin', admin_id: principalId }
         : { user_type: 'user', user_id: principalId, branch_id: user.branch_id, hire_date: user.hire_date };
 
-      await api.post(`/api/notifications/mark-all-read`, body);
+  await notificationApi.post(`notifications/mark-all-read`, body);
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
       // Revert to previous state on error

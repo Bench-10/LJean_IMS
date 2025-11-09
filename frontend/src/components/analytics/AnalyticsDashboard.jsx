@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
 
-import api from '../../utils/api.js';
+import api, { analyticsApi } from '../../utils/api.js';
 import { currencyFormat } from '../../utils/formatCurrency.js';
 import { NavLink } from "react-router-dom";
 
@@ -32,6 +32,78 @@ const DELIVERY_META_DEFAULT = {
   max_reference: null,
   step: 'day'
 };
+
+const CACHE_TTL_MS = Number.POSITIVE_INFINITY;
+
+const analyticsCaches = {
+  branches: new Map(),
+  salesPerformance: new Map(),
+  topProducts: new Map(),
+  restockTrends: new Map(),
+  restockSuggestions: new Map(),
+  inventoryLevels: new Map(),
+  categoryDistribution: new Map(),
+  kpis: new Map(),
+  delivery: new Map(),
+  branchesSummary: new Map()
+};
+
+const pendingRequests = new Map();
+
+const buildCacheKey = (name, params) => `${name}::${JSON.stringify(params)}`;
+
+const getCachedValue = (name, params) => {
+  const cache = analyticsCaches[name];
+  if (!cache) return null;
+  const key = JSON.stringify(params);
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+};
+
+const setCachedValue = (name, params, value) => {
+  const cache = analyticsCaches[name];
+  if (!cache) return;
+  const key = JSON.stringify(params);
+  cache.set(key, { value, timestamp: Date.now() });
+};
+
+const fetchAndCache = async (name, params, fetcher) => {
+  const cached = getCachedValue(name, params);
+  if (cached) {
+    return cached;
+  }
+
+  const cacheKey = buildCacheKey(name, params);
+  if (pendingRequests.has(cacheKey)) {
+    return pendingRequests.get(cacheKey);
+  }
+
+  const promise = (async () => {
+    const result = await fetcher();
+    setCachedValue(name, params, result);
+    return result;
+  })().finally(() => {
+    pendingRequests.delete(cacheKey);
+  });
+
+  pendingRequests.set(cacheKey, promise);
+  return promise;
+};
+
+const clearAnalyticsCaches = () => {
+  Object.values(analyticsCaches).forEach((cache) => cache.clear());
+  pendingRequests.clear();
+  cachedCategoryList = null;
+};
+
+let cachedCategoryList = null;
+
+const getDashboardStorageKey = (branchId) => `analytics-dashboard-state:${branchId ?? 'global'}`;
 
 const normalizeDeliveryEntry = (entry) => {
   if (!entry || entry.date == null) return null;
@@ -137,10 +209,23 @@ const Card = ({ title, children, className = '', exportRef, bodyClassName = '' }
 const CategorySelect = ({ categoryFilter, setCategoryFilter, onCategoryNameChange }) => {
   const [list, setList] = useState([]);
   useEffect(() => {
+    if (cachedCategoryList) {
+      setList(cachedCategoryList);
+      return;
+    }
+    const controller = new AbortController();
     async function load() {
-      try { const res = await api.get(`/api/categories`); setList(res.data); } catch (e) { console.error(e); }
+      try {
+        const res = await api.get(`/api/categories`, { signal: controller.signal });
+        const data = Array.isArray(res.data) ? res.data : [];
+        cachedCategoryList = data;
+        setList(data);
+      } catch (e) {
+        if (e?.code !== 'ERR_CANCELED') console.error(e);
+      }
     }
     load();
+    return () => controller.abort();
   }, []);
   const options = [{ value: '', label: 'All Categories' }, ...list.map(c => ({ value: String(c.category_id), label: c.category_name }))];
   return (
@@ -205,6 +290,18 @@ function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, d
 export default function AnalyticsDashboard({ branchId, canSelectBranch = false }) {
   const { user } = useAuth();
 
+  const storageKey = useMemo(() => getDashboardStorageKey(branchId), [branchId]);
+  const persistedState = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.sessionStorage.getItem(storageKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      console.error('Failed to read analytics preferences:', error);
+      return null;
+    }
+  }, [storageKey]);
+
   const isOwner = useMemo(() => {
     if (!user) return false;
     const roles = Array.isArray(user.role) ? user.role : user?.role ? [user.role] : [];
@@ -220,6 +317,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const branchTimelineRef = useRef(null);
   const kpiRef = useRef(null);
   const deliveryRequestIdRef = useRef(0);
+  const skipPersistRef = useRef(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   const [salesPerformance, setSalesPerformance] = useState({ history: [], forecast: [], series: [] });
@@ -238,21 +336,21 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [loadingKPIs, setLoadingKPIs] = useState(false);
 
-  const [salesInterval, setSalesInterval] = useState('monthly');
-  const [restockInterval, setRestockInterval] = useState('monthly');
+  const [salesInterval, setSalesInterval] = useState(persistedState?.salesInterval ?? 'monthly');
+  const [restockInterval, setRestockInterval] = useState(persistedState?.restockInterval ?? 'monthly');
 
-  const [deliveryInterval, setDeliveryInterval] = useState('monthly');
-  const [deliveryStatus, setDeliveryStatus] = useState('delivered');
+  const [deliveryInterval, setDeliveryInterval] = useState(persistedState?.deliveryInterval ?? 'monthly');
+  const [deliveryStatus, setDeliveryStatus] = useState(persistedState?.deliveryStatus ?? 'delivered');
 
   const todayISO = dayjs().format('YYYY-MM-DD');
   const monthStartISO = dayjs().startOf('month').format('YYYY-MM-DD');
 
-  const [rangeMode, setRangeMode] = useState('preset');
-  const [preset, setPreset] = useState('current_month');
-  const [startDate, setStartDate] = useState(monthStartISO);
-  const [endDate, setEndDate] = useState(todayISO);
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [productIdFilter, setProductIdFilter] = useState('');
+  const [rangeMode, setRangeMode] = useState(persistedState?.rangeMode ?? 'preset');
+  const [preset, setPreset] = useState(persistedState?.preset ?? 'current_month');
+  const [startDate, setStartDate] = useState(persistedState?.startDate ?? monthStartISO);
+  const [endDate, setEndDate] = useState(persistedState?.endDate ?? todayISO);
+  const [categoryFilter, setCategoryFilter] = useState(persistedState?.categoryFilter ?? '');
+  const [productIdFilter, setProductIdFilter] = useState(persistedState?.productIdFilter ?? '');
   const [kpis, setKpis] = useState({
     total_sales: 0, total_investment: 0, total_profit: 0,
     prev_total_sales: 0, prev_total_investment: 0, prev_total_profit: 0,
@@ -291,11 +389,81 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   }, [rangeMode, preset]);
 
   const [currentCharts, setCurrentCharts] = useState(() => {
-    if (user && !branchId && user.role && user.role.some(role => role === "Owner")) {
-      return "branch";
+    if (persistedState?.currentCharts) return persistedState.currentCharts;
+    if (user && !branchId && user.role && user.role.some(role => role === 'Owner')) {
+      return 'branch';
     }
-    return "sale";
+    return 'sale';
   });
+
+  useEffect(() => {
+    skipPersistRef.current = true;
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (!persistedState) {
+        setRangeMode('preset');
+        setPreset('current_month');
+        setStartDate(monthStartISO);
+        setEndDate(todayISO);
+        setCategoryFilter('');
+        setProductIdFilter('');
+        setSalesInterval('monthly');
+        setRestockInterval('monthly');
+        setDeliveryInterval('monthly');
+        setDeliveryStatus('delivered');
+        if (user && !branchId && user.role && user.role.some(role => role === 'Owner')) {
+          setCurrentCharts('branch');
+        } else {
+          setCurrentCharts('sale');
+        }
+        skipPersistRef.current = true;
+        return;
+      }
+      if (persistedState.rangeMode) setRangeMode(persistedState.rangeMode);
+      if (persistedState.preset) setPreset(persistedState.preset);
+      if (persistedState.startDate) setStartDate(persistedState.startDate);
+      if (persistedState.endDate) setEndDate(persistedState.endDate);
+      if (Object.prototype.hasOwnProperty.call(persistedState, 'categoryFilter')) setCategoryFilter(persistedState.categoryFilter ?? '');
+      if (Object.prototype.hasOwnProperty.call(persistedState, 'productIdFilter')) setProductIdFilter(persistedState.productIdFilter ?? '');
+      if (persistedState.salesInterval) setSalesInterval(persistedState.salesInterval);
+      if (persistedState.restockInterval) setRestockInterval(persistedState.restockInterval);
+      if (persistedState.deliveryInterval) setDeliveryInterval(persistedState.deliveryInterval);
+      if (persistedState.deliveryStatus) setDeliveryStatus(persistedState.deliveryStatus);
+      if (persistedState.currentCharts) setCurrentCharts(persistedState.currentCharts);
+      skipPersistRef.current = true;
+    } catch (error) {
+      console.error('Failed to hydrate analytics preferences:', error);
+    }
+  }, [branchId, monthStartISO, persistedState, storageKey, todayISO, user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (skipPersistRef.current) {
+      skipPersistRef.current = false;
+      return;
+    }
+    const payload = {
+      rangeMode,
+      preset,
+      startDate,
+      endDate,
+      categoryFilter,
+      productIdFilter,
+      salesInterval,
+      restockInterval,
+      deliveryInterval,
+      deliveryStatus,
+      currentCharts
+    };
+    try {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch (error) {
+      console.error('Failed to persist analytics preferences:', error);
+    }
+  }, [categoryFilter, currentCharts, deliveryInterval, deliveryStatus, endDate, preset, rangeMode, restockInterval, salesInterval, startDate, storageKey, productIdFilter]);
 
   const resolvedRange = useMemo(() => {
     if (rangeMode === 'preset') {
@@ -328,9 +496,18 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       setAllBranches([]);
       return;
     }
+    const cacheParams = { scope: 'all' };
+    const cached = getCachedValue('branches', cacheParams);
+    if (cached) {
+      setAllBranches(cached);
+      return;
+    }
     try {
-      const res = await api.get(`/api/analytics/branches`, { signal });
-      setAllBranches(Array.isArray(res.data) ? res.data : []);
+      const data = await fetchAndCache('branches', cacheParams, async () => {
+        const res = await analyticsApi.get(`/api/analytics/branches`, { signal });
+        return Array.isArray(res.data) ? res.data : [];
+      });
+      setAllBranches(data);
     } catch (e) {
       if (e?.code === 'ERR_CANCELED') return;
       console.error('Branches fetch error', e);
@@ -350,7 +527,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     });
     setDeliveryData([]);
     setDeliveryOldestCursor(0);
-  setDeliveryMeta({ ...DELIVERY_META_DEFAULT });
+    setDeliveryMeta({ ...DELIVERY_META_DEFAULT });
     deliveryRequestIdRef.current = 0;
     setLoadingSalesPerformance(false);
     setLoadingTopProducts(false);
@@ -361,6 +538,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     setLoadingBranchPerformance(false);
     setRestockSuggestions([]);
     setLoadingRestockSuggestions(false);
+    clearAnalyticsCaches();
   }, []);
 
   useEffect(() => {
@@ -374,16 +552,31 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     if (branchId) params.branch_id = branchId;
     if (categoryFilter) params.category_id = categoryFilter;
     if (productIdFilter) params.product_id = productIdFilter;
+    const cacheParams = {
+      branch: branchId ?? 'all',
+      category: categoryFilter || 'all',
+      product: productIdFilter || 'all',
+      interval: salesInterval
+    };
+    const cached = getCachedValue('salesPerformance', cacheParams);
+    if (cached) {
+      setSalesPerformance(cached);
+      setLoadingSalesPerformance(false);
+      return;
+    }
     setLoadingSalesPerformance(true);
     try {
-      const response = await api.get(`/api/analytics/sales-performance`, { params, signal });
-      const normalized = Array.isArray(response.data)
-        ? { history: response.data, forecast: [], series: response.data }
-        : {
+      const normalized = await fetchAndCache('salesPerformance', cacheParams, async () => {
+        const response = await analyticsApi.get(`/api/analytics/sales-performance`, { params, signal });
+        if (Array.isArray(response.data)) {
+          return { history: response.data, forecast: [], series: response.data };
+        }
+        return {
           history: response.data?.history ?? [],
           forecast: response.data?.forecast ?? [],
           series: response.data?.series ?? response.data?.history ?? []
         };
+      });
       setSalesPerformance(normalized);
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Sales performance fetch error', e);
@@ -408,26 +601,65 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     const paramsRestock = { interval: restockInterval };
     if (branchId) paramsRestock.branch_id = branchId;
 
+    const topKey = {
+      branch: branchId ?? 'all',
+      category: categoryFilter || 'all',
+      start: resolvedRange.start_date,
+      end: resolvedRange.end_date,
+      limit: paramsTop.limit,
+      interval: paramsTop.interval
+    };
+    const restockKey = {
+      branch: branchId ?? 'all',
+      interval: restockInterval
+    };
+
+    const cachedTop = getCachedValue('topProducts', topKey);
+    const cachedRestock = getCachedValue('restockTrends', restockKey);
+
+    if (cachedTop) setTopProducts(cachedTop);
+    if (cachedRestock) setRestockTrends(cachedRestock);
+
+    const tasks = [];
+
+    if (!cachedTop) {
+      tasks.push(
+        fetchAndCache('topProducts', topKey, async () => {
+          const response = await analyticsApi.get(`/api/analytics/top-products`, { params: paramsTop, signal });
+          return Array.isArray(response.data) ? response.data : [];
+        })
+          .then((data) => setTopProducts(data))
+          .catch((err) => {
+            if (err?.code === 'ERR_CANCELED') return;
+            console.error('Top products fetch error', err);
+            setTopProducts([]);
+          })
+      );
+    }
+
+    if (!cachedRestock) {
+      tasks.push(
+        fetchAndCache('restockTrends', restockKey, async () => {
+          const response = await analyticsApi.get(`/api/analytics/restock-trends`, { params: paramsRestock, signal });
+          return Array.isArray(response.data) ? response.data : [];
+        })
+          .then((data) => setRestockTrends(data))
+          .catch((err) => {
+            if (err?.code === 'ERR_CANCELED') return;
+            console.error('Restock trends fetch error', err);
+            setRestockTrends([]);
+          })
+      );
+    }
+
+    if (tasks.length === 0) {
+      setLoadingTopProducts(false);
+      return;
+    }
+
     setLoadingTopProducts(true);
     try {
-      const [topResult, restockResult] = await Promise.allSettled([
-        api.get(`/api/analytics/top-products`, { params: paramsTop, signal }),
-        api.get(`/api/analytics/restock-trends`, { params: paramsRestock, signal })
-      ]);
-
-      if (topResult.status === 'fulfilled') {
-        setTopProducts(Array.isArray(topResult.value.data) ? topResult.value.data : []);
-      } else if (topResult.reason?.code !== 'ERR_CANCELED') {
-        console.error('Top products fetch error', topResult.reason);
-        setTopProducts([]);
-      }
-
-      if (restockResult.status === 'fulfilled') {
-        setRestockTrends(Array.isArray(restockResult.value.data) ? restockResult.value.data : []);
-      } else if (restockResult.reason?.code !== 'ERR_CANCELED') {
-        console.error('Restock trends fetch error', restockResult.reason);
-        setRestockTrends([]);
-      }
+      await Promise.all(tasks);
     } finally {
       setLoadingTopProducts(false);
     }
@@ -446,10 +678,29 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       include_forecast: true
     };
 
+    const cacheParams = {
+      branch: branchId ?? 'all',
+      category: categoryFilter || 'all',
+      start: resolvedRange.start_date,
+      end: resolvedRange.end_date,
+      interval: salesInterval,
+      includeForecast: true
+    };
+
+    const cached = getCachedValue('restockSuggestions', cacheParams);
+    if (cached) {
+      setRestockSuggestions(cached);
+      setLoadingRestockSuggestions(false);
+      return;
+    }
+
     setLoadingRestockSuggestions(true);
     try {
-      const response = await api.get(`/api/analytics/top-products`, { params, signal });
-      setRestockSuggestions(Array.isArray(response.data) ? response.data : []);
+      const data = await fetchAndCache('restockSuggestions', cacheParams, async () => {
+        const response = await analyticsApi.get(`/api/analytics/top-products`, { params, signal });
+        return Array.isArray(response.data) ? response.data : [];
+      });
+      setRestockSuggestions(data);
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Restock suggestions fetch error', e);
       setRestockSuggestions([]);
@@ -462,9 +713,20 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     if (!user) return;
     const params = {};
     if (branchId) params.branch_id = branchId;
+    const cacheParams = {
+      branch: branchId ?? 'all'
+    };
+    const cached = getCachedValue('inventoryLevels', cacheParams);
+    if (cached) {
+      setInventoryLevels(cached);
+      return;
+    }
     try {
-      const response = await api.get(`/api/analytics/inventory-levels`, { params, signal });
-      setInventoryLevels(Array.isArray(response.data) ? response.data : []);
+      const data = await fetchAndCache('inventoryLevels', cacheParams, async () => {
+        const response = await analyticsApi.get(`/api/analytics/inventory-levels`, { params, signal });
+        return Array.isArray(response.data) ? response.data : [];
+      });
+      setInventoryLevels(data);
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Inventory levels fetch error', e);
     }
@@ -473,9 +735,20 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const fetchCategoryDistribution = useCallback(async (signal) => {
     if (!user) return;
     const params = branchId ? { branch_id: branchId } : {};
+    const cacheParams = {
+      branch: branchId ?? 'all'
+    };
+    const cached = getCachedValue('categoryDistribution', cacheParams);
+    if (cached) {
+      setCategoryDist(cached);
+      return;
+    }
     try {
-      const response = await api.get(`/api/analytics/category-distribution`, { params, signal });
-      setCategoryDist(Array.isArray(response.data) ? response.data : []);
+      const data = await fetchAndCache('categoryDistribution', cacheParams, async () => {
+        const response = await analyticsApi.get(`/api/analytics/category-distribution`, { params, signal });
+        return Array.isArray(response.data) ? response.data : [];
+      });
+      setCategoryDist(data);
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Category distribution fetch error', e);
     }
@@ -492,18 +765,37 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     if (categoryFilter) params.category_id = categoryFilter;
     if (productIdFilter) params.product_id = productIdFilter;
 
+    const cacheParams = {
+      branch: branchId ?? 'all',
+      category: categoryFilter || 'all',
+      product: productIdFilter || 'all',
+      start: resolvedRange.start_date,
+      end: resolvedRange.end_date,
+      preset: resolvedRange.presetKey
+    };
+
+    const cached = getCachedValue('kpis', cacheParams);
+    if (cached) {
+      setKpis(cached);
+      setLoadingKPIs(false);
+      return;
+    }
+
     setLoadingKPIs(true);
     try {
-      const response = await api.get(`/api/analytics/kpis`, { params, signal });
-      setKpis(response.data || {
-        total_sales: 0,
-        total_investment: 0,
-        total_profit: 0,
-        prev_total_sales: 0,
-        prev_total_investment: 0,
-        prev_total_profit: 0,
-        inventory_count: 0
+      const data = await fetchAndCache('kpis', cacheParams, async () => {
+        const response = await analyticsApi.get(`/api/analytics/kpis`, { params, signal });
+        return response.data || {
+          total_sales: 0,
+          total_investment: 0,
+          total_profit: 0,
+          prev_total_sales: 0,
+          prev_total_investment: 0,
+          prev_total_profit: 0,
+          inventory_count: 0
+        };
       });
+      setKpis(data);
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('KPIs fetch error', e);
       setKpis({
@@ -573,44 +865,70 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
     if (branchId) params.branch_id = branchId;
 
+    const cacheParams = {
+      branch: branchId ?? 'all',
+      interval: deliveryInterval,
+      status: deliveryStatus,
+      cursor,
+      start: range.start_date,
+      end: range.end_date
+    };
+
+    const cached = getCachedValue('delivery', cacheParams);
+    if (cached) {
+      if (mode === 'prepend') {
+        setDeliveryData((prev) => mergeDeliverySeries(cached.data, prev));
+        setDeliveryOldestCursor((prev) => Math.max(prev, cursor));
+      } else {
+        setDeliveryData(cached.data);
+        setDeliveryOldestCursor(cursor);
+      }
+      setDeliveryMeta(cached.meta ?? { ...DELIVERY_META_DEFAULT });
+      setLoadingDelivery(false);
+      return;
+    }
+
     const requestId = deliveryRequestIdRef.current + 1;
     deliveryRequestIdRef.current = requestId;
     setLoadingDelivery(true);
 
     try {
-      const response = await api.get(`/api/analytics/delivery`, { params, signal });
-      const payload = response.data;
-      const rawRows = Array.isArray(payload?.data)
-        ? payload.data
-        : Array.isArray(payload)
-          ? payload
-          : [];
+      const result = await fetchAndCache('delivery', cacheParams, async () => {
+        const response = await analyticsApi.get(`/api/analytics/delivery`, { params, signal });
+        const payload = response.data;
+        const rawRows = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+            ? payload
+            : [];
 
-      const normalized = rawRows
-        .map(normalizeDeliveryEntry)
-        .filter(Boolean);
+        const normalized = rawRows
+          .map(normalizeDeliveryEntry)
+          .filter(Boolean);
 
-      const filled = fillDeliverySeries(normalized, deliveryInterval, range.start_date, range.end_date);
+        const filled = fillDeliverySeries(normalized, deliveryInterval, range.start_date, range.end_date);
 
-      setDeliveryData((prev) => (mode === 'prepend' ? mergeDeliverySeries(filled, prev) : filled));
+        const metaPayload = payload?.meta
+          ? {
+              min_bucket: payload.meta.min_bucket ?? null,
+              max_bucket: payload.meta.max_bucket ?? null,
+              min_reference: payload.meta.min_reference ?? null,
+              max_reference: payload.meta.max_reference ?? null,
+              step: payload.meta.step ?? 'day'
+            }
+          : { ...DELIVERY_META_DEFAULT };
+
+        return { data: filled, meta: metaPayload };
+      });
 
       if (mode === 'prepend') {
+        setDeliveryData((prev) => mergeDeliverySeries(result.data, prev));
         setDeliveryOldestCursor((prev) => Math.max(prev, cursor));
       } else {
+        setDeliveryData(result.data);
         setDeliveryOldestCursor(cursor);
       }
-
-      if (payload?.meta) {
-        setDeliveryMeta({
-          min_bucket: payload.meta.min_bucket ?? null,
-          max_bucket: payload.meta.max_bucket ?? null,
-          min_reference: payload.meta.min_reference ?? null,
-          max_reference: payload.meta.max_reference ?? null,
-          step: payload.meta.step ?? 'day'
-        });
-      } else if (mode === 'replace') {
-        setDeliveryMeta({ ...DELIVERY_META_DEFAULT });
-      }
+      setDeliveryMeta(result.meta ?? { ...DELIVERY_META_DEFAULT });
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Delivery analytics fetch error', e);
       if (mode === 'replace') setDeliveryData([]);
@@ -695,8 +1013,23 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       const params = { start_date: resolvedRange.start_date, end_date: resolvedRange.end_date };
       if (categoryFilter) params.category_id = categoryFilter;
 
-      const response = await api.get(`/api/analytics/branches-summary`, { params, signal });
-      const data = Array.isArray(response.data) ? response.data : [];
+      const cacheParams = {
+        start: resolvedRange.start_date,
+        end: resolvedRange.end_date,
+        category: categoryFilter || 'all'
+      };
+
+      const cached = getCachedValue('branchesSummary', cacheParams);
+      if (cached) {
+        setBranchTotals(cached);
+        setLoadingBranchPerformance(false);
+        return;
+      }
+
+      const data = await fetchAndCache('branchesSummary', cacheParams, async () => {
+        const response = await analyticsApi.get(`/api/analytics/branches-summary`, { params, signal });
+        return Array.isArray(response.data) ? response.data : [];
+      });
       setBranchTotals(data);
     } catch (e) {
       if (e?.code === 'ERR_CANCELED') return;

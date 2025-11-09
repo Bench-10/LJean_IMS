@@ -1,4 +1,4 @@
-import api from "./utils/api.js";
+import api, { notificationApi } from "./utils/api.js";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { io } from "socket.io-client";
 import ModalForm from "./components/ModalForm";
@@ -1660,8 +1660,8 @@ function App() {
       }
 
       const queryString = params.toString();
-      const endpoint = `/api/notifications${queryString ? `?${queryString}` : ''}`;
-      const time = await api.get(endpoint);
+      const endpoint = `notifications${queryString ? `?${queryString}` : ''}`;
+      const time = await notificationApi.get(endpoint);
       const fetchedNotifications = Array.isArray(time.data) ? time.data : [];
       setNotify(dedupeNotifications(fetchedNotifications));
     } catch (error) {

@@ -4,7 +4,7 @@ import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
-import api from '../../../utils/api.js';
+import { analyticsApi } from '../../../utils/api.js';
 import DropdownCustom from '../../DropdownCustom.jsx';
 
 function BranchTimeline({ Card, categoryFilter, allBranches, branchTimelineRef }) {
@@ -44,7 +44,7 @@ function BranchTimeline({ Card, categoryFilter, allBranches, branchTimelineRef }
         params.category_id = categoryFilter;
       }
 
-      const response = await api.get(`/api/analytics/branch-timeline`, {
+  const response = await analyticsApi.get(`/api/analytics/branch-timeline`, {
         params,
         signal
       });

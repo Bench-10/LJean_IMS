@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
-import api from '../utils/api';
+import api, { cancelAllPendingRequests } from '../utils/api';
 
 
 const AuthContext = createContext();
@@ -60,6 +60,7 @@ function Authentication ({ children }) {
 
 
     const logout = async (skipApiCall = false) => {
+      cancelAllPendingRequests();
       // SEND LOGOUT API CALL FOR ALL USER TYPES TO UPDATE STATUS (UNLESS SKIPPED FOR DELETED USERS)
       if (!skipApiCall && user && user.user_id) {
         try {
