@@ -243,5 +243,38 @@ CREATE TABLE Inventory_Pending_Actions (
     approved_by INT REFERENCES Users(user_id) ON DELETE SET NULL,
     approved_at TIMESTAMP,
     rejection_reason TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    cancelled_by INT REFERENCES Users(user_id) ON DELETE SET NULL,
+    cancelled_at TIMESTAMP,
+    cancelled_reason TEXT
 );
+
+CREATE TABLE User_Creation_Requests (
+    request_id SERIAL PRIMARY KEY,
+    pending_user_id INT REFERENCES Users(user_id) ON DELETE SET NULL,
+    creator_user_id INT REFERENCES Users(user_id) ON DELETE SET NULL,
+    creator_name TEXT,
+    creator_roles TEXT[],
+    resolution_status TEXT NOT NULL DEFAULT 'pending' CHECK (resolution_status IN ('pending','approved','rejected','deleted','cancelled')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resolved_at TIMESTAMPTZ,
+    manager_approver_id INT REFERENCES Users(user_id) ON DELETE SET NULL,
+    manager_approved_at TIMESTAMP,
+    owner_resolved_by INT REFERENCES Administrator(admin_id) ON DELETE SET NULL,
+    resolution_reason TEXT,
+    deleted_at TIMESTAMP,
+    deleted_by_user_id INT REFERENCES Users(user_id) ON DELETE SET NULL,
+    deleted_by_admin_id INT REFERENCES Administrator(admin_id) ON DELETE SET NULL,
+    target_branch_id INT,
+    target_branch_name TEXT,
+    target_roles TEXT[],
+    target_full_name TEXT,
+    target_username TEXT,
+    target_cell_number TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_creation_requests_pending_user_id_idx
+    ON User_Creation_Requests(pending_user_id) WHERE pending_user_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS user_creation_requests_creator_user_id_idx
+    ON User_Creation_Requests(creator_user_id);

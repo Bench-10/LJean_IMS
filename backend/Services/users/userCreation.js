@@ -765,14 +765,31 @@ export const rejectPendingUser = async (userId, approverId, options = {}) => {
 
         branchId = pendingRecord.branch_id;
 
+        // Populate snapshot columns before deleting user so rejected request history is preserved
         await SQLquery(
             `UPDATE User_Creation_Requests
              SET resolution_status = 'rejected',
                  resolved_at = NOW(),
                  owner_resolved_by = COALESCE($2, owner_resolved_by),
-                 resolution_reason = COALESCE($3, resolution_reason)
+                 resolution_reason = COALESCE($3, resolution_reason),
+                 target_branch_id = COALESCE(target_branch_id, $4),
+                 target_branch_name = COALESCE(target_branch_name, $5),
+                 target_roles = COALESCE(target_roles, $6),
+                 target_full_name = COALESCE(target_full_name, $7),
+                 target_username = COALESCE(target_username, $8),
+                 target_cell_number = COALESCE(target_cell_number, $9)
              WHERE pending_user_id = $1`,
-            [userIdInt, approverIdInt, resolvedReason]
+            [
+                userIdInt, 
+                approverIdInt, 
+                resolvedReason,
+                pendingRecord.branch_id,
+                pendingRecord.branch,
+                pendingRecord.role,
+                pendingRecord.full_name,
+                pendingRecord.username,
+                pendingRecord.cell_number
+            ]
         );
 
         const decryptedPassword = await passwordEncryption.decryptPassword(pendingRecord.password);
