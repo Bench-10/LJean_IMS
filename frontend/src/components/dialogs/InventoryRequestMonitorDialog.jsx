@@ -310,8 +310,10 @@ const InventoryRequestMonitorDialog = ({ open, onClose, user, branches = [], use
       }
 
       if (isBranchManager) {
-        // BM: hide items awaiting their own approval
-        return code !== 'pending_manager';
+        // BM: hide items awaiting their own approval, unless filtering for pending
+        if (statusFilter !== 'pending') {
+          return code !== 'pending_manager';
+        }
       }
 
       return true;
