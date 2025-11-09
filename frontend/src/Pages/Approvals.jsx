@@ -6,6 +6,19 @@ import { MdInfoOutline, MdRefresh } from "react-icons/md";
 import { useAuth } from "../authentication/Authentication";
 import RejectionReasonDialog from "../components/dialogs/RejectionReasonDialog";
 
+/**
+ * APPROVAL CENTER - Real-time Approval Management
+ * 
+ * This component displays pending user account and inventory requests for Owner approval.
+ * All updates are handled in real-time via WebSocket:
+ * - New requests automatically appear when created by Branch Managers
+ * - Approved requests instantly disappear from the pending list
+ * - Rejected requests are removed immediately
+ * - Cancelled requests are removed in real-time
+ * 
+ * WebSocket events: 'user-approval-request', 'user-approval-updated'
+ * No manual refresh needed - the page updates automatically!
+ */
 function Approvals({
   userRequests = [],
   userRequestsLoading = false,
@@ -55,6 +68,7 @@ function Approvals({
     setSearchItem(sanitizeInput(event.target.value));
   };
 
+  // Manual refresh function (kept as fallback, but WebSocket handles real-time updates automatically)
   const handleRefreshAll = useCallback(() => {
     if (typeof refreshInventoryRequests === 'function') {
       refreshInventoryRequests();
@@ -504,11 +518,11 @@ function Approvals({
     />
   </div>
 
-  {/* Actions (always side-by-side) */}
-  {((ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function") ||
-    typeof refreshInventoryRequests === "function") && (
+  {/* Actions */}
+  {ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function" && (
     <div className="flex items-center gap-2 md:ml-auto">
-
+      {/* Manual refresh button removed - using real-time WebSocket updates */}
+      {/* Uncomment if needed as fallback:
       {(typeof refreshInventoryRequests === "function" || typeof refreshUserRequests === "function") && (
         <button
           type="button"
@@ -522,18 +536,15 @@ function Approvals({
           <span className="sr-only">Refresh inventory approvals</span>
         </button>
       )}
+      */}
 
-      {ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function" && (
-        <button
-          type="button"
-          className="w-full px-4 py-2 text-sm rounded-md bg-emerald-700 text-white font-medium transition hover:bg-emerald-600"
-          onClick={onOpenRequestMonitor}
-        >
-          View request status
-        </button>
-      )}
-
-      
+      <button
+        type="button"
+        className="w-full px-4 py-2 text-sm rounded-md bg-emerald-700 text-white font-medium transition hover:bg-emerald-600"
+        onClick={onOpenRequestMonitor}
+      >
+        View request status
+      </button>
     </div>
   )}
 </div>

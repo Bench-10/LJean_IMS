@@ -19,8 +19,7 @@ const toneStyles = {
 const statusFilters = [
   { id: 'pending',  label: 'Pending' },
   { id: 'approved', label: 'Approved' },
-  { id: 'rejected', label: 'Rejected' },
-  { id: 'cancelled', label: 'Cancelled' }
+  { id: 'rejected', label: 'Rejected' }
 ];
 
 const requestTypeFilters = [

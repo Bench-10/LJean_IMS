@@ -644,7 +644,12 @@ const createPendingInventoryAction = async ({
         `INSERT INTO Inventory_Pending_Actions
             (branch_id, product_id, action_type, payload, status, current_stage, requires_admin_review, created_by, created_by_name, created_by_roles, manager_approver_id, manager_approved_at, approved_by, approved_at)
          VALUES ($1, $2, $3, $4::jsonb, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13)
-         RETURNING *` ,
+         RETURNING 
+            Inventory_Pending_Actions.*,
+            Branch.branch_name
+         FROM Inventory_Pending_Actions
+         LEFT JOIN Branch ON Branch.branch_id = Inventory_Pending_Actions.branch_id
+         WHERE Inventory_Pending_Actions.pending_id = (SELECT pending_id FROM Inventory_Pending_Actions ORDER BY pending_id DESC LIMIT 1)`,
         [
             branchId,
             productId,

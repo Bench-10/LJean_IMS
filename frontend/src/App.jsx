@@ -163,13 +163,10 @@ function App() {
           return null;
         }
 
-        const normalizedStatusRaw = String(record?.request_status ?? record?.status ?? 'pending').toLowerCase().trim();
+        const normalizedStatusRaw = String(record?.request_status ?? record?.status ?? 'pending').toLowerCase();
         const normalizedStatus = (() => {
-          if (!normalizedStatusRaw) return 'pending';
-          if (normalizedStatusRaw.startsWith('pending')) return 'pending';
-          if (normalizedStatusRaw === 'inactive') return 'pending';
           if (normalizedStatusRaw === 'active') return 'approved';
-          if (normalizedStatusRaw === 'deleted' || normalizedStatusRaw === 'cancelled') return 'cancelled';
+          if (normalizedStatusRaw === 'deleted') return 'cancelled';
           return normalizedStatusRaw;
         })();
 
@@ -223,12 +220,7 @@ function App() {
         const hasCreatorReference = record.created_by_id !== null
           || (typeof record.created_by_display === 'string' && record.created_by_display.trim() !== '');
 
-        if (!hasCreatorReference) {
-          const status = String(record.normalized_status ?? record.status ?? '').toLowerCase();
-          return status === 'pending';
-        }
-
-        return true;
+        return hasCreatorReference;
       });
   }, [userCreationRequests]);
 
@@ -1229,6 +1221,28 @@ function App() {
 
       const statusRaw = payload.status ?? incoming?.request_status ?? incoming?.status ?? null;
       const nextStatus = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : null;
+
+      // Show real-time notification for status changes
+      if (nextStatus && nextStatus !== 'pending') {
+        const userName = incoming?.full_name ?? incoming?.target_full_name ?? 'User';
+        if (nextStatus === 'approved') {
+          addToNotificationQueue(`${userName}'s account has been approved`, {
+            title: 'Account Approved',
+            tone: 'success',
+            duration: 3000
+          });
+        } else if (nextStatus === 'rejected') {
+          addToNotificationQueue(`${userName}'s account request was rejected`, {
+            title: 'Account Rejected',
+            duration: 3000
+          });
+        } else if (nextStatus === 'cancelled') {
+          addToNotificationQueue(`${userName}'s account request was cancelled`, {
+            title: 'Request Cancelled',
+            duration: 3000
+          });
+        }
+      }
       const resolvedAt = incoming?.request_resolved_at
         ?? incoming?.resolved_at
         ?? payload.resolved_at
@@ -1778,6 +1792,7 @@ function App() {
         title: 'Request cancelled'
       });
 
+      // Fetch latest data to ensure UI is in sync (WebSocket updates may have timing delays)
       await fetchUserCreationRequests();
     } catch (error) {
       console.error('Error cancelling user request:', error);
@@ -1799,6 +1814,7 @@ function App() {
     fetchAdminPendingInventoryRequests();
   }, [fetchAdminPendingInventoryRequests]);
 
+  // Initial fetch only - WebSocket handles all subsequent updates in real-time
   useEffect(() => {
     fetchUserCreationRequests();
   }, [fetchUserCreationRequests]);
@@ -2267,6 +2283,7 @@ function App() {
         isLocal: true,
         title: 'Account approved'
       });
+      // Fetch latest data to ensure UI is in sync (WebSocket updates may have timing delays)
       await fetchUserCreationRequests();
       setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
@@ -2291,6 +2308,7 @@ function App() {
         title: 'Account rejected'
       });
 
+      // Fetch latest data to ensure UI is in sync (WebSocket updates may have timing delays)
       await fetchUserCreationRequests();
       setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
