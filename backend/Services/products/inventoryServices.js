@@ -640,16 +640,11 @@ const createPendingInventoryAction = async ({
         category_name: categoryName
     };
 
-    const { rows } = await SQLquery(
+    const insertResult = await SQLquery(
         `INSERT INTO Inventory_Pending_Actions
             (branch_id, product_id, action_type, payload, status, current_stage, requires_admin_review, created_by, created_by_name, created_by_roles, manager_approver_id, manager_approved_at, approved_by, approved_at)
          VALUES ($1, $2, $3, $4::jsonb, 'pending', $5, $6, $7, $8, $9, $10, $11, $12, $13)
-         RETURNING 
-            Inventory_Pending_Actions.*,
-            Branch.branch_name
-         FROM Inventory_Pending_Actions
-         LEFT JOIN Branch ON Branch.branch_id = Inventory_Pending_Actions.branch_id
-         WHERE Inventory_Pending_Actions.pending_id = (SELECT pending_id FROM Inventory_Pending_Actions ORDER BY pending_id DESC LIMIT 1)`,
+         RETURNING *`,
         [
             branchId,
             productId,
@@ -665,6 +660,15 @@ const createPendingInventoryAction = async ({
             approvedByValue,
             approvedAtValue
         ]
+    );
+
+    // Fetch the branch_name separately
+    const { rows } = await SQLquery(
+        `SELECT ipa.*, b.branch_name
+         FROM Inventory_Pending_Actions ipa
+         LEFT JOIN Branch b ON b.branch_id = ipa.branch_id
+         WHERE ipa.pending_id = $1`,
+        [insertResult.rows[0].pending_id]
     );
 
     const mapped = mapPendingRequest(rows[0]);
