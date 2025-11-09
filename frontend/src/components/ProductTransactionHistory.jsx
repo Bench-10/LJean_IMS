@@ -4,6 +4,7 @@ import DropdownCustom from '../components/DropdownCustom';
 import DatePickerCustom from '../components/DatePickerCustom.jsx';
 import { BsFunnelFill } from "react-icons/bs";
 import { TbFileExport } from "react-icons/tb";
+import { IoMdClose } from "react-icons/io";
 import NoInfoFound from './common/NoInfoFound.jsx';
 import { useAuth } from '../authentication/Authentication';
 import { currencyFormat } from '../utils/formatCurrency.js';
@@ -342,13 +343,19 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
 
         <div className="relative flex flex-col border border-gray-600/40 bg-white h-[80vh] sm:h-[85vh] lg:h-[90vh] w-[96vw] sm:w-[95vw] max-h-none sm:max-h-[600px] max-w-none sm:max-w-[1000px] rounded-xl p-3 sm:p-4 lg:p-7 pb-4 sm:pb-8 border-gray-300 animate-popup mx-auto my-auto">
-          <button type='button' className="absolute top-4 right-3 sm:top-4 w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors z-10"
-            onClick={() => { onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([]) }}>✕</button>
+          <button
+  type="button"
+  className="absolute top-4 right-3 sm:top-4 w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors z-10"
+  onClick={() => { onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([]); }}
+  aria-label="Close"
+>
+  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+</button>
 
           {/*TITLE AND FILTER SECTION*/}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-2  gap-4 sm:gap-0">
             {/* LEFT SIDE */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 w-full">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 w-full pt-2">
               {/* TITLE */}
               <h1 className="font-bold text-3xl sm:text-4xl text-gray-800 tracking-tight">
                 Product History

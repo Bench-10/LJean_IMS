@@ -45,95 +45,90 @@ function UserInformation({ openUsers, userDetailes, onClose, handleUserModalOpen
       )}
 
       {openUsers && (
-        <>
-          {/* Single backdrop container — click anywhere outside the card to close */}
+        <div
+          className="fixed inset-0 z-[9998] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={handleClose}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-info-title"
+        >
+          {/* Modal Card (header + scrollable body + fixed footer) */}
           <div
-            className="fixed inset-0 z-[9998] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm "
-            onClick={handleClose}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="user-info-title"
+            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[900px] max-h-[90vh] flex flex-col overflow-hidden animate-popup"
+            onClick={(e) => e.stopPropagation()} // prevent outside-close when clicking inside
           >
-            {/* Modal Card */}
-            <div
-              className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[900px] max-h-[85vh] overflow-y-auto flex flex-col hide-scrollbar animate-popup"
-              onClick={(e) => e.stopPropagation()} // keep clicks inside from closing
-            >
-              {/* HEADER */}
-              <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-center gap-3 sticky top-0 z-10">
-                <h1 id="user-info-title" className="text-white font-bold text-2xl">User Information</h1>
-                <button
-                  onClick={handleClose}
-                  className="text-white hover:bg-green-600 p-1.5 rounded-lg transition-colors"
-                >
-                  <RxCross2 className="text-xl" />
-                </button>
-              </div>
+            {/* HEADER (non-scrolling) */}
+            <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-center gap-3 flex-shrink-0 sticky top-0 z-10">
+              <h1 id="user-info-title" className="text-white font-bold text-2xl">User Information</h1>
+              <button
+                onClick={handleClose}
+                className="text-white hover:bg-green-600 p-1.5 rounded-lg transition-colors"
+              >
+                <RxCross2 className="text-xl" />
+              </button>
+            </div>
 
-              {/* BODY */}
-              <div className="p-5 bg-green-50/30 rounded-b-2xl">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 auto-rows-fr">
-                  {[
-                    ['First Name', userDetailes.first_name],
-                    ['Last Name', userDetailes.last_name],
-                    ['Branch', userDetailes.branch],
-                    ['Role', Array.isArray(userDetailes.role) ? userDetailes.role.join(', ') : userDetailes.role],
-                    ['Cell Number', userDetailes.cell_number],
-                    ['Address', userDetailes.address],
-                    [
-                      'Permissions',
-                      Array.isArray(userDetailes.permissions)
-                        ? userDetailes.permissions.join(', ')
-                        : userDetailes.permissions || '',
-                    ],
-                    ['Hire Date', userDetailes.formated_hire_date],
-                    [
-                      'Account Status',
-                      (() => {
-                        const badge = getStatusBadge();
-                        return (
-                          <span
-                            className={`text-xs font-semibold py-1 px-3 rounded-full inline-block ${badge.className}`}
-                          >
-                            {badge.label}
-                          </span>
-                        );
-                      })(),
-                    ],
-                    ['Last Login', userDetailes.last_login],
-                  ].map(([label, value], i) => (
-                    <div
-                      key={i}
-                      className="bg-white shadow-inner rounded-lg px-3 py-1 border border-gray-200 w-full h-full flex flex-col justify-center"
-                    >
-                      <h2 className="text-green-800 text-sm font-medium mb-1">{label}</h2>
-                      <p className="text-gray-800 text-base font-semibold break-words">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* BUTTONS */}
-              <div className="flex flex-col sm:flex-row justify-center gap-4 p-5 bg-white border-t border-green-100 rounded-b-2xl shadow-inner">
-                <button
-                  className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium shadow-md transition-all"
-                  onClick={(e) => { e.stopPropagation(); handleUserModalOpen('edit'); }}
-                >
-                  <FiEdit className="text-lg" />
-                  <span>Edit</span>
-                </button>
-
-                <button
-                  className="py-2.5 px-6 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium shadow-md transition-all"
-                  onClick={(e) => { e.stopPropagation(); setDialog(true); }}
-                >
-                  <MdDelete className="text-lg" />
-                  <span>Delete</span>
-                </button>
+            {/* BODY (scrolls) */}
+            <div className="flex-1 overflow-y-auto p-5 bg-green-50/30">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 auto-rows-fr">
+                {[
+                  ['First Name', userDetailes.first_name],
+                  ['Last Name', userDetailes.last_name],
+                  ['Branch', userDetailes.branch],
+                  ['Role', Array.isArray(userDetailes.role) ? userDetailes.role.join(', ') : userDetailes.role],
+                  ['Cell Number', userDetailes.cell_number],
+                  ['Address', userDetailes.address],
+                  [
+                    'Permissions',
+                    Array.isArray(userDetailes.permissions)
+                      ? userDetailes.permissions.join(', ')
+                      : userDetailes.permissions || '',
+                  ],
+                  ['Hire Date', userDetailes.formated_hire_date],
+                  [
+                    'Account Status',
+                    (() => {
+                      const badge = getStatusBadge();
+                      return (
+                        <span className={`text-xs font-semibold py-1 px-3 rounded-full inline-block ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      );
+                    })(),
+                  ],
+                  ['Last Login', userDetailes.last_login],
+                ].map(([label, value], i) => (
+                  <div
+                    key={i}
+                    className="bg-white shadow-inner rounded-lg px-3 py-2 border border-gray-200 w-full h-full flex flex-col justify-center"
+                  >
+                    <h2 className="text-green-800 text-sm font-medium mb-1">{label}</h2>
+                    <p className="text-gray-800 text-base font-semibold break-words">{value}</p>
+                  </div>
+                ))}
               </div>
             </div>
+
+            {/* FOOTER (non-scrolling, always visible) */}
+            <div className="flex flex-col sm:flex-row justify-center gap-4 p-3 lg:p-5 bg-white border-t border-green-100 flex-shrink-0">
+              <button
+                className="py-1 lg:py-2.5 px-4 lg:px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium shadow-md transition-all"
+                onClick={(e) => { e.stopPropagation(); handleUserModalOpen('edit'); }}
+              >
+                <FiEdit className="text-base lg:text-lg" />
+                <span>Edit</span>
+              </button>
+
+              <button
+                className="py-1 lg:py-2.5 px-4 lg:px-6 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center gap-2 font-medium shadow-md transition-all"
+                onClick={(e) => { e.stopPropagation(); setDialog(true); }}
+              >
+                <MdDelete className="text-base lg:text-lg" />
+                <span>Delete</span>
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

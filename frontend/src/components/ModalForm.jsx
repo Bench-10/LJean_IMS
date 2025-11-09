@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../authentication/Authentication';
+import { IoMdClose } from 'react-icons/io';
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
 import api from '../utils/api';
@@ -587,13 +588,13 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
             </p>
           </div>
           <button
-            type="button"
-            className="w-9 h-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-            onClick={() => setShowSellingUnitsEditor(false)}
-            aria-label="Close selling units editor"
-          >
-            ✕
-          </button>
+  type="button"
+  className="w-9 h-9 flex items-center justify-center rounded-lg  text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+  onClick={() => setShowSellingUnitsEditor(false)}
+  aria-label="Close selling units editor"
+>
+  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+</button>
         </div>
 
         {/* BODY: scrolls, panel height stays fixed */}
@@ -794,29 +795,21 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
 
     {/* Close button — nudged toward the very top-right */}
     <button
-      type="button"
-      aria-label="Close"
-      onClick={() => {
-        onClose();
-        setShowExistingProducts(false);
-        setMaxQuant(false);
-        setShowSellingUnitsEditor(false);
-      }}
-      className="absolute w-9 h-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100
-                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-white"
-      // Fine-tune the exact spot here:
-      style={{ top: 2, right: 1 }}   // ~6px from top, ~10px from right (adjust to taste)
-    >
-      <svg
-        className="w-5 h-5 text-gray-700"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-      </svg>
-    </button>
+  type="button"
+  aria-label="Close"
+  onClick={() => {
+    onClose();
+    setShowExistingProducts(false);
+    setMaxQuant(false);
+    setShowSellingUnitsEditor(false);
+  }}
+  className="absolute w-9 h-9 inline-flex items-center justify-center rounded-lg hover:bg-gray-100
+             "
+  style={{ top: 2, right: 1 }}
+>
+  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+</button>
+
   </div>
 </div>
 

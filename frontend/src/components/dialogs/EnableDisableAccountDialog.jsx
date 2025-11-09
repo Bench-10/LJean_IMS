@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { FaSpinner } from "react-icons/fa";
 import { MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
+import { IoMdClose } from "react-icons/io";
 
 function EnableDisableAccountDialog({ onClose, status, action, loading = false }) {
   const isCurrentlyDisabled = !!status;        // true => disabled now
@@ -13,22 +14,20 @@ function EnableDisableAccountDialog({ onClose, status, action, loading = false }
     ? "This account is currently disabled. Enabling will restore user access to the system."
     : "Disabling will immediately revoke this user's ability to log in and mark the account as inactive.";
 
-  // Tailwind-safe palette map (no dynamic class strings)
-  const palette = willEnable ? "green" : "red";
-  const styles =
-    palette === "green"
-      ? {
-          iconWrap: "bg-green-100",
-          icon: "text-green-600",
-          title: "text-green-700",
-          btn: "bg-green-600 hover:bg-green-700",
-        }
-      : {
-          iconWrap: "bg-red-100",
-          icon: "text-red-600",
-          title: "text-red-700",
-          btn: "bg-red-600 hover:bg-red-700",
-        };
+  // Tailwind-safe palette map
+  const styles = willEnable
+    ? {
+        iconWrap: "bg-green-100",
+        icon: "text-green-600",
+        title: "text-green-700",
+        btn: "bg-green-600 hover:bg-green-700",
+      }
+    : {
+        iconWrap: "bg-red-100",
+        icon: "text-red-600",
+        title: "text-red-700",
+        btn: "bg-red-600 hover:bg-red-700",
+      };
 
   const cancelRef = useRef(null);
 
@@ -51,16 +50,19 @@ function EnableDisableAccountDialog({ onClose, status, action, loading = false }
       aria-labelledby="enable-disable-title"
       aria-describedby="enable-disable-desc"
     >
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-[2px]"
-        onClick={() => !loading && onClose()}
-      />
+      {/* Visual overlay */}
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" />
 
-      {/* Centering + padding for small screens */}
-      <div className="relative min-h-full grid place-items-center p-4 sm:p-6">
-        {/* Panel */}
-        <div className="w-full max-w-[92vw] sm:max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+      {/* Centering container — clicks OUTSIDE the panel close the dialog */}
+      <div
+        className="relative min-h-full grid place-items-center p-4 sm:p-6"
+        onClick={() => !loading && onClose()}              // ← outside click
+      >
+        {/* Panel — ONLY the card pops, and stops propagation */}
+        <div
+          className="w-full max-w-[92vw] sm:max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-popup"
+          onClick={(e) => e.stopPropagation()}             // ← prevent outside-close when inside
+        >
           {/* Header */}
           <div className="flex items-start gap-3 px-5 pt-5 pb-4 border-b">
             <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${styles.iconWrap}`}>
@@ -85,7 +87,7 @@ function EnableDisableAccountDialog({ onClose, status, action, loading = false }
               aria-label="Close"
               disabled={loading}
             >
-              ✕
+              <IoMdClose className="text-2xl" />
             </button>
           </div>
 

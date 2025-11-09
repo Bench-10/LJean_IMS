@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { MdOutlineLogout } from "react-icons/md";
 import { FaSpinner } from "react-icons/fa";
+import { IoMdClose } from "react-icons/io"; // ← added
 
 function LogoutDialog({ onClose, logout, loading = false }) {
   const cancelRef = useRef(null);
@@ -55,14 +56,12 @@ function LogoutDialog({ onClose, logout, loading = false }) {
             </div>
             <button
               type="button"
-              onClick={() => {
-                if (!loading) onClose();
-              }}
+              onClick={() => { if (!loading) onClose(); }}
               aria-label="Close"
               className="h-9 w-9 inline-flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition disabled:opacity-60"
               disabled={loading}
             >
-              <span className="sr-only">Close</span>✕
+              <IoMdClose className="text-2xl" /> {/* ← replaced ✕ with IoMdClose */}
             </button>
           </div>
 
@@ -77,9 +76,7 @@ function LogoutDialog({ onClose, logout, loading = false }) {
               <button
                 type="button"
                 ref={cancelRef}
-                onClick={() => {
-                  if (!loading) onClose();
-                }}
+                onClick={() => { if (!loading) onClose(); }}
                 className="w-full sm:w-auto px-4 py-2 rounded-lg font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 disabled={loading}
               >

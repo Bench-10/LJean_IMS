@@ -35,7 +35,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
         >
           <button
             type="button"
-            className="btn-sm btn-circle btn-ghost absolute right-5 top-5 rounded-lg text-gray-500 transition hover:bg-gray-100"
+            className="absolute right-3 top-5 h-8 w-8 inline-flex items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
             onClick={onClose} 
           >
             <IoMdClose className='sm:w-6 sm:h-6' />

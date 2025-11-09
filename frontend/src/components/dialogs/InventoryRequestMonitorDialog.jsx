@@ -485,9 +485,17 @@ const InventoryRequestMonitorDialog = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative flex h-[90vh] w-full max-w-4xl mx-2 lg:mx-4 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        {/* Header: overflow-visible so dropdown menus aren't clipped on mobile */}
+    <div
+    className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onClick={onClose}
+  >
+      <div
+      className="relative flex h-[90vh] w/full max-w-4xl mx-2 lg:mx-4 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Header: overflow-visible so dropdown menus aren't clipped on mobile */}
         <div className="sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 sm:px-6 py-4 overflow-visible">
           <div className="flex items-start justify-between gap-3 sm:gap-4">
             <div>
@@ -496,7 +504,15 @@ const InventoryRequestMonitorDialog = ({
             </div>
             <div className="flex items-center gap-2">
               <button
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none"
+                aria-label="Refresh"
+                title="Refresh"
+              >
+                <MdRefresh className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100"
                 onClick={onClose}
                 aria-label="Close request status dialog"
               >
