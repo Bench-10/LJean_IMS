@@ -11,6 +11,10 @@ import DatePickerCustom from './DatePickerCustom';
 function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput }) {
   const { user } = useAuth();
 
+  // Feature flag: hide selling-units UI and price fields from users without deleting code.
+  // Set to true to prevent users from accessing selling unit configuration and price input.
+  const HIDE_SELLING_UNITS = true;
+
   // FORM STATE
   const [product_name, setItemName] = useState('');
   const [category_id, setCategory] = useState('');
@@ -208,6 +212,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   }, [unit, unit_price, syncSellingUnitsWithBase]);
 
   useEffect(() => {
+    if (HIDE_SELLING_UNITS) return;
     if (!showSellingUnitsEditor) return;
     const onEsc = (e) => { if (e.key === 'Escape') setShowSellingUnitsEditor(false); };
     document.addEventListener('keydown', onEsc);
@@ -565,7 +570,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
           onClick={(e) => e.stopPropagation()}
         >
           {/* Selling Units editor (kept as-is) */}
-          {showSellingUnitsEditor && (
+          {!HIDE_SELLING_UNITS && showSellingUnitsEditor && (
   <div
     className="fixed inset-0 z-[400] bg-black/30 backdrop-blur-[2px]"
     onClick={() => setShowSellingUnitsEditor(false)}
@@ -966,7 +971,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   {/* Unit (+ Selling Units button) — RIGHT (row 1) */}
   {!(mode === 'edit' && editChoice === 'addStocks') && (
     <div className="md:col-start-2">
-      <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-3">
         <div className="flex-1">
           <DropdownCustom
             value={unit}
@@ -979,20 +984,22 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
             ]}
           />
         </div>
-        <button
-          type="button"
-          onClick={() => { if (!unit?.trim()) return; setShowSellingUnitsEditor(p => !p); }}
-          disabled={!unit?.trim()}
-          className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-md border transition ${sellingUnitToggleButtonClass}`}
-        >
-          <span>
-            Selling Units &amp; Pricing
-            {sellingUnits.filter(s => !s.is_base).length ? ` (${sellingUnits.filter(s => !s.is_base).length})` : ''}
-          </span>
-        </button>
+        {!HIDE_SELLING_UNITS && (
+          <button
+            type="button"
+            onClick={() => { if (!unit?.trim()) return; setShowSellingUnitsEditor(p => !p); }}
+            disabled={!unit?.trim()}
+            className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-md border transition ${sellingUnitToggleButtonClass}`}
+          >
+            <span>
+              Selling Units &amp; Pricing
+              {sellingUnits.filter(s => !s.is_base).length ? ` (${sellingUnits.filter(s => !s.is_base).length})` : ''}
+            </span>
+          </button>
+        )}
       </div>
       {errorflag('unit', 'unit')}
-      {sellingUnitErrors.general && !showSellingUnitsEditor && (
+      {!HIDE_SELLING_UNITS && sellingUnitErrors.general && !showSellingUnitsEditor && (
         <p className="mt-1 text-xs text-red-600">{sellingUnitErrors.general}</p>
       )}
     </div>
