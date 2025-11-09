@@ -22,19 +22,7 @@
 }
 .login-right{ padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 
-/* Collapse to single column on phones/short screens/touch devices */
-@media (max-width: 1200px), (max-height: 650px),
-       (hover: none) and (pointer: coarse){
-  .login-container{
-    grid-template-columns: 1fr;
-  }
-  .login-left{ display: none; }
-  .login-right{
-    height: 100dvh;   /* keep the panel bounded on mobile */
-    overflow-y: auto; /* still scrolls */
-    scrollbar-width: none;
-  }
-}
+
 
 
 
@@ -314,30 +302,66 @@
 
 
 /*PHONE*/
+/* Phones & small tablets: stack layout, make right panel fill width */
 @media (max-width: 768px) {
   .login-container {
-    flex-direction: column;
+    flex-direction: column; /* stack left/right vertically */
   }
 
-  .login-left {
-    display: none;
+  .login-left { 
+    display: none; /* hide the decorative/left panel on small screens */
   }
 
   .login-right {
     width: 100%;
-    padding: 20px;
+    padding: 16px;          /* slightly tighter side padding on small screens */
+    align-items: stretch;   /* let children expand to full width */
+    justify-content: center;
+    min-height: 100vh;      /* ensure the panel fills the viewport height */
   }
 
   .company-name-box {
-    padding: 10px 20px;
-    font-size: 24px;
+    width: 90%;             /* wide but with safe margins */
+    max-width: none;        /* remove desktop cap */
+    padding: 12px 14px;
+    box-sizing: border-box; /* include padding in width calc */
   }
 
   .login-form {
-    width: 100%;
-    padding: 20px;
+    width: 95%;             /* near full-width form */
+    max-width: none;        /* remove desktop cap */
+    padding: 18px 16px;
+    box-sizing: border-box;
   }
 }
+
+/* Extra-small phones: tighten padding a bit more */
+@media (max-width: 480px) {
+  .login-right { padding: 12px; }
+  .login-form  { padding: 16px 14px; }
+  .company-name-box { padding: 10px 12px; }
+}
+
+/* Single-column fallback for narrow, short, or touch-only devices */
+@media (max-width: 1200px), (max-height: 650px), 
+       (hover: none) and (pointer: coarse) {
+  .login-container {
+    /* Only relevant if this container uses CSS Grid.
+       If it's a flex container, remove this line or switch to display:grid. */
+    grid-template-columns: 1fr;
+  }
+
+  .login-left { 
+    display: none; /* keep left panel hidden in compact conditions */
+  }
+
+  .login-right {
+    height: 100dvh;         /* include mobile browser UI in viewport calc */
+    overflow-y: auto;       /* allow vertical scrolling */
+    scrollbar-width: none;  /* hide scrollbar track in Firefox */
+  }
+}
+
 
 /* Forgot Password Styles */
 .forgot-password-container {

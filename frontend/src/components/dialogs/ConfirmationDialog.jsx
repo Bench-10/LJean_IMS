@@ -3,6 +3,7 @@ import ReactDOM from "react-dom";
 import { IoAddCircle } from "react-icons/io5";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteOutline } from "react-icons/md";
+import { IoMdClose } from "react-icons/io"; // <-- added
 
 function ConfirmationDialog({ mode, message, submitFunction, onClose }) {
   const cancelRef = useRef(null);
@@ -53,7 +54,7 @@ function ConfirmationDialog({ mode, message, submitFunction, onClose }) {
       aria-labelledby="confirm-title"
       aria-describedby="confirm-desc"
     >
-      {/* Overlay */}
+      {/* Overlay (click to close) */}
       <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
 
       {/* Centering + mobile padding */}
@@ -81,7 +82,7 @@ function ConfirmationDialog({ mode, message, submitFunction, onClose }) {
               aria-label="Close"
               className="h-9 w-9 inline-flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
             >
-              ✕
+              <IoMdClose className="text-2xl" />
             </button>
           </div>
 

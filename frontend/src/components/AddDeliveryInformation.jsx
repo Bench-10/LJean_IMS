@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../utils/api.js';
+import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 import FormLoading from './common/FormLoading';
@@ -293,7 +294,7 @@ function AddDeliveryInformation({
         className="relative z-[9999] w-full max-w-[95vw] sm:max-w-[500px] md:max-w-[600px] lg:max-w-[650px] xl:max-w-[700px] rounded-xl bg-white shadow-lg border border-gray-200 p-4 sm:p-6 md:p-8 max-h-[90vh] overflow-y-auto hide-scrollbar"
         onClick={(e) => e.stopPropagation()}
       >
-        <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold mb-5 sm:mb-6 pr-8 text-center sm:text-left">
+        <h1 className="text-lg sm:text-xl md:text-3xl font-bold mb-5 sm:mb-6 pr-8 text-center sm:text-left">
           {mode === 'edit' ? 'EDIT DELIVERY DETAILS' : 'DELIVERY DETAILS'}
         </h1>
 
@@ -367,12 +368,14 @@ function AddDeliveryInformation({
         </form>
 
         <button
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
-        >
-          ✕
-        </button>
+  type="button"
+  onClick={onClose}
+  aria-label="Close"
+  title="Close"
+  className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600"
+>
+  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+</button>
       </div>
     </div>
   );

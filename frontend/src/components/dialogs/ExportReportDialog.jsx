@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import { exportChartsAsPDF } from '../../utils/exportUtils';
-import { FaFileExport, FaTimes } from 'react-icons/fa';
+import { FaFileExport } from 'react-icons/fa';
+import { IoMdClose } from 'react-icons/io';
 
 function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
   const [selectedCharts, setSelectedCharts] = useState([]);
   const [exporting, setExporting] = useState(false);
 
   const handleToggle = (chartId) => {
-    setSelectedCharts(prev =>
-      prev.includes(chartId)
-        ? prev.filter(id => id !== chartId)
-        : [...prev, chartId]
+    setSelectedCharts((prev) =>
+      prev.includes(chartId) ? prev.filter((id) => id !== chartId) : [...prev, chartId]
     );
   };
 
@@ -18,7 +17,7 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
     if (selectedCharts.length === availableCharts.length) {
       setSelectedCharts([]);
     } else {
-      setSelectedCharts(availableCharts.map(c => c.id));
+      setSelectedCharts(availableCharts.map((c) => c.id));
     }
   };
 
@@ -30,10 +29,8 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
 
     setExporting(true);
     try {
-      const selectedChartData = availableCharts.filter(chart => selectedCharts.includes(chart.id));
-      const chartsToExport = selectedChartData
-        .map(chart => chart.ref)
-        .filter(ref => ref.current); // Filter out refs that haven't been populated yet
+      const selectedChartData = availableCharts.filter((chart) => selectedCharts.includes(chart.id));
+      const chartsToExport = selectedChartData.map((chart) => chart.ref).filter((ref) => ref.current);
 
       if (chartsToExport.length === 0) {
         alert('Charts are not ready yet. Please wait for charts to load and try again.');
@@ -41,8 +38,7 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
         return;
       }
 
-      // Pass chart IDs along with refs for layout identification
-      const chartIds = selectedChartData.map(chart => chart.id);
+      const chartIds = selectedChartData.map((chart) => chart.id);
       await exportChartsAsPDF(chartsToExport, 'analytics-report.pdf', chartIds);
       onClose();
       setSelectedCharts([]);
@@ -58,42 +54,37 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* OVERLAY */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
-        onClick={onClose}
-      />
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[3px]" onClick={onClose} />
 
-      {/* MODAL PANEL */}
+      {/* Modal panel */}
       <div
         role="dialog"
         aria-modal="true"
         className="relative w-[500px] max-w-[92%] bg-white rounded-lg shadow-xl border border-gray-200 p-6 animate-popup"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <FaFileExport className="text-2xl text-green-600" />
-            <h2 className="text-xl font-bold text-gray-800">Export Report</h2>
+            <h2 className="text-2xl font-bold text-gray-800">Export Report</h2>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-600 top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 "
             aria-label="Close"
           >
-            <FaTimes size={20} />
+            <IoMdClose className="w-5 h-5" />
           </button>
         </div>
 
-        {/* DESCRIPTION */}
-        <p className="text-sm text-gray-600 mb-4">
-          Select the charts you want to include in your PDF report.
-        </p>
+        {/* Description */}
+        <p className="text-sm text-gray-600 mb-4">Select the charts you want to include in your PDF report.</p>
 
-        {/* CHART SELECTION */}
+        {/* Chart selection */}
         <div className="border border-gray-200 rounded-lg p-4 mb-6 max-h-[400px] overflow-y-auto">
-          {/* SELECT ALL */}
+          {/* Select all */}
           <label className="flex items-center gap-3 p-3 rounded-md hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 mb-2">
             <input
               type="checkbox"
@@ -104,13 +95,11 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
             <span className="font-semibold text-gray-700">Select All</span>
           </label>
 
-          {/* INDIVIDUAL CHARTS */}
+          {/* Individual charts */}
           {availableCharts.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No charts available to export
-            </div>
+            <div className="text-center py-8 text-gray-500">No charts available to export</div>
           ) : (
-            availableCharts.map(chart => (
+            availableCharts.map((chart) => (
               <label
                 key={chart.id}
                 className="flex items-center gap-3 p-3 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
@@ -127,7 +116,7 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
           )}
         </div>
 
-        {/* FOOTER ACTIONS */}
+        {/* Footer actions */}
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">
             {selectedCharts.length} of {availableCharts.length} selected

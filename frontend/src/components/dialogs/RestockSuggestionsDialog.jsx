@@ -1,18 +1,13 @@
 import React, { useMemo } from 'react';
 import { currencyFormat } from '../../utils/formatCurrency';
-import {
-  FaExclamationTriangle,
-  FaInfoCircle,
-  FaTimes,
-  FaCalendarAlt,
-  FaChartLine
-} from 'react-icons/fa';
+import { FaExclamationTriangle, FaInfoCircle, FaCalendarAlt } from 'react-icons/fa';
+import { IoMdClose } from 'react-icons/io';
 
 const intervalLabelMap = {
   daily: 'day',
   weekly: 'week',
   monthly: 'month',
-  yearly: 'year'
+  yearly: 'year',
 };
 
 const RestockSuggestionsDialog = ({
@@ -22,7 +17,7 @@ const RestockSuggestionsDialog = ({
   salesInterval,
   categoryName,
   selectedProductName,
-  loading = false
+  loading = false,
 }) => {
   const coverageMultiplier = getIntervalMultiplier(salesInterval);
   const intervalLabel = intervalLabelMap[salesInterval] || 'period';
@@ -31,21 +26,21 @@ const RestockSuggestionsDialog = ({
   const enhancedProducts = useMemo(() => {
     if (!Array.isArray(topProducts) || topProducts.length === 0) return [];
 
-    const mapped = topProducts.map(product => {
+    const mapped = topProducts.map((product) => {
       const historySeries = Array.isArray(product.history)
-        ? product.history.map(entry => ({
+        ? product.history.map((entry) => ({
             period: entry.period,
             units_sold: Number(entry.units_sold ?? 0),
-            sales_amount: Number(entry.sales_amount ?? 0)
+            sales_amount: Number(entry.sales_amount ?? 0),
           }))
         : [];
 
       const forecastSeries = Array.isArray(product.forecast)
-        ? product.forecast.map(entry => ({
+        ? product.forecast.map((entry) => ({
             period: entry.period,
             forecast_units: Number(entry.forecast_units ?? entry.forecast ?? entry.units_sold ?? 0),
             forecast_lower: entry.forecast_lower != null ? Number(entry.forecast_lower) : null,
-            forecast_upper: entry.forecast_upper != null ? Number(entry.forecast_upper) : null
+            forecast_upper: entry.forecast_upper != null ? Number(entry.forecast_upper) : null,
           }))
         : [];
 
@@ -53,10 +48,7 @@ const RestockSuggestionsDialog = ({
       const minThreshold = product.min_threshold != null ? Number(product.min_threshold) : null;
       const maxThreshold = product.max_threshold != null ? Number(product.max_threshold) : null;
       const isLowStock =
-        currentQuantity != null &&
-        minThreshold != null &&
-        minThreshold > 0 &&
-        currentQuantity <= minThreshold;
+        currentQuantity != null && minThreshold != null && minThreshold > 0 && currentQuantity <= minThreshold;
 
       return {
         product_id: product.product_id,
@@ -68,14 +60,14 @@ const RestockSuggestionsDialog = ({
         max_threshold: maxThreshold,
         isLowStock,
         historySeries,
-        forecastSeries
+        forecastSeries,
       };
     });
 
     mapped.sort((a, b) => b.sales_amount - a.sales_amount);
 
     if (selectedProductName) {
-      const selectedIndex = mapped.findIndex(product => product.product_name === selectedProductName);
+      const selectedIndex = mapped.findIndex((p) => p.product_name === selectedProductName);
       if (selectedIndex > 0) {
         const [selected] = mapped.splice(selectedIndex, 1);
         mapped.unshift(selected);
@@ -87,13 +79,9 @@ const RestockSuggestionsDialog = ({
 
   const prioritizedProducts = useMemo(() => {
     if (enhancedProducts.length === 0) return [];
-
     const topBySales = enhancedProducts.slice(0, Math.min(5, enhancedProducts.length));
-    const topIds = new Set(topBySales.map(product => product.product_id));
-    const lowStockExtras = enhancedProducts.filter(
-      product => product.isLowStock && !topIds.has(product.product_id)
-    );
-
+    const topIds = new Set(topBySales.map((p) => p.product_id));
+    const lowStockExtras = enhancedProducts.filter((p) => p.isLowStock && !topIds.has(p.product_id));
     return [...topBySales, ...lowStockExtras];
   }, [enhancedProducts]);
 
@@ -103,23 +91,22 @@ const RestockSuggestionsDialog = ({
       const forecastSeries = product.forecastSeries;
 
       const periodsHistorical = historySeries.length;
-      const totalHistoricalUnits = historySeries.reduce((sum, entry) => sum + entry.units_sold, 0);
+      const totalHistoricalUnits = historySeries.reduce((s, e) => s + e.units_sold, 0);
       const averageHistoricalUnits = periodsHistorical > 0 ? totalHistoricalUnits / periodsHistorical : 0;
       const historyWindow = Math.max(1, Math.min(coverageMultiplier, periodsHistorical || 1));
       const historicalSuggested = Math.ceil(averageHistoricalUnits * historyWindow);
 
       const forecastWindow = Math.min(coverageMultiplier, forecastSeries.length);
-      const totalForecastUnits = forecastWindow > 0
-        ? forecastSeries.slice(0, forecastWindow).reduce((sum, entry) => sum + entry.forecast_units, 0)
-        : 0;
+      const totalForecastUnits =
+        forecastWindow > 0 ? forecastSeries.slice(0, forecastWindow).reduce((s, e) => s + e.forecast_units, 0) : 0;
       const forecastSuggested = Math.ceil(totalForecastUnits);
 
       const minTarget = product.min_threshold != null ? Math.ceil(product.min_threshold * 1.1) : 0;
       const targetStock = Math.max(forecastSuggested, minTarget);
-      const restockGap = product.current_quantity != null ? Math.max(targetStock - product.current_quantity, 0) : targetStock;
+      const restockGap =
+        product.current_quantity != null ? Math.max(targetStock - product.current_quantity, 0) : targetStock;
 
       const confidence = computeConfidence(periodsHistorical, forecastSeries.length);
-
       const unitPrice = totalHistoricalUnits > 0 ? product.sales_amount / totalHistoricalUnits : 0;
       const allocationCost = restockGap * unitPrice;
 
@@ -146,22 +133,22 @@ const RestockSuggestionsDialog = ({
         unitPrice,
         allocationCost,
         historySeries,
-        forecastSeries
+        forecastSeries,
       };
     });
   }, [prioritizedProducts, coverageMultiplier]);
 
-  const totalAllocation = productInsights.reduce((sum, product) => sum + product.allocationCost, 0);
-
+  const totalAllocation = productInsights.reduce((sum, p) => sum + p.allocationCost, 0);
   const hasData = productInsights.length > 0;
-  const lowStockCount = productInsights.filter(product => product.lowStock).length;
-  const maxHistoricalPeriods = productInsights.reduce((max, product) => Math.max(max, product.periodsHistorical), 0);
-  const totalForecastPoints = productInsights.reduce((sum, product) => sum + product.forecastWindow, 0);
-  const productsWithForecast = productInsights.filter(product => product.forecastWindow > 0).length;
+  const lowStockCount = productInsights.filter((p) => p.lowStock).length;
+  const maxHistoricalPeriods = productInsights.reduce((m, p) => Math.max(m, p.periodsHistorical), 0);
+  const totalForecastPoints = productInsights.reduce((s, p) => s + p.forecastWindow, 0);
+  const productsWithForecast = productInsights.filter((p) => p.forecastWindow > 0).length;
 
-  const periodDescriptor = maxHistoricalPeriods > 1
-    ? `${maxHistoricalPeriods} previous ${intervalLabel}${maxHistoricalPeriods > 1 ? 's' : ''}`
-    : maxHistoricalPeriods === 1
+  const periodDescriptor =
+    maxHistoricalPeriods > 1
+      ? `previous ${maxHistoricalPeriods} ${intervalLabel}${maxHistoricalPeriods > 1 ? 's' : ''}`
+      : maxHistoricalPeriods === 1
       ? `previous ${intervalLabel}`
       : 'limited recent history';
 
@@ -173,28 +160,36 @@ const RestockSuggestionsDialog = ({
   `;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-xl flex flex-col">
-        <div className="p-7 border-b-2 border-black/20">
-          <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-sm">
+      <style>{hideScrollbarStyles}</style>
+
+      {/* Panel */}
+      <div
+        className="bg-white rounded-lg w-full max-w-4xl h-[90vh] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {/* Header */}
+        <div className="relative px-4 sm:px-6 md:px-7 py-3 sm:py-4 border-b border-gray-200">
+          <div className="flex items-start sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Restocking Suggestions</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Restocking Suggestions</h2>
+              <p className="text-xs sm:text-sm text-gray-600">
                 Recommendations for {analysisFocus} • {salesInterval} view
               </p>
             </div>
+
             <button
               onClick={onClose}
-              className="hover:bg-gray-100 rounded-full p-2 transition-colors"
-              aria-label="Close restocking suggestions dialog"
+              aria-label="Close"
+              className="shrink-0 text-gray-600 top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 "
             >
-              <FaTimes size={20} />
+              <IoMdClose className="w-6 h-6" />
             </button>
           </div>
         </div>
 
-  <style>{hideScrollbarStyles}</style>
-  <div className="p-6 overflow-y-auto flex-1 hide-scrollbar">
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto hide-scrollbar px-4 sm:px-6 md:px-7 py-4 sm:py-6 pb-28 sm:pb-32">
           {loading ? (
             <div className="text-center py-12">
               <FaInfoCircle className="text-4xl text-gray-400 mx-auto mb-4" />
@@ -211,108 +206,137 @@ const RestockSuggestionsDialog = ({
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="bg-gray-200 border border-gray-100 rounded-lg p-4 text-sm text-gray-600">
-                <div className="grid gap-3 md:grid-cols-4">
+              {/* Summary card */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                   <div>
-                    <span className="text-gray-500">Historical coverage</span>
-                    <div className="font-medium text-gray-800">{periodDescriptor}</div>
+                    <div className="text-xs text-gray-500">Historical coverage</div>
+                    <div className="font-semibold text-gray-900">{periodDescriptor}</div>
                   </div>
                   <div>
-                    <span className="text-gray-500">Forecast horizon</span>
-                    <div className="font-medium text-gray-800">Up to {coverageMultiplier} {intervalLabel}{coverageMultiplier > 1 ? 's' : ''}</div>
+                    <div className="text-xs text-gray-500">Forecast horizon</div>
+                    <div className="font-semibold text-gray-900">
+                      Up to {coverageMultiplier} {intervalLabel}
+                      {coverageMultiplier > 1 ? 's' : ''}
+                    </div>
                   </div>
                   <div>
-                    <span className="text-gray-500">Prioritized products</span>
-                    <div className="font-medium text-gray-800">{productInsights.length}</div>
+                    <div className="text-xs text-gray-500">Prioritized products</div>
+                    <div className="font-semibold text-gray-900">{productInsights.length}</div>
                   </div>
                   <div>
-                    <span className="text-gray-500">Low stock alerts</span>
-                    <div className="font-medium text-gray-800">{lowStockCount}</div>
+                    <div className="text-xs text-gray-500">Low stock alerts</div>
+                    <div className="font-semibold text-gray-900">{lowStockCount}</div>
                   </div>
                 </div>
-                <div className="mt-3 text-xs text-gray-500">
-                  Prophet forecasts available for {productsWithForecast} item{productsWithForecast === 1 ? '' : 's'} • Total forecast points analysed: {totalForecastPoints}.
+                <div className="mt-3 text-[11px] text-gray-500">
+                  Prophet forecasts available for {productsWithForecast} item
+                  {productsWithForecast === 1 ? '' : 's'} • Total forecast points analysed: {totalForecastPoints}.
                 </div>
               </div>
 
+              {/* Section title */}
               <section className="space-y-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                     <FaCalendarAlt />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Restocking priorities</h3>
-                    <p className="text-sm text-gray-500">Historical performance and Prophet forecast presented together for clarity.</p>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">Restocking priorities</h3>
+                    <p className="text-xs sm:text-sm text-gray-500">
+                      Historical performance and Prophet forecast presented together for clarity.
+                    </p>
                   </div>
                 </div>
 
-                {productInsights.map(product => (
-                  <div key={product.id} className="border border-gray-400 rounded-lg p-4 bg-white shadow-md hover:shadow-2xl hover:border-green-600 transition-all">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="sm:flex-1">
-                        <div className="text-xs font-semibold text-gray-500 uppercase">Priority {product.priority}</div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-lg font-semibold text-gray-900">{product.name}</h4>
-                          {product.lowStock && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
-                              <FaExclamationTriangle className="h-3 w-3" /> Low stock
-                            </span>
-                          )}
+                {productInsights.map((p) => (
+                  <div
+                    key={p.id}
+                    className="border border-emerald-200 rounded-xl p-4 bg-white shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all"
+                  >
+                    {/* TOP ROW: Priority (left) + Low stock (right) */}
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] sm:text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                        Priority {p.priority}
+                      </div>
+
+                      {p.lowStock && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] sm:text-[12px] font-semibold text-red-600">
+                          <FaExclamationTriangle className="h-3 w-3" />
+                          Low stock
+                        </span>
+                      )}
+                    </div>
+
+                    {/* NAME + METRICS ROW */}
+                    <div className="mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        {/* Name wraps on mobile (no truncation) */}
+                        <h4 className="text-base sm:text-lg font-semibold text-gray-900 whitespace-normal break-words">
+                          {p.name}
+                        </h4>
+
+                        <div className="mt-1 text-[11px] sm:text-xs text-gray-500">
+                          Confidence:{' '}
+                          <span className={confidenceTone(p.confidence)}>{p.confidence.toUpperCase()}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-center">
-                        <div className="text-xs font-semibold text-gray-500">
-                          Confidence:&nbsp;
-                          <span className={confidenceTone(product.confidence)}>{product.confidence.toUpperCase()}</span>
+                      <div className="text-right shrink-0 mt-1 sm:mt-0">
+                        <div className="text-xs sm:text-sm font-semibold text-emerald-700">
+                          {p.totalHistoricalUnits.toLocaleString()} units sold
                         </div>
-                      </div>
-
-                      <div className="text-right sm:w-48">
-                        <div className="text-sm font-semibold text-emerald-600">{product.totalHistoricalUnits.toLocaleString()} units sold</div>
-                        <div className="text-xs text-gray-500">{currencyFormat(product.salesAmount)}</div>
+                        <div className="text-[11px] sm:text-xs text-gray-500">{currencyFormat(p.salesAmount)}</div>
                       </div>
                     </div>
 
+                    {/* Two columns on md+, stacked on mobile */}
                     <div className="mt-4 flex flex-col md:flex-row md:items-stretch md:gap-4">
-                      <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 md:flex-1 flex flex-col items-center justify-center text-center md:h-full">
+                      {/* Historical snapshot */}
+                      <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 md:flex-1 flex flex-col items-center justify-center text-center">
                         <h5 className="text-sm font-semibold text-gray-800">Historical snapshot</h5>
-                        {product.periodsHistorical === 0 ? (
+                        {p.periodsHistorical === 0 ? (
                           <p className="mt-2 text-xs text-gray-500">Not enough historical data for this product.</p>
                         ) : (
                           <div className="mt-2 space-y-2 text-gray-600">
                             <div className="text-2xl font-extrabold text-gray-900">
-                              {Math.ceil(product.averageHistoricalUnits).toLocaleString()}
+                              {Math.ceil(p.averageHistoricalUnits).toLocaleString()}
                             </div>
-                            <div className="text-sm">
-                              unit{Math.ceil(product.averageHistoricalUnits) === 1 ? '' : 's'} per {intervalLabel} • over the past {product.periodsHistorical} {intervalLabel}{product.periodsHistorical === 1 ? '' : 's'}
+                            <div className="text-xs sm:text-sm">
+                              unit{Math.ceil(p.averageHistoricalUnits) === 1 ? '' : 's'} per {intervalLabel} • over the past{' '}
+                              {p.periodsHistorical} {intervalLabel}
+                              {p.periodsHistorical === 1 ? '' : 's'}
                             </div>
                           </div>
                         )}
                       </div>
 
-                      <div className="rounded-lg bg-emerald-50 p-4 md:flex-1 md:border-l md:border-gray-200 md:pl-4 flex flex-col items-center justify-center md:h-full">
+                      {/* Recommendation */}
+                      <div className="rounded-lg bg-emerald-50 p-4 md:flex-1 md:border-l md:border-gray-200 md:pl-4 flex flex-col items-center justify-center">
                         <div className="w-full text-center">
                           <div className="text-sm font-semibold text-gray-700 mb-2">Recommended restocking</div>
                           <div className="flex items-center justify-center">
                             <div className="text-center">
-                              <div className="mt-1 text-2xl md:text-3xl font-extrabold text-emerald-900">{Math.ceil(product.totalForecastUnits).toLocaleString()}</div>
-                              <div className="text-xs text-gray-500">in next {product.forecastWindow} {intervalLabel}{product.forecastWindow > 1 ? 's' : ''}</div>
+                              <div className="mt-1 text-2xl md:text-3xl font-extrabold text-emerald-900">
+                                {Math.ceil(p.totalForecastUnits).toLocaleString()}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                in next {p.forecastWindow} {intervalLabel}
+                                {p.forecastWindow > 1 ? 's' : ''}
+                              </div>
                             </div>
                           </div>
 
-                          {product.forecastWindow === 0 ? (
-                            <p className="mt-2 text-xs text-gray-500">Forecast unavailable — additional sales data is required.</p>
+                          {p.forecastWindow === 0 ? (
+                            <p className="mt-2 text-xs text-gray-500">
+                              Forecast unavailable — additional sales data is required.
+                            </p>
                           ) : (
-                            <div className="mt-2 text-xs text-gray-600">
-                              {/* Compact summary; header/icon removed. */}
-                            </div>
+                            <div className="mt-2 text-xs text-gray-600" />
                           )}
                         </div>
                       </div>
                     </div>
-
-                    
                   </div>
                 ))}
               </section>
@@ -320,12 +344,21 @@ const RestockSuggestionsDialog = ({
           )}
         </div>
 
-        {/* Sticky footer: compact budget allocation that doesn't take much space */}
-        <div className="p-3 border-t bg-white flex items-center justify-start">
-          <div>
-            <div className="text-sm text-gray-700">Budget allocation recommendation</div>
-            <div className="text-lg font-extrabold text-gray-900 mt-1">{currencyFormat(totalAllocation)}</div>
-            <div className="text-xs text-gray-500">Total to allocate for the recommended restocking (based on {intervalLabel} forecast)</div>
+        {/* Footer — always visible */}
+        <div
+          className="sticky bottom-0 z-20 border-t border-gray-200 bg-white px-4 sm:px-6 md:px-7 py-3 sm:py-4 shadow-[0_-6px_12px_-6px_rgba(0,0,0,0.08)]"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom))' }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm sm:text-base text-gray-700">Budget allocation recommendation</div>
+              <div className="text-lg sm:text-2xl font-extrabold text-gray-900 mt-1">
+                {currencyFormat(totalAllocation)}
+              </div>
+              <div className="text-[11px] sm:text-xs text-gray-500">
+                Total to allocate for the recommended restocking (based on {intervalLabel} forecast)
+              </div>
+            </div>
           </div>
         </div>
       </div>

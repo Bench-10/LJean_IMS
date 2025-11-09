@@ -39,9 +39,22 @@ function ProductInventory({
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [pendingRejectId, setPendingRejectId] = useState(null);
 
+  // lock body scroll while modal is open
+  useEffect(() => {
+    if (!isPendingDialogOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isPendingDialogOpen]);
+
   // Loading states for approve/reject actions (store pending_id while processing)
-  const [approveLoadingId, setApproveLoadingId] = useState(null);
-  const [rejectLoadingId, setRejectLoadingId] = useState(null);
+const [approvingIds, setApprovingIds] = useState(() => new Set());
+const [rejectingIds, setRejectingIds] = useState(() => new Set());
+
+const isApproving = (id) => approvingIds.has(id);
+const isRejecting = (id) => rejectingIds.has(id);
+const isBusy      = (id) => isApproving(id) || isRejecting(id);
+
   const [highlightedPendingIds, setHighlightedPendingIds] = useState([]);
   const pendingRequestRefs = useRef(new Map());
   const pendingDialogScrollRef = useRef(null);
@@ -64,20 +77,27 @@ function ProductInventory({
     }
   };
 
-  const handleApproveClick = (pendingId) => {
-    if (typeof approvePendingRequest === 'function') {
-      // set loading, await the provided function if it returns a promise
-      const run = async () => {
-        try {
-          setApproveLoadingId(pendingId);
-          await approvePendingRequest(pendingId);
-        } finally {
-          setApproveLoadingId(null);
-        }
-      };
-      run();
+const handleApproveClick = (pendingId) => {
+  if (typeof approvePendingRequest !== 'function') return;
+
+  (async () => {
+    setApprovingIds(prev => {
+      const next = new Set(prev);
+      next.add(pendingId);
+      return next;
+    });
+
+    try {
+      await approvePendingRequest(pendingId);
+    } finally {
+      setApprovingIds(prev => {
+        const next = new Set(prev);
+        next.delete(pendingId);
+        return next;
+      });
     }
-  };
+  })();
+};
 
   const handleRejectClick = (pendingId) => {
     if (typeof rejectPendingRequest !== 'function') return;
@@ -91,21 +111,34 @@ function ProductInventory({
     setPendingRejectId(null);
   };
 
-  const handleRejectDialogConfirm = (reason) => {
-    if (typeof rejectPendingRequest === 'function' && pendingRejectId !== null) {
-      const run = async () => {
-        try {
-          setRejectLoadingId(pendingRejectId);
-          await rejectPendingRequest(pendingRejectId, reason);
-        } finally {
-          setRejectLoadingId(null);
-        }
-      };
-      run();
+const handleRejectDialogConfirm = (reason) => {
+  if (typeof rejectPendingRequest !== 'function' || pendingRejectId == null) {
+    setIsRejectDialogOpen(false);
+    setPendingRejectId(null);
+    return;
+  }
+
+  (async () => {
+    setRejectingIds(prev => {
+      const next = new Set(prev);
+      next.add(pendingRejectId);
+      return next;
+    });
+
+    try {
+      await rejectPendingRequest(pendingRejectId, reason);
+    } finally {
+      setRejectingIds(prev => {
+        const next = new Set(prev);
+        next.delete(pendingRejectId);
+        return next;
+      });
     }
     setIsRejectDialogOpen(false);
     setPendingRejectId(null);
-  };
+  })();
+};
+
 
   // NEW: DIALOG STATE
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -292,42 +325,55 @@ function ProductInventory({
 
       <hr className="mt-3 mb-6 border-t-4 border-green-800 rounded-lg" />
 
+      {/* ===================== PENDING REQUESTS MODAL ===================== */}
       {displayPendingApprovals && isPendingDialogOpen && (
-        <div className="fixed inset-0 z-[100] backdrop-blur-sm transition-opacity flex items-center justify-center bg-black/50 p-4">
-          <div className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="text-lg md:text-xl font-semibold text-gray-800">
-                  Pending Inventory Requests
-                </h2>
-                <p className="text-xs md:text-sm text-gray-500">
-                  Review inventory additions or updates awaiting your approval.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {typeof refreshPendingRequests === 'function' && (
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center w-9 h-9 rounded-lg  text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={refreshPendingRequests}
-                    disabled={pendingRequestsLoading}
-                    aria-label="Refresh pending inventory requests"
-                    title="Refresh pending inventory requests"
-                  >
-                    <MdRefresh className={`text-xl ${pendingRequestsLoading ? "animate-spin" : ""}`} />
-                    <span className="sr-only">Refresh</span>
-                  </button>
-                )}
-                <button
-                  className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-lg transition"
-                  onClick={() => setIsPendingDialogOpen(false)}
-                  aria-label="Close"
-                >
-                 <IoMdClose className='w-5 h-5 sm:w-6 sm:h-6' />
-                </button>
-              </div>
-            </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    {/* Backdrop: click to close */}
+    <div
+      className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      onClick={() => setIsPendingDialogOpen(false)}
+    />
+
+    {/* Panel: stop clicks from bubbling to the backdrop */}
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="relative z-10 w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-popup"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-800">
+            Pending Inventory Requests
+          </h2>
+          <p className="text-xs md:text-sm text-gray-500">
+            Review inventory additions or updates awaiting your approval.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {typeof refreshPendingRequests === 'function' && (
+            <button
+              type="button"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={refreshPendingRequests}
+              disabled={pendingRequestsLoading}
+              aria-label="Refresh pending inventory requests"
+              title="Refresh pending inventory requests"
+            >
+              <MdRefresh className={`text-xl ${pendingRequestsLoading ? 'animate-spin' : ''}`} />
+              <span className="sr-only">Refresh</span>
+            </button>
+          )}
+          <button
+            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-lg transition"
+            onClick={() => setIsPendingDialogOpen(false)}
+            aria-label="Close"
+          >
+            <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        </div>
+      </div>
 
             {/* Content */}
             <div
@@ -375,47 +421,41 @@ function ProductInventory({
                             )}
                           </div>
 
-                          {/* Buttons (stack vertically on mobile) */}
+                          {/* Buttons */}
                           <div className="flex flex-wrap gap-2 w-full md:w-auto">
                             <button
-                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${approveLoadingId === request.pending_id ||
-                                  rejectLoadingId === request.pending_id
+                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${isApproving === request.pending_id ||
+                                  rejectingIds === request.pending_id
                                   ? 'bg-green-400 cursor-not-allowed'
                                   : 'bg-green-600 hover:bg-green-700'
                                 }`}
                               onClick={() => handleApproveClick(request.pending_id)}
-                              disabled={
-                                approveLoadingId === request.pending_id ||
-                                rejectLoadingId === request.pending_id
-                              }
+  disabled={isBusy(request.pending_id)}
                             >
-                              {approveLoadingId === request.pending_id ? (
-                                <span className="inline-flex items-center">
-                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                  Processing
-                                </span>
+                              {isApproving(request.pending_id) ? (
+    <span className="inline-flex items-center">
+      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+      Processing
+    </span>
                               ) : (
                                 'Approve'
                               )}
                             </button>
 
                             <button
-                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${rejectLoadingId === request.pending_id ||
-                                  approveLoadingId === request.pending_id
+                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${isRejecting === request.pending_id ||
+                                  isApproving === request.pending_id
                                   ? 'bg-red-300 cursor-not-allowed'
                                   : 'bg-red-500 hover:bg-red-600'
                                 }`}
                               onClick={() => handleRejectClick(request.pending_id)}
-                              disabled={
-                                rejectLoadingId === request.pending_id ||
-                                approveLoadingId === request.pending_id
-                              }
+  disabled={isBusy(request.pending_id)}
                             >
-                              {rejectLoadingId === request.pending_id ? (
-                                <span className="inline-flex items-center">
-                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                  Processing
-                                </span>
+                              {isRejecting(request.pending_id) ? (
+    <span className="inline-flex items-center">
+      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+      Processing
+    </span>
                               ) : (
                                 'Reject'
                               )}
@@ -517,6 +557,7 @@ function ProductInventory({
           </div>
         </div>
       )}
+      {/* ===================== /PENDING REQUESTS MODAL ===================== */}
 
       {/* SEARCH + FILTERS + ACTIONS */}
       <div className="w-full lg:flex lg:items-center lg:gap-6">
@@ -574,10 +615,8 @@ function ProductInventory({
         </div>
 
         {/* RIGHT: actions */}
-        {/* Base: grid with 2 columns so Export spans full width and the other two sit side-by-side.
-            Desktop (≥lg): switches to a single flex row aligned right. */}
         <div className="mt-3 lg:mt-0 ml-0 lg:ml-auto grid grid-cols-2 gap-3 items-center w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 shrink-0">
-          {/* Export (full width on mobile) */}
+          {/* Export */}
           <div className="relative group col-span-2 lg:col-span-1">
             <button className="w-full text-sm lg:w-auto bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center justify-center gap-2">
               <TbFileExport />

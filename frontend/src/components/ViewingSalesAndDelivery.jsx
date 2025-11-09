@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BsTelephoneFill } from "react-icons/bs";
 import { RiCellphoneFill } from "react-icons/ri";
 import { MdEmail, MdOutlineCorporateFare } from "react-icons/md";
+import { IoMdClose } from "react-icons/io";
 
 import NoInfoFound from './common/NoInfoFound';
 import api from '../utils/api';
@@ -351,12 +352,14 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
         <div className="relative flex flex-col border border-gray-600/40 bg-white h-[95vh] sm:h-[90vh] w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[1100px] max-h-none sm:max-h-[700px] rounded-lg py-2 sm:py-3 md:py-5 px-2 sm:px-3 animate-popup overflow-hidden overflow-y-auto hide-scrollbar">
           
           <button
-            type='button'
-            className="absolute right-2 top-2 z-10 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 font-bold"
-            onClick={closeModal}
-          >
-            ✕
-          </button>
+  type="button"
+  className="absolute right-2 top-2 z-10 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600"
+  onClick={closeModal}
+  aria-label="Close dialog"
+  title="Close"
+>
+  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+</button>
 
           <div className="pb-4 pt-2 px-3 sm:px-4 md:px-8 w-full flex-1 flex flex-col">
             

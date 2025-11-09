@@ -673,7 +673,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
               </div>
               <button
                 onClick={closeModal}
-                className='absolute top-3 right-3 sm:top-4 sm:right-4 p-2 z-10 hover:bg-green-800 rounded-full transition-colors'
+                className='absolute top-3 right-3 sm:top-4 sm:right-4 p-2 z-10 hover:bg-green-700 rounded-lg transition-colors'
                 aria-label="Close Modal"
               >
                 <IoMdClose className='w-5 h-5 sm:w-6 sm:h-6' />

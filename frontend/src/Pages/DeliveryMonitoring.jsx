@@ -484,7 +484,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
         </div>{/* END OF MOBILE VIEW*/}
 
         {/* DESKTOP LAYOUT: LEFT + CENTER PAGINATION */}
-        <div className="hidden sm:relative sm:flex sm:items-center w-full mt-3 pb-6 px-3">
+        <div className="hidden sm:relative sm:flex sm:items-center w-full pb-6">
 
           {/* LEFT: ITEM COUNT */}
           <div className="text-[13px] text-gray-600">
@@ -497,13 +497,13 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
 
           {/* CENTER: PAGINATION CONTROLS */}
           {filteredData.length > 0 && (
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+            <div className="lg:absolute lg:left-1/2 lg:-translate-x-1/2 flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
                 className="px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
-                Previous
+                Previous 
               </button>
               <span className="text-[13px] text-gray-600 whitespace-nowrap">
                 Page {currentPage} of {totalPages}
