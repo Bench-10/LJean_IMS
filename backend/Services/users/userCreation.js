@@ -230,11 +230,13 @@ export const createUserAccount = async (UserData) => {
 
     const creatorRoles = Array.isArray(creator_roles) ? creator_roles : [];
     const isOwnerCreator = creatorRoles.includes("Owner");
+    const isBranchManagerCreator = creatorRoles.includes('Branch Manager');
+    
+    // Owner creates → active, no request record
+    // Branch Manager creates → pending, create request record
     const accountStatus = isOwnerCreator ? 'active' : 'pending';
     const approvedBy = isOwnerCreator ? (creatorName || null) : null;
     const approvedAt = isOwnerCreator ? new Date() : null;
-    const requestResolutionStatus = accountStatus === 'pending' ? 'pending' : 'approved';
-    const resolvedAt = accountStatus === 'pending' ? null : approvedAt;
 
     const { rows: branchRows } = await SQLquery('SELECT branch_name FROM Branch WHERE branch_id = $1 LIMIT 1', [branch]);
     const targetBranchName = branchRows[0]?.branch_name || null;
@@ -244,82 +246,81 @@ export const createUserAccount = async (UserData) => {
         .replace(/\s+/g, ' ')
         .trim() || null;
 
-    const creatorIsBranchManager = creatorRoles.includes('Branch Manager');
-    const managerApproverId = creatorIsBranchManager ? creatorId : null;
-    const managerApprovedAt = managerApproverId ? new Date() : null;
     const snapshotRoles = allowedRoles.length > 0 ? allowedRoles : null;
     const sanitizedCreatorRoles = creatorRoles.length > 0 ? creatorRoles : null;
 
     await SQLquery('BEGIN');
 
     try {
+        // 1. Create user in Users table
         await SQLquery(
             `INSERT INTO Users(user_id, branch_id, role, first_name, last_name, cell_number, is_active, last_login, permissions, address, status, created_by, approved_by, approved_at) 
             VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
             [user_id, branch, allowedRoles, first_name, last_name, cell_number, false, 'Not yet logged in.', permissions, address, accountStatus, creatorName, approvedBy, approvedAt]
         );
 
+        // 2. Create login credentials
         await SQLquery(
             `INSERT INTO Login_credentials(user_id, username, password) 
             VALUES($1, $2, $3)`,
             [user_id, username, securePassword]
         );
 
-        await SQLquery(
-            `INSERT INTO User_Creation_Requests (
-                pending_user_id,
-                creator_user_id,
-                creator_name,
-                creator_roles,
-                resolution_status,
-                created_at,
-                resolved_at,
-                manager_approver_id,
-                manager_approved_at,
-                owner_resolved_by,
-                resolution_reason,
-                deleted_at,
-                deleted_by_user_id,
-                deleted_by_admin_id,
-                target_branch_id,
-                target_branch_name,
-                target_roles,
-                target_full_name,
-                target_username,
-                target_cell_number
-            )
-             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, NULL, NULL, NULL, NULL, NULL, $9, $10, $11, $12, $13, $14)
-             ON CONFLICT (pending_user_id) DO UPDATE
-             SET creator_user_id = EXCLUDED.creator_user_id,
-                 creator_name = EXCLUDED.creator_name,
-                 creator_roles = EXCLUDED.creator_roles,
-                 resolution_status = EXCLUDED.resolution_status,
-                 resolved_at = EXCLUDED.resolved_at,
-                 manager_approver_id = EXCLUDED.manager_approver_id,
-                 manager_approved_at = EXCLUDED.manager_approved_at,
-                 target_branch_id = EXCLUDED.target_branch_id,
-                 target_branch_name = EXCLUDED.target_branch_name,
-                 target_roles = EXCLUDED.target_roles,
-                 target_full_name = EXCLUDED.target_full_name,
-                 target_username = EXCLUDED.target_username,
-                 target_cell_number = EXCLUDED.target_cell_number`,
-            [
-                user_id,
-                creatorId,
-                creatorName || null,
-                sanitizedCreatorRoles,
-                requestResolutionStatus,
-                resolvedAt,
-                managerApproverId,
-                managerApprovedAt,
-                branch,
-                targetBranchName,
-                snapshotRoles,
-                normalizedTargetFullName,
-                username,
-                cell_number
-            ]
-        );
+        // 3. ONLY create request record if creator is Branch Manager (NOT Owner)
+        if (isBranchManagerCreator && !isOwnerCreator) {
+            await SQLquery(
+                `INSERT INTO User_Creation_Requests (
+                    pending_user_id,
+                    creator_user_id,
+                    creator_name,
+                    creator_roles,
+                    resolution_status,
+                    created_at,
+                    resolved_at,
+                    manager_approver_id,
+                    manager_approved_at,
+                    owner_resolved_by,
+                    resolution_reason,
+                    deleted_at,
+                    deleted_by_user_id,
+                    deleted_by_admin_id,
+                    target_branch_id,
+                    target_branch_name,
+                    target_roles,
+                    target_full_name,
+                    target_username,
+                    target_cell_number
+                )
+                 VALUES ($1, $2, $3, $4, $5, NOW(), NULL, $6, NOW(), NULL, NULL, NULL, NULL, NULL, $7, $8, $9, $10, $11, $12)
+                 ON CONFLICT (pending_user_id) DO UPDATE
+                 SET creator_user_id = EXCLUDED.creator_user_id,
+                     creator_name = EXCLUDED.creator_name,
+                     creator_roles = EXCLUDED.creator_roles,
+                     resolution_status = EXCLUDED.resolution_status,
+                     manager_approver_id = EXCLUDED.manager_approver_id,
+                     manager_approved_at = EXCLUDED.manager_approved_at,
+                     target_branch_id = EXCLUDED.target_branch_id,
+                     target_branch_name = EXCLUDED.target_branch_name,
+                     target_roles = EXCLUDED.target_roles,
+                     target_full_name = EXCLUDED.target_full_name,
+                     target_username = EXCLUDED.target_username,
+                     target_cell_number = EXCLUDED.target_cell_number`,
+                [
+                    user_id,
+                    creatorId,
+                    creatorName || null,
+                    sanitizedCreatorRoles,
+                    'pending', // Always pending for Branch Manager requests
+                    creatorId, // manager_approver_id = creator
+                    branch,
+                    targetBranchName,
+                    snapshotRoles,
+                    normalizedTargetFullName,
+                    username,
+                    cell_number
+                ]
+            );
+        }
 
         await SQLquery('COMMIT');
     } catch (error) {
@@ -350,9 +351,8 @@ export const createUserAccount = async (UserData) => {
             user: userWithDecryptedPassword
         });
 
-        // NOTIFY OWNERS IF APPROVAL IS REQUIRED
-        const creatorIsBranchManager = creatorRoles.includes('Branch Manager');
-        if (accountStatus === 'pending' && creatorIsBranchManager) {
+        // NOTIFY OWNERS IF APPROVAL IS REQUIRED (only for Branch Manager requests)
+        if (isBranchManagerCreator && !isOwnerCreator && accountStatus === 'pending') {
             const approvalMessage = `${userWithDecryptedPassword.full_name} needs approval for ${userWithDecryptedPassword.branch}.`;
             const creatorDisplayName = creatorId ? (await getUserFullName(creatorId)) || 'Branch Manager' : (creatorName || 'Branch Manager');
 
@@ -391,11 +391,9 @@ export const createUserAccount = async (UserData) => {
                     targetRoles: ['Owner']
                 });
             }
-        }
 
-        if (accountStatus === 'pending') {
+            // Broadcast user approval request WebSocket event
             const requestSnapshot = await fetchUserCreationRequestById(user_id);
-
             if (requestSnapshot) {
                 broadcastUserApprovalRequest(branch, {
                     request: requestSnapshot,
@@ -894,18 +892,6 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
 
         branchId = pendingRecord.branch_id;
 
-        await SQLquery(
-            `UPDATE User_Creation_Requests
-             SET resolution_status = 'cancelled',
-                 resolved_at = NOW(),
-                 resolution_reason = COALESCE($3, resolution_reason),
-                 deleted_at = NOW(),
-                 deleted_by_user_id = CASE WHEN $4 = 'user' THEN $2 ELSE deleted_by_user_id END,
-                 deleted_by_admin_id = CASE WHEN $4 = 'admin' THEN $2 ELSE deleted_by_admin_id END
-             WHERE pending_user_id = $1`,
-            [userIdInt, cancellerIdInt, resolvedReason, actorType]
-        );
-
         const decryptedPassword = await passwordEncryption.decryptPassword(pendingRecord.password);
 
         cancelledUser = {
@@ -917,6 +903,10 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
             creator_request_reason: resolvedReason ?? pendingRecord.creator_request_reason
         };
 
+        // DELETE the request record (not preserve it)
+        await SQLquery('DELETE FROM User_Creation_Requests WHERE pending_user_id = $1', [userIdInt]);
+        
+        // DELETE the user from Users and Login_Credentials
         await SQLquery('DELETE FROM Login_Credentials WHERE user_id = $1', [userIdInt]);
         await SQLquery('DELETE FROM Users WHERE user_id = $1', [userIdInt]);
 
@@ -926,23 +916,21 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
         throw error;
     }
 
+    // Broadcast user deletion
     broadcastUserUpdate(branchId, {
         action: 'delete',
         user_id: userIdInt,
         reason: resolvedReason || 'cancelled'
     });
 
-    const requestSnapshot = await fetchUserCreationRequestById(userIdInt);
-
-    if (requestSnapshot) {
-        broadcastUserApprovalUpdate(branchId, {
-            pending_user_id: userIdInt,
-            status: 'cancelled',
-            branch_id: branchId,
-            reason: resolvedReason || null,
-            request: requestSnapshot
-        });
-    }
+    // Broadcast request removal (status: 'cancelled' signals complete removal)
+    broadcastUserApprovalUpdate(branchId, {
+        pending_user_id: userIdInt,
+        status: 'cancelled',
+        branch_id: branchId,
+        reason: resolvedReason || null,
+        request: null // No request snapshot because it's deleted
+    });
 
     return cancelledUser;
 };

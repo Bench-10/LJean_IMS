@@ -107,10 +107,14 @@ const InventoryRequestMonitorDialog = ({
     setRefreshIndex((prev) => prev + 1);
   }, []);
 
-  // On open: do NOT preselect any status
+  // On open: default to 'rejected' + 'user' to show rejected user creation requests
   useEffect(() => {
     if (!open) return;
-    setStatusFilter('');
+    setBranchFilter(''); // Clear branch filter to show ALL rejected users across all branches
+    // Default to showing rejected requests when the dialog opens so owners/managers
+    // can immediately review rejected items (both inventory and user accounts).
+    setStatusFilter('rejected');
+    setRequestTypeFilter('');
   }, [open]);
 
   useEffect(() => {
@@ -380,21 +384,53 @@ const InventoryRequestMonitorDialog = ({
       return true;
     });
 
-    // 2) Type filter (always enabled for BM/Owner; ignored for others because not shown)
+    // 2) Type filter
+    // If a type chip is selected, respect it strictly (don't show the other kind).
+    // Previously this check only applied when the type UI was visible; enforce it
+    // regardless so programmatic/default filters behave predictably.
     const afterType = roleTrimmed.filter((req) => {
-      if (canSeeTypeFilter && requestTypeFilter && req.kind !== requestTypeFilter) return false;
+      if (requestTypeFilter && req.kind !== requestTypeFilter) return false;
       return true;
     });
 
     // 3) Status chip (if any chip is selected)
+    // - If no status chip is selected, hide rejected *user account* requests by default
+    // - If the status chip is 'pending', show only pending-type codes
+    // - If the status chip is 'rejected', isolate by type:
+    //   - If type is 'inventory', show only rejected inventory
+    //   - If type is 'user', show only rejected user accounts
+    //   - If no type selected, show rejected inventory only (not rejected user accounts)
+    // - Additional requirement: Prevent rejected user accounts from appearing in any other filter
     const afterStatus = afterType.filter((req) => {
-      if (!statusFilter) return true;
       const code = req?.status_detail?.code;
+      // If the request has no status code, exclude it
       if (!code) return false;
+
+      // Prevent rejected user accounts from appearing in any filter except when status='rejected' and type='user'
+      if (req.kind === 'user' && code === 'rejected') {
+        return statusFilter === 'rejected' && requestTypeFilter === 'user';
+      }
+
+      // No status filter selected: hide rejected user-account requests by default (already handled above)
+      if (!statusFilter) {
+        return true;
+      }
+
+      // Pending chip: show pending manager/admin/pending codes
       if (statusFilter === 'pending') {
         return code === 'pending_manager' || code === 'pending_admin' || code === 'pending';
       }
-      return code === statusFilter; // approved / rejected
+
+      // Rejected chip: isolate by type to prevent rejected user accounts from appearing in inventory filter
+      if (statusFilter === 'rejected') {
+        if (requestTypeFilter === 'inventory') return req.kind === 'inventory' && code === 'rejected';
+        if (requestTypeFilter === 'user') return req.kind === 'user' && code === 'rejected';
+        // If no type selected, show rejected inventory only (not rejected user accounts)
+        return req.kind === 'inventory' && code === 'rejected';
+      }
+
+      // For other explicit chips (e.g. 'approved'), match exact code
+      return code === statusFilter;
     });
 
     return afterStatus;

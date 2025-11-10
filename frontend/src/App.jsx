@@ -89,39 +89,130 @@ const createDeleteGuardState = () => ({
   targetPendingIds: []
 });
 
-const dedupeUserRequestList = (records) => {
-  if (!Array.isArray(records)) {
-    return [];
-  }
+const dedupeUserRequestList = (records, statusFilter = null) => {
+  // Purpose: normalize and deduplicate user-creation request records while preserving
+  // the most recent/authoritative record per user id. This prevents old rejected
+  // records from resurfacing in other filters when a newer pending/approved entry exists.
+  // 
+  // CRITICAL: Rejected user accounts should ONLY appear when explicitly requested.
+  // They should never leak into pending, approved, or unfiltered views.
+  
+  if (!Array.isArray(records)) return [];
 
-  const seen = new Set();
-  const deduped = [];
+  // 1) Normalize input and filter out non-objects
+  const normalized = records
+    .filter((r) => r && typeof r === 'object')
+    .map((r) => ({ ...r }));
 
-  for (const record of records) {
-    if (!record || typeof record !== 'object') {
-      continue;
+  // Helper to normalize status consistently
+  const normalizeStatus = (record) => {
+    const raw = String(record?.request_status ?? record?.status ?? '').toLowerCase().trim();
+    if (raw === 'active') return 'approved';
+    return raw || 'pending';
+  };
+
+  // 2) Apply status-based prefiltering to exclude unwanted records early
+  const prefiltered = normalized.filter((record) => {
+    const status = normalizeStatus(record);
+    
+    // If filtering for pending, exclude rejected/cancelled/deleted entirely
+    if (statusFilter === 'pending') {
+      return status === 'pending';
+    }
+    
+    // If filtering for a specific status other than rejected, exclude rejected
+    if (statusFilter && statusFilter !== 'rejected') {
+      return status === statusFilter;
+    }
+    
+    // If filtering for rejected explicitly, only include rejected
+    if (statusFilter === 'rejected') {
+      return status === 'rejected';
+    }
+    
+    // If no filter, exclude rejected by default (they must be explicitly requested)
+    if (!statusFilter) {
+      return status !== 'rejected';
+    }
+    
+    return true;
+  });
+
+  // 3) Deduplicate by numeric id, keeping the most authoritative record
+  const byId = new Map();
+
+  const toTime = (v) => {
+    if (!v) return 0;
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? 0 : t;
+  };
+
+  const getPriority = (record) => {
+    const status = normalizeStatus(record);
+    // Higher number = higher priority when timestamps are equal
+    // Pending has highest priority (active requests should be visible)
+    // Approved second (completed successfully)
+    // Rejected third (still informative)
+    // Cancelled/deleted lowest (least relevant)
+    if (status === 'pending') return 100;
+    if (status === 'approved' || status === 'active') return 80;
+    if (status === 'rejected') return 50;
+    if (status === 'cancelled' || status === 'deleted') return 10;
+    return 60;
+  };
+
+  prefiltered.forEach((rec, index) => {
+    const rawId = rec?.pending_user_id ?? rec?.user_id ?? rec?.id ?? null;
+    const idNum = Number.isFinite(Number(rawId)) ? String(Number(rawId)) : null;
+
+    if (!idNum) {
+      // No usable id: store with a synthetic key to preserve these entries
+      byId.set(`__noid__${index}`, rec);
+      return;
     }
 
-    const rawId = record.pending_user_id ?? record.user_id ?? record.request_id ?? null;
-    const numericId = Number(rawId);
-    const key = Number.isFinite(numericId)
-      ? `id:${numericId}`
-      : rawId !== null && rawId !== undefined
-        ? `key:${String(rawId).toLowerCase()}`
-        : null;
+    const candidateTime = toTime(
+      rec?.request_resolved_at ?? 
+      rec?.request_decision_at ?? 
+      rec?.updated_at ?? 
+      rec?.request_created_at ?? 
+      rec?.created_at ?? 
+      rec?.createdAt
+    ) || 0;
 
-    if (key && seen.has(key)) {
-      continue;
+    const existing = byId.get(idNum);
+    if (!existing) {
+      byId.set(idNum, rec);
+      return;
     }
 
-    if (key) {
-      seen.add(key);
+    const existingTime = toTime(
+      existing?.request_resolved_at ?? 
+      existing?.request_decision_at ?? 
+      existing?.updated_at ?? 
+      existing?.request_created_at ?? 
+      existing?.created_at ?? 
+      existing?.createdAt
+    ) || 0;
+
+    // Strategy: Always prefer the most recent timestamp
+    if (candidateTime > existingTime) {
+      byId.set(idNum, rec);
+      return;
     }
 
-    deduped.push(record);
-  }
+    if (candidateTime < existingTime) {
+      return; // Keep existing
+    }
 
-  return deduped;
+    // If timestamps are equal, use priority
+    if (getPriority(rec) > getPriority(existing)) {
+      byId.set(idNum, rec);
+    }
+  });
+
+  // 4) Return deduplicated list, preserving insertion order
+  return Array.from(byId.values());
 };
 
 
@@ -223,6 +314,15 @@ function App() {
 
         const allowedStatuses = new Set(['pending', 'approved', 'rejected', 'cancelled']);
         if (!allowedStatuses.has(normalizedStatus)) {
+          return null;
+        }
+
+        // Filter out auto-approved users created directly by Owner (no approval process)
+        const creatorRoles = normalizeRoleList(record?.creator_roles);
+        const isOwnerCreator = creatorRoles.includes('Owner');
+        const wasAutoApproved = normalizedStatus === 'approved' && isOwnerCreator && !record?.manager_approver_id;
+        
+        if (wasAutoApproved) {
           return null;
         }
 
@@ -1654,6 +1754,7 @@ function App() {
     try {
       setUserCreationLoading(true);
       const response = await api.get('/api/users/pending');
+      console.log(response)
   const payload = response.data ?? [];
   const requests = Array.isArray(payload?.requests) ? payload.requests : (Array.isArray(payload) ? payload : []);
   setUserCreationRequests(dedupeUserRequestList(requests));
