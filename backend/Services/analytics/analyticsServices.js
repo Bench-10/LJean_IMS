@@ -3,6 +3,156 @@ import { correctDateFormat } from '../Services_Utils/convertRedableDate.js';
 import dayjs from 'dayjs';
 import { runDemandForecast } from '../forecasting/forecastService.js';
 
+const INTERVAL_UNIT_MAP = {
+  daily: 'day',
+  weekly: 'week',
+  monthly: 'month',
+  yearly: 'year'
+};
+
+const HISTORY_LOOKBACK_CONFIG = {
+  daily: { periods: 365, unit: 'day', maxPoints: 450 },
+  weekly: { periods: 52, unit: 'week', maxPoints: 160 },
+  monthly: { periods: 12, unit: 'month', maxPoints: 72 },
+  yearly: { periods: 5, unit: 'year', maxPoints: 15 },
+  default: { periods: 12, unit: 'month', maxPoints: 72 }
+};
+
+function alignToInterval(date, interval) {
+  const base = dayjs(date);
+  if (!base.isValid()) {
+    return null;
+  }
+  switch (interval) {
+    case 'daily':
+      return base.startOf('day');
+    case 'weekly': {
+      const diff = (base.day() + 6) % 7;
+      return base.subtract(diff, 'day').startOf('day');
+    }
+    case 'monthly':
+      return base.startOf('month');
+    case 'yearly':
+      return base.startOf('year');
+    default:
+      return base.startOf(INTERVAL_UNIT_MAP[interval] || 'month');
+  }
+}
+
+function addInterval(date, interval, amount = 1) {
+  const unit = INTERVAL_UNIT_MAP[interval] || 'month';
+  const base = dayjs(date);
+  if (!base.isValid()) {
+    return base;
+  }
+  const next = base.add(amount, unit);
+  return alignToInterval(next, interval) || next;
+}
+
+function normalizeNumeric(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function resampleTimeSeries(rows, interval, start, end, numericKeys = [], options = {}) {
+  const data = Array.isArray(rows) ? rows.slice() : [];
+  const numericFields = Array.isArray(numericKeys) ? numericKeys : [];
+  const staticFields = options.staticFields || {};
+  const normalized = data
+    .map((row) => {
+      const primary = dayjs(row.period);
+      let periodKey;
+      if (primary.isValid()) {
+        periodKey = primary.format('YYYY-MM-DD');
+      } else {
+        const fallback = dayjs(String(row.period));
+        periodKey = fallback.isValid() ? fallback.format('YYYY-MM-DD') : String(row.period ?? '');
+      }
+      const result = { ...row, period: periodKey };
+      for (const key of numericFields) {
+        result[key] = normalizeNumeric(result[key]);
+      }
+      return result;
+    })
+    .sort((a, b) => a.period.localeCompare(b.period));
+
+  const startCandidate = start ? dayjs(start) : (normalized[0] ? dayjs(normalized[0].period) : null);
+  const endCandidate = end ? dayjs(end) : (normalized.length ? dayjs(normalized[normalized.length - 1].period) : null);
+
+  if (!startCandidate?.isValid() || !endCandidate?.isValid()) {
+    return normalized;
+  }
+
+  let cursor = alignToInterval(startCandidate, interval);
+  let final = alignToInterval(endCandidate, interval);
+
+  if (!cursor || !final) {
+    return normalized;
+  }
+
+  if (cursor.isAfter(final)) {
+    [cursor, final] = [final, cursor];
+  }
+
+  const unit = INTERVAL_UNIT_MAP[interval] || 'month';
+  const expectedCount = Math.floor(final.diff(cursor, unit, true)) + 1;
+  const configLimit = options.maxPoints ?? HISTORY_LOOKBACK_CONFIG[interval]?.maxPoints ?? expectedCount;
+  const maxIterations = Math.max(expectedCount, configLimit);
+
+  const lookup = new Map();
+  for (const row of normalized) {
+    const key = alignToInterval(row.period, interval);
+    if (!key) {
+      continue;
+    }
+    lookup.set(key.format('YYYY-MM-DD'), row);
+  }
+
+  const filled = [];
+  let iterations = 0;
+  while ((cursor.isBefore(final) || cursor.isSame(final)) && iterations < maxIterations) {
+    const key = cursor.format('YYYY-MM-DD');
+    const existing = lookup.get(key);
+    const base = existing ? { ...existing } : { period: key, ...staticFields };
+
+    if (!existing) {
+      Object.assign(base, staticFields);
+    }
+
+    for (const numericKey of numericFields) {
+      base[numericKey] = normalizeNumeric(existing ? existing[numericKey] : 0);
+    }
+
+    base.period = key;
+    filled.push(base);
+    cursor = addInterval(cursor, interval, 1);
+    iterations += 1;
+  }
+
+  return filled;
+}
+
+function computeHistoryStart(start, end, interval) {
+  if (!end) {
+    return start;
+  }
+  const endDate = dayjs(end);
+  if (!endDate.isValid()) {
+    return start;
+  }
+  const config = HISTORY_LOOKBACK_CONFIG[interval] || HISTORY_LOOKBACK_CONFIG.default;
+  const offsetPeriods = Math.max((config?.periods || 0) - 1, 0);
+  const candidate = alignToInterval(endDate.subtract(offsetPeriods, config.unit), interval) || endDate;
+  if (!start) {
+    return candidate.format('YYYY-MM-DD');
+  }
+  const startDate = dayjs(start);
+  if (!startDate.isValid() || startDate.isAfter(candidate)) {
+    return candidate.format('YYYY-MM-DD');
+  }
+  return start;
+}
+
 
 const RESTORED_SALES_FILTER = `NOT EXISTS (
     SELECT 1 FROM Sales_Stock_Usage ssu 
@@ -172,12 +322,19 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     ${where}
     GROUP BY 1
     ORDER BY 1;`, params);
-  
-  // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
-  const history = rows.map(row => ({
+
+  const rawHistory = rows.map(row => ({
     period: dayjs(row.period).format('YYYY-MM-DD'),
     sales_amount: Number(row.sales_amount || 0),
     units_sold: Number(row.units_sold || 0)
+  }));
+
+  const resampledHistory = resampleTimeSeries(rawHistory, interval, start, end, ['sales_amount', 'units_sold']);
+
+  const history = resampledHistory.map(item => ({
+    period: item.period,
+    sales_amount: Number(item.sales_amount || 0),
+    units_sold: Number(item.units_sold || 0)
   }));
 
   let forecast = [];
@@ -263,6 +420,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
   } else {
     ({ start, end } = buildDateRange(range));
   }
+  const historyStart = include_forecast ? computeHistoryStart(start, end, interval) : start;
   const cacheKey = makeAnalyticsCacheKey('fetchTopProducts', {
     branch_id,
     category_id,
@@ -277,8 +435,8 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     return cached;
   }
 
-  const { filters, params, nextIdx } = buildSalesFilters({ start, end, branch_id, category_id });
-  const where = 'WHERE ' + filters.join(' AND ');
+  const { filters: summaryFilters, params: summaryParams } = buildSalesFilters({ start, end, branch_id, category_id });
+  const where = 'WHERE ' + summaryFilters.join(' AND ');
   const safeLimit = Number.isFinite(Number.parseInt(limit, 10)) ? Number.parseInt(limit, 10) : 10;
   const { rows } = await SQLquery(`
     SELECT
@@ -295,7 +453,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     ${where}
     GROUP BY 1,2
     ORDER BY sales_amount DESC
-    LIMIT ${safeLimit};`, params);
+    LIMIT ${safeLimit};`, summaryParams);
   if (!include_forecast || rows.length === 0) {
     setAnalyticsCache(cacheKey, rows);
     return rows;
@@ -309,9 +467,10 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     return rows;
   }
 
-  const productArrayParamIndex = nextIdx;
-  const historyFilters = [...filters, `si.product_id = ANY($${productArrayParamIndex}::int[])`];
-  const historyParams = [...params, topProductIds];
+  const historyFiltersContext = buildSalesFilters({ start: historyStart, end, branch_id, category_id });
+  const productArrayParamIndex = historyFiltersContext.nextIdx;
+  const historyFilters = [...historyFiltersContext.filters, `si.product_id = ANY($${productArrayParamIndex}::int[])`];
+  const historyParams = [...historyFiltersContext.params, topProductIds];
   const historyWhere = 'WHERE ' + historyFilters.join(' AND ');
 
   const { rows: historyRows } = await SQLquery(`
@@ -333,15 +492,47 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     }
     historyMap.get(row.product_id).push({
       period: dayjs(row.period).format('YYYY-MM-DD'),
+      product_id: row.product_id,
       units_sold: Number(row.units_sold || 0),
       sales_amount: Number(row.sales_amount || 0)
     });
   }
 
+  const lookbackConfig = HISTORY_LOOKBACK_CONFIG[interval] || HISTORY_LOOKBACK_CONFIG.default;
+
   const enriched = await Promise.all(rows.map(async (product, index) => {
-    const historySeries = historyMap.get(product.product_id) || [];
-    if (index >= MAX_FORECAST_PRODUCTS || historySeries.length < 2) {
-      return { ...product, history: historySeries, forecast: [] };
+    const rawHistory = historyMap.get(product.product_id) || [];
+    const resampledHistory = resampleTimeSeries(rawHistory, interval, historyStart, end, ['units_sold', 'sales_amount'], {
+      maxPoints: lookbackConfig?.maxPoints,
+      staticFields: { product_id: product.product_id }
+    });
+
+    const historySeriesSource = resampledHistory.length ? resampledHistory : rawHistory;
+    const historySeries = historySeriesSource.map(item => ({
+      period: dayjs(item.period).format('YYYY-MM-DD'),
+      units_sold: Number(item.units_sold || 0),
+      sales_amount: Number(item.sales_amount || 0)
+    }));
+
+    const historyRangeStart = historySeries.length ? historySeries[0].period : (historyStart || null);
+    const historyRangeEnd = historySeries.length ? historySeries[historySeries.length - 1].period : (end || null);
+    const historyCoverageDays = historyRangeStart && historyRangeEnd && dayjs(historyRangeStart).isValid() && dayjs(historyRangeEnd).isValid()
+      ? dayjs(historyRangeEnd).diff(dayjs(historyRangeStart), 'day') + 1
+      : 0;
+    const historyCoveragePeriods = historySeries.length;
+
+    const hasSufficientHistory = rawHistory.length >= 2;
+
+    if (index >= MAX_FORECAST_PRODUCTS || !hasSufficientHistory) {
+      return {
+        ...product,
+        history: historySeries,
+        forecast: [],
+        history_range_start: historyRangeStart,
+        history_range_end: historyRangeEnd,
+        history_coverage_days: historyCoverageDays,
+        history_coverage_periods: historyCoveragePeriods
+      };
     }
 
     try {
@@ -357,14 +548,22 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
       return {
         ...product,
         history: historySeries,
-        forecast: forecastSeries
+        forecast: forecastSeries,
+        history_range_start: historyRangeStart,
+        history_range_end: historyRangeEnd,
+        history_coverage_days: historyCoverageDays,
+        history_coverage_periods: historyCoveragePeriods
       };
     } catch (err) {
       console.error('Top product forecast error', err);
       return {
         ...product,
         history: historySeries,
-        forecast: []
+        forecast: [],
+        history_range_start: historyRangeStart,
+        history_range_end: historyRangeEnd,
+        history_coverage_days: historyCoverageDays,
+        history_coverage_periods: historyCoveragePeriods
       };
     }
   }));
