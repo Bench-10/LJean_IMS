@@ -102,6 +102,7 @@ const InventoryRequestMonitorDialog = ({
   const [cancelError, setCancelError] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
   const lastRefreshTokenRef = useRef(refreshToken);
+  const [showRefreshIndicator, setShowRefreshIndicator] = useState(false);
 
   const triggerRefresh = useCallback(() => {
     setRefreshIndex((prev) => prev + 1);
@@ -132,8 +133,15 @@ const InventoryRequestMonitorDialog = ({
       return;
     }
 
+    // Always trigger refresh when refreshToken changes and dialog is open
     if (lastRefreshTokenRef.current !== refreshToken) {
       lastRefreshTokenRef.current = refreshToken;
+      console.log('🔄 WebSocket event detected - refreshing inventory request status');
+      
+      // Show brief refresh indicator
+      setShowRefreshIndicator(true);
+      setTimeout(() => setShowRefreshIndicator(false), 2000);
+      
       triggerRefresh();
     }
   }, [refreshToken, open, triggerRefresh]);
@@ -542,9 +550,11 @@ const InventoryRequestMonitorDialog = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Refresh"
                 title="Refresh"
+                onClick={triggerRefresh}
+                disabled={loading}
               >
                 <MdRefresh className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
               </button>

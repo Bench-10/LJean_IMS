@@ -1195,10 +1195,11 @@ function App() {
 
       const isBranchManager = user.role && user.role.some(role => ['Branch Manager'].includes(role));
       const isOwner = user.role && user.role.some(role => ['Owner'].includes(role));
+      const isInSameBranch = payload.branch_id && payload.branch_id === user.branch_id;
 
       let affectedMonitor = false;
 
-      if (isBranchManager && payload.branch_id && payload.branch_id === user.branch_id) {
+      if (isBranchManager && isInSameBranch) {
         setPendingInventoryRequests(prev => prev.filter(req => normalizePendingId(req.pending_id) !== normalizePendingId(payload.pending_id)));
         affectedMonitor = true;
 
@@ -1267,6 +1268,14 @@ function App() {
       }
 
       if (affectedMonitor) {
+        console.log('📡 Inventory approval updated via WebSocket - triggering refresh', {
+          pendingId: payload.pending_id,
+          status: payload.status,
+          branchId: payload.branch_id,
+          userBranchId: user.branch_id,
+          isOwner,
+          isBranchManager
+        });
         setRequestStatusRefreshKey((prev) => prev + 1);
       }
     });
@@ -2457,10 +2466,6 @@ function App() {
         approver_id: user.admin_id ?? null,
         approverName: user.full_name ?? null,
         approver_roles: user.role || []
-      });
-      addToNotificationQueue('User account approved.', {
-        isLocal: true,
-        title: 'Account approved'
       });
       // Fetch latest data to ensure UI is in sync (WebSocket updates may have timing delays)
       await fetchUserCreationRequests();
