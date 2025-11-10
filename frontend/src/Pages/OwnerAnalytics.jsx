@@ -92,6 +92,8 @@ export default function OwnerAnalytics(){
 
     if(interval==='weekly') return d.toLocaleDateString('en-US',{ month:'short', day:'numeric'});
 
+    if(interval==='yearly') return d.toLocaleDateString('en-US',{ year:'numeric'});
+
     return d.toLocaleDateString('en-US',{ month:'short'});
 
   };

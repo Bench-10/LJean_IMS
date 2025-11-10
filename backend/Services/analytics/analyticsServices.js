@@ -293,7 +293,7 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
   } else {
     ({ start, end } = buildDateRange(range));
   }
-  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
+  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : interval === 'yearly' ? 'year' : 'month';
   const cacheKey = makeAnalyticsCacheKey('fetchSalesPerformance', {
     branch_id,
     category_id,
@@ -378,7 +378,7 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
 
 export async function fetchRestockTrends({ branch_id, interval, range }) {
   const { start, end } = buildDateRange(range);
-  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
+  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : interval === 'yearly' ? 'year' : 'month';
   const branchFilter = branch_id ? 'AND ip.branch_id = $3' : '';
   const params = [start, end];
   if(branch_id) params.push(branch_id);
@@ -459,7 +459,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     return rows;
   }
 
-  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
+  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : interval === 'yearly' ? 'year' : 'month';
   const MAX_FORECAST_PRODUCTS = 10;
   const topProductIds = rows.slice(0, MAX_FORECAST_PRODUCTS).map((product) => product.product_id);
   if (topProductIds.length === 0) {
@@ -862,7 +862,7 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
   }
 
   // Determine date truncation based on interval
-  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : 'month';
+  const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : interval === 'yearly' ? 'year' : 'month';
   
   // Build conditions and parameters
   const conditions = ['s.date BETWEEN $1 AND $2', 's.branch_id = $3'];

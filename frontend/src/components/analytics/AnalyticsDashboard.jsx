@@ -1119,6 +1119,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       day.setDate(day.getDate() + offset);
       return day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
+    if (intervalType === 'yearly') return d.toLocaleDateString('en-US', { year: 'numeric' });
     return d.toLocaleDateString('en-US', { month: 'short' });
   };
 
