@@ -1,4 +1,4 @@
-import { React, useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
 import { TbFileExport } from "react-icons/tb";
 import api from '../utils/api';
@@ -8,7 +8,120 @@ import ChartLoading from '../components/common/ChartLoading';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 import DropdownCustom from '../components/DropdownCustom';
 
-function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList }) {
+const normalizeDateValue = (value) => {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  if (typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const parsed = Date.parse(trimmed);
+    if (!Number.isNaN(parsed)) {
+      return new Date(parsed).toISOString().slice(0, 10);
+    }
+
+    return trimmed.toLowerCase();
+  }
+
+  return null;
+};
+
+const matchesFocus = (entry, focus) => {
+  if (!entry || !focus) return false;
+
+  const entryAlertId = entry.alert_id ?? entry.alertId;
+  if (focus.alertId && entryAlertId !== undefined && entryAlertId !== null) {
+    if (Number(entryAlertId) === Number(focus.alertId)) {
+      return true;
+    }
+  }
+
+  const entryAddStockId = entry.add_stock_id ?? entry.addStockId ?? entry.add_id;
+  if (focus.addStockId && entryAddStockId !== undefined && entryAddStockId !== null) {
+    if (Number(entryAddStockId) === Number(focus.addStockId)) {
+      return true;
+    }
+  }
+
+  const entryProductId = entry.product_id ?? entry.productId ?? entry.inventory_product_id;
+  if (focus.productId && entryProductId !== undefined && entryProductId !== null) {
+    if (Number(entryProductId) === Number(focus.productId)) {
+      if (!focus.productValidityDate) {
+        return true;
+      }
+
+      const focusDate = normalizeDateValue(focus.productValidityDate);
+      if (!focusDate) {
+        return true;
+      }
+
+      const entryDates = [
+        entry.product_validity,
+        entry.product_validity_date,
+        entry.formated_product_validity,
+        entry.formatedProductValidity
+      ];
+
+      if (entryDates.some(candidate => focusDate === normalizeDateValue(candidate))) {
+        return true;
+      }
+    }
+  }
+
+  if (focus.productValidityDate) {
+    const focusDate = normalizeDateValue(focus.productValidityDate);
+    if (focusDate) {
+      const entryDates = [
+        entry.product_validity,
+        entry.product_validity_date,
+        entry.formated_product_validity,
+        entry.formatedProductValidity
+      ];
+
+      if (entryDates.some(candidate => focusDate === normalizeDateValue(candidate))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+const getEntryKey = (entry, fallbackIndex = 0) => {
+  if (!entry) return `validity-row-${fallbackIndex}`;
+
+  const entryAlertId = entry.alert_id ?? entry.alertId;
+  if (entryAlertId !== undefined && entryAlertId !== null) {
+    return `validity-alert-${entryAlertId}`;
+  }
+
+  const entryAddStockId = entry.add_stock_id ?? entry.addStockId ?? entry.add_id;
+  if (entryAddStockId !== undefined && entryAddStockId !== null) {
+    return `validity-add-${entryAddStockId}`;
+  }
+
+  const entryProductId = entry.product_id ?? entry.productId ?? entry.inventory_product_id;
+  if (entryProductId !== undefined && entryProductId !== null && entry.date_added) {
+    return `validity-${entryProductId}-${entry.date_added}`;
+  }
+
+  if (entryProductId !== undefined && entryProductId !== null && entry.product_validity) {
+    return `validity-${entryProductId}-${entry.product_validity}`;
+  }
+
+  return `validity-row-${fallbackIndex}`;
+};
+
+function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList, focusEntry, onClearFocus }) {
   const [productValidityList, setValidity] = useState(propValidityList || []);
   const [searchValidity, setSearchValidity] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,6 +137,13 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const { user } = useAuth();
   const cacheKey = `product_validity_branch_${user?.branch_id || 'unknown'}`;
 
+  const tableRowRefs = useRef({});
+  const cardRefs = useRef({});
+  const mobileContainerRef = useRef(null);
+  const desktopContainerRef = useRef(null);
+  const pendingFocusRef = useRef(null);
+  const [pendingRowKey, setPendingRowKey] = useState(null);
+  const [highlightedRowKey, setHighlightedRowKey] = useState(null);
 
   const getProductInfo = async ({ force = false } = {}) => {
     // If we already have cached data and not forcing, show it immediately without spinner
@@ -70,6 +190,86 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     // On mount: show cache if available, then refresh in background
     getProductInfo({ force: false });
   }, [user.branch_id]);
+
+  useEffect(() => {
+    if (!focusEntry) return;
+
+    pendingFocusRef.current = focusEntry;
+    setSearchValidity('');
+    setShowNearExpiry(false);
+    setShowExpired(false);
+    setSelectedYear('');
+    setSelectedMonth('');
+  }, [focusEntry]);
+
+  useEffect(() => {
+    if (!pendingFocusRef.current) return;
+    if (!Array.isArray(productValidityList) || productValidityList.length === 0) {
+      return;
+    }
+
+    const focus = pendingFocusRef.current;
+    const matchIndex = productValidityList.findIndex(entry => matchesFocus(entry, focus));
+
+    if (matchIndex === -1) {
+      return;
+    }
+
+    const targetEntry = productValidityList[matchIndex];
+    const targetKey = getEntryKey(targetEntry, matchIndex);
+    pendingFocusRef.current = null;
+
+    const targetPage = Math.floor(matchIndex / itemsPerPage) + 1;
+    setCurrentPage(targetPage);
+    setPendingRowKey(targetKey);
+
+    if (typeof onClearFocus === 'function') {
+      onClearFocus();
+    }
+  }, [productValidityList, itemsPerPage, onClearFocus]);
+
+  // Scroll newly focused validity rows/cards into view with a temporary highlight.
+  useEffect(() => {
+    if (!pendingRowKey) return;
+
+    const targetElement = tableRowRefs.current[pendingRowKey] || cardRefs.current[pendingRowKey];
+    if (!targetElement) return;
+
+    // prefer scrolling the inner container so the full page doesn't jump
+    const container = desktopContainerRef.current && desktopContainerRef.current.contains(targetElement)
+      ? desktopContainerRef.current
+      : mobileContainerRef.current && mobileContainerRef.current.contains(targetElement)
+        ? mobileContainerRef.current
+        : null;
+
+    setHighlightedRowKey(pendingRowKey);
+
+    if (container) {
+      // compute offset relative to container and smoothly scroll the container
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = targetElement.getBoundingClientRect();
+      const currentScrollTop = container.scrollTop;
+      const offsetWithin = targetRect.top - containerRect.top;
+      const targetScrollTop = currentScrollTop + offsetWithin - (container.clientHeight / 2) + (targetElement.clientHeight / 2);
+
+      try {
+        container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+      } catch (e) {
+        // fallback
+        container.scrollTop = targetScrollTop;
+      }
+    } else {
+      // last resort: element scrollIntoView (may scroll page)
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    }
+
+    const timer = setTimeout(() => {
+      setHighlightedRowKey(null);
+      setPendingRowKey(null);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [pendingRowKey, currentPage]);
 
   // LISTEN FOR REAL-TIME VALIDITY UPDATES
   useEffect(() => {
@@ -191,6 +391,9 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const endIndex = startIndex + itemsPerPage;
   const currentPageData = filteredValidityData.slice(startIndex, endIndex);
 
+  tableRowRefs.current = {};
+  cardRefs.current = {};
+
   // Export functionality
   const handleExportValidity = (format) => {
     const exportData = formatForExport(filteredValidityData, []);
@@ -301,7 +504,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
       {/* MOBILE CARD VIEW */}
-      <div className="block lg:hidden space-y-3 overflow-y-auto h-[55vh] pb-6 hide-scrollbar">
+  <div ref={mobileContainerRef} className="block lg:hidden space-y-3 overflow-y-auto h-[55vh] pb-6 hide-scrollbar">
         {loading ? (
           <div className='h-96 flex items-center justify-center'>
             <ChartLoading message='Loading products...' />
@@ -311,17 +514,29 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
             <NoInfoFound isTable={false} />
           </div>
         ) : (
-          currentPageData.map((validity, index) => (
-            <div
-              key={index}
-              className={`rounded-lg p-4 border-l-4 shadow-sm ${
-                validity.expy
-                  ? 'bg-[#bc2424] text-white border-red-700'
-                  : validity.near_expy
-                  ? 'bg-[#FFF3C1] border-yellow-500'
-                  : 'bg-white border-gray-300'
-              }`}
-            >
+          currentPageData.map((validity, index) => {
+            const globalIndex = startIndex + index;
+            const rowKey = getEntryKey(validity, globalIndex);
+            const isHighlighted = highlightedRowKey === rowKey;
+
+            return (
+              <div
+                key={rowKey}
+                ref={(element) => {
+                  if (element) {
+                    cardRefs.current[rowKey] = element;
+                  } else {
+                    delete cardRefs.current[rowKey];
+                  }
+                }}
+                className={`rounded-lg p-4 border-l-4 shadow-sm transition-[box-shadow] ${
+                  validity.expy
+                    ? 'bg-[#bc2424] text-white border-red-700'
+                    : validity.near_expy
+                      ? 'bg-[#FFF3C1] border-yellow-500'
+                      : 'bg-white border-gray-300'
+                } ${isHighlighted ? 'bg-emerald-200 text-emerald-900 transition-colors' : ''}`}
+              >
               {(validity.expy || validity.near_expy) && (
                 <div className="flex items-center gap-2 mb-2">
                   <RiErrorWarningLine className="text-xl" />
@@ -354,8 +569,9 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                   <span className="font-bold text-base">{validity.quantity_left}</span>
                 </div>
               </div>
-            </div>
-          ))
+              </div>
+            );
+          })
         )}
         
       </div>
@@ -364,7 +580,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
 
       {/*DESKTOP VIEW*/}
-      <div className="hidden lg:block overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+  <div ref={desktopContainerRef} className="hidden lg:block overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
         <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 z-20">
 
@@ -410,17 +626,32 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 ) :
 
                 (
-                  currentPageData.map((validity, index) => (
-                    <tr
-                      key={index}
-                      className={
-                        validity.expy
-                          ? 'bg-[#bc2424] text-white hover:bg-[#bc2424]/90 h-14'
-                          : validity.near_expy
-                            ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
-                            : 'hover:bg-gray-200/70 h-14'
-                      }
-                    >
+                  currentPageData.map((validity, index) => {
+                    const globalIndex = startIndex + index;
+                    const rowKey = getEntryKey(validity, globalIndex);
+                    const isHighlighted = highlightedRowKey === rowKey;
+
+                    const baseRowClass = validity.expy
+                      ? 'bg-[#bc2424] text-white hover:bg-[#bc2424]/90 h-14'
+                      : validity.near_expy
+                        ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
+                        : 'hover:bg-gray-200/70 h-14';
+
+                    // Use temporary green background for highlight (no border/outline)
+                    const highlightClass = isHighlighted ? 'bg-emerald-200 text-emerald-900 transition-colors' : '';
+
+                    return (
+                      <tr
+                        key={rowKey}
+                        ref={(element) => {
+                          if (element) {
+                            tableRowRefs.current[rowKey] = element;
+                          } else {
+                            delete tableRowRefs.current[rowKey];
+                          }
+                        }}
+                        className={`${baseRowClass} ${highlightClass}`}
+                      >
                       {(validity.expy || validity.near_expy) ?
 
                         (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
@@ -452,7 +683,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
                     </tr>
 
-                  ))
+                    );
+                  })
 
                 )
             }
