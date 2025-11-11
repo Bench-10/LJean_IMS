@@ -1,10 +1,13 @@
-import webPush from 'web-push';
-import { SQLquery } from '../db.js';
 import dayjs from 'dayjs';
+import webPush from 'web-push';
+import { DEV_VAPID_PRIVATE_KEY, DEV_VAPID_PUBLIC_KEY } from '../config/devVapidKeys.js';
+import { SQLquery } from '../db.js';
+
+const isProduction = (process.env.NODE_ENV || '').toLowerCase() === 'production';
 
 // Configure web-push only when keys are available
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || (!isProduction ? DEV_VAPID_PUBLIC_KEY : undefined);
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || (!isProduction ? DEV_VAPID_PRIVATE_KEY : undefined);
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@ljean.com';
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
@@ -362,13 +365,11 @@ export const sendAlertPushNotification = async (alert) => {
  * @returns {string} - VAPID public key
  */
 export const getVapidPublicKey = () => {
-    const currentKey = process.env.VAPID_PUBLIC_KEY;
-
-    if (!currentKey || currentKey === 'YOUR_PUBLIC_KEY_HERE' || currentKey.length < 50) {
-        throw new Error('VAPID public key not configured. Set VAPID_PUBLIC_KEY in environment variables.');
+    if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE' || VAPID_PUBLIC_KEY.length < 50) {
+        throw new Error('VAPID public key not configured. Set VAPID_PUBLIC_KEY in environment variables or populate config/devVapidKeys.js in development.');
     }
 
-    return currentKey;
+    return VAPID_PUBLIC_KEY;
 };
 
 /**
