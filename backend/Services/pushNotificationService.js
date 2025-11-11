@@ -9,12 +9,28 @@ const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'YOUR_PUBLIC_KEY_HERE';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'YOUR_PRIVATE_KEY_HERE';
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@ljean.com';
 
+// Log VAPID configuration status on module load (helps diagnose issues)
+console.log('[Push Notifications] VAPID Configuration:');
+console.log('  - Public Key:', VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE' ? '❌ NOT CONFIGURED (using placeholder)' : '✅ Configured');
+console.log('  - Private Key:', VAPID_PRIVATE_KEY === 'YOUR_PRIVATE_KEY_HERE' ? '❌ NOT CONFIGURED (using placeholder)' : '✅ Configured');
+console.log('  - Subject:', VAPID_SUBJECT);
+
 // Configure web-push
-webPush.setVapidDetails(
+try {
+  webPush.setVapidDetails(
     VAPID_SUBJECT,
     VAPID_PUBLIC_KEY,
     VAPID_PRIVATE_KEY
-);
+  );
+  if (VAPID_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY_HERE') {
+    console.log('[Push Notifications] ✅ web-push configured successfully');
+  } else {
+    console.warn('[Push Notifications] ⚠️  Using placeholder VAPID keys - push notifications will NOT work!');
+    console.warn('[Push Notifications] ⚠️  Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in environment variables');
+  }
+} catch (error) {
+  console.error('[Push Notifications] ❌ Failed to configure web-push:', error.message);
+}
 
 /**
  * Subscribe to push notifications
@@ -367,9 +383,18 @@ export const sendAlertPushNotification = async (alert) => {
  * @returns {string} - VAPID public key
  */
 export const getVapidPublicKey = () => {
+    console.log('[getVapidPublicKey] Called - Current value:', VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE' ? 'PLACEHOLDER' : 'CONFIGURED');
+    
     if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE') {
-        throw new Error('VAPID public key not configured. Please set VAPID_PUBLIC_KEY in environment variables.');
+        const error = new Error('VAPID public key not configured. Please set VAPID_PUBLIC_KEY in environment variables.');
+        console.error('[getVapidPublicKey]', error.message);
+        console.error('[getVapidPublicKey] Debugging info:');
+        console.error('  - process.env.VAPID_PUBLIC_KEY:', process.env.VAPID_PUBLIC_KEY ? 'EXISTS' : 'UNDEFINED');
+        console.error('  - VAPID_PUBLIC_KEY constant:', VAPID_PUBLIC_KEY);
+        throw error;
     }
+    
+    console.log('[getVapidPublicKey] Returning key (first 20 chars):', VAPID_PUBLIC_KEY.substring(0, 20) + '...');
     return VAPID_PUBLIC_KEY;
 };
 

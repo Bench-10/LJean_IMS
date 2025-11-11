@@ -14,6 +14,7 @@ import analyticsRoutes from './Routes/analyticsRoutes.js';
 import deliveryRoutes from './Routes/deliveryRoutes.js';
 import passwordResetRoutes from './Routes/passwordResetRoutes.js';
 import pushNotificationRoutes from './Routes/pushNotificationRoutes.js';
+import debugRoutes from './Routes/debugRoutes.js';
 import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 import { loadUnitConversionCache } from './Services/Services_Utils/unitConversion.js';
@@ -155,7 +156,11 @@ app.use('/api', passwordResetRoutes);
 //FOR PUSH NOTIFICATIONS
 app.use('/api/push', pushNotificationRoutes);
 
-
+//DEBUG ROUTES (REMOVE IN PRODUCTION)
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api/debug', debugRoutes);
+  console.log('⚠️  Debug routes enabled at /api/debug');
+}
 
 //WEBSOCKET INTEGRATION
 // STORE CURRNTLY CONNECTED USERS
