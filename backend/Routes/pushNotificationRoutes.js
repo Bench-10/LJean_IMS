@@ -7,7 +7,7 @@ import {
     getPublicKey,
     cleanup
 } from '../Controllers/pushNotificationController.js';
-import { verifyToken } from '../middleware/auth.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -15,10 +15,10 @@ const router = express.Router();
 router.get('/vapid-public-key', getPublicKey);
 
 // Protected routes - require authentication
-router.post('/subscribe', verifyToken, subscribe);
-router.post('/unsubscribe', verifyToken, unsubscribe);
-router.get('/subscriptions', verifyToken, getSubscriptions);
-router.post('/test', verifyToken, sendTestNotification);
-router.post('/cleanup', verifyToken, cleanup); // Admin only (checked in controller)
+router.post('/subscribe', authenticate, subscribe);
+router.post('/unsubscribe', authenticate, unsubscribe);
+router.get('/subscriptions', authenticate, getSubscriptions);
+router.post('/test', authenticate, sendTestNotification);
+router.post('/cleanup', authenticate, cleanup); // Admin only (checked in controller)
 
 export default router;
