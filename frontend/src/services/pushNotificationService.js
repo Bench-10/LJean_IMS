@@ -95,16 +95,23 @@ export async function subscribeToPushNotifications(user) {
     // Get VAPID public key from server
     let vapidData;
     try {
+      console.log('[Push Service] Fetching VAPID key from: /push/vapid-public-key');
       const response = await api.get('/push/vapid-public-key');
+      console.log('[Push Service] VAPID response:', response);
       vapidData = response.data;
+      console.log('[Push Service] VAPID data:', vapidData);
     } catch (error) {
-      console.error('Failed to fetch VAPID key:', error);
-      throw new Error(`Failed to get VAPID public key from server: ${error.message}`);
+      console.error('[Push Service] Failed to fetch VAPID key:', error);
+      console.error('[Push Service] Error response:', error.response?.data);
+      console.error('[Push Service] Error status:', error.response?.status);
+      throw new Error(`Failed to get VAPID public key from server: ${error.response?.data?.message || error.message}`);
     }
 
     const vapidPublicKey = vapidData?.publicKey;
+    console.log('[Push Service] Extracted public key:', vapidPublicKey ? `${vapidPublicKey.substring(0, 20)}...` : 'EMPTY');
 
     if (!vapidPublicKey) {
+      console.error('[Push Service] vapidData:', vapidData);
       throw new Error('VAPID public key is empty or not configured on server');
     }
 

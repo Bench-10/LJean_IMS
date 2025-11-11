@@ -383,19 +383,26 @@ export const sendAlertPushNotification = async (alert) => {
  * @returns {string} - VAPID public key
  */
 export const getVapidPublicKey = () => {
-    console.log('[getVapidPublicKey] Called - Current value:', VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE' ? 'PLACEHOLDER' : 'CONFIGURED');
+    // Get fresh value from environment (in case module was loaded before env vars)
+    const currentKey = process.env.VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY;
     
-    if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE') {
+    console.log('[getVapidPublicKey] Called');
+    console.log('[getVapidPublicKey] process.env.VAPID_PUBLIC_KEY exists:', !!process.env.VAPID_PUBLIC_KEY);
+    console.log('[getVapidPublicKey] VAPID_PUBLIC_KEY constant:', VAPID_PUBLIC_KEY?.substring(0, 20) + '...');
+    console.log('[getVapidPublicKey] currentKey:', currentKey?.substring(0, 20) + '...');
+    
+    if (!currentKey || currentKey === 'YOUR_PUBLIC_KEY_HERE' || currentKey.length < 50) {
         const error = new Error('VAPID public key not configured. Please set VAPID_PUBLIC_KEY in environment variables.');
         console.error('[getVapidPublicKey]', error.message);
         console.error('[getVapidPublicKey] Debugging info:');
-        console.error('  - process.env.VAPID_PUBLIC_KEY:', process.env.VAPID_PUBLIC_KEY ? 'EXISTS' : 'UNDEFINED');
+        console.error('  - process.env.VAPID_PUBLIC_KEY:', process.env.VAPID_PUBLIC_KEY);
         console.error('  - VAPID_PUBLIC_KEY constant:', VAPID_PUBLIC_KEY);
+        console.error('  - currentKey:', currentKey);
         throw error;
     }
     
-    console.log('[getVapidPublicKey] Returning key (first 20 chars):', VAPID_PUBLIC_KEY.substring(0, 20) + '...');
-    return VAPID_PUBLIC_KEY;
+    console.log('[getVapidPublicKey] ✅ Returning valid key');
+    return currentKey;
 };
 
 /**
