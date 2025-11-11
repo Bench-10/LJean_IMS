@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime.js';
 import isToday from 'dayjs/plugin/isToday.js';
 import isYesterday from 'dayjs/plugin/isYesterday.js';
+import { sendAlertPushNotification } from '../pushNotificationService.js';
 
 
 const normalizeRoles = (roles) => {
@@ -261,4 +262,19 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
   );
 
   return alertIds.length;
+};
+
+/**
+ * Send push notification for a new alert
+ * This should be called after creating an alert in Inventory_Alerts table
+ * @param {Object} alert - Alert object from Inventory_Alerts table
+ */
+export const sendPushForAlert = async (alert) => {
+  try {
+    // Call the push notification service
+    await sendAlertPushNotification(alert);
+  } catch (error) {
+    // Log error but don't throw - push notifications are optional/nice-to-have
+    console.error('Failed to send push notification for alert:', error);
+  }
 };

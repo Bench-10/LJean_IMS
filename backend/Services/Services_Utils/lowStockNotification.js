@@ -1,5 +1,6 @@
 import { SQLquery } from "../../db.js";
 import { broadcastNotification } from "../../server.js";
+import { sendPushForAlert } from "../products/notificationServices.js";
 
 
 
@@ -63,7 +64,7 @@ export const checkAndHandleLowStock = async (productId, branchId, options = {}) 
       );
 
       if (alertResult.rows[0]) {
-        broadcastNotification(branchId, {
+        const alertData = {
           alert_id: alertResult.rows[0].alert_id,
           alert_type: 'Low Stock Alert',
           message,
@@ -74,9 +75,16 @@ export const checkAndHandleLowStock = async (productId, branchId, options = {}) 
           isDateToday: true,
           alert_date_formatted: 'Just now',
           target_roles: ['Branch Manager', 'Inventory Staff'],
-          creator_id: triggeredByUserId
-        });
+          creator_id: triggeredByUserId,
+          product_id: productId,
+          branch_id: branchId
+        };
 
+        // Broadcast WebSocket notification
+        broadcastNotification(branchId, alertData);
+
+        // Send push notification
+        sendPushForAlert(alertResult.rows[0]);
       }
 
     }
