@@ -43,19 +43,45 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
+  // Only handle same-origin GET requests to avoid interfering with API calls or third-party assets.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone the response
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME)
-          .then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+        // Cache only successful responses so we can serve them offline later.
+        const shouldCache = response.status === 200 && requestUrl.pathname.startsWith('/');
+        if (shouldCache) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME)
+            .then((cache) => {
+              cache.put(event.request, responseToCache);
+            })
+            .catch((error) => {
+              console.warn('[Service Worker] Failed to cache resource:', requestUrl.href, error);
+            });
+        }
         return response;
       })
       .catch(() => {
-        return caches.match(event.request);
+        return caches.match(event.request)
+          .then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // Fall back to cached index.html for navigation requests so the SPA can bootstrap offline.
+            if (event.request.mode === 'navigate') {
+              return caches.match('/index.html');
+            }
+            return Response.error();
+          });
       })
   );
 });
