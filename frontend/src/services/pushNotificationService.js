@@ -97,23 +97,30 @@ export async function subscribeToPushNotifications(user) {
     try {
       console.log('[Push Service] Fetching VAPID key from: /push/vapid-public-key');
       const response = await api.get('/push/vapid-public-key');
-      console.log('[Push Service] VAPID response:', response);
+      console.log('[Push Service] Response status:', response.status);
+      console.log('[Push Service] Response data:', response.data);
       vapidData = response.data;
-      console.log('[Push Service] VAPID data:', vapidData);
     } catch (error) {
-      console.error('[Push Service] Failed to fetch VAPID key:', error);
+      console.error('[Push Service] ❌ Failed to fetch VAPID key');
+      console.error('[Push Service] Error:', error);
       console.error('[Push Service] Error response:', error.response?.data);
       console.error('[Push Service] Error status:', error.response?.status);
-      throw new Error(`Failed to get VAPID public key from server: ${error.response?.data?.message || error.message}`);
+      const serverMessage = error.response?.data?.message || error.response?.data?.error;
+      throw new Error(`Server error: ${serverMessage || error.message}`);
     }
 
+    console.log('[Push Service] Success:', vapidData?.success);
+    console.log('[Push Service] Public key exists:', !!vapidData?.publicKey);
+    
     const vapidPublicKey = vapidData?.publicKey;
-    console.log('[Push Service] Extracted public key:', vapidPublicKey ? `${vapidPublicKey.substring(0, 20)}...` : 'EMPTY');
 
-    if (!vapidPublicKey) {
-      console.error('[Push Service] vapidData:', vapidData);
-      throw new Error('VAPID public key is empty or not configured on server');
+    if (!vapidPublicKey || vapidPublicKey === 'undefined' || vapidPublicKey === 'null') {
+      console.error('[Push Service] ❌ Invalid public key in response');
+      console.error('[Push Service] Full vapidData:', JSON.stringify(vapidData, null, 2));
+      throw new Error(`VAPID public key is empty or not configured on server. Server response: ${JSON.stringify(vapidData)}`);
     }
+    
+    console.log('[Push Service] ✅ Got valid key:', vapidPublicKey.substring(0, 20) + '...');
 
     // Subscribe to push notifications
     const subscription = await registration.pushManager.subscribe({

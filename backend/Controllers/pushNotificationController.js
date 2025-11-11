@@ -148,7 +148,13 @@ export const sendTestNotification = async (req, res) => {
  */
 export const getPublicKey = async (req, res) => {
     try {
+        console.log('[getPublicKey Controller] Request received');
+        console.log('[getPublicKey Controller] Calling getVapidPublicKey()...');
+        
         const publicKey = getVapidPublicKey();
+        
+        console.log('[getPublicKey Controller] Got key:', publicKey ? `${publicKey.substring(0, 20)}...` : 'EMPTY');
+        console.log('[getPublicKey Controller] Sending response');
         
         res.status(200).json({
             success: true,
@@ -156,10 +162,11 @@ export const getPublicKey = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error in getPublicKey controller:', error);
+        console.error('[getPublicKey Controller] ❌ Error:', error.message);
+        console.error('[getPublicKey Controller] Stack:', error.stack);
         res.status(500).json({
             success: false,
-            message: 'Failed to retrieve public key',
+            message: error.message || 'Failed to retrieve public key',
             error: error.message
         });
     }
