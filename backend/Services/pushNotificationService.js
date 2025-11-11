@@ -367,6 +367,9 @@ export const sendAlertPushNotification = async (alert) => {
  * @returns {string} - VAPID public key
  */
 export const getVapidPublicKey = () => {
+    if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE') {
+        throw new Error('VAPID public key not configured. Please set VAPID_PUBLIC_KEY in environment variables.');
+    }
     return VAPID_PUBLIC_KEY;
 };
 

@@ -1,4 +1,4 @@
-import { api } from '../utils/api';
+import api from '../utils/api';
 
 /**
  * Convert VAPID public key from base64 to Uint8Array
@@ -93,11 +93,19 @@ export async function subscribeToPushNotifications(user) {
     const registration = await navigator.serviceWorker.ready;
 
     // Get VAPID public key from server
-    const { data: vapidData } = await api.get('/push/vapid-public-key');
-    const vapidPublicKey = vapidData.publicKey;
+    let vapidData;
+    try {
+      const response = await api.get('/push/vapid-public-key');
+      vapidData = response.data;
+    } catch (error) {
+      console.error('Failed to fetch VAPID key:', error);
+      throw new Error(`Failed to get VAPID public key from server: ${error.message}`);
+    }
+
+    const vapidPublicKey = vapidData?.publicKey;
 
     if (!vapidPublicKey) {
-      throw new Error('Failed to get VAPID public key');
+      throw new Error('VAPID public key is empty or not configured on server');
     }
 
     // Subscribe to push notifications
