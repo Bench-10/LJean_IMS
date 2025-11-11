@@ -57,15 +57,50 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
           duration: 5200
         });
 
-        //  BROWSER NOTIFICATION
+        //  BROWSER NOTIFICATION - Mobile-safe implementation
         if ('Notification' in window && window.Notification.permission === 'granted') {
-          const notification = new window.Notification('LJean Notification', {
-            body: newNotification.message,
-            icon: '/src/assets/images/ljean.png',
-            tag: newNotification.alert_id
-          });
+          try {
+            // Check if we have service worker support (mobile-friendly)
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+              // Use service worker notification (works better on mobile)
+              navigator.serviceWorker.ready.then((registration) => {
+                registration.showNotification('LJean Notification', {
+                  body: newNotification.message,
+                  icon: '/vite.svg',
+                  tag: String(newNotification.alert_id || Date.now()),
+                  badge: '/vite.svg',
+                  vibrate: [200, 100, 200],
+                  requireInteraction: false,
+                  data: {
+                    url: window.location.origin,
+                    alert_id: newNotification.alert_id
+                  }
+                }).catch((error) => {
+                  console.warn('[Notification] Service worker notification failed:', error);
+                });
+              }).catch((error) => {
+                console.warn('[Notification] Service worker not ready:', error);
+              });
+            } else {
+              // Fallback to direct notification (desktop browsers)
+              const notification = new window.Notification('LJean Notification', {
+                body: newNotification.message,
+                icon: '/vite.svg',
+                tag: String(newNotification.alert_id || Date.now())
+              });
 
-          setTimeout(() => notification.close(), 5000);
+              setTimeout(() => {
+                try {
+                  notification.close();
+                } catch (e) {
+                  // Ignore close errors
+                }
+              }, 5000);
+            }
+          } catch (error) {
+            console.error('[Notification] Failed to show notification:', error);
+            // Don't break the app if notification fails
+          }
         }
       }
     }
