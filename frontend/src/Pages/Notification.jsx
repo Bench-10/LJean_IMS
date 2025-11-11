@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
 import { toast } from 'react-hot-toast';
+import PushNotificationControls from '../components/PushNotificationControls';
 
 function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNotificationNavigate }) {
 
@@ -215,24 +216,29 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
 
             {/*HEADER*/}
             <div className='px-4 sm:px-6 lg:px-8 py-4 sm:py-5 lg:py-6 border-b border-gray-200 flex-shrink-0'>
-              <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
-                <div>
-                  <h1 className='text-3xl sm:text-2xl lg:text-3xl font-bold text-gray-800'>
-                    Notifications
-                  </h1>
-                  <p className='text-xs sm:text-sm text-gray-700 mt-1'>
-                    You have <span className='font-bold'>{unreadCount}</span> unread messages.
-                  </p>
+              <div className='flex flex-col gap-4'>
+                <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
+                  <div>
+                    <h1 className='text-3xl sm:text-2xl lg:text-3xl font-bold text-gray-800'>
+                      Notifications
+                    </h1>
+                    <p className='text-xs sm:text-sm text-gray-700 mt-1'>
+                      You have <span className='font-bold'>{unreadCount}</span> unread messages.
+                    </p>
+                  </div>
+
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className='w-full sm:w-auto px-4 py-2 mr-0 sm:mr-6 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors'
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
                 </div>
 
-                {unreadCount > 0 && (
-                  <button
-                    onClick={markAllAsRead}
-                    className='w-full sm:w-auto px-4 py-2 mr-0 sm:mr-6 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors'
-                  >
-                    Mark All as Read
-                  </button>
-                )}
+                {/* Push Notification Controls */}
+                <PushNotificationControls />
               </div>
             </div>
 

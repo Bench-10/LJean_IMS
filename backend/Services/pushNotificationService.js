@@ -1,5 +1,5 @@
 import webPush from 'web-push';
-import SQLquery from '../../backend/db.js';
+import { SQLquery } from '../db.js';
 import dayjs from 'dayjs';
 
 // VAPID Keys Configuration
