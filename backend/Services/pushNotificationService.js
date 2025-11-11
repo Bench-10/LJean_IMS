@@ -2,34 +2,13 @@ import webPush from 'web-push';
 import { SQLquery } from '../db.js';
 import dayjs from 'dayjs';
 
-// VAPID Keys Configuration
-// Generate keys using: npx web-push generate-vapid-keys
-// Store these in environment variables for production
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'YOUR_PUBLIC_KEY_HERE';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'YOUR_PRIVATE_KEY_HERE';
+// Configure web-push only when keys are available
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@ljean.com';
 
-// Log VAPID configuration status on module load (helps diagnose issues)
-console.log('[Push Notifications] VAPID Configuration:');
-console.log('  - Public Key:', VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_KEY_HERE' ? '❌ NOT CONFIGURED (using placeholder)' : '✅ Configured');
-console.log('  - Private Key:', VAPID_PRIVATE_KEY === 'YOUR_PRIVATE_KEY_HERE' ? '❌ NOT CONFIGURED (using placeholder)' : '✅ Configured');
-console.log('  - Subject:', VAPID_SUBJECT);
-
-// Configure web-push
-try {
-  webPush.setVapidDetails(
-    VAPID_SUBJECT,
-    VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY
-  );
-  if (VAPID_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY_HERE') {
-    console.log('[Push Notifications] ✅ web-push configured successfully');
-  } else {
-    console.warn('[Push Notifications] ⚠️  Using placeholder VAPID keys - push notifications will NOT work!');
-    console.warn('[Push Notifications] ⚠️  Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in environment variables');
-  }
-} catch (error) {
-  console.error('[Push Notifications] ❌ Failed to configure web-push:', error.message);
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+    webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
 
 /**
@@ -383,25 +362,12 @@ export const sendAlertPushNotification = async (alert) => {
  * @returns {string} - VAPID public key
  */
 export const getVapidPublicKey = () => {
-    // Get fresh value from environment (in case module was loaded before env vars)
-    const currentKey = process.env.VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY;
-    
-    console.log('[getVapidPublicKey] Called');
-    console.log('[getVapidPublicKey] process.env.VAPID_PUBLIC_KEY exists:', !!process.env.VAPID_PUBLIC_KEY);
-    console.log('[getVapidPublicKey] VAPID_PUBLIC_KEY constant:', VAPID_PUBLIC_KEY?.substring(0, 20) + '...');
-    console.log('[getVapidPublicKey] currentKey:', currentKey?.substring(0, 20) + '...');
-    
+    const currentKey = process.env.VAPID_PUBLIC_KEY;
+
     if (!currentKey || currentKey === 'YOUR_PUBLIC_KEY_HERE' || currentKey.length < 50) {
-        const error = new Error('VAPID public key not configured. Please set VAPID_PUBLIC_KEY in environment variables.');
-        console.error('[getVapidPublicKey]', error.message);
-        console.error('[getVapidPublicKey] Debugging info:');
-        console.error('  - process.env.VAPID_PUBLIC_KEY:', process.env.VAPID_PUBLIC_KEY);
-        console.error('  - VAPID_PUBLIC_KEY constant:', VAPID_PUBLIC_KEY);
-        console.error('  - currentKey:', currentKey);
-        throw error;
+        throw new Error('VAPID public key not configured. Set VAPID_PUBLIC_KEY in environment variables.');
     }
-    
-    console.log('[getVapidPublicKey] ✅ Returning valid key');
+
     return currentKey;
 };
 

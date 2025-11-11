@@ -39,6 +39,11 @@ function PushNotificationControls() {
   };
 
   const handleEnable = async () => {
+    if (!user) {
+      toast.error('You must be logged in to enable notifications');
+      return;
+    }
+
     setIsLoading(true);
     try {
       // 1. Request permission
@@ -51,6 +56,9 @@ function PushNotificationControls() {
       // 2. Get service worker and VAPID key
       const registration = await navigator.serviceWorker.ready;
       const { data } = await api.get('/push/vapid-public-key');
+      if (!data?.publicKey) {
+        throw new Error('Server did not return VAPID public key');
+      }
       
       // 3. Subscribe to push
       const subscription = await registration.pushManager.subscribe({
@@ -62,7 +70,7 @@ function PushNotificationControls() {
       await api.post('/push/subscribe', {
         userId: user?.user_id,
         adminId: user?.admin_id,
-        userType: user?.admin_id ? 'admin' : 'user',
+  userType: user?.admin_id ? 'admin' : 'user',
         subscription: subscription.toJSON(),
         deviceInfo: {
           userAgent: navigator.userAgent,
