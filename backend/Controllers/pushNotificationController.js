@@ -15,10 +15,12 @@ import {
 export const subscribe = async (req, res) => {
     try {
         const { subscription, deviceInfo } = req.body;
-        const { userId, adminId, role } = req.user;
-
-        // Determine user type based on role
-        const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
+        const roleField = req.user?.role;
+        const normalizedRoles = Array.isArray(roleField) ? roleField : [roleField].filter(Boolean);
+        const isAdmin = req.user?.user_type === 'admin' || normalizedRoles.some(r => r?.includes('Owner') || r?.includes('Admin'));
+        const userType = isAdmin ? 'admin' : 'user';
+        const userId = !isAdmin ? req.user?.user_id : null;
+        const adminId = isAdmin ? (req.user?.admin_id ?? req.user?.id ?? null) : null;
 
         const result = await subscribeToPush({
             userId: userType === 'user' ? userId : null,
@@ -75,10 +77,12 @@ export const unsubscribe = async (req, res) => {
  */
 export const getSubscriptions = async (req, res) => {
     try {
-        const { userId, adminId, role } = req.user;
-
-        // Determine user type based on role
-        const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
+        const roleField = req.user?.role;
+        const normalizedRoles = Array.isArray(roleField) ? roleField : [roleField].filter(Boolean);
+        const isAdmin = req.user?.user_type === 'admin' || normalizedRoles.some(r => r?.includes('Owner') || r?.includes('Admin'));
+        const userType = isAdmin ? 'admin' : 'user';
+        const userId = !isAdmin ? req.user?.user_id : null;
+        const adminId = isAdmin ? (req.user?.admin_id ?? req.user?.id ?? null) : null;
 
         const result = await getUserSubscriptions(
             userType === 'user' ? userId : null,
@@ -106,10 +110,12 @@ export const getSubscriptions = async (req, res) => {
 export const sendTestNotification = async (req, res) => {
     try {
         const { title, message } = req.body;
-        const { userId, adminId, role } = req.user;
-
-        // Determine user type based on role
-        const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
+        const roleField = req.user?.role;
+        const normalizedRoles = Array.isArray(roleField) ? roleField : [roleField].filter(Boolean);
+        const isAdmin = req.user?.user_type === 'admin' || normalizedRoles.some(r => r?.includes('Owner') || r?.includes('Admin'));
+        const userType = isAdmin ? 'admin' : 'user';
+        const userId = !isAdmin ? req.user?.user_id : null;
+        const adminId = isAdmin ? (req.user?.admin_id ?? req.user?.id ?? null) : null;
 
         const notificationData = {
             title: title || 'Test Notification',

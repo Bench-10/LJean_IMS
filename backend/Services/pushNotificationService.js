@@ -28,6 +28,14 @@ export const subscribeToPush = async (subscriptionData) => {
             throw new Error('Invalid user type. Must be "user" or "admin"');
         }
 
+        if (userType === 'user' && !userId) {
+            throw new Error('Missing user ID for user push subscription');
+        }
+
+        if (userType === 'admin' && !adminId) {
+            throw new Error('Missing admin ID for admin push subscription');
+        }
+
         // Validate subscription object
         if (!subscription || !subscription.endpoint || !subscription.keys) {
             throw new Error('Invalid subscription object');
