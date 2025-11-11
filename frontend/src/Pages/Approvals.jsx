@@ -2,22 +2,20 @@ import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ChartLoading from "../components/common/ChartLoading";
 import NoInfoFound from "../components/common/NoInfoFound";
-import { MdInfoOutline, MdRefresh } from "react-icons/md";
+import { MdInfoOutline } from "react-icons/md";
 import { useAuth } from "../authentication/Authentication";
 import RejectionReasonDialog from "../components/dialogs/RejectionReasonDialog";
 
+/* ── Unified button styles: identical sizes everywhere ─────────────────────── */
+const BTN_BASE =
+  "h-9 min-w-[140px] px-4 rounded-lg text-white font-semibold text-sm " +
+  "shadow-sm disabled:opacity-70 disabled:cursor-not-allowed transition-colors whitespace-nowrap";
+const BTN_APPROVE_GREEN  = `${BTN_BASE} bg-green-600 hover:bg-green-700`;
+const BTN_APPROVE_ORANGE = `${BTN_BASE} bg-amber-500 hover:bg-amber-600`;
+const BTN_REJECT_RED     = `${BTN_BASE} bg-red-600 hover:bg-red-700`;
+
 /**
  * APPROVAL CENTER - Real-time Approval Management
- * 
- * This component displays pending user account and inventory requests for Owner approval.
- * All updates are handled in real-time via WebSocket:
- * - New requests automatically appear when created by Branch Managers
- * - Approved requests instantly disappear from the pending list
- * - Rejected requests are removed immediately
- * - Cancelled requests are removed in real-time
- * 
- * WebSocket events: 'user-approval-request', 'user-approval-updated'
- * No manual refresh needed - the page updates automatically!
  */
 function Approvals({
   userRequests = [],
@@ -68,14 +66,9 @@ function Approvals({
     setSearchItem(sanitizeInput(event.target.value));
   };
 
-  // Manual refresh function (kept as fallback, but WebSocket handles real-time updates automatically)
   const handleRefreshAll = useCallback(() => {
-    if (typeof refreshInventoryRequests === 'function') {
-      refreshInventoryRequests();
-    }
-    if (typeof refreshUserRequests === 'function') {
-      refreshUserRequests();
-    }
+    if (typeof refreshInventoryRequests === "function") refreshInventoryRequests();
+    if (typeof refreshUserRequests === "function") refreshUserRequests();
   }, [refreshInventoryRequests, refreshUserRequests]);
 
   const formatDateTime = (value) => {
@@ -88,42 +81,34 @@ function Approvals({
         hour: "numeric",
         minute: "2-digit"
       });
-    } catch (error) {
+    } catch {
       return value;
     }
   };
 
   const pendingUsers = useMemo(() => {
     if (!Array.isArray(userRequests)) return [];
-
     const normalizedSearch = searchItem.toLowerCase();
 
     return userRequests
       .filter((request) => {
-        // Consider multiple possible status fields (request_status, status, resolution_status)
-        // and ensure only truly pending requests appear in the Owner approvals list.
-        const status = String(request?.request_status ?? request?.status ?? request?.resolution_status ?? '').toLowerCase();
-        return status === 'pending';
+        const status = String(request?.request_status ?? request?.status ?? request?.resolution_status ?? "").toLowerCase();
+        return status === "pending";
       })
       .filter((request) => {
         if (!normalizedSearch) return true;
-
-        const fullName = String(request?.full_name ?? '').toLowerCase();
-        const branchName = String(request?.branch_name ?? request?.branch ?? '').toLowerCase();
+        const fullName = String(request?.full_name ?? "").toLowerCase();
+        const branchName = String(request?.branch_name ?? request?.branch ?? "").toLowerCase();
         const roleLabel = Array.isArray(request?.role)
-          ? request.role.join(', ').toLowerCase()
-          : String(request?.role ?? '').toLowerCase();
-
-        return fullName.includes(normalizedSearch)
-          || branchName.includes(normalizedSearch)
-          || roleLabel.includes(normalizedSearch);
+          ? request.role.join(", ").toLowerCase()
+          : String(request?.role ?? "").toLowerCase();
+        return fullName.includes(normalizedSearch) || branchName.includes(normalizedSearch) || roleLabel.includes(normalizedSearch);
       });
   }, [userRequests, searchItem]);
 
   const handleApprove = async (event, pendingUser) => {
     event.stopPropagation();
     if (!approvePendingAccount) return;
-
     try {
       setApprovingUserId(pendingUser.user_id);
       await approvePendingAccount(pendingUser.user_id);
@@ -136,25 +121,20 @@ function Approvals({
 
   const pendingInventoryRequests = useMemo(() => {
     if (!Array.isArray(inventoryRequests)) return [];
-
     const normalizedSearch = searchItem.toLowerCase();
 
     return inventoryRequests
       .filter((request) => {
-        // Normalize various possible status fields so cancelled/rejected items are excluded.
-        const status = String(request?.status ?? request?.request_status ?? request?.resolution_status ?? '').toLowerCase();
+        const status = String(request?.status ?? request?.request_status ?? request?.resolution_status ?? "").toLowerCase();
         return request.current_stage === "admin_review" && status === "pending";
       })
       .filter((request) => {
         if (!normalizedSearch) return true;
-
         const payload = request.payload || {};
         const productData = payload.productData || payload;
-
         const productNameMatch = productData?.product_name?.toLowerCase().includes(normalizedSearch);
         const branchMatch = request.branch_name?.toLowerCase().includes(normalizedSearch);
         const creatorMatch = request.created_by_name?.toLowerCase().includes(normalizedSearch);
-
         return productNameMatch || branchMatch || creatorMatch;
       });
   }, [inventoryRequests, searchItem]);
@@ -167,13 +147,13 @@ function Approvals({
     };
 
     const userEntries = pendingUsers.map((record) => ({
-      kind: 'user',
+      kind: "user",
       createdAt: record.request_created_at ?? record.created_at ?? record.createdAt ?? null,
       record
     }));
 
     const inventoryEntries = pendingInventoryRequests.map((record) => ({
-      kind: 'inventory',
+      kind: "inventory",
       createdAt: record.created_at ?? null,
       record
     }));
@@ -186,60 +166,38 @@ function Approvals({
   const setPendingRowRef = useCallback((pendingId, node) => {
     const map = pendingRowRefs.current;
     if (!map) return;
-    if (node) {
-      map.set(pendingId, node);
-    } else {
-      map.delete(pendingId);
-    }
+    if (node) map.set(pendingId, node);
+    else map.delete(pendingId);
   }, []);
 
   const setPendingMobileRef = useCallback((pendingId, node) => {
     const map = pendingMobileRefs.current;
     if (!map) return;
-    if (node) {
-      map.set(pendingId, node);
-    } else {
-      map.delete(pendingId);
-    }
+    if (node) map.set(pendingId, node);
+    else map.delete(pendingId);
   }, []);
 
   const setPendingUserRowRef = useCallback((userId, node) => {
     const map = pendingUserRowRefs.current;
     if (!map) return;
-    if (node) {
-      map.set(userId, node);
-    } else {
-      map.delete(userId);
-    }
+    if (node) map.set(userId, node);
+    else map.delete(userId);
   }, []);
 
   const setPendingUserMobileRef = useCallback((userId, node) => {
     const map = pendingUserMobileRefs.current;
     if (!map) return;
-    if (node) {
-      map.set(userId, node);
-    } else {
-      map.delete(userId);
-    }
+    if (node) map.set(userId, node);
+    else map.delete(userId);
   }, []);
 
+  // Highlight: user approvals
   useEffect(() => {
-    if (!highlightDirective || highlightDirective.type !== 'owner-approvals') {
-      return;
-    }
-
-    const focusKind = highlightDirective.focusKind || 'inventory';
-    if (focusKind !== 'user') {
-      return;
-    }
-
-  if (userRequestsLoading) {
-      return;
-    }
-
-    if (lastHandledHighlightRef.current === highlightDirective.triggeredAt) {
-      return;
-    }
+    if (!highlightDirective || highlightDirective.type !== "owner-approvals") return;
+    const focusKind = highlightDirective.focusKind || "inventory";
+    if (focusKind !== "user") return;
+    if (userRequestsLoading) return;
+    if (lastHandledHighlightRef.current === highlightDirective.triggeredAt) return;
 
     const directiveTargetIds = Array.isArray(highlightDirective.targetIds)
       ? highlightDirective.targetIds
@@ -251,24 +209,21 @@ function Approvals({
       : [];
 
     const targetUserId = Number(highlightDirective.userId);
-    const normalizedName = (highlightDirective.userName || '').toLowerCase();
+    const normalizedName = (highlightDirective.userName || "").toLowerCase();
 
     const matchesDirective = (record) => {
       if (!record) return false;
       const numericId = Number(record.user_id);
-      if (directiveTargetIds.length > 0) {
-        return directiveTargetIds.includes(numericId);
-      }
-      if (Number.isFinite(targetUserId) && numericId === targetUserId) {
-        return true;
-      }
-      if (!normalizedName) {
-        return false;
-      }
-      return (record.full_name || '').toLowerCase() === normalizedName;
+      if (directiveTargetIds.length > 0) return directiveTargetIds.includes(numericId);
+      if (Number.isFinite(targetUserId) && numericId === targetUserId) return true;
+      if (!normalizedName) return false;
+      return (record.full_name || "").toLowerCase() === normalizedName;
     };
 
-    let candidateIds = pendingUsers.filter(matchesDirective).map((record) => Number(record.user_id)).filter((value) => Number.isFinite(value));
+    let candidateIds = pendingUsers
+      .filter(matchesDirective)
+      .map((record) => Number(record.user_id))
+      .filter((value) => Number.isFinite(value));
 
     if (candidateIds.length === 0 && directiveTargetIds.length > 0) {
       candidateIds = directiveTargetIds.filter((id) => pendingUsers.some((record) => Number(record.user_id) === id));
@@ -277,25 +232,21 @@ function Approvals({
     lastHandledHighlightRef.current = highlightDirective.triggeredAt;
 
     if (candidateIds.length === 0) {
-      onHighlightConsumed?.('owner-approvals');
+      onHighlightConsumed?.("owner-approvals");
       return;
     }
 
     setHighlightedUserIds(candidateIds);
     setHighlightedInventoryIds([]);
 
-    const isMobileView = typeof window !== 'undefined'
-      ? window.matchMedia('(max-width: 767px)').matches
-      : false;
+    const isMobileView = typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : false;
 
     const firstId = candidateIds[0];
     const preferredElement = isMobileView
-      ? (pendingUserMobileRefs.current.get(firstId) || pendingUserRowRefs.current.get(firstId))
-      : (pendingUserRowRefs.current.get(firstId) || pendingUserMobileRefs.current.get(firstId));
+      ? pendingUserMobileRefs.current.get(firstId) || pendingUserRowRefs.current.get(firstId)
+      : pendingUserRowRefs.current.get(firstId) || pendingUserMobileRefs.current.get(firstId);
 
-    const fallbackElement = isMobileView
-      ? pendingUserRowRefs.current.get(firstId)
-      : pendingUserMobileRefs.current.get(firstId);
+    const fallbackElement = isMobileView ? pendingUserRowRefs.current.get(firstId) : pendingUserMobileRefs.current.get(firstId);
 
     const targetElement = preferredElement || fallbackElement;
     const scrollContainer = isMobileView ? mobileScrollContainerRef.current : tableScrollContainerRef.current;
@@ -305,20 +256,19 @@ function Approvals({
         const offset = targetElement.offsetTop - scrollContainer.offsetTop;
         scrollContainer.scrollTo({
           top: Math.max(offset - scrollContainer.clientHeight / 3, 0),
-          behavior: 'smooth'
+          behavior: "smooth"
         });
         return;
       }
-
-      if (targetElement && typeof targetElement.scrollIntoView === 'function') {
-        targetElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (targetElement && typeof targetElement.scrollIntoView === "function") {
+        targetElement.scrollIntoView({ block: "center", behavior: "smooth" });
       }
     };
 
     const scrollTimer = setTimeout(scrollAction, 140);
     const clearTimer = setTimeout(() => setHighlightedUserIds([]), 6000);
 
-    onHighlightConsumed?.('owner-approvals');
+    onHighlightConsumed?.("owner-approvals");
 
     return () => {
       clearTimeout(scrollTimer);
@@ -326,23 +276,13 @@ function Approvals({
     };
   }, [highlightDirective, pendingUsers, userRequestsLoading, onHighlightConsumed]);
 
+  // Highlight: inventory approvals
   useEffect(() => {
-    if (!highlightDirective || highlightDirective.type !== 'owner-approvals') {
-      return;
-    }
-
-    const focusKind = highlightDirective.focusKind || 'inventory';
-    if (focusKind === 'user') {
-      return;
-    }
-
-    if (inventoryRequestsLoading) {
-      return;
-    }
-
-    if (lastHandledHighlightRef.current === highlightDirective.triggeredAt) {
-      return;
-    }
+    if (!highlightDirective || highlightDirective.type !== "owner-approvals") return;
+    const focusKind = highlightDirective.focusKind || "inventory";
+    if (focusKind === "user") return;
+    if (inventoryRequestsLoading) return;
+    if (lastHandledHighlightRef.current === highlightDirective.triggeredAt) return;
 
     const directiveTargetIds = Array.isArray(highlightDirective.targetIds)
       ? highlightDirective.targetIds
@@ -354,17 +294,13 @@ function Approvals({
       : [];
 
     const targetUserId = Number(highlightDirective.userId);
-    const normalizedName = (highlightDirective.userName || '').toLowerCase();
+    const normalizedName = (highlightDirective.userName || "").toLowerCase();
 
     const matchesDirective = (request) => {
       const createdBy = Number(request.created_by ?? request.created_by_id ?? request.user_id ?? null);
-      if (Number.isFinite(targetUserId) && createdBy === targetUserId) {
-        return true;
-      }
-      if (!normalizedName) {
-        return false;
-      }
-      return (request.created_by_name || '').toLowerCase() === normalizedName;
+      if (Number.isFinite(targetUserId) && createdBy === targetUserId) return true;
+      if (!normalizedName) return false;
+      return (request.created_by_name || "").toLowerCase() === normalizedName;
     };
 
     let targetIds = [];
@@ -380,25 +316,21 @@ function Approvals({
     lastHandledHighlightRef.current = highlightDirective.triggeredAt;
 
     if (targetIds.length === 0) {
-      onHighlightConsumed?.('owner-approvals');
+      onHighlightConsumed?.("owner-approvals");
       return;
     }
 
     setHighlightedInventoryIds(targetIds);
     setHighlightedUserIds([]);
 
-    const isMobileView = typeof window !== 'undefined'
-      ? window.matchMedia('(max-width: 767px)').matches
-      : false;
+    const isMobileView = typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : false;
 
     const firstId = targetIds[0];
     const preferredElement = isMobileView
-      ? (pendingMobileRefs.current.get(firstId) || pendingRowRefs.current.get(firstId))
-      : (pendingRowRefs.current.get(firstId) || pendingMobileRefs.current.get(firstId));
+      ? pendingMobileRefs.current.get(firstId) || pendingRowRefs.current.get(firstId)
+      : pendingRowRefs.current.get(firstId) || pendingMobileRefs.current.get(firstId);
 
-    const fallbackElement = isMobileView
-      ? pendingRowRefs.current.get(firstId)
-      : pendingMobileRefs.current.get(firstId);
+    const fallbackElement = isMobileView ? pendingRowRefs.current.get(firstId) : pendingMobileRefs.current.get(firstId);
 
     const targetElement = preferredElement || fallbackElement;
     const scrollContainer = isMobileView ? mobileScrollContainerRef.current : tableScrollContainerRef.current;
@@ -408,20 +340,20 @@ function Approvals({
         const offset = targetElement.offsetTop - scrollContainer.offsetTop;
         scrollContainer.scrollTo({
           top: Math.max(offset - scrollContainer.clientHeight / 3, 0),
-          behavior: 'smooth'
+          behavior: "smooth"
         });
         return;
       }
 
-      if (targetElement && typeof targetElement.scrollIntoView === 'function') {
-        targetElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (targetElement && typeof targetElement.scrollIntoView === "function") {
+        targetElement.scrollIntoView({ block: "center", behavior: "smooth" });
       }
     };
 
     const scrollTimer = setTimeout(scrollAction, 140);
     const clearTimer = setTimeout(() => setHighlightedInventoryIds([]), 6000);
 
-    onHighlightConsumed?.('owner-approvals');
+    onHighlightConsumed?.("owner-approvals");
 
     return () => {
       clearTimeout(scrollTimer);
@@ -431,7 +363,6 @@ function Approvals({
 
   const handleInventoryApprove = async (pendingId) => {
     if (!approveInventoryRequest) return;
-
     try {
       setProcessingInventoryId(pendingId);
       await approveInventoryRequest(pendingId);
@@ -444,19 +375,16 @@ function Approvals({
 
   const handleInventoryReject = (pendingId) => {
     if (!rejectInventoryRequest) return;
-
-    setRejectDialogContext({ type: 'inventory', targetId: pendingId });
+    setRejectDialogContext({ type: "inventory", targetId: pendingId });
     setRejectDialogOpen(true);
   };
 
   const handleUserReject = (event, pendingUser) => {
     if (!rejectPendingAccount) return;
     event?.stopPropagation?.();
-
     const targetId = Number(pendingUser?.user_id);
     if (!Number.isFinite(targetId)) return;
-
-    setRejectDialogContext({ type: 'user', targetId });
+    setRejectDialogContext({ type: "user", targetId });
     setRejectDialogOpen(true);
   };
 
@@ -477,19 +405,19 @@ function Approvals({
     setRejectDialogLoading(true);
 
     try {
-      if (rejectDialogContext.type === 'inventory') {
+      if (rejectDialogContext.type === "inventory") {
         if (!rejectInventoryRequest) return;
         setProcessingInventoryId(targetId);
         await rejectInventoryRequest(targetId, reason);
-        if (typeof refreshInventoryRequests === 'function') {
+        if (typeof refreshInventoryRequests === "function") {
           await refreshInventoryRequests();
         }
         setProcessingInventoryId(null);
-      } else if (rejectDialogContext.type === 'user') {
+      } else if (rejectDialogContext.type === "user") {
         if (!rejectPendingAccount) return;
         setRejectingUserId(targetId);
         await rejectPendingAccount(targetId, reason);
-        if (typeof refreshUserRequests === 'function') {
+        if (typeof refreshUserRequests === "function") {
           await refreshUserRequests();
         }
         setRejectingUserId(null);
@@ -497,7 +425,7 @@ function Approvals({
 
       handleRejectDialogCancel();
     } catch (error) {
-      console.error('Error rejecting request:', error);
+      console.error("Error rejecting request:", error);
     } finally {
       setRejectDialogLoading(false);
       setProcessingInventoryId(null);
@@ -513,51 +441,33 @@ function Approvals({
       </div>
 
       {/* Search + Actions */}
-<div className="flex w-full flex-col gap-3 sm:gap-4 md:flex-row md:items-center">
-  {/* Search */}
-  <div className="w-full md:w-[360px] lg:w-[460px] md:mr-auto">
-    <input
-      type="text"
-      placeholder="Search pending request by name, branch, or role"
-      className="border outline outline-1 outline-gray-400 
-        focus:border-green-500 focus:ring-2 focus:ring-green-200 
-        transition-all px-3 mb-2 sm:mb-0 rounded-lg w-full h-[35px] text-sm sm:text-sm"
-      onChange={handleSearch}
-      value={searchItem}
-    />
-  </div>
+      <div className="flex w-full flex-col gap-3 sm:gap-4 md:flex-row md:items-center">
+        {/* Search */}
+        <div className="w-full md:w-[360px] lg:w-[460px] md:mr-auto">
+          <input
+            type="text"
+            placeholder="Search pending request by name, branch, or role"
+            className="border outline outline-1 outline-gray-400 
+              focus:border-green-500 focus:ring-2 focus:ring-green-200 
+              transition-all px-3 mb-2 sm:mb-0 rounded-lg w-full h-[35px] text-sm sm:text-sm"
+            onChange={handleSearch}
+            value={searchItem}
+          />
+        </div>
 
-  {/* Actions */}
-  {ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function" && (
-    <div className="flex items-center gap-2 md:ml-auto">
-      {/* Manual refresh button removed - using real-time WebSocket updates */}
-      {/* Uncomment if needed as fallback:
-      {(typeof refreshInventoryRequests === "function" || typeof refreshUserRequests === "function") && (
-        <button
-          type="button"
-          className="inline-flex items-center justify-center px-2 w-9 h-9 rounded-md border border-gray-500 text-gray-600 hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleRefreshAll}
-          disabled={inventoryRequestsLoading || userRequestsLoading}
-          aria-label="Refresh inventory approvals"
-          title="Refresh inventory approvals"
-        >
-          <MdRefresh className={`text-xl ${(inventoryRequestsLoading || userRequestsLoading) ? "animate-spin" : ""}`} />
-          <span className="sr-only">Refresh inventory approvals</span>
-        </button>
-      )}
-      */}
-
-      <button
-        type="button"
-        className="w-full px-4 py-2 text-sm rounded-md bg-emerald-700 text-white font-medium transition hover:bg-emerald-600"
-        onClick={onOpenRequestMonitor}
-      >
-        View request status
-      </button>
-    </div>
-  )}
-</div>
-
+        {/* Actions */}
+        {ownerCanOpenRequestMonitor && typeof onOpenRequestMonitor === "function" && (
+          <div className="flex items-center gap-2 md:ml-auto">
+            <button
+              type="button"
+              className="w-full px-4 py-2 text-sm rounded-md bg-emerald-700 text-white font-medium transition hover:bg-emerald-600"
+              onClick={onOpenRequestMonitor}
+            >
+              View request status
+            </button>
+          </div>
+        )}
+      </div>
 
       <hr className="border-t-2 my-3 sm:my-4 w-full border-gray-500 rounded-lg" />
 
@@ -588,14 +498,10 @@ function Approvals({
               <NoInfoFound col={6} message="No pending approvals at the moment." />
             ) : (
               combinedRequests.map((entry) => {
-                if (entry.kind === 'user') {
+                if (entry.kind === "user") {
                   const pendingUser = entry.record;
-                  const rolesLabel = Array.isArray(pendingUser.role)
-                    ? pendingUser.role.join(", ")
-                    : pendingUser.role ?? "";
-
-                  const creatorName = pendingUser.created_by_name || 'Branch Manager';
-
+                  const rolesLabel = Array.isArray(pendingUser.role) ? pendingUser.role.join(", ") : pendingUser.role ?? "";
+                  const creatorName = pendingUser.created_by_name || "Branch Manager";
                   const numericUserId = Number(pendingUser.user_id);
                   const hasNumericId = Number.isFinite(numericUserId);
                   const isUserHighlighted = hasNumericId && highlightedUserIds.includes(numericUserId);
@@ -606,44 +512,44 @@ function Approvals({
                     <tr
                       key={`user-${pendingUser.user_id}`}
                       ref={(node) => {
-                        if (hasNumericId) {
-                          setPendingUserRowRef(numericUserId, node);
-                        }
+                        if (hasNumericId) setPendingUserRowRef(numericUserId, node);
                       }}
                       className={`h-auto border-b last:border-b-0 hover:bg-amber-50 transition-colors cursor-pointer bg-amber-50/30 ${
-                        isUserHighlighted ? 'ring-2 ring-amber-400 ring-offset-2 animate-pulse' : ''
+                        isUserHighlighted ? "ring-2 ring-amber-400 ring-offset-2 animate-pulse" : ""
                       }`}
                       onClick={() => navigate(`/user_management?selected=${pendingUser.user_id}`)}
                     >
                       <td className="px-4 py-4 align-top">
                         <div className="flex flex-col gap-2">
                           <span className="font-semibold text-gray-800 text-base">{pendingUser.full_name}</span>
-                          <span className="inline-flex w-max items-center gap-2 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold px-3 py-1 border border-emerald-200">
+                          <span className="inline-flex w-max items-center gap-2 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1 border border-amber-200">
                             User Account Approval
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-gray-700 whitespace-nowrap align-top font-medium">{pendingUser.branch || '—'}</td>
+                      <td className="px-4 py-4 text-gray-700 whitespace-nowrap align-top font-medium">
+                        {pendingUser.branch || "—"}
+                      </td>
                       <td className="px-4 py-4 text-gray-600 whitespace-nowrap align-top">{creatorName}</td>
                       <td className="px-4 py-4 text-gray-700 align-top">
-                        <span className="text-sm">Roles: {rolesLabel || '—'}</span>
+                        <span className="text-sm">Roles: {rolesLabel || "—"}</span>
                       </td>
                       <td className="px-4 py-4 text-center align-top">
-                        <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-4 py-1 text-sm font-semibold text-amber-700 border border-amber-300">
+                        <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-3 h-7 text-[13px] leading-none font-semibold text-amber-700 border border-amber-300 whitespace-nowrap">
                           For Approval
                         </span>
                       </td>
                       <td className="px-4 py-4 text-center align-top">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            className="py-1 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium w-auto disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                            className={BTN_APPROVE_ORANGE}
                             onClick={(e) => handleApprove(e, pendingUser)}
                             disabled={approvingInProgress || rejectingInProgress}
                           >
                             {approvingInProgress ? "Approving..." : "Approve account"}
                           </button>
                           <button
-                            className="py-1 px-4 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium w-auto disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                            className={BTN_REJECT_RED}
                             onClick={(e) => handleUserReject(e, pendingUser)}
                             disabled={approvingInProgress || rejectingInProgress}
                           >
@@ -658,9 +564,9 @@ function Approvals({
                 const request = entry.record;
                 const payload = request.payload || {};
                 const productData = payload.productData || payload;
-                const categoryLabel = payload.category_name || '—';
-                const unitPrice = productData?.unit_price ? `₱ ${Number(productData.unit_price).toLocaleString()}` : '—';
-                const unitCost = productData?.unit_cost ? `₱ ${Number(productData.unit_cost).toLocaleString()}` : '—';
+                const categoryLabel = payload.category_name || "—";
+                const unitPrice = productData?.unit_price ? `₱ ${Number(productData.unit_price).toLocaleString()}` : "—";
+                const unitCost = productData?.unit_cost ? `₱ ${Number(productData.unit_cost).toLocaleString()}` : "—";
                 const quantityAdded = productData?.quantity_added ?? 0;
 
                 const isHighlighted = highlightedInventoryIds.includes(request.pending_id);
@@ -670,53 +576,67 @@ function Approvals({
                     key={`inventory-${request.pending_id}`}
                     ref={(node) => setPendingRowRef(request.pending_id, node)}
                     className={`h-auto border-b last:border-b-0 hover:bg-blue-50 transition-colors bg-blue-50/20 ${
-                      isHighlighted ? 'ring-2 ring-amber-400 ring-offset-2 animate-pulse' : ''
+                      isHighlighted ? "ring-2 ring-amber-400 ring-offset-2 animate-pulse" : ""
                     }`}
                   >
                     <td className="px-4 py-4 align-top">
                       <div className="flex flex-col gap-2">
-                        <span className="font-semibold text-gray-800 text-base">{productData?.product_name || 'Unnamed Product'}</span>
+                        <span className="font-semibold text-gray-800 text-base">
+                          {productData?.product_name || "Unnamed Product"}
+                        </span>
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 font-semibold px-3 py-1 border border-blue-200">
-                            Inventory {request.action_type === 'update' ? 'Update' : 'Addition'}
+                            Inventory {request.action_type === "update" ? "Update" : "Addition"}
                           </span>
                           <span className="text-gray-500">Submitted {formatDateTime(request.created_at)}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-gray-700 whitespace-nowrap align-top font-medium">{request.branch_name || '—'}</td>
+                    <td className="px-4 py-4 text-gray-700 whitespace-nowrap align-top font-medium">
+                      {request.branch_name || "—"}
+                    </td>
                     <td className="px-4 py-4 text-gray-700 align-top">
                       <div className="flex flex-col gap-1">
-                        <span className="font-medium">{request.created_by_name || 'Inventory Staff'}</span>
+                        <span className="font-medium">{request.created_by_name || "Inventory Staff"}</span>
                         {request.manager_approver_name && (
-                          <span className="text-xs text-gray-500">Forwarded by {request.manager_approver_name} on {formatDateTime(request.manager_approved_at)}</span>
+                          <span className="text-xs text-gray-500">
+                            Forwarded by {request.manager_approver_name} on {formatDateTime(request.manager_approved_at)}
+                          </span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-gray-700 align-top">
                       <div className="text-sm space-y-1.5">
-                        <p><span className="font-medium">Category:</span> {categoryLabel}</p>
-                        <p><span className="font-medium">Quantity:</span> {quantityAdded}</p>
-                        <p><span className="font-medium">Unit Price:</span> {unitPrice}</p>
-                        <p><span className="font-medium">Unit Cost:</span> {unitCost}</p>
+                        <p>
+                          <span className="font-medium">Category:</span> {categoryLabel}
+                        </p>
+                        <p>
+                          <span className="font-medium">Quantity:</span> {quantityAdded}
+                        </p>
+                        <p>
+                          <span className="font-medium">Unit Price:</span> {unitPrice}
+                        </p>
+                        <p>
+                          <span className="font-medium">Unit Cost:</span> {unitCost}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center align-top">
-                      <span className="inline-flex items-center justify-center rounded-lg bg-blue-100 px-4 py-1 text-sm font-semibold text-blue-700 border border-blue-200">
+                      <span className="inline-flex items-center justify-center rounded-lg bg-blue-100 px-3 h-7 text-[13px] leading-none font-semibold text-blue-700 border border-blue-200 whitespace-nowrap">
                         Awaiting Owner Approval
                       </span>
                     </td>
                     <td className="px-4 py-4 text-center align-top">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          className="px-4 py-1 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                          className={BTN_APPROVE_GREEN}
                           onClick={() => handleInventoryApprove(request.pending_id)}
                           disabled={processingInventoryId === request.pending_id}
                         >
-                          {processingInventoryId === request.pending_id ? 'Processing...' : 'Approve'}
+                          {processingInventoryId === request.pending_id ? "Processing..." : "Approve"}
                         </button>
                         <button
-                          className="px-4 py-1 rounded-md bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                          className={BTN_REJECT_RED}
                           onClick={() => handleInventoryReject(request.pending_id)}
                           disabled={processingInventoryId === request.pending_id}
                         >
@@ -746,13 +666,13 @@ function Approvals({
           </div>
         ) : (
           combinedRequests.map((entry) => {
-            if (entry.kind === 'user') {
+            if (entry.kind === "user") {
               const pendingUser = entry.record;
               const rolesLabel = Array.isArray(pendingUser.role)
                 ? pendingUser.role.join(", ")
                 : pendingUser.role ?? "";
 
-              const creatorName = pendingUser.created_by_name || 'Branch Manager';
+              const creatorName = pendingUser.created_by_name || "Branch Manager";
 
               const numericUserId = Number(pendingUser.user_id);
               const hasNumericId = Number.isFinite(numericUserId);
@@ -764,12 +684,10 @@ function Approvals({
                 <div
                   key={`user-${pendingUser.user_id}`}
                   ref={(node) => {
-                    if (hasNumericId) {
-                      setPendingUserMobileRef(numericUserId, node);
-                    }
+                    if (hasNumericId) setPendingUserMobileRef(numericUserId, node);
                   }}
                   className={`bg-white border-2 border-amber-300 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
-                    isUserHighlighted ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse' : ''
+                    isUserHighlighted ? "border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse" : ""
                   }`}
                   onClick={() => navigate(`/user_management?selected=${pendingUser.user_id}`)}
                 >
@@ -777,11 +695,11 @@ function Approvals({
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                       <div className="flex-1">
                         <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">{pendingUser.full_name}</h3>
-                        <span className="inline-flex w-max items-center gap-2 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold px-3 py-1 border border-emerald-200">
+                        <span className="inline-flex w-max items-center gap-2 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1 border border-amber-200">
                           User Account Approval
                         </span>
                       </div>
-                      <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-3 sm:px-4 py-1 text-xs sm:text-sm font-semibold text-amber-700 border border-amber-300">
+                      <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-3 h-7 text-[13px] leading-none font-semibold text-amber-700 border border-amber-300 whitespace-nowrap">
                         For Approval
                       </span>
                     </div>
@@ -789,7 +707,7 @@ function Approvals({
                     <div className="space-y-2 text-sm border-t border-gray-200 pt-3">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                         <span className="font-medium text-gray-700">Branch:</span>
-                        <span className="text-gray-600">{pendingUser.branch || '—'}</span>
+                        <span className="text-gray-600">{pendingUser.branch || "—"}</span>
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                         <span className="font-medium text-gray-700">Requested By:</span>
@@ -797,13 +715,14 @@ function Approvals({
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
                         <span className="font-medium text-gray-700">Roles:</span>
-                        <span className="text-gray-600">{rolesLabel || '—'}</span>
+                        <span className="text-gray-600">{rolesLabel || "—"}</span>
                       </div>
                     </div>
 
+                    {/* Actions — side-by-side */}
                     <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
                       <button
-                        className="py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                        className={BTN_APPROVE_ORANGE}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleApprove(e, pendingUser);
@@ -813,7 +732,7 @@ function Approvals({
                         {approvingInProgress ? "Approving..." : "Approve"}
                       </button>
                       <button
-                        className="py-2.5 px-4 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                        className={BTN_REJECT_RED}
                         onClick={(e) => handleUserReject(e, pendingUser)}
                         disabled={approvingInProgress || rejectingInProgress}
                       >
@@ -828,9 +747,9 @@ function Approvals({
             const request = entry.record;
             const payload = request.payload || {};
             const productData = payload.productData || payload;
-            const categoryLabel = payload.category_name || '—';
-            const unitPrice = productData?.unit_price ? `₱ ${Number(productData.unit_price).toLocaleString()}` : '—';
-            const unitCost = productData?.unit_cost ? `₱ ${Number(productData.unit_cost).toLocaleString()}` : '—';
+            const categoryLabel = payload.category_name || "—";
+            const unitPrice = productData?.unit_price ? `₱ ${Number(productData.unit_price).toLocaleString()}` : "—";
+            const unitCost = productData?.unit_cost ? `₱ ${Number(productData.unit_cost).toLocaleString()}` : "—";
             const quantityAdded = productData?.quantity_added ?? 0;
             const isHighlighted = highlightedInventoryIds.includes(request.pending_id);
 
@@ -839,21 +758,23 @@ function Approvals({
                 key={`inventory-${request.pending_id}`}
                 ref={(node) => setPendingMobileRef(request.pending_id, node)}
                 className={`bg-white border-2 border-blue-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
-                  isHighlighted ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse' : ''
+                  isHighlighted ? "border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse" : ""
                 }`}
               >
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">{productData?.product_name || 'Unnamed Product'}</h3>
+                      <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
+                        {productData?.product_name || "Unnamed Product"}
+                      </h3>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs px-3 py-1 border border-blue-200">
-                          Inventory {request.action_type === 'update' ? 'Update' : 'Addition'}
+                          Inventory {request.action_type === "update" ? "Update" : "Addition"}
                         </span>
                         <span className="text-xs text-gray-500">{formatDateTime(request.created_at)}</span>
                       </div>
                     </div>
-                    <span className="inline-flex items-center justify-center rounded-lg bg-blue-100 px-3 sm:px-4 py-1 text-xs sm:text-sm font-semibold text-blue-700 border border-blue-200">
+                    <span className="inline-flex items-center justify-center rounded-lg bg-blue-100 px-3 h-7 text-[13px] leading-none font-semibold text-blue-700 border border-blue-200 whitespace-nowrap">
                       Awaiting Owner Approval
                     </span>
                   </div>
@@ -861,11 +782,11 @@ function Approvals({
                   <div className="space-y-2 text-sm border-t border-gray-200 pt-3">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                       <span className="font-medium text-gray-700">Branch:</span>
-                      <span className="text-gray-600">{request.branch_name || '—'}</span>
+                      <span className="text-gray-600">{request.branch_name || "—"}</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                       <span className="font-medium text-gray-700">Requested By:</span>
-                      <span className="text-gray-600">{request.created_by_name || 'Inventory Staff'}</span>
+                      <span className="text-gray-600">{request.created_by_name || "Inventory Staff"}</span>
                     </div>
                     {request.manager_approver_name && (
                       <div className="flex flex-col gap-1 text-xs text-gray-500">
@@ -893,16 +814,17 @@ function Approvals({
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-gray-200 flex flex-col sm:flex-row gap-2">
+                  {/* Actions — side-by-side */}
+                  <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
                     <button
-                      className="flex-1 py-2.5 px-4 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                      className={BTN_APPROVE_GREEN}
                       onClick={() => handleInventoryApprove(request.pending_id)}
                       disabled={processingInventoryId === request.pending_id}
                     >
-                      {processingInventoryId === request.pending_id ? 'Processing...' : 'Approve'}
+                      {processingInventoryId === request.pending_id ? "Processing..." : "Approve"}
                     </button>
                     <button
-                      className="flex-1 py-2.5 px-4 rounded-md bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                      className={BTN_REJECT_RED}
                       onClick={() => handleInventoryReject(request.pending_id)}
                       disabled={processingInventoryId === request.pending_id}
                     >
@@ -915,6 +837,7 @@ function Approvals({
           })
         )}
       </div>
+
       <hr className="border-t-2 my-3 sm:my-4 w-full border-gray-500 rounded-lg lg:hidden" />
 
       <RejectionReasonDialog

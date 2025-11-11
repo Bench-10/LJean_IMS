@@ -274,7 +274,7 @@ function UserModalForm({
           >
             {/* Modal card — ONLY element that pops */}
             <div
-              className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] overflow-y-auto hide-scrollbar flex flex-col animate-popup"
+              className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] overflow-y-auto hide-scrollbar flex flex-col"
               onClick={(e) => e.stopPropagation()} // ← prevent closing when clicking INSIDE
             >
               {/* Header */}

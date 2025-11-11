@@ -122,7 +122,7 @@ function BranchPerformance({
     const lh = 12;
     return (
       <g transform={`translate(${x},${y})`}>
-        <text textAnchor="middle" fontSize={11} fill="#374151">
+        <text textAnchor="middle" fontSize={10} fill="#374151">
           <tspan x="0" dy="0">{l1}</tspan>
           {l2 && <tspan x="0" dy={lh}>{l2}</tspan>}
         </text>
@@ -162,7 +162,7 @@ function BranchPerformance({
                     tick={<TwoLineTick />}   // two-line tick
                     axisLine={false}
                     tickLine={false}
-                    interval="preserveStartEnd"         // auto-skip when crowded
+                    interval={0}       // auto-skip when crowded CHANGE THIS INSTEAD OF "preserveStartEnd"   
                     tickMargin={8}
                     height={screenDimensions.width < 640 ? 44 : 36}
                     angle={0}

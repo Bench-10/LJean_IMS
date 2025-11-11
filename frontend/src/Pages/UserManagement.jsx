@@ -233,7 +233,7 @@ function UserManagement({handleUserModalOpen, users, user, setOpenUsers, setUser
                             )
                           ) : (
                             <button
-                              className={`py-2 px-4 ${row.is_disabled ? 'bg-green-500 text-white':'bg-gray-300 text-gray-500'} w-auto rounded-lg flex items-center justify-center gap-2 mx-auto`}
+                              className={`py-2 px-4 ${row.is_disabled ? 'bg-green-500 text-white hover:bg-green-700':'bg-red-600 text-white hover:bg-red-700'} w-auto rounded-lg flex items-center justify-center gap-2 mx-auto`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setUserStatus(row.is_disabled);
