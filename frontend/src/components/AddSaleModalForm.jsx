@@ -864,6 +864,15 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
                           <td className="px-2 relative">
                             <div className="relative">
+                              {/* Hovering "Not enough stocks" message above quantity field */}
+                              {exceedQuanity.includes(String(row.product_id)) && row.product_id && (
+                                <div
+                                  className="absolute right-[140px] top-[0]  h-full bg-red-100 border-2 border-red-500 rounded-lg shadow-lg z-[5] p-1.5 pointer-events-none whitespace-nowrap"
+                                  style={{ bottom: '100%', marginBottom: '8px' }}
+                                >
+                                  <span className="text-red-700 font-medium text-xs">⚠️ Not enough stocks available</span>
+                                </div>
+                              )}
                               <input
                                 type="number"
                                 step={row.unit ? getQuantityStep(row.unit) : "0.001"}
@@ -884,14 +893,6 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                                   style={{ bottom: '-3em' }}
                                 >
                                   {quantityValidationErrors[idx]}
-                                </div>
-                              )}
-                              {exceedQuanity.includes(row.product_id) && (
-                                <div
-                                  className="absolute left-0 w-full text-xs text-red-600 mt-1 z-10 bg-white pointer-events-none"
-                                  style={{ bottom: '-1.5em' }}
-                                >
-                                  *Not enough stock available
                                 </div>
                               )}
                             </div>
@@ -965,8 +966,19 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                     <div
                       key={idx}
                       ref={(el) => (rowRefs.current[idx] = el)} // attach ref here
-                      className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
+                      className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative"
                     >
+                      {/* Hovering "Not enough stocks" message for mobile */}
+                      {exceedQuanity.includes(String(row.product_id)) && row.product_id && (
+                        <div
+                          className="absolute top-0 left-0 right-0 bg-red-100 border-2 border-red-500 rounded-lg shadow-lg z-50 p-2 pointer-events-none"
+                          style={{ transform: 'translateY(-100%)', marginTop: '-8px' }}
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-red-700 font-semibold text-sm">⚠️ Not enough stocks available</span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* ✅ Item number */}
                       <div className="text-sm text-right font-semibold text-gray-700 mb-2">
@@ -1020,6 +1032,17 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                         <div>
                           <label className='block text-xs font-bold mb-1 text-gray-600 uppercase'>Quantity</label>
                           <div className="relative">
+                            {/* Hovering "Not enough stocks" message above quantity field */}
+                            {exceedQuanity.includes(String(row.product_id)) && row.product_id && (
+                              <div
+                                className="absolute left-0 w-full bg-red-100 border-2 border-red-500 rounded-lg shadow-lg z-50 p-2 pointer-events-none"
+                                style={{ bottom: '100%', marginBottom: '8px' }}
+                              >
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-red-700 font-semibold text-sm">⚠️ Not enough stocks available</span>
+                                </div>
+                              </div>
+                            )}
                             <input
                               type="number"
                               step={row.unit ? getQuantityStep(row.unit) : "0.001"}
@@ -1037,11 +1060,6 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                             {quantityValidationErrors[idx] && (
                               <div className="text-xs text-red-600 mt-1">
                                 {quantityValidationErrors[idx]}
-                              </div>
-                            )}
-                            {exceedQuanity.includes(row.product_id) && (
-                              <div className="text-xs text-red-600 mt-1">
-                                *Not enough stock available
                               </div>
                             )}
                           </div>

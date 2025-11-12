@@ -689,11 +689,11 @@ const handleRejectDialogConfirm = (reason) => {
               <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white">
                 ITEM NAME
               </th>
-              <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-48">
-                CATEGORY
-              </th>
               <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-3">
                 UNIT
+              </th>
+              <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-40">
+                CATEGORY
               </th>
               <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
                 UNIT PRICE
@@ -748,8 +748,8 @@ const handleRejectDialogConfirm = (reason) => {
                     <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1) % 2 === 0 ? "bg-[#F6F6F6]" : ""}`} onClick={() => openDetails(row)} style={{ cursor: 'pointer' }}>
                       <td className="px-4 py-2 text-center"  >{`${String(row.branch_id).padStart(2, '0')}${String(row.category_id).padStart(2, '0')}-${row.product_id}`}</td>
                       <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
+                      <td className="px-4 py-2 font-bold"  >{row.unit.toUpperCase()}</td>
                       <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
-                      <td className="px-4 py-2"  >{row.unit}</td>
                       <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_price)}</td>
 
                       {user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) &&

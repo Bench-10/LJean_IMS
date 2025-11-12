@@ -326,7 +326,11 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
           {user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) && (
             <button
               className='flex items-center gap-x-3 w-full lg:w-auto justify-center bg-[#119200] text-sm text-white font-medium hover:bg-[#56be48] px-5 py-2 rounded-lg transition-all'
-              onClick={() => setAddDelivery(true)}
+              onClick={() => {
+                requestAnimationFrame(() => {
+                  setAddDelivery(true);
+                });
+              }}
             >
               <TbTruckDelivery />
               ADD DELIVERY
@@ -418,10 +422,12 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
                           <td className="px-4 py-2 text-left">{row.formated_delivered_date}</td>
                           <td className="px-4 py-2 text-center">
                             <button
-                              className={`${row.is_pending ? 'bg-amber-400 text-white' : row.is_delivered ? 'border-2 border-green-700/70 text-green-700/70 font-semibold' : 'border-2 border-red-700/70 text-red-700/70 font-semibold'} rounded-md px-4 py-2`}
+                              className={`${row.is_pending ? 'bg-amber-400 text-white' : row.is_delivered ? 'border-2 border-green-700/70 text-green-700/70 font-semibold' : 'border-2 border-red-700/70 text-red-700/70 font-semibold'} rounded-md px-4 py-2 transition-colors`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                deliveryEdit('edit', row);
+                                requestAnimationFrame(() => {
+                                  deliveryEdit('edit', row);
+                                });
                               }}
                             >
                               {row.is_pending ? 'Delivering...' : row.is_delivered ? 'Delivered' : 'Undelivered'}

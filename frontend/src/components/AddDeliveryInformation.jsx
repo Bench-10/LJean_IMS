@@ -7,7 +7,7 @@ import FormLoading from './common/FormLoading';
 import DatePickerCustom from '../components/DatePickerCustom';
 
 // SEARCHABLE DROPDOWN
-function SearchableSaleDropdown({ saleHeader = [], deliveryData = [], value, onChange }) {
+const SearchableSaleDropdown = React.memo(function SearchableSaleDropdown({ saleHeader = [], deliveryData = [], value, onChange }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const wrapperRef = useRef(null);
@@ -18,27 +18,47 @@ function SearchableSaleDropdown({ saleHeader = [], deliveryData = [], value, onC
         setOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [open]);
 
-  const options = saleHeader
-    .filter(
-      (row) =>
-        row.is_for_delivery &&
-        !deliveryData.some((d) => String(d.sales_information_id) === String(row.sales_information_id))
-    )
-    .map((row) => ({
+  // Create a Set of delivered sale IDs for O(1) lookup instead of O(n) .some() check
+  const deliveredSaleIds = React.useMemo(() => {
+    const ids = new Set();
+    deliveryData.forEach(delivery => {
+      ids.add(String(delivery.sales_information_id));
+    });
+    return ids;
+  }, [deliveryData]);
+
+  const options = React.useMemo(() => {
+    // Pre-filter saleHeader to only include deliverable items not already delivered
+    const availableSales = saleHeader.filter(row =>
+      row.is_for_delivery && !deliveredSaleIds.has(String(row.sales_information_id))
+    );
+
+    // Create options array
+    const allOptions = availableSales.map((row) => ({
       id: String(row.sales_information_id),
       label: `${row.sales_information_id} — ${row.charge_to || 'Unknown'}${
         row.address ? ' (' + String(row.address).slice(0, 30) + (String(row.address).length > 30 ? '...' : '') + ')' : ''
       }`,
       address: row.address || '',
-    }))
-    .filter((opt) => opt.label.toLowerCase().includes(query.toLowerCase()));
+    }));
 
-  const selectedLabel =
-    value && options.find((o) => o.id === String(value)) ? options.find((o) => o.id === String(value)).label : '';
+    // Apply search filter if query exists
+    if (!query) return allOptions;
+    const lowerQuery = query.toLowerCase();
+    return allOptions.filter((opt) => opt.label.toLowerCase().includes(lowerQuery));
+  }, [saleHeader, deliveredSaleIds, query]);
+
+  const selectedLabel = React.useMemo(() => {
+    if (!value) return '';
+    const found = options.find((o) => o.id === String(value));
+    return found ? found.label : '';
+  }, [value, options]);
 
   return (
     <div ref={wrapperRef} className="relative w-full">
@@ -72,7 +92,7 @@ function SearchableSaleDropdown({ saleHeader = [], deliveryData = [], value, onC
             {options.length === 0 ? (
               <div className="p-3 text-xs sm:text-sm text-gray-500">No matching sales</div>
             ) : (
-              options.map((opt) => (
+              options.slice(0, 50).map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
@@ -88,20 +108,26 @@ function SearchableSaleDropdown({ saleHeader = [], deliveryData = [], value, onC
                 </button>
               ))
             )}
+            {options.length > 50 && (
+              <div className="p-2 text-xs text-gray-500 border-t text-center">
+                Showing first 50 results. Use search to find more.
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
-}
+});
 
 // STATUS DROPDOWN COMPONENT
-function StatusDropdown({ status, onChange, mode }) {
+const StatusDropdown = React.memo(function StatusDropdown({ status, onChange, mode }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
+    if (!open) return;
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setOpen(false);
@@ -109,7 +135,7 @@ function StatusDropdown({ status, onChange, mode }) {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     if (open && dropdownRef.current) {
@@ -124,28 +150,31 @@ function StatusDropdown({ status, onChange, mode }) {
     }
   }, [open]);
 
-  const getStatusValue = () => {
+  const getStatusValue = React.useCallback(() => {
     if (status.pending) return 'out';
     if (status.is_delivered) return 'delivered';
     return 'undelivered';
-  };
+  }, [status.pending, status.is_delivered]);
 
-  const statusOptions = [
+  const statusOptions = React.useMemo(() => [
     { value: 'out', label: 'OUT FOR DELIVERY', dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-400' },
     ...(mode === 'edit' ? [
       { value: 'delivered', label: 'DELIVERED', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-400' },
       { value: 'undelivered', label: 'UNDELIVERED', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-400' }
     ] : [])
-  ];
+  ], [mode]);
 
-  const currentStatus = statusOptions.find(opt => opt.value === getStatusValue());
+  const currentStatus = React.useMemo(() => 
+    statusOptions.find(opt => opt.value === getStatusValue()),
+    [statusOptions, getStatusValue]
+  );
 
-  const handleSelect = (val) => {
+  const handleSelect = React.useCallback((val) => {
     if (val === 'out') onChange({ is_delivered: false, pending: true });
     if (val === 'delivered') onChange({ is_delivered: true, pending: false });
     if (val === 'undelivered') onChange({ is_delivered: false, pending: false });
     setOpen(false);
-  };
+  }, [onChange]);
 
   return (
     <div ref={wrapperRef} className="flex flex-col flex-1">
@@ -191,9 +220,9 @@ function StatusDropdown({ status, onChange, mode }) {
       </div>
     </div>
   );
-}
+});
 
-function AddDeliveryInformation({
+const AddDeliveryInformation = React.memo(function AddDeliveryInformation({
   openAddDelivery,
   onClose,
   saleHeader,
@@ -379,6 +408,6 @@ function AddDeliveryInformation({
       </div>
     </div>
   );
-}
+});
 
 export default AddDeliveryInformation;
