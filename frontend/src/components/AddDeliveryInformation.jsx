@@ -164,10 +164,24 @@ const StatusDropdown = React.memo(function StatusDropdown({ status, onChange, mo
     ] : [])
   ], [mode]);
 
-  const currentStatus = React.useMemo(() => 
-    statusOptions.find(opt => opt.value === getStatusValue()),
-    [statusOptions, getStatusValue]
-  );
+  const currentStatus = React.useMemo(() => {
+    const found = statusOptions.find(opt => opt.value === getStatusValue());
+    if (found) return found;
+
+    // Fallback: mode may restrict available options (e.g. add-mode only exposes 'out')
+    // If the incoming `status` indicates a value not present in options, synthesize
+    // a reasonable display object so the component doesn't crash.
+    const value = getStatusValue();
+    if (value === 'delivered') {
+      return { value: 'delivered', label: 'DELIVERED', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-400' };
+    }
+    if (value === 'undelivered') {
+      return { value: 'undelivered', label: 'UNDELIVERED', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-400' };
+    }
+
+    // Default to the first available option or a neutral object
+    return statusOptions[0] || { value: 'out', label: 'OUT FOR DELIVERY', dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-400' };
+  }, [statusOptions, getStatusValue]);
 
   const handleSelect = React.useCallback((val) => {
     if (val === 'out') onChange({ is_delivered: false, pending: true });

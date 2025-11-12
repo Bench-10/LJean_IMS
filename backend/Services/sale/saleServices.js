@@ -152,16 +152,10 @@ export const addSale = async (headerAndProducts = {}) => {
                     throw new Error(`Unable to resolve a valid base quantity for product ID ${productId}.`);
                 }
 
-                const { rows: stockRows } = await SQLquery(
-                    'SELECT SUM(quantity_left_base) AS available_quantity_base FROM Add_Stocks WHERE product_id = $1 AND branch_id = $2 AND quantity_left_base > 0',
-                    [productId, branchId]
-                );
-
-                const availableQuantityBase = Number(stockRows?.[0]?.available_quantity_base) || 0;
-                if (quantityBase > availableQuantityBase) {
-                    const availableInventoryDisplay = convertToDisplayUnit(availableQuantityBase, saleConfig.inventory_unit);
-                    throw new Error(`Insufficient inventory for product ID ${productId}. Available: ${availableInventoryDisplay} ${saleConfig.inventory_unit}, Requested: ${quantityDisplay} ${rawUnit}`);
-                }
+                // NOTE: availability check is deferred until after all lines are normalized
+                // to correctly validate combined requested quantities per product (prevents
+                // per-line checks from allowing overcommit when a sale contains multiple
+                // lines for the same product).
 
                 const requestedUnitPrice = Number(rawLine.unitPrice ?? rawLine.unit_price);
                 const lineUnitPrice = Number.isFinite(requestedUnitPrice) && requestedUnitPrice > 0
@@ -181,6 +175,35 @@ export const addSale = async (headerAndProducts = {}) => {
                     inventory_unit: saleConfig.inventory_unit,
                     conversion_factor: saleConfig.conversion_factor
                 });
+            }
+
+            // After we've normalized all lines, verify combined availability per product
+            // (sum requested base quantities for each product) to prevent overcommit when
+            // multiple lines in the same sale reference the same product.
+
+            // Build totals per product
+            const totalsByProduct = new Map();
+            for (const line of normalizedLines) {
+                const prev = totalsByProduct.get(line.product_id) || 0;
+                totalsByProduct.set(line.product_id, prev + Number(line.quantity_base));
+            }
+
+            // Validate availability for each product
+            for (const [productId, requiredBase] of totalsByProduct.entries()) {
+                const { rows: stockRows } = await SQLquery(
+                    'SELECT COALESCE(SUM(quantity_left_base),0) AS available_quantity_base FROM Add_Stocks WHERE product_id = $1 AND branch_id = $2 AND quantity_left_base > 0',
+                    [productId, branchId]
+                );
+
+                const availableQuantityBase = Number(stockRows?.[0]?.available_quantity_base) || 0;
+
+                if (requiredBase > availableQuantityBase) {
+                    // Find a normalized line for unit/context to format the message
+                    const sampleLine = normalizedLines.find(l => l.product_id === productId) || {};
+                    const availableInventoryDisplay = convertToDisplayUnit(availableQuantityBase, sampleLine.inventory_unit || '');
+                    const requestedDisplay = convertToDisplayUnit(requiredBase, sampleLine.inventory_unit || '');
+                    throw new Error(`Insufficient inventory for product ID ${productId}. Available: ${availableInventoryDisplay} ${sampleLine.inventory_unit || ''}, Requested: ${requestedDisplay} ${sampleLine.sale_unit || ''}`);
+                }
             }
 
             await SQLquery(
@@ -229,6 +252,10 @@ export const addSale = async (headerAndProducts = {}) => {
                 );
             }
 
+            // Deduct stock for each line. Collect affected product ids so we can
+            // run low-stock checks after the transaction commits (to avoid
+            // notification failures rolling back inventory updates).
+            const productsToCheck = new Set();
             for (const line of normalizedLines) {
                 await deductStockAndTrackUsage(
                     saleId,
@@ -239,9 +266,26 @@ export const addSale = async (headerAndProducts = {}) => {
                     line.sale_unit,
                     line.base_quantity_per_sell_unit
                 );
+                productsToCheck.add(line.product_id);
             }
 
             await SQLquery('COMMIT');
+
+            // After commit, run low-stock checks for affected products. These may
+            // produce alerts and push notifications but must not run inside the
+            // sale transaction to avoid rollback on external failures.
+            try {
+                for (const pid of productsToCheck) {
+                    try {
+                        await checkAndHandleLowStock(pid, branchId, { triggeredByUserId: headerInformationAndTotal.userID });
+                    } catch (notifyErr) {
+                        console.error(`Post-commit checkAndHandleLowStock failed for product=${pid} branch=${branchId}:`, notifyErr?.message || notifyErr);
+                        // continue with other products
+                    }
+                }
+            } catch (err) {
+                console.error('Error running post-commit low-stock checks:', err?.message || err);
+            }
 
             invalidateAnalyticsCache();
 
@@ -491,15 +535,11 @@ export const deductStockAndTrackUsage = async (
         throw new Error('Insufficient inventory while deducting stock (partial deduction occurred).');
     }
 
-    // Run low-stock handling but do not let notification/push failures abort the sale transaction.
-    // Notifications (push/websocket) can fail for external reasons; swallowing errors here
-    // ensures the inventory changes persist and the sale is not rolled back.
-    try {
-        await checkAndHandleLowStock(productId, branchId, { triggeredByUserId: userId });
-    } catch (notifyErr) {
-        console.error(`checkAndHandleLowStock failed for product=${productId} branch=${branchId}:`, notifyErr?.message || notifyErr);
-        // Do not re-throw. The transaction should commit the inventory deduction regardless of notification outcome.
-    }
+    // NOTE: low-stock notification is intentionally NOT handled here to avoid
+    // performing additional writes / external I/O while still inside the stock
+    // deduction transaction. Callers should invoke `checkAndHandleLowStock` after
+    // they commit the surrounding transaction to ensure notifications do not
+    // cause a rollback of inventory updates.
 
     return {
         quantity_display: resolvedQuantityDisplay,

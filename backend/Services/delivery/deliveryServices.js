@@ -1,6 +1,7 @@
 import { SQLquery } from "../../db.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 import { restoreStockFromSale, deductStockAndTrackUsage } from "../sale/saleServices.js";
+import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
 import { broadcastInventoryUpdate, broadcastSaleUpdate, broadcastNotification, broadcastValidityUpdate } from "../../server.js";
 import { createNewDeliveryNotification, createDeliveryStatusNotification, createDeliveryStockNotification } from "./deliveryNotificationService.js";
 import { invalidateAnalyticsCache } from "../analytics/analyticsServices.js";
@@ -39,6 +40,8 @@ export const addDeliveryData = async(data) =>{
 
     try {
         await SQLquery('BEGIN');
+        // Collect product ids affected by stock changes so we can run low-stock checks after commit
+        const productsToCheck = new Set();
 
         const {rows: newData} = await SQLquery(
             `INSERT INTO Delivery(
@@ -151,6 +154,8 @@ export const setToDelivered = async(saleID, update) => {
 
     try {
         await SQLquery('BEGIN');
+        // Collect product ids affected by stock changes so we can run low-stock checks after commit
+        const productsToCheck = new Set();
 
     // GET CURRENT DELIVERY STATUS BEFORE UPDATE TO KNOW WHAT CHANGED
         const {rows: currentStatus} = await SQLquery(
@@ -179,6 +184,9 @@ export const setToDelivered = async(saleID, update) => {
             // DELIVERED → UNDELIVERED (TRULY CANCELED) - RESTORE STOCK
             const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
             const branchId = branchInfo[0]?.branch_id;
+            // collect affected products for post-commit low-stock checks
+            const {rows: itemsForRestore0} = await SQLquery(`SELECT product_id FROM Sales_Items WHERE sales_information_id = $1`, [saleID]);
+            for (const it of itemsForRestore0) productsToCheck.add(it.product_id);
             await restoreStockFromSale(saleID, 'Delivery marked as undelivered', branchId, userID);
             console.log(`Stock restored for sale ID: ${saleID} due to undelivered status`);
             
@@ -212,8 +220,9 @@ export const setToDelivered = async(saleID, update) => {
             const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
             const branchId = branchInfo[0]?.branch_id;
 
-            for (const product of itemsToRededuct) {
-                    await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
+        for (const product of itemsToRededuct) {
+            await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
+            productsToCheck.add(product.product_id);
             }
             console.log(`Stock re-deducted for sale ID: ${saleID} due to reactivating delivery from undelivered to out for delivery`);
 
@@ -230,9 +239,12 @@ export const setToDelivered = async(saleID, update) => {
             );
 
             // IF STOCK HASN'T BEEN RESTORED YET, RESTORE IT (FIRST TIME MARKING AS UNDELIVERED)
-            if (stockUsage.length > 0 && stockUsage[0].is_restored === false) {
+                if (stockUsage.length > 0 && stockUsage[0].is_restored === false) {
                 const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
                 const branchId = branchInfo[0]?.branch_id;
+                // collect affected products for post-commit low-stock checks
+                const {rows: itemsForRestore} = await SQLquery(`SELECT product_id FROM Sales_Items WHERE sales_information_id = $1`, [saleID]);
+                for (const it of itemsForRestore) productsToCheck.add(it.product_id);
                 await restoreStockFromSale(saleID, 'Delivery set as undelivered', branchId, userID);
                 console.log(`Stock restored for sale ID: ${saleID} - first time marked as undelivered`);
             } else {
@@ -274,6 +286,7 @@ export const setToDelivered = async(saleID, update) => {
 
                     for (const product of itemsToDeduct) {
                         await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
+                        productsToCheck.add(product.product_id);
                     }
                     console.log(`Stock re-deducted for sale ID: ${saleID} (was previously restored)`);
                 } else {
@@ -288,6 +301,9 @@ export const setToDelivered = async(saleID, update) => {
             // OUT FOR DELIVERY > UNDELIVERED - RESTORE STOCK
             const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
             const branchId = branchInfo[0]?.branch_id;
+            // collect affected products for post-commit low-stock checks
+            const {rows: itemsForRestore2} = await SQLquery(`SELECT product_id FROM Sales_Items WHERE sales_information_id = $1`, [saleID]);
+            for (const it of itemsForRestore2) productsToCheck.add(it.product_id);
             await restoreStockFromSale(saleID, 'Delivery canceled from pending status', branchId, userID);
             console.log(`Stock restored for sale ID: ${saleID} due to canceling pending delivery`);
 
@@ -430,6 +446,22 @@ export const setToDelivered = async(saleID, update) => {
         }
 
         await SQLquery('COMMIT');
+
+        // After successful commit, run low-stock checks for any affected products
+        try {
+            const branchIdForCheck = saleData && saleData[0] ? saleData[0].branch_id : null;
+            if (branchIdForCheck && productsToCheck && productsToCheck.size > 0) {
+                for (const pid of productsToCheck) {
+                    try {
+                        await checkAndHandleLowStock(pid, branchIdForCheck, { broadcast: true });
+                    } catch (innerErr) {
+                        console.error(`Error running low-stock check for product ${pid} after delivery update:`, innerErr);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error during post-commit low-stock checks:', err);
+        }
 
         invalidateAnalyticsCache();
         return updateDelivery[0];
