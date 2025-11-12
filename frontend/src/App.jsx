@@ -130,9 +130,9 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
       return status === 'rejected';
     }
     
-    // If no filter, exclude rejected by default (they must be explicitly requested)
+    // If no filter, include all (let frontend filter)
     if (!statusFilter) {
-      return status !== 'rejected';
+      return true;
     }
     
     return true;
@@ -1762,7 +1762,7 @@ function App() {
 
     try {
       setUserCreationLoading(true);
-      const response = await api.get('/api/users/pending');
+      const response = await api.get('/api/users/pending?status=pending,approved,rejected,cancelled');
       console.log(response)
   const payload = response.data ?? [];
   const requests = Array.isArray(payload?.requests) ? payload.requests : (Array.isArray(payload) ? payload : []);

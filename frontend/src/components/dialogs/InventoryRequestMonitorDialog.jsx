@@ -299,10 +299,14 @@ const InventoryRequestMonitorDialog = ({
             cancellation_reason: normalizedStatus === 'cancelled' ? (resolutionReason || null) : null
           };
 
+      const safeTimestamp = toTime(createdAtIso) || toTime(decisionAtIso) || Date.now();
+
       return {
         kind: 'user',
-        pending_id: `user-${record.user_id}`,
-        user_id: record.user_id,
+        // Ensure we always produce a stable pending_id even when user_id is missing.
+        // Fallback order: user_id -> pending_user_id -> username/email -> createdAt timestamp
+        pending_id: `user-${record.user_id ?? record.pending_user_id ?? record.username ?? record.email ?? safeTimestamp}`,
+        user_id: record.user_id ?? null,
         branch_id: record.branch_id,
         branch_name: branchName,
         created_by_id: createdById,
@@ -316,6 +320,7 @@ const InventoryRequestMonitorDialog = ({
         timeline: { submitted_at: createdAtIso, manager: null, admin: adminTimeline, final: finalTimeline },
         metadata: { email: record?.username || null, phone: record?.cell_number || null, requested_roles: roles },
         user_status: normalizedStatus,
+        normalized_status: normalizedStatus,
         decision_at: decisionAtIso,
         rejection_reason: normalizedStatus === 'rejected' ? resolutionReason : null,
         cancellation_reason: normalizedStatus === 'cancelled' ? resolutionReason : null
@@ -363,85 +368,83 @@ const InventoryRequestMonitorDialog = ({
   }, [normalizedUserRequests, scope, branchFilter, user]);
 
   const combinedRequests = useMemo(() => {
-    const aggregate = [...inventoryEntries, ...scopedUserRequests];
+    const inventory = inventoryEntries;
+    const users = scopedUserRequests.map(req => ({ ...req, kind: 'user' }));
+    const aggregate = [...inventory, ...users];
     return aggregate.sort((a, b) => toTime(b.last_activity_at || b.created_at) - toTime(a.last_activity_at || a.created_at));
   }, [inventoryEntries, scopedUserRequests]);
 
   // ✅ ROLE-BASED & chip filtering
   const filteredRequests = useMemo(() => {
-    // 1) Role-based gate
-    const roleTrimmed = combinedRequests.filter((req) => {
+    // Simplified, explicit filtering pipeline for clarity and correctness.
+    // 1) Start by removing cancelled/deleted items.
+    let list = combinedRequests.filter((req) => {
       const code = req?.status_detail?.code;
       if (!code) return false;
-
-      // Hide cancelled and deleted requests from all users
       if (code === 'cancelled' || code === 'deleted') return false;
+      return true;
+    });
 
+    // 2) Role-based visibility constraints
+    list = list.filter((req) => {
+      const code = req.status_detail?.code;
+      if (!code) return false;
+
+      // Owner: show only final decisions (approved/rejected) to avoid clutter
       if (isOwnerUser) {
-        // Owner: only final states (approved/rejected)
+        if (req.kind === 'user') return ['approved', 'rejected'].includes(req.normalized_status);
         return code === 'approved' || code === 'rejected';
       }
 
-      if (isBranchManager) {
-        // BM: hide items awaiting their own approval, unless filtering for pending
-        if (statusFilter !== 'pending') {
-          return code !== 'pending_manager';
-        }
+      // Branch Manager: if not explicitly viewing pending, hide items that are "pending_manager"
+      if (isBranchManager && statusFilter !== 'pending') {
+        return code !== 'pending_manager';
       }
 
       return true;
     });
 
-    // 2) Type filter
-    // If a type chip is selected, respect it strictly (don't show the other kind).
-    // Previously this check only applied when the type UI was visible; enforce it
-    // regardless so programmatic/default filters behave predictably.
-    const afterType = roleTrimmed.filter((req) => {
-      if (requestTypeFilter && req.kind !== requestTypeFilter) return false;
-      return true;
+    // 3) Type filter (strict): if a type chip is active, only show that kind
+    if (requestTypeFilter) {
+      list = list.filter((req) => req.kind === requestTypeFilter);
+    }
+
+    // 4) Status filter: explicit, small set of rules to avoid leakage of rejected user accounts
+    if (!statusFilter) {
+      // Default behavior:
+      // - If the user explicitly selected the "User" type chip, show all user requests
+      //   (include rejected) so branch managers/owners can review as many accounts as possible.
+      // - Otherwise, hide rejected user accounts unless 'rejected' is explicitly selected.
+      if (requestTypeFilter === 'user') {
+        return list;
+      }
+
+      list = list.filter((req) => !(req.kind === 'user' && req.normalized_status === 'rejected'));
+      return list;
+    }
+
+    if (statusFilter === 'pending') {
+      return list.filter((req) => {
+        if (req.kind === 'user') return req.normalized_status === 'pending';
+        const code = req.status_detail?.code || '';
+        return code === 'pending' || code === 'pending_manager' || code === 'pending_admin';
+      });
+    }
+
+    if (statusFilter === 'rejected') {
+      return list.filter((req) => {
+        if (requestTypeFilter === 'user') return req.kind === 'user' && req.normalized_status === 'rejected';
+        if (requestTypeFilter === 'inventory') return req.kind === 'inventory' && req.status_detail?.code === 'rejected';
+        // No type specified: include both rejected inventory and user requests
+        return (req.kind === 'inventory' && req.status_detail?.code === 'rejected') || (req.kind === 'user' && req.normalized_status === 'rejected');
+      });
+    }
+
+    // Other explicit status chips (e.g., 'approved')
+    return list.filter((req) => {
+      if (req.kind === 'user') return req.normalized_status === statusFilter;
+      return req.status_detail?.code === statusFilter;
     });
-
-    // 3) Status chip (if any chip is selected)
-    // - If no status chip is selected, hide rejected *user account* requests by default
-    // - If the status chip is 'pending', show only pending-type codes
-    // - If the status chip is 'rejected', isolate by type:
-    //   - If type is 'inventory', show only rejected inventory
-    //   - If type is 'user', show only rejected user accounts
-    //   - If no type selected, show rejected inventory only (not rejected user accounts)
-    // - Additional requirement: Prevent rejected user accounts from appearing in any other filter
-    const afterStatus = afterType.filter((req) => {
-      const code = req?.status_detail?.code;
-      // If the request has no status code, exclude it
-      if (!code) return false;
-
-      // Prevent rejected user accounts from appearing in any filter except when status='rejected' and type='user'
-      if (req.kind === 'user' && code === 'rejected') {
-        return statusFilter === 'rejected' && requestTypeFilter === 'user';
-      }
-
-      // No status filter selected: hide rejected user-account requests by default (already handled above)
-      if (!statusFilter) {
-        return true;
-      }
-
-      // Pending chip: show pending manager/admin/pending codes
-      if (statusFilter === 'pending') {
-        return code === 'pending_manager' || code === 'pending_admin' || code === 'pending';
-      }
-
-      // Rejected chip: isolate by type to prevent rejected user accounts from appearing in inventory filter
-      if (statusFilter === 'rejected') {
-        if (requestTypeFilter === 'inventory') return req.kind === 'inventory' && code === 'rejected';
-        if (requestTypeFilter === 'user') return req.kind === 'user' && code === 'rejected';
-        // If no type selected, show rejected inventory only (not rejected user accounts)
-        return req.kind === 'inventory' && code === 'rejected';
-      }
-
-      // For other explicit chips (e.g. 'approved'), match exact code
-      return code === statusFilter;
-    });
-
-    return afterStatus;
   }, [
     combinedRequests,
     isOwnerUser,
@@ -680,7 +683,7 @@ const InventoryRequestMonitorDialog = ({
                     && Number(request.created_by_id ?? request.created_by) === currentUserId
                     && request.status_detail
                     && !request.status_detail.is_final;
-                  const cancelKey = `user-${request.user_id}`;
+                  const cancelKey = request.pending_id;
                   const isCancellingUser = cancellingId === cancelKey;
                   const borderToneClass = (() => {
                     switch (request.status_detail?.tone) {
@@ -717,7 +720,7 @@ const InventoryRequestMonitorDialog = ({
                             <button
                               type="button"
                               className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                              onClick={() => handleCancelUserRequest(request.user_id)}
+                              onClick={() => handleCancelUserRequest(request.user_id ?? String(request.pending_id).replace(/^user-/, ''))}
                               disabled={isCancellingUser}
                             >
                               {isCancellingUser ? 'Cancelling…' : 'Cancel'}
