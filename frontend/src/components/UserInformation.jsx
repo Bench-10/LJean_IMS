@@ -54,7 +54,7 @@ function UserInformation({ openUsers, userDetailes, onClose, handleUserModalOpen
         >
           {/* Modal Card (header + scrollable body + fixed footer) */}
           <div
-            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[900px] max-h-[90vh] flex flex-col overflow-hidden animate-popup"
+            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[900px] max-h-[90vh] flex flex-col overflow-hidden  animate-popup"
             onClick={(e) => e.stopPropagation()} // prevent outside-close when clicking inside
           >
             {/* HEADER (non-scrolling) */}
@@ -69,7 +69,7 @@ function UserInformation({ openUsers, userDetailes, onClose, handleUserModalOpen
             </div>
 
             {/* BODY (scrolls) */}
-            <div className="flex-1 overflow-y-auto p-5 bg-green-50/30">
+            <div className="flex-1 overflow-y-auto p-5 bg-green-50/30 hide-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 auto-rows-fr">
                 {[
                   ['First Name', userDetailes.first_name],

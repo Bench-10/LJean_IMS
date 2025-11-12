@@ -1110,7 +1110,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                     <input
                       type="checkbox"
                       id="isForDelivery"
-                      className='mr-2'
+                      className='mr-2 accent-green-600'
                       checked={isForDelivery}
                       onChange={(e) => setIsForDelivery(e.target.checked)}
                     />

@@ -757,11 +757,28 @@ const handleRejectDialogConfirm = (reason) => {
                       }
 
                       <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
-                      <td className="px-4 py-2 text-center w-36"  >
-                        <div className={`border rounded-full px-5 py-1 font- ${row.quantity <= row.min_threshold ? 'bg-[#f05959] text-red-900' : row.quantity >= row.max_threshold ? 'bg-[#1e5e1b] text-white' : 'bg-[#61E85C] text-green-700'} font-medium`}>
-                          {row.quantity <= row.min_threshold ? 'Low Stock' : row.quantity >= row.max_threshold ? 'Max Stock' : 'In Stock'}
-                        </div>
-                      </td>
+                      <td className="px-4 py-2 text-center w-36">
+  <div
+    className={`inline-flex items-center justify-center h-8 px-4 rounded-full text-[13px] font-medium whitespace-nowrap min-w-[110px] border
+      ${
+        Number(row.quantity) === 0
+          ? 'bg-gray-300 text-gray-800 border-gray-300'       // Out of Stock
+          : row.quantity <= row.min_threshold
+          ? 'bg-[#f05959] text-red-900 border-red-300'         // Low Stock
+          : row.quantity >= row.max_threshold
+          ? 'bg-[#1e5e1b] text-white border-green-900'         // Max Stock
+          : 'bg-[#61E85C] text-green-700 border-green-300'     // In Stock
+      }`}
+  >
+    {Number(row.quantity) === 0
+      ? 'Out of Stock'
+      : row.quantity <= row.min_threshold
+      ? 'Low Stock'
+      : row.quantity >= row.max_threshold
+      ? 'Max Stock'
+      : 'In Stock'}
+  </div>
+</td>
 
                       {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
                       {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) &&
