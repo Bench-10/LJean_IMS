@@ -92,200 +92,6 @@ const roundToDecimals = (value, decimals) => {
 };
 
 
-const normalizeSellingUnitsPayload = (rawUnits, baseUnit, basePrice) => {
-    const sanitizedBaseUnit = typeof baseUnit === 'string' ? baseUnit.trim() : '';
-    const seenUnits = new Set();
-    const normalizedUnits = [];
-    let baseUnitPrice = toNumberOrNull(basePrice);
-    let requiresWholeBaseUnit = false;
-
-    if (sanitizedBaseUnit) {
-        try {
-            const baseConversion = getUnitConversion(sanitizedBaseUnit);
-            requiresWholeBaseUnit = baseConversion.conversion_factor === 1;
-        } catch (error) {
-            throw new InventoryValidationError(`Base unit '${sanitizedBaseUnit}' is not registered in the conversion table.`);
-        }
-    }
-
-    if (Array.isArray(rawUnits)) {
-        rawUnits.forEach((rawUnit) => {
-            const unitValue = typeof rawUnit?.unit === 'string' ? rawUnit.unit.trim() : '';
-            if (!unitValue || seenUnits.has(unitValue)) {
-                return;
-            }
-
-            const priceValue = toNumberOrNull(rawUnit.unit_price ?? rawUnit.unitPrice ?? rawUnit.price);
-            if (!priceValue || priceValue <= 0) {
-                throw new InventoryValidationError(`Invalid price for unit '${unitValue}'. Price must be greater than 0.`);
-            }
-
-            const baseQuantityRaw = toNumberOrNull(
-                rawUnit.base_quantity_per_sell_unit ??
-                rawUnit.baseQuantityPerSellUnit ??
-                rawUnit.base_quantity ??
-                rawUnit.baseQty
-            );
-
-            const unitsPerBaseRaw = toNumberOrNull(rawUnit.units_per_base ?? rawUnit.unitsPerBase);
-
-            let resolvedBaseQuantity = baseQuantityRaw;
-            if (!resolvedBaseQuantity || resolvedBaseQuantity <= 0) {
-                if (unitsPerBaseRaw && unitsPerBaseRaw > 0) {
-                    resolvedBaseQuantity = 1 / unitsPerBaseRaw;
-                } else {
-                    throw new InventoryValidationError(`Invalid conversion value for unit '${unitValue}'. Provide units per ${sanitizedBaseUnit || 'base unit'} or base quantity.`);
-                }
-            }
-
-            if (!Number.isFinite(resolvedBaseQuantity) || resolvedBaseQuantity <= 0) {
-                throw new InventoryValidationError(`Invalid conversion value for unit '${unitValue}'.`);
-            }
-
-            if (requiresWholeBaseUnit && resolvedBaseQuantity < 1) {
-                throw new InventoryValidationError(`Unit '${unitValue}' must contain at least 1 ${sanitizedBaseUnit}.`);
-            }
-
-            const unitsPerBase = 1 / resolvedBaseQuantity;
-
-            const record = {
-                unit: unitValue,
-                unit_price: roundToDecimals(priceValue, 2),
-                base_quantity_per_sell_unit: roundToDecimals(resolvedBaseQuantity, 6),
-                units_per_base: roundToDecimals(unitsPerBase, 6),
-                is_base: sanitizedBaseUnit ? unitValue === sanitizedBaseUnit : false
-            };
-
-            normalizedUnits.push(record);
-            seenUnits.add(unitValue);
-
-            if (record.is_base) {
-                baseUnitPrice = record.unit_price;
-            }
-        });
-    }
-
-    if (sanitizedBaseUnit) {
-        const hasBaseEntry = normalizedUnits.some(entry => entry.unit === sanitizedBaseUnit);
-        if (!hasBaseEntry) {
-            if (!baseUnitPrice || baseUnitPrice <= 0) {
-                throw new InventoryValidationError('Base unit price must be provided and greater than 0.');
-            }
-
-            normalizedUnits.push({
-                unit: sanitizedBaseUnit,
-                unit_price: roundToDecimals(baseUnitPrice, 2),
-                base_quantity_per_sell_unit: 1,
-                units_per_base: 1,
-                is_base: true
-            });
-        } else {
-            normalizedUnits.forEach(entry => {
-                if (entry.unit === sanitizedBaseUnit) {
-                    entry.is_base = true;
-                    entry.base_quantity_per_sell_unit = 1;
-                    entry.units_per_base = 1;
-                    if (!baseUnitPrice || baseUnitPrice <= 0) {
-                        baseUnitPrice = entry.unit_price;
-                    }
-                }
-            });
-        }
-    }
-
-    const sortedUnits = normalizedUnits.sort((a, b) => {
-        if (a.is_base === b.is_base) {
-            return a.unit.localeCompare(b.unit);
-        }
-        return a.is_base ? -1 : 1;
-    });
-
-    return {
-        units: sortedUnits,
-        basePrice: baseUnitPrice
-    };
-};
-
-
-const mapSellingUnitRow = (row) => ({
-    unit: row.sell_unit,
-    unit_price: Number(row.unit_price),
-    base_quantity_per_sell_unit: Number(row.base_quantity_per_sell_unit),
-    units_per_base: Number(row.units_per_base ?? (row.base_quantity_per_sell_unit ? (1 / Number(row.base_quantity_per_sell_unit)) : null)),
-    is_base: row.is_base
-});
-
-
-const getProductSellingUnits = async (productId, branchId) => {
-    const { rows } = await SQLquery(
-        `SELECT sell_unit, unit_price, base_quantity_per_sell_unit, units_per_base, is_base
-         FROM inventory_product_sell_units
-         WHERE product_id = $1 AND branch_id = $2
-         ORDER BY is_base DESC, sell_unit ASC`,
-        [productId, branchId]
-    );
-
-    return rows.map(mapSellingUnitRow);
-};
-
-
-const replaceProductSellingUnits = async (productId, branchId, sellingUnits) => {
-    await SQLquery('DELETE FROM inventory_product_sell_units WHERE product_id = $1 AND branch_id = $2', [productId, branchId]);
-
-    if (!Array.isArray(sellingUnits) || sellingUnits.length === 0) {
-        return;
-    }
-
-    const values = [];
-    const placeholders = sellingUnits.map((unit, index) => {
-        const baseQuantity = Number(unit.base_quantity_per_sell_unit ?? (unit.units_per_base ? (1 / Number(unit.units_per_base)) : 0));
-        const price = Number(unit.unit_price);
-
-        if (!baseQuantity || baseQuantity <= 0) {
-            throw new InventoryValidationError(`Invalid conversion ratio for unit '${unit.unit}'.`);
-        }
-
-        if (!price || price <= 0) {
-            throw new InventoryValidationError(`Invalid price for unit '${unit.unit}'.`);
-        }
-
-        const offset = index * 6;
-        values.push(productId, branchId, unit.unit, roundToDecimals(baseQuantity, 6), roundToDecimals(price, 2), Boolean(unit.is_base));
-        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`;
-    });
-
-    await SQLquery(
-        `INSERT INTO inventory_product_sell_units (product_id, branch_id, sell_unit, base_quantity_per_sell_unit, unit_price, is_base)
-         VALUES ${placeholders.join(', ')}`,
-        values
-    );
-};
-
-
-const ensureSellingUnitsForResponse = (units, baseUnit, basePrice) => {
-    if (Array.isArray(units) && units.length > 0) {
-        return units;
-    }
-
-    if (!baseUnit) {
-        return [];
-    }
-
-    const resolvedPrice = toNumberOrNull(basePrice);
-    if (!resolvedPrice || resolvedPrice <= 0) {
-        return [];
-    }
-
-    return [{
-        unit: baseUnit,
-        unit_price: roundToDecimals(resolvedPrice, 2),
-        base_quantity_per_sell_unit: 1,
-        units_per_base: 1,
-        is_base: true
-    }];
-};
-
-
 const sanitizeProductPayload = (productData) => {
     if (!productData) return null;
 
@@ -294,17 +100,6 @@ const sanitizeProductPayload = (productData) => {
     let sanitizedUnitPrice = Number(productData.unit_price);
     if (!Number.isFinite(sanitizedUnitPrice)) {
         sanitizedUnitPrice = null;
-    }
-
-    let normalizedSellingUnits = null;
-    const hasSellingUnits = Array.isArray(productData.selling_units) && productData.selling_units.length > 0;
-
-    if (hasSellingUnits) {
-        const normalized = normalizeSellingUnitsPayload(productData.selling_units, baseUnit, sanitizedUnitPrice);
-        normalizedSellingUnits = normalized.units;
-        if (normalized.basePrice && normalized.basePrice > 0) {
-            sanitizedUnitPrice = normalized.basePrice;
-        }
     }
 
     if (!sanitizedUnitPrice || sanitizedUnitPrice <= 0) {
@@ -328,8 +123,7 @@ const sanitizeProductPayload = (productData) => {
         fullName: productData.fullName,
         requestor_roles: normalizeRoles(productData.requestor_roles || productData.userRoles),
         existing_product_id: productData.existing_product_id || null,
-        description: productData.description || null,
-        selling_units: normalizedSellingUnits
+        description: productData.description || null
     };
 };
 
@@ -769,30 +563,7 @@ export const getAllUniqueProducts = async () => {
             c.category_name,
             ip.unit,
             p.description,
-            COALESCE(
-                (
-                    SELECT jsonb_agg(jsonb_build_object(
-                        'unit', sub.sell_unit,
-                        'unit_price', sub.unit_price,
-                        'base_quantity_per_sell_unit', sub.base_quantity_per_sell_unit,
-                        'units_per_base', sub.units_per_base,
-                        'is_base', sub.is_base
-                    ) ORDER BY sub.is_base DESC, sub.sell_unit ASC)
-                    FROM (
-                        SELECT DISTINCT ON (sup.sell_unit)
-                            sup.sell_unit,
-                            sup.unit_price,
-                            sup.base_quantity_per_sell_unit,
-                            sup.units_per_base,
-                            sup.is_base,
-                            sup.updated_at
-                        FROM inventory_product_sell_units sup
-                        WHERE sup.product_id = ip.product_id
-                        ORDER BY sup.sell_unit, sup.updated_at DESC
-                    ) sub
-                ),
-                '[]'::jsonb
-            ) AS selling_units,
+            '[]'::jsonb AS selling_units,
             STRING_AGG(DISTINCT b.branch_name, ', ' ORDER BY b.branch_name) as branches
         FROM inventory_product ip
         LEFT JOIN category c USING(category_id)
@@ -819,21 +590,7 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
             ip.unit, 
             ip.unit_price, 
             ip.unit_cost, 
-            COALESCE(
-                (
-                    SELECT jsonb_agg(json_build_object(
-                        'unit', sup.sell_unit,
-                        'unit_price', sup.unit_price,
-                        'base_quantity_per_sell_unit', sup.base_quantity_per_sell_unit,
-                        'units_per_base', sup.units_per_base,
-                        'is_base', sup.is_base
-                    ) ORDER BY sup.is_base DESC, sup.sell_unit ASC)
-                    FROM inventory_product_sell_units sup
-                    WHERE sup.product_id = ip.product_id
-                      AND sup.branch_id = ip.branch_id
-                ),
-                '[]'::jsonb
-            ) AS selling_units,
+            '[]'::jsonb AS selling_units,
             COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
             ip.min_threshold,
             ip.max_threshold,
@@ -876,21 +633,7 @@ export const getProductItems = async(branchId) => {
                 ip.unit, 
                 ip.unit_price, 
                 ip.unit_cost, 
-                COALESCE(
-                    (
-                        SELECT jsonb_agg(json_build_object(
-                            'unit', sup.sell_unit,
-                            'unit_price', sup.unit_price,
-                            'base_quantity_per_sell_unit', sup.base_quantity_per_sell_unit,
-                            'units_per_base', sup.units_per_base,
-                            'is_base', sup.is_base
-                        ) ORDER BY sup.is_base DESC, sup.sell_unit ASC)
-                        FROM inventory_product_sell_units sup
-                        WHERE sup.product_id = ip.product_id
-                          AND sup.branch_id = ip.branch_id
-                    ),
-                    '[]'::jsonb
-                ) AS selling_units,
+                '[]'::jsonb AS selling_units,
                 COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
                 ip.min_threshold,
                 ip.max_threshold,
@@ -929,21 +672,7 @@ export const getProductItems = async(branchId) => {
             ip.unit, 
             ip.unit_price, 
             ip.unit_cost, 
-            COALESCE(
-                (
-                    SELECT jsonb_agg(json_build_object(
-                        'unit', sup.sell_unit,
-                        'unit_price', sup.unit_price,
-                        'base_quantity_per_sell_unit', sup.base_quantity_per_sell_unit,
-                        'units_per_base', sup.units_per_base,
-                        'is_base', sup.is_base
-                    ) ORDER BY sup.is_base DESC, sup.sell_unit ASC)
-                    FROM inventory_product_sell_units sup
-                    WHERE sup.product_id = ip.product_id
-                      AND sup.branch_id = ip.branch_id
-                ),
-                '[]'::jsonb
-            ) AS selling_units,
+            '[]'::jsonb AS selling_units,
             COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
             ip.min_threshold,
             ip.max_threshold,
@@ -990,7 +719,7 @@ export const addProductItem = async (productData, options = {}) => {
         fullName: actingUserName
     });
 
-    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id, description, selling_units: sanitizedSellingUnits } = cleanedData;
+    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id, description } = cleanedData;
 
     const isNewProductSubmission = !existing_product_id;
     const ignorePendingId = bypassApproval ? pendingActionId : null;
@@ -1098,9 +827,6 @@ export const addProductItem = async (productData, options = {}) => {
 
     // Get base unit and conversion factor for the unit
     const unitConversion = getUnitConversion(unit);
-    const sellingUnits = Array.isArray(sanitizedSellingUnits) && sanitizedSellingUnits.length > 0
-        ? sanitizedSellingUnits
-        : normalizeSellingUnitsPayload([], unit, unit_price).units;
     
     await SQLquery(
         `INSERT INTO Inventory_Product 
@@ -1108,8 +834,6 @@ export const addProductItem = async (productData, options = {}) => {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [product_id, category_id, branch_id, product_name, unit, unit_price, unit_cost, min_threshold, max_threshold, unitConversion.base_unit, unitConversion.conversion_factor]
     );   
-
-    await replaceProductSellingUnits(product_id, branch_id, sellingUnits);
 
     // Calculate base units for storage - ensure quantity_added is a number
     const quantity_added_base = convertToBaseUnit(Number(quantity_added), unit);
@@ -1281,9 +1005,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
         branch_id: branchIdNumeric
     });
 
-    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, selling_units: sanitizedSellingUnits } = cleanedData;
-
-    const sellingUnitsProvided = Array.isArray(sanitizedSellingUnits) && sanitizedSellingUnits.length > 0;
+    const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName } = cleanedData;
 
     const addStocksQuery = async () => {
         // Calculate base units for storage - ensure quantity_added is a number
@@ -1335,40 +1057,6 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
     const color = 'blue';
 
     await SQLquery('BEGIN');
-
-    const basePriceForNormalization = Number.isFinite(normalizedUnitPrice) && normalizedUnitPrice > 0
-        ? normalizedUnitPrice
-        : Number(unit_price);
-
-    let sellingUnitsToPersist = await getProductSellingUnits(itemId, branch_id);
-
-    if (sellingUnitsProvided) {
-        sellingUnitsToPersist = sanitizedSellingUnits;
-    }
-
-    if (unitChanged) {
-        sellingUnitsToPersist = normalizeSellingUnitsPayload([], unit, basePriceForNormalization).units;
-    } else if (!sellingUnitsProvided && (!sellingUnitsToPersist || sellingUnitsToPersist.length === 0)) {
-        sellingUnitsToPersist = normalizeSellingUnitsPayload([], unit, basePriceForNormalization).units;
-    }
-
-    if (!sellingUnitsProvided && !unitChanged && Array.isArray(sellingUnitsToPersist)) {
-        sellingUnitsToPersist = sellingUnitsToPersist.map(entry => {
-            if (entry.unit === unit) {
-                return {
-                    ...entry,
-                    unit_price: basePriceForNormalization,
-                    is_base: true,
-                    base_quantity_per_sell_unit: 1,
-                    units_per_base: 1
-                };
-            }
-            return entry;
-        });
-    }
-
-    sellingUnitsToPersist = normalizeSellingUnitsPayload(sellingUnitsToPersist, unit, basePriceForNormalization).units;
-    const shouldUpdateSellingUnits = sellingUnitsProvided || unitChanged || priceChanged || !sellingUnitsToPersist.length;
 
     let alertResult = null;
     let finalMessage = '';
@@ -1481,10 +1169,6 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
                 alert_date_formatted: 'Just now'
             });
         }
-    }
-
-    if (shouldUpdateSellingUnits) {
-        await replaceProductSellingUnits(itemId, branch_id, sellingUnitsToPersist);
     }
 
     await SQLquery('COMMIT');

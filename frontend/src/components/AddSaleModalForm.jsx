@@ -900,22 +900,22 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
 
                           <td className="px-2 relative overflow-visible min-w-[140px]">
-  <DropdownUnitSelect
-    className="relative"                 // anchor the absolute-positioned menu
-    label="Unit"
-    labelClassName="sr-only"             // hide label in table
-    placeholder={row.product_id ? 'Select unit' : 'Choose product first'}
-    disabled={!row.product_id}
-    value={row.unit || ''}
-    onChange={(e) => handleUnitChange(idx, e.target.value)}
-    options={
-      !row.product_id
-        ? [{ value: '', label: 'Choose product first' }]
-        : (Array.isArray(row.sellingUnits) ? row.sellingUnits : [])
-            .map(u => ({ value: u.unit, label: u.unit }))
-    }
-  />
-</td>
+                            <DropdownUnitSelect
+                              className="relative"                 // anchor the absolute-positioned menu
+                              label="Unit"
+                              labelClassName="sr-only"             // hide label in table
+                              placeholder={row.product_id ? 'Select unit' : 'Choose product first'}
+                              disabled={!row.product_id}
+                              value={row.unit || ''}
+                              onChange={(e) => handleUnitChange(idx, e.target.value)}
+                              options={
+                                !row.product_id
+                                  ? [{ value: '', label: 'Choose product first' }]
+                                  : (Array.isArray(row.sellingUnits) ? row.sellingUnits : [])
+                                      .map(u => ({ value: u.unit, label: u.unit }))
+                              }
+                            />
+                          </td>
 
 
 

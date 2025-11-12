@@ -242,37 +242,43 @@ export const setToDelivered = async(saleID, update) => {
         }
         else if (!wasDelivered && status.is_delivered) {
 
-            // NOT DELIVERED > DELIVERED - CHECK IF STOCK NEEDS RE-DEDUCTION
-            const {rows: stockUsage} = await SQLquery(`
-                SELECT is_restored 
-                FROM Sales_Stock_Usage 
-                WHERE sales_information_id = $1 
-                LIMIT 1`,
-                [saleID]
-
-            );
-
-            // ONLY RE-DEDUCT IF STOCK WAS RESTORED DUE TO PREVIOUS UNDELIVERED STATUS
-            if (stockUsage.length > 0 && stockUsage[0].is_restored === true) {
-                const {rows: itemsToDeduct} = await SQLquery(`
-                    SELECT 
-                        product_id,
-                        quantity_display AS quantity,
-                        unit
-                    FROM Sales_Items
-                    WHERE sales_information_id = $1`,
+            // NOT DELIVERED > DELIVERED
+            // If the sale was already "pending" (out for delivery) we must NOT re-deduct stock here
+            // because stock was deducted when the sale was created or when it was set to pending.
+            if (wasPending) {
+                console.log(`Delivery confirmed for sale ID: ${saleID} (pending -> delivered) - no stock re-deduction required`);
+            } else {
+                // CHECK IF STOCK NEEDS RE-DEDUCTION (only when it was previously restored)
+                const {rows: stockUsage} = await SQLquery(`
+                    SELECT is_restored 
+                    FROM Sales_Stock_Usage 
+                    WHERE sales_information_id = $1 
+                    LIMIT 1`,
                     [saleID]
                 );
 
-                const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
-                const branchId = branchInfo[0]?.branch_id;
+                // ONLY RE-DEDUCT IF STOCK WAS RESTORED DUE TO PREVIOUS UNDELIVERED STATUS
+                if (stockUsage.length > 0 && stockUsage[0].is_restored === true) {
+                    const {rows: itemsToDeduct} = await SQLquery(`
+                        SELECT 
+                            product_id,
+                            quantity_display AS quantity,
+                            unit
+                        FROM Sales_Items
+                        WHERE sales_information_id = $1`,
+                        [saleID]
+                    );
 
-                for (const product of itemsToDeduct) {
-                    await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
+                    const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
+                    const branchId = branchInfo[0]?.branch_id;
+
+                    for (const product of itemsToDeduct) {
+                        await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
+                    }
+                    console.log(`Stock re-deducted for sale ID: ${saleID} (was previously restored)`);
+                } else {
+                    console.log(`Delivery confirmed for sale ID: ${saleID} (stock remained deducted - no double deduction)`);
                 }
-                console.log(`Stock re-deducted for sale ID: ${saleID} (was previously restored)`);
-            } else {
-                console.log(`Delivery confirmed for sale ID: ${saleID} (stock remained deducted - no double deduction)`);
             }
 
         }
