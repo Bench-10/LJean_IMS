@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { FaSpinner } from "react-icons/fa";
+import useModalLock from "../../hooks/useModalLock"; // adjust path if needed
 
 /**
  * RejectionReasonDialog
  * - Shows a loading spinner and blocks closing while submitting
- * - Locks body scroll when open
- * - Use with a parent that: (1) awaits API, (2) closes dialog, then (3) refreshes + toasts
+ * - Uses useModalLock to prevent background scroll and close on Back
+ * - Parent is responsible for closing the dialog and then refreshing/toasting
  */
 function RejectionReasonDialog({
   open = false,
@@ -14,84 +15,63 @@ function RejectionReasonDialog({
   description = "Add an optional note explaining why this request is being rejected.",
   confirmLabel = "Submit",
   cancelLabel = "Cancel",
-  onCancel,                    // () => void
-  onConfirm,                   // (reason) => (void | Promise)
+  onCancel,
+  onConfirm,
   initialReason = "",
-  sanitizeInput,               // optional (value: string) => string
-  loading: loadingProp = false,      // controlled loading from parent (boolean)
+  sanitizeInput,
+  loading: loadingProp = false,
   loadingLabel = "Submitting…",
-  blockCloseWhileLoading = true,     // prevent closing while loading
-  zIndexClass = "z-[6000]",          // ensure above toasts
+  blockCloseWhileLoading = true,
+  zIndexClass = "z-[6000]",
 }) {
   const [reason, setReason] = useState(initialReason ?? "");
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef(null);
   const openRef = useRef(open);
 
-  // unified loading flag (parent-controlled OR internal)
+  // Unified loading flag (parent-controlled OR internal)
   const loading = useMemo(
     () => Boolean(loadingProp) || submitting,
     [loadingProp, submitting]
   );
 
-  // Reset & lock scroll on open
+  // Reset reason when opened
   useEffect(() => {
     if (!open) return;
     setReason(initialReason ?? "");
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
   }, [open, initialReason]);
 
-  // Focus textarea when opened
+  // Focus textarea when opened and keep openRef in sync
   useEffect(() => {
     if (open) textareaRef.current?.focus();
     openRef.current = open;
   }, [open]);
 
-  // ESC to close (unless loading)
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape" && open && !(loading && blockCloseWhileLoading)) {
-        onCancel?.();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, loading, blockCloseWhileLoading, onCancel]);
+  const handleChange = useCallback(
+    (e) => {
+      const val = sanitizeInput ? sanitizeInput(e.target.value) : e.target.value;
+      setReason(val);
+    },
+    [sanitizeInput]
+  );
 
-  if (!open) return null;
-
-  const handleChange = (e) => {
-    const val = sanitizeInput ? sanitizeInput(e.target.value) : e.target.value;
-    setReason(val);
-  };
-
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     if (loading && blockCloseWhileLoading) return;
     setReason(initialReason ?? "");
     onCancel?.();
-  };
+  }, [loading, blockCloseWhileLoading, initialReason, onCancel]);
 
-  const handleConfirm = async () => {
+  const handleConfirm = useCallback(async () => {
     const trimmed = reason.trim();
     try {
-      // Show loading in the dialog BEFORE any background update occurs
       setSubmitting(true);
 
-      // Call the parent handler. If it returns a promise, await it.
-      // If it returns synchronously (void), keep the dialog in a loading
-      // state until the parent closes the dialog (open -> false) or a
-      // sane timeout elapses. This covers cases where the parent fires an
-      // async background task but doesn't return a promise.
       const maybePromise = onConfirm?.(trimmed);
 
       if (maybePromise && typeof maybePromise.then === "function") {
         await maybePromise;
       } else {
-        // wait until parent closes dialog (open becomes false) or 10s timeout
+        // Wait until parent closes dialog (open becomes false) or 10s timeout
         await new Promise((resolve) => {
           const interval = setInterval(() => {
             if (!openRef.current) {
@@ -107,12 +87,27 @@ function RejectionReasonDialog({
           }, 10000);
         });
       }
-      // IMPORTANT: Do not auto-close here.
-      // Let the parent close the dialog FIRST, then refresh + toast (see example below).
+      // Parent is responsible for actually closing the dialog
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [reason, onConfirm]);
+
+  // Apply modal lock to prevent background scroll and make Back close via handleCancel
+  useModalLock(open, handleCancel);
+
+  // ESC to close (respect loading and blockCloseWhileLoading)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape" && open && !(loading && blockCloseWhileLoading)) {
+        handleCancel();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, loading, blockCloseWhileLoading, handleCancel]);
+
+  if (!open) return null;
 
   return ReactDOM.createPortal(
     <div
@@ -127,7 +122,7 @@ function RejectionReasonDialog({
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-[2px]"
         onClick={() => {
-          if (!(loading && blockCloseWhileLoading)) onCancel?.();
+          if (!(loading && blockCloseWhileLoading)) handleCancel();
         }}
       />
 

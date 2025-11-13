@@ -29,23 +29,24 @@ function ProductInventory({
   highlightPendingDirective = null,
   onHighlightConsumed
 }) {
-
   const { user } = useAuth();
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState(() => user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) ? user.branch_id : '');
+  const [selectedBranch, setSelectedBranch] = useState(
+    () =>
+      user &&
+      user.role &&
+      user.role.some(role => ['Branch Manager'].includes(role))
+        ? user.branch_id
+        : ''
+  );
   const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [pendingRejectId, setPendingRejectId] = useState(null);
 
-  // lock body scroll while modal is open
-  useEffect(() => {
-    if (!isPendingDialogOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, [isPendingDialogOpen]);
+  // Track if we already pushed a history state for the pending modal
+  const hasPushedPendingModalRef = useRef(false);
 
   // Loading states for approve/reject actions (store pending_id while processing)
   const [approvingIds, setApprovingIds] = useState(() => new Set());
@@ -60,7 +61,10 @@ function ProductInventory({
   const pendingDialogScrollRef = useRef(null);
   const lastHandledPendingHighlightRef = useRef(null);
 
-  const displayPendingApprovals = user && user.role && user.role.some(role => ['Branch Manager'].includes(role));
+  const displayPendingApprovals =
+    user &&
+    user.role &&
+    user.role.some(role => ['Branch Manager'].includes(role));
 
   const formatDateTime = (value) => {
     if (!value) return '';
@@ -139,6 +143,61 @@ function ProductInventory({
     })();
   };
 
+  // Close handler for Pending dialog that cooperates with browser history
+  const handleClosePendingDialog = useCallback(() => {
+    if (typeof window !== 'undefined' && hasPushedPendingModalRef.current) {
+      // Let the first "Back" just close the modal by popping the pushed state
+      window.history.back();
+    } else {
+      // Fallback if no history state was pushed
+      setIsPendingDialogOpen(false);
+      setHighlightedPendingIds([]);
+    }
+  }, []);
+
+  // Lock background scroll + handle browser/device Back when Pending dialog is open
+  useEffect(() => {
+    if (!isPendingDialogOpen) return;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const { documentElement, body } = document;
+    const prevHtmlOverflow = documentElement.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+
+    // Lock scroll on both <html> and <body>
+    documentElement.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+
+    // Push a history state so that the next "Back" only closes the modal
+    if (!hasPushedPendingModalRef.current) {
+      window.history.pushState(
+        { ...(window.history.state || {}), pendingInventoryModal: true },
+        ''
+      );
+      hasPushedPendingModalRef.current = true;
+    }
+
+    const handlePopState = (event) => {
+      // If the modal was open and history moves back, close the modal
+      if (hasPushedPendingModalRef.current) {
+        hasPushedPendingModalRef.current = false;
+        setIsPendingDialogOpen(false);
+        setHighlightedPendingIds([]);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      documentElement.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      window.removeEventListener('popstate', handlePopState);
+      // If we are cleaning up while still marked as pushed, clear the flag
+      if (hasPushedPendingModalRef.current && !isPendingDialogOpen) {
+        hasPushedPendingModalRef.current = false;
+      }
+    };
+  }, [isPendingDialogOpen]);
 
   // NEW: DIALOG STATE
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -151,7 +210,7 @@ function ProductInventory({
   const handleSearch = (event) => {
     setSearchItem(sanitizeInput(event.target.value));
     setCurrentPage(1); // Reset to first page when searching
-  }
+  };
 
   // RESET PAGINATION WHEN FILTERS CHANGE
   useEffect(() => {
@@ -169,23 +228,22 @@ function ProductInventory({
     setSelectedItem(null);
   };
 
-  //CONTAINS ALL AVAILABLE PRODUCTS WHEN LOADED
+  // CONTAINS ALL AVAILABLE PRODUCTS WHEN LOADED
   let filteredProducts = productsData;
 
-  //FILTER BY CATEGORY
+  // FILTER BY CATEGORY
   filteredProducts = selectedCategory
     ? filteredProducts.filter(item => item.category_id === Number(selectedCategory))
     : filteredProducts;
 
-  //FILTER BY BRANCH
+  // FILTER BY BRANCH
   filteredProducts = selectedBranch
     ? filteredProducts.filter(item => item.branch_id === Number(selectedBranch))
     : filteredProducts;
 
-  //FILTER BY SEARCH
+  // FILTER BY SEARCH
   const filteredData = filteredProducts.filter(product =>
     product.product_name.toLowerCase().includes(searchItem.toLowerCase())
-
   );
 
   // PAGINATION LOGIC
@@ -232,7 +290,9 @@ function ProductInventory({
       return (request.created_by_name || '').toLowerCase() === normalizedName;
     };
 
-    const targetIds = (pendingRequests || []).filter(matchesDirective).map(req => req.pending_id);
+    const targetIds = (pendingRequests || [])
+      .filter(matchesDirective)
+      .map(req => req.pending_id);
 
     lastHandledPendingHighlightRef.current = highlightPendingDirective.triggeredAt;
 
@@ -295,10 +355,8 @@ function ProductInventory({
   };
 
   return (
-
     <div className="pt-20 lg:pt-7 px-4 lg:px-8 pb-6">
-
-      {/*REJECTION REASON */}
+      {/* REJECTION REASON */}
       <RejectionReasonDialog
         open={isRejectDialogOpen}
         onCancel={handleRejectDialogCancel}
@@ -316,9 +374,9 @@ function ProductInventory({
         item={selectedItem}
       />
 
-      <div className='flex items-center justify-between'>
-        {/*TITLE*/}
-        <h1 className=' text-[33px] leading-[36px] font-bold text-green-900'>
+      <div className="flex items-center justify-between">
+        {/* TITLE */}
+        <h1 className="text-[33px] leading-[36px] font-bold text-green-900">
           INVENTORY
         </h1>
       </div>
@@ -331,7 +389,7 @@ function ProductInventory({
           {/* Backdrop: click to close */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setIsPendingDialogOpen(false)}
+            onClick={handleClosePendingDialog}
           />
 
           {/* Panel: stop clicks from bubbling to the backdrop */}
@@ -367,7 +425,7 @@ function ProductInventory({
                 )}
                 <button
                   className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-lg transition"
-                  onClick={() => setIsPendingDialogOpen(false)}
+                  onClick={handleClosePendingDialog}
                   aria-label="Close"
                 >
                   <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -403,7 +461,11 @@ function ProductInventory({
                       <div
                         key={request.pending_id}
                         ref={(node) => setPendingRequestRef(request.pending_id, node)}
-                        className={`border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition ${isHighlighted ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse' : ''}`}
+                        className={`border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition ${
+                          isHighlighted
+                            ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse'
+                            : ''
+                        }`}
                       >
                         {/* Header Info */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-2">
@@ -424,11 +486,11 @@ function ProductInventory({
                           {/* Buttons */}
                           <div className="flex flex-wrap gap-2 w-full md:w-auto">
                             <button
-                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${isApproving === request.pending_id ||
-                                rejectingIds === request.pending_id
-                                ? 'bg-green-400 cursor-not-allowed'
-                                : 'bg-green-600 hover:bg-green-700'
-                                }`}
+                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${
+                                isBusy(request.pending_id)
+                                  ? 'bg-green-400 cursor-not-allowed'
+                                  : 'bg-green-600 hover:bg-green-700'
+                              }`}
                               onClick={() => handleApproveClick(request.pending_id)}
                               disabled={isBusy(request.pending_id)}
                             >
@@ -443,11 +505,11 @@ function ProductInventory({
                             </button>
 
                             <button
-                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${isRejecting === request.pending_id ||
-                                isApproving === request.pending_id
-                                ? 'bg-red-300 cursor-not-allowed'
-                                : 'bg-red-500 hover:bg-red-600'
-                                }`}
+                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${
+                                isBusy(request.pending_id)
+                                  ? 'bg-red-300 cursor-not-allowed'
+                                  : 'bg-red-500 hover:bg-red-600'
+                              }`}
                               onClick={() => handleRejectClick(request.pending_id)}
                               disabled={isBusy(request.pending_id)}
                             >
@@ -592,26 +654,32 @@ function ProductInventory({
           </div>
 
           {/* Branch (if allowed) */}
-          {(user && user.role && user.role.some(r => ['Branch Manager', 'Owner'].includes(r))) && (
-            <div className="w-full lg:w-auto">
-              <DropdownCustom
-                value={selectedBranch}
-                onChange={e => setSelectedBranch(e.target.value)}
-                label="Filter by Branch:"
-                variant="floating"
-                size="sm"
-                options={[
-                  ...(user.role.some(r => r === 'Owner')
-                    ? [{ value: '', label: 'All Branch' }]
-                    : branches.length !== 0 ? [] : [{ value: '', label: `${user.branch_name} (Your Branch)` }]),
-                  ...branches.map(b => ({
-                    value: b.branch_id,
-                    label: `${b.branch_name}${b.branch_id === user.branch_id ? ' (Your Branch)' : ''}`
-                  }))
-                ]}
-              />
-            </div>
-          )}
+          {user &&
+            user.role &&
+            user.role.some(r => ['Branch Manager', 'Owner'].includes(r)) && (
+              <div className="w-full lg:w-auto">
+                <DropdownCustom
+                  value={selectedBranch}
+                  onChange={e => setSelectedBranch(e.target.value)}
+                  label="Filter by Branch:"
+                  variant="floating"
+                  size="sm"
+                  options={[
+                    ...(user.role.some(r => r === 'Owner')
+                      ? [{ value: '', label: 'All Branch' }]
+                      : branches.length !== 0
+                        ? []
+                        : [{ value: '', label: `${user.branch_name} (Your Branch)` }]),
+                    ...branches.map(b => ({
+                      value: b.branch_id,
+                      label: `${b.branch_name}${
+                        b.branch_id === user.branch_id ? ' (Your Branch)' : ''
+                      }`
+                    }))
+                  ]}
+                />
+              </div>
+            )}
         </div>
 
         {/* RIGHT: actions */}
@@ -677,12 +745,15 @@ function ProductInventory({
 
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
-      {/*TABLE */}
+      {/* TABLE */}
       <div className="overflow-x-auto overflow-y-auto h-[65vh] sm:h-[65vh] md:h-[70vh] lg:h-[75vh] xl:h-[60vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
-        <table className={`w-full ${filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
+        <table
+          className={`w-full ${
+            filteredData.length === 0 ? 'h-full' : ''
+          } divide-y divide-gray-200 text-sm`}
+        >
           <thead className="sticky top-0 z-10">
             <tr>
-
               <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-40">
                 INVENTORY ID
               </th>
@@ -699,13 +770,13 @@ function ProductInventory({
                 UNIT PRICE
               </th>
 
-              {user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) &&
-
-                <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
-                  UNIT COST
-                </th>
-
-              }
+              {user &&
+                user.role &&
+                user.role.some(role => ['Branch Manager'].includes(role)) && (
+                  <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
+                    UNIT COST
+                  </th>
+                )}
 
               <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-4">
                 QUANTITY
@@ -715,104 +786,127 @@ function ProductInventory({
                 STATUS
               </th>
 
-              {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-              {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) &&
-
-                <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-20">
-                  ACTION
-                </th>
-
-              }
-
+              {/* APPEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
+              {user &&
+                user.role &&
+                user.role.some(role => ['Inventory Staff'].includes(role)) && (
+                  <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-20">
+                    ACTION
+                  </th>
+                )}
             </tr>
           </thead>
 
           <tbody className="bg-white relative">
-            {invetoryLoading ?
+            {invetoryLoading ? (
               <tr>
                 <td colSpan="13" className="h-96 text-center">
-                  <ChartLoading message='Loading inventory products...' />
+                  <ChartLoading message="Loading inventory products..." />
                 </td>
               </tr>
+            ) : currentPageData.length === 0 ? (
+              <NoInfoFound col={11} />
+            ) : (
+              currentPageData.map((row, rowIndex) => (
+                <tr
+                  key={rowIndex}
+                  className={`hover:bg-gray-200/70 h-14 ${
+                    (rowIndex + 1) % 2 === 0 ? 'bg-[#F6F6F6]' : ''
+                  }`}
+                  onClick={() => openDetails(row)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td className="px-4 py-2 text-center">
+                    {`${String(row.branch_id).padStart(2, '0')}${String(
+                      row.category_id
+                    ).padStart(2, '0')}-${row.product_id}`}
+                  </td>
+                  <td className="px-4 py-2 font-medium whitespace-nowrap">
+                    {row.product_name}
+                  </td>
+                  <td className="px-4 py-2 font-bold">
+                    {row.unit.toUpperCase()}
+                  </td>
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    {row.category_name}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    {currencyFormat(row.unit_price)}
+                  </td>
 
-              :
-
-              currentPageData.length === 0 ?
-                (
-                  <NoInfoFound col={11} />
-                ) :
-
-                (
-                  currentPageData.map((row, rowIndex) => (
-
-                    <tr key={rowIndex} className={`hover:bg-gray-200/70 h-14 ${(rowIndex + 1) % 2 === 0 ? "bg-[#F6F6F6]" : ""}`} onClick={() => openDetails(row)} style={{ cursor: 'pointer' }}>
-                      <td className="px-4 py-2 text-center"  >{`${String(row.branch_id).padStart(2, '0')}${String(row.category_id).padStart(2, '0')}-${row.product_id}`}</td>
-                      <td className="px-4 py-2 font-medium whitespace-nowrap"  >{row.product_name}</td>
-                      <td className="px-4 py-2 font-bold"  >{row.unit.toUpperCase()}</td>
-                      <td className="px-4 py-2 whitespace-nowrap"  >{row.category_name}</td>
-                      <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_price)}</td>
-
-                      {user && user.role && user.role.some(role => ['Branch Manager'].includes(role)) &&
-                        <td className="px-4 py-2 text-right"  >{currencyFormat(row.unit_cost)}</td>
-                      }
-
-                      <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
-                      <td className="px-4 py-2 text-center w-36">
-                        <div
-                          className={`inline-flex items-center justify-center h-8 px-4 rounded-full text-[13px] font-medium whitespace-nowrap min-w-[110px] border
-      ${Number(row.quantity) === 0
-                              ? 'bg-gray-300 text-gray-800 border-gray-300'       // Out of Stock
-                              : row.quantity <= row.min_threshold
-                                ? 'bg-[#f05959] text-red-900 border-red-300'         // Low Stock
-                                : row.quantity >= row.max_threshold
-                                  ? 'bg-[#1e5e1b] text-white border-green-900'         // Max Stock
-                                  : 'bg-[#61E85C] text-green-700 border-green-300'     // In Stock
-                            }`}
-                        >
-                          {Number(row.quantity) === 0
-                            ? 'Out of Stock'
-                            : row.quantity <= row.min_threshold
-                              ? 'Low Stock'
-                              : row.quantity >= row.max_threshold
-                                ? 'Max Stock'
-                                : 'In Stock'}
-                        </div>
+                  {user &&
+                    user.role &&
+                    user.role.some(role => ['Branch Manager'].includes(role)) && (
+                      <td className="px-4 py-2 text-right">
+                        {currencyFormat(row.unit_cost)}
                       </td>
+                    )}
 
-                      {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
-                      {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) &&
+                  <td className="px-4 py-2 text-right">
+                    {Number(row.quantity).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2 text-center w-36">
+                    <div
+                      className={`inline-flex items-center justify-center h-8 px-4 rounded-full text-[13px] font-medium whitespace-nowrap min-w-[110px] border
+      ${
+        Number(row.quantity) === 0
+          ? 'bg-gray-300 text-gray-800 border-gray-300' // Out of Stock
+          : row.quantity <= row.min_threshold
+          ? 'bg-[#f05959] text-red-900 border-red-300' // Low Stock
+          : row.quantity >= row.max_threshold
+          ? 'bg-[#1e5e1b] text-white border-green-900' // Max Stock
+          : 'bg-[#61E85C] text-green-700 border-green-300' // In Stock
+      }`}
+                    >
+                      {Number(row.quantity) === 0
+                        ? 'Out of Stock'
+                        : row.quantity <= row.min_threshold
+                        ? 'Low Stock'
+                        : row.quantity >= row.max_threshold
+                        ? 'Max Stock'
+                        : 'In Stock'}
+                    </div>
+                  </td>
 
-                        <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            disabled={user.branch_id !== row.branch_id}
-                            className="bg-[#007278] hover:bg-[#009097] px-5 py-1 rounded-lg text-white
+                  {/* APPEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
+                  {user &&
+                    user.role &&
+                    user.role.some(role => ['Inventory Staff'].includes(role)) && (
+                      <td
+                        className="px-4 py-2 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          disabled={user.branch_id !== row.branch_id}
+                          className="bg-[#007278] hover:bg-[#009097] px-5 py-1 rounded-lg text-white
                                          disabled:bg-gray-400 disabled:cursor-not-allowed"
-                            onClick={() => handleOpen('edit', row)}
-                          >
-                            Update
-                          </button>
-                        </td>
-
-                      }
-
-                    </tr>
-                  ))
-                )
-            }
-
+                          onClick={() => handleOpen('edit', row)}
+                        >
+                          Update
+                        </button>
+                      </td>
+                    )}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-        {error && <div className="flex font-bold justify-center px-4 py-4">{error}</div>}
+        {error && (
+          <div className="flex font-bold justify-center px-4 py-4">{error}</div>
+        )}
       </div>
 
-      {/*PAGINATION AND CONTROLS */}
-      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3'>
+      {/* PAGINATION AND CONTROLS */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-6 px-3">
         {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
-        <div className='flex justify-between items-center gap-2 sm:hidden'>
+        <div className="flex justify-between items-center gap-2 sm:hidden">
           {/* LEFT: ITEM COUNT (MOBILE) */}
-          <div className='text-xs text-gray-600 flex-shrink-0'>
+          <div className="text-xs text-gray-600 flex-shrink-0">
             {filteredData.length > 0 ? (
-              <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length}</>
+              <>
+                Showing {startIndex + 1} to{' '}
+                {Math.min(endIndex, filteredData.length)} of {filteredData.length}
+              </>
             ) : (
               <span></span>
             )}
@@ -820,56 +914,70 @@ function ProductInventory({
 
           {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
           {filteredData.length > 0 && (
-            <div className='flex items-center gap-1'>
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                onClick={() =>
+                  setCurrentPage(prev => Math.max(prev - 1, 1))
+                }
                 disabled={currentPage === 1}
-                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className="px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Previous
               </button>
-              <span className='text-xs text-gray-600 whitespace-nowrap'>
+              <span className="text-xs text-gray-600 whitespace-nowrap">
                 Page {currentPage} of {totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                onClick={() =>
+                  setCurrentPage(prev => Math.min(prev + 1, totalPages))
+                }
                 disabled={currentPage === totalPages}
-                className='px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className="px-2 py-1.5 text-xs border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Next
               </button>
             </div>
           )}
-        </div>{/* END OF MOBILE VIEW*/}
+        </div>
+        {/* END OF MOBILE VIEW */}
 
         {/* DESKTOP LAYOUT: THREE COLUMNS */}
+
         {/* LEFT: ITEM COUNT (DESKTOP) */}
-        <div className='hidden sm:block text-[13px] text-gray-600 sm:flex-1'>
+        <div className="hidden sm:block text-[13px] text-gray-600 sm:flex-1">
           {filteredData.length > 0 ? (
-            <>Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} items</>
+            <>
+              Showing {startIndex + 1} to{' '}
+              {Math.min(endIndex, filteredData.length)} of {filteredData.length}{' '}
+              items
+            </>
           ) : (
             <span></span>
           )}
         </div>
 
         {/* CENTER: PAGINATION CONTROLS (DESKTOP) */}
-        <div className='hidden sm:flex sm:justify-center sm:flex-1'>
+        <div className="hidden sm:flex sm:justify-center sm:flex-1">
           {filteredData.length > 0 && (
-            <div className='flex items-center gap-2'>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                onClick={() =>
+                  setCurrentPage(prev => Math.max(prev - 1, 1))
+                }
                 disabled={currentPage === 1}
-                className='px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className="px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Previous
               </button>
-              <span className='text-[13px] text-gray-600 whitespace-nowrap'>
+              <span className="text-[13px] text-gray-600 whitespace-nowrap">
                 Page {currentPage} of {totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                onClick={() =>
+                  setCurrentPage(prev => Math.min(prev + 1, totalPages))
+                }
                 disabled={currentPage === totalPages}
-                className='px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white'
+                className="px-3 py-1.5 text-[13px] border rounded-lg bg-white hover:bg-gray-200  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Next
               </button>
@@ -878,19 +986,22 @@ function ProductInventory({
         </div>
 
         {/* RIGHT: INVENTORY HISTORY BUTTON (BOTH MOBILE & DESKTOP) */}
-        <div className='flex justify-end sm:flex-1'>
+        <div className="flex justify-end sm:flex-1">
           <button
-            className='bg-white hover:bg-gray-200 rounded-lg border transition-all py-2 px-3 lg:px-5 text-[13px] whitespace-nowrap w-full sm:w-auto'
+            className="bg-white hover:bg-gray-200 rounded-lg border transition-all py-2 px-3 lg:px-5 text-[13px] whitespace-nowrap w-full sm:w-auto"
             onClick={() => setIsProductTransactOpen(true)}
           >
             Show Inventory History
           </button>
         </div>
       </div>
-
     </div>
-
-  )
+  );
 }
 
 export default ProductInventory;
+
+
+
+
+

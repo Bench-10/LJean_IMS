@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useCallback } from 'react';
 import dayjs from 'dayjs';
 import { currencyFormat } from '../../utils/formatCurrency';
 import { FaExclamationTriangle, FaInfoCircle, FaCalendarAlt } from 'react-icons/fa';
 import { IoMdClose } from 'react-icons/io';
+import useModalLock from '../../hooks/useModalLock'; // adjust path if needed
 
 const intervalLabelMap = {
   daily: 'day',
@@ -23,6 +24,25 @@ const RestockSuggestionsDialog = ({
   const coverageMultiplier = getIntervalMultiplier(salesInterval);
   const intervalLabel = intervalLabelMap[salesInterval] || 'period';
   const analysisFocus = selectedProductName || categoryName || 'All Products';
+
+  const handleClose = useCallback(() => {
+    onClose?.();
+  }, [onClose]);
+
+  // Prevent background scroll and make Back button close this dialog
+  useModalLock(isOpen, handleClose);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, handleClose]);
 
   const enhancedProducts = useMemo(() => {
     if (!Array.isArray(topProducts) || topProducts.length === 0) return [];
@@ -111,9 +131,13 @@ const RestockSuggestionsDialog = ({
       const historyRangeEnd = product.historyRangeEnd;
       const historyCoverageDays = product.historyCoverageDays;
       const historyCoverageLabel = formatHistoryRange(historyRangeStart, historyRangeEnd);
-      const historyCoverageMonths = historyRangeStart && historyRangeEnd && dayjs(historyRangeStart).isValid() && dayjs(historyRangeEnd).isValid()
-        ? dayjs(historyRangeEnd).diff(dayjs(historyRangeStart), 'month', true)
-        : 0;
+      const historyCoverageMonths =
+        historyRangeStart &&
+        historyRangeEnd &&
+        dayjs(historyRangeStart).isValid() &&
+        dayjs(historyRangeEnd).isValid()
+          ? dayjs(historyRangeEnd).diff(dayjs(historyRangeStart), 'month', true)
+          : 0;
 
       const periodsHistorical = historySeries.length;
       const totalHistoricalUnits = historySeries.reduce((s, e) => s + e.units_sold, 0);
@@ -163,7 +187,7 @@ const RestockSuggestionsDialog = ({
         historyRangeEnd,
         historyCoverageDays,
         historyCoverageLabel,
-        historyCoverageMonths
+        historyCoverageMonths,
       };
     });
   }, [prioritizedProducts, coverageMultiplier]);
@@ -227,12 +251,18 @@ const RestockSuggestionsDialog = ({
   `;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <style>{hideScrollbarStyles}</style>
+
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={handleClose}
+      />
 
       {/* Panel */}
       <div
-        className="bg-white rounded-lg w-full max-w-4xl h-[90vh] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden"
+        className="relative bg-white rounded-lg w-full max-w-4xl h-[90vh] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {/* Header */}
@@ -246,7 +276,7 @@ const RestockSuggestionsDialog = ({
             </div>
 
             <button
-              onClick={onClose}
+              onClick={handleClose}
               aria-label="Close"
               className="shrink-0 text-gray-600 top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 "
             >
@@ -261,7 +291,9 @@ const RestockSuggestionsDialog = ({
             <div className="text-center py-12">
               <FaInfoCircle className="text-4xl text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-2">Generating restock insights…</p>
-              <p className="text-sm text-gray-500">We are refreshing Prophet forecasts to match the selected interval.</p>
+              <p className="text-sm text-gray-500">
+                We are refreshing Prophet forecasts to match the selected interval.
+              </p>
             </div>
           ) : !hasData ? (
             <div className="text-center py-12">
@@ -344,7 +376,6 @@ const RestockSuggestionsDialog = ({
                     {/* NAME + METRICS ROW */}
                     <div className="mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                       <div className="min-w-0">
-                        {/* Name wraps on mobile (no truncation) */}
                         <h4 className="text-base sm:text-lg font-semibold text-gray-900 whitespace-normal break-words">
                           {p.name}
                         </h4>
@@ -359,7 +390,9 @@ const RestockSuggestionsDialog = ({
                         <div className="text-xs sm:text-sm font-semibold text-emerald-700">
                           {p.totalHistoricalUnits.toLocaleString()} units sold
                         </div>
-                        <div className="text-[11px] sm:text-xs text-gray-500">{currencyFormat(p.salesAmount)}</div>
+                        <div className="text-[11px] sm:text-xs text-gray-500">
+                          {currencyFormat(p.salesAmount)}
+                        </div>
                       </div>
                     </div>
 
@@ -369,7 +402,9 @@ const RestockSuggestionsDialog = ({
                       <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 md:flex-1 flex flex-col items-center justify-center text-center">
                         <h5 className="text-sm font-semibold text-gray-800">Historical snapshot</h5>
                         {p.periodsHistorical === 0 ? (
-                          <p className="mt-2 text-xs text-gray-500">Not enough historical data for this product.</p>
+                          <p className="mt-2 text-xs text-gray-500">
+                            Not enough historical data for this product.
+                          </p>
                         ) : (
                           <div className="mt-2 space-y-2 text-gray-600">
                             <div className="text-2xl font-extrabold text-gray-900">
@@ -381,7 +416,9 @@ const RestockSuggestionsDialog = ({
                             <div className="text-[11px] sm:text-xs text-gray-500">
                               {p.historyCoverageLabel
                                 ? `Coverage: ${p.historyCoverageLabel}`
-                                : `Based on ${p.periodsHistorical} ${intervalLabel}${p.periodsHistorical === 1 ? '' : 's'}`}
+                                : `Based on ${p.periodsHistorical} ${intervalLabel}${
+                                    p.periodsHistorical === 1 ? '' : 's'
+                                  }`}
                             </div>
                           </div>
                         )}
@@ -390,7 +427,9 @@ const RestockSuggestionsDialog = ({
                       {/* Recommendation */}
                       <div className="rounded-lg bg-emerald-50 p-4 md:flex-1 md:border-l md:border-gray-200 md:pl-4 flex flex-col items-center justify-center">
                         <div className="w-full text-center">
-                          <div className="text-sm font-semibold text-gray-700 mb-2">Recommended restocking</div>
+                          <div className="text-sm font-semibold text-gray-700 mb-2">
+                            Recommended restocking
+                          </div>
                           <div className="flex items-center justify-center">
                             <div className="text-center">
                               <div className="mt-1 text-2xl md:text-3xl font-extrabold text-emerald-900">
@@ -427,7 +466,9 @@ const RestockSuggestionsDialog = ({
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-sm sm:text-base text-gray-700">Budget allocation recommendation</div>
+              <div className="text-sm sm:text-base text-gray-700">
+                Budget allocation recommendation
+              </div>
               <div className="text-lg sm:text-2xl font-extrabold text-gray-900 mt-1">
                 {currencyFormat(totalAllocation)}
               </div>

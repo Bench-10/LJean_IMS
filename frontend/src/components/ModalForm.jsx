@@ -7,6 +7,7 @@ import api from '../utils/api';
 import { getQuantityStep, validateQuantity, getQuantityPlaceholder } from '../utils/unitConversion';
 import DropdownCustom from './DropdownCustom';
 import DatePickerCustom from './DatePickerCustom';
+import useModalLock from '../hooks/useModalLock';
 
 function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput }) {
   const { user } = useAuth();
@@ -53,12 +54,31 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   // Lock background scroll while open
   useEffect(() => {
     if (isModalOpen) {
-      const original = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
       setTimeout(() => firstFieldRef.current?.focus(), 0);
-      return () => { document.body.style.overflow = original; };
+      setDialog(false);
     }
   }, [isModalOpen]);
+
+    // Modal lock: prevent background scroll + close on browser Back
+  const isInventoryStaff = user?.role?.some(r => r === 'Inventory Staff');
+
+const handleModalClose = useCallback(() => {
+  // Close the confirmation dialog too
+  setDialog(false);
+
+  // Reset local modal UI state
+  setEditChoice(null);
+  setShowExistingProducts(false);
+  setMaxQuant(false);
+  setShowSellingUnitsEditor(false);
+
+  // Tell parent to hide the modal
+  onClose();
+}, [onClose]);
+
+  // Lock body scroll and intercept Back button while the modal is open
+  useModalLock(Boolean(isModalOpen && isInventoryStaff), handleModalClose);
+
 
   const areSellingUnitsEqual = (first = [], second = []) => {
     if (first.length !== second.length) return false;
@@ -477,7 +497,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       };
 
       await OnSubmit(itemDataPayload);
-      onClose();
+       handleModalClose();
     } catch (error) {
       console.error('Error submitting form:', error);
     } finally {
@@ -535,7 +555,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
             <div className="mt-8 text-center">
               <button
                 type="button"
-                onClick={() => { onClose(); setEditChoice(null); setShowExistingProducts(false); setMaxQuant(false); setShowSellingUnitsEditor(false); }}
+                onClick={handleModalClose}
                 className="text-sm text-gray-600 px-5 py-2 rounded-md border hover:bg-gray-50"
               >
                 Cancel
@@ -550,7 +570,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
         <div
           className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm"
           style={{ pointerEvents: 'auto' }}
-          onClick={() => { onClose(); setMaxQuant(false); setShowSellingUnitsEditor(false); }}
+          onClick={handleModalClose}
         />
       )}
 
@@ -804,12 +824,7 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
     <button
   type="button"
   aria-label="Close"
-  onClick={() => {
-    onClose();
-    setShowExistingProducts(false);
-    setMaxQuant(false);
-    setShowSellingUnitsEditor(false);
-  }}
+  onClick={handleModalClose}
   className="absolute w-9 h-9 inline-flex items-center justify-center rounded-lg hover:bg-gray-100
              "
   style={{ top: 2, right: 1 }}

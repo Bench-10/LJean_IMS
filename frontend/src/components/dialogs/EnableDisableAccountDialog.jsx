@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { FaSpinner } from "react-icons/fa";
 import { MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
 import { IoMdClose } from "react-icons/io";
+import useModalLock from "../../hooks/useModalLock"; 
 
 function EnableDisableAccountDialog({ onClose, status, action, loading = false }) {
   const isCurrentlyDisabled = !!status;      // true => disabled now
@@ -23,15 +24,28 @@ function EnableDisableAccountDialog({ onClose, status, action, loading = false }
   const [pending, setPending] = useState(false);
   const effectiveLoading = loading || pending;
 
-  // ESC to close (no TS annotations)
+  // 🔒 Unified close handler (used by ESC, overlay, X, Cancel, Back button)
+  const handleModalClose = useCallback(() => {
+    if (effectiveLoading) return;  // don't close if we're mid-request
+    onClose?.();
+  }, [effectiveLoading, onClose]);
+
+  // 🔒 Apply modal lock: prevent background scroll + intercept BACK to close modal
+  // This component only exists when it's open, so `isOpen` is always true here.
+  useModalLock(true, handleModalClose);
+
+  // ESC to close (reuse the same close logic)
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "Escape" && !effectiveLoading) onClose?.();
+      if (e.key === "Escape") {
+        handleModalClose();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [effectiveLoading, onClose]);
+  }, [handleModalClose]);
 
+  // Autofocus Cancel
   useEffect(() => {
     cancelRef.current?.focus();
   }, []);
@@ -44,7 +58,7 @@ function EnableDisableAccountDialog({ onClose, status, action, loading = false }
       if (maybe && typeof maybe.then === "function") {
         await maybe; // await promise if returned
       }
-      // if action is sync, it already ran; we still showed the spinner briefly
+      // if action is sync, it already ran
     } finally {
       setPending(false);
     }
@@ -58,10 +72,13 @@ function EnableDisableAccountDialog({ onClose, status, action, loading = false }
       aria-labelledby="enable-disable-title"
       aria-describedby="enable-disable-desc"
     >
+      {/* Dimmed overlay */}
       <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" />
+
+      {/* Click outside to close (when not loading) */}
       <div
         className="relative min-h-full grid place-items-center p-4 sm:p-6"
-        onClick={() => !effectiveLoading && onClose?.()}
+        onClick={handleModalClose}
       >
         <div
           className="w-full max-w-[92vw] sm:max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-popup"
@@ -86,7 +103,7 @@ function EnableDisableAccountDialog({ onClose, status, action, loading = false }
             </div>
             <button
               type="button"
-              onClick={() => !effectiveLoading && onClose?.()}
+              onClick={handleModalClose}
               className="h-9 w-9 inline-flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition disabled:opacity-60"
               aria-label="Close"
               disabled={effectiveLoading}
@@ -100,7 +117,7 @@ function EnableDisableAccountDialog({ onClose, status, action, loading = false }
               <button
                 type="button"
                 ref={cancelRef}
-                onClick={() => !effectiveLoading && onClose?.()}
+                onClick={handleModalClose}
                 className="w-full sm:w-auto rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 transition disabled:opacity-60"
                 disabled={effectiveLoading}
               >

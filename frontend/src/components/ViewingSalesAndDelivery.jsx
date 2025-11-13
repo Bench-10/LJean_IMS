@@ -8,6 +8,7 @@ import NoInfoFound from './common/NoInfoFound';
 import api from '../utils/api';
 import { currencyFormat } from '../utils/formatCurrency';
 import ChartLoading from './common/ChartLoading';
+import useModalLock from '../hooks/useModalLock';
 
 const escapeHtml = (value) => {
   if (value === null || value === undefined) return '';
@@ -24,6 +25,8 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
 
+  // 🔒 Lock body scroll and intercept Back while this modal is open
+  useModalLock(openModal, closeModal);
 
   const statusDetails = useMemo(() => {
     if (!headerInformation) return null;
@@ -74,7 +77,8 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
   useEffect(() => {
     if (!sale_id) return;
     items();
-  }, [openModal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openModal]); // re-fetch when modal opens
 
   const items = async () => {
     try {
@@ -352,20 +356,18 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
         <div className="relative flex flex-col border border-gray-600/40 bg-white h-[95vh] sm:h-[90vh] w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[1100px] max-h-none sm:max-h-[700px] rounded-lg py-2 sm:py-3 md:py-5 px-2 sm:px-3 animate-popup overflow-hidden overflow-y-auto hide-scrollbar">
           
           <button
-  type="button"
-  className="absolute right-2 top-2 z-10 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600"
-  onClick={closeModal}
-  aria-label="Close dialog"
-  title="Close"
->
-  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
-</button>
+            type="button"
+            className="absolute right-2 top-2 z-10 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600"
+            onClick={closeModal}
+            aria-label="Close dialog"
+            title="Close"
+          >
+            <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
 
           <div className="pb-4 pt-2 px-3 sm:px-4 md:px-8 w-full flex-1 flex flex-col">
-            
             {/* SALE HEADERS SECTION */}
             <div className="mb-4">
-              
               {/* HEADER INFORMATION */}
               <div>
                 {/* TITLES */}
@@ -562,7 +564,7 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
               <div className="border-t pt-3 sm:pt-4">
                 <div className="flex flex-col lg:flex-row gap-4">
                   
-                  {/* Summary Details - Full width on mobile, left side on desktop */}
+                  {/* Summary Details */}
                   <div className="flex-1 order-2 lg:order-1">
                     <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">Summary Details</h3>
                     
@@ -597,7 +599,7 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
                     </div>
                   </div>
 
-                  {/* Financial Summary - Full width on mobile, right side on desktop */}
+                  {/* Financial Summary */}
                   <div className="w-full lg:w-[400px] bg-gray-50 p-3 sm:p-4 rounded-lg border border-gray-200 order-1 lg:order-2">
                     <div className="space-y-2 sm:space-y-3">
                       <div className="flex justify-between py-2 border-b border-gray-200 text-sm sm:text-base">

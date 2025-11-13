@@ -15,11 +15,11 @@ import {
   allowsFractional
 } from '../utils/unitConversion';
 import { IoMdClose } from "react-icons/io";
+import useModalLock from "../hooks/useModalLock"; 
 
 
 
 function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSaleHeader, fetchProductsData }) {
-
 
   const { user } = useAuth();
 
@@ -179,6 +179,9 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   //TO RESET THE FORM ONCE CLOSED
   const closeModal = () => {
     setOpenSaleModal(false);
+
+    setDialog(false);
+  setDialogMode('');
 
     setRows([createEmptySaleRow()]);
     setProductSelected([]);
@@ -625,6 +628,15 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     }
   };
 
+  const canOpenSaleModal =
+  openSaleModal &&
+  user &&
+  user.role &&
+  user.role.some((role) => ["Sales Associate"].includes(role));
+
+// Lock scroll + intercept Back when this modal is really open
+useModalLock(canOpenSaleModal, closeModal);
+
 
 
 
@@ -650,14 +662,14 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
       }
 
-      {openSaleModal && user && user.role && user.role.some(role => ['Sales Associate'].includes(role)) && (
+      {canOpenSaleModal && (
         <div
           className="fixed inset-0 bg-black/35 bg-opacity-50 z-[9998] backdrop-blur-sm transition-opacity"
           style={{ pointerEvents: 'auto' }} onClick={closeModal}
         />
       )}
 
-      <dialog className='bg-transparent fixed top-0 bottom-0 z-[9999] rounded-lg animate-popup' open={openSaleModal && user && user.role.some(role => ['Sales Associate'].includes(role))}>
+      <dialog className='bg-transparent fixed top-0 bottom-0 z-[9999] rounded-lg animate-popup' open={canOpenSaleModal}>
         <div className="relative flex flex-col border border-gray-300 bg-white h-[90vh] max-h-[700px] w-[95vw] lg:w-[1100px] rounded-lg shadow-2xl animate-popup" >
 
 

@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { MdOutlinePendingActions } from "react-icons/md";
+import useModalLock from "../../hooks/useModalLock"; // adjust path if needed
 
 function PendingRequestsGuardDialog({
   open = false,
@@ -16,6 +17,14 @@ function PendingRequestsGuardDialog({
   const panelRef = useRef(null);
   const reviewButtonRef = useRef(null);
   const cancelButtonRef = useRef(null);
+
+  // Unified close handler for overlay, Escape, and Back button
+  const handleCancel = useCallback(() => {
+    onCancel?.();
+  }, [onCancel]);
+
+  // Apply modal lock: prevent background scroll and make Back button close this dialog
+  useModalLock(open, handleCancel);
 
   useEffect(() => {
     if (!open) {
@@ -33,7 +42,7 @@ function PendingRequestsGuardDialog({
     const handleKey = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onCancel?.();
+        handleCancel();
       }
 
       if (event.key === "Tab") {
@@ -65,7 +74,7 @@ function PendingRequestsGuardDialog({
       clearTimeout(focusTimer);
       window.removeEventListener("keydown", handleKey);
     };
-  }, [open, onCancel, showReviewButton]);
+  }, [open, showReviewButton, handleCancel]);
 
   if (!open) {
     return null;
@@ -79,7 +88,10 @@ function PendingRequestsGuardDialog({
       aria-labelledby="pending-guard-title"
       aria-describedby="pending-guard-message"
     >
-      <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={onCancel} />
+      <div
+        className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+        onClick={handleCancel}
+      />
 
       <div
         ref={panelRef}
@@ -104,7 +116,8 @@ function PendingRequestsGuardDialog({
         <div className="px-5 sm:px-6 py-6 space-y-4">
           {userName ? (
             <p className="text-sm text-gray-700">
-              <span className="font-semibold text-gray-900">{userName}</span> {userPendingDescription || "still has requests awaiting a decision."}
+              <span className="font-semibold text-gray-900">{userName}</span>{" "}
+              {userPendingDescription || "still has requests awaiting a decision."}
             </p>
           ) : null}
           <p id="pending-guard-message" className="text-base text-gray-700 leading-relaxed">
@@ -116,7 +129,7 @@ function PendingRequestsGuardDialog({
           <button
             ref={cancelButtonRef}
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
           >
             Cancel

@@ -3,12 +3,11 @@ import ReactDOM from "react-dom";
 import { IoAddCircle } from "react-icons/io5";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteOutline } from "react-icons/md";
-import { IoMdClose } from "react-icons/io"; // <-- added
+import { IoMdClose } from "react-icons/io";
 
 function ConfirmationDialog({ mode, message, submitFunction, onClose }) {
   const cancelRef = useRef(null);
 
-  // Palette map (no dynamic Tailwind class strings)
   const styles =
     mode === "add"
       ? {
@@ -32,7 +31,11 @@ function ConfirmationDialog({ mode, message, submitFunction, onClose }) {
         };
 
   const title =
-    mode === "add" ? "Confirm new data?" : mode === "edit" ? "Confirm changes?" : "Delete data?";
+    mode === "add"
+      ? "Confirm new data?"
+      : mode === "edit"
+      ? "Confirm changes?"
+      : "Delete data?";
 
   // ESC to close
   useEffect(() => {
@@ -54,12 +57,11 @@ function ConfirmationDialog({ mode, message, submitFunction, onClose }) {
       aria-labelledby="confirm-title"
       aria-describedby="confirm-desc"
     >
-      {/* Overlay (click to close) */}
+      {/* Overlay */}
       <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
 
-      {/* Centering + mobile padding */}
+      {/* Centering */}
       <div className="relative min-h-full grid place-items-center p-4 sm:p-6 animate-popup">
-        {/* Panel */}
         <div className="w-full max-w-[92vw] sm:max-w-lg bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b">
@@ -92,7 +94,6 @@ function ConfirmationDialog({ mode, message, submitFunction, onClose }) {
               {message}
             </p>
 
-            {/* Actions: stack on mobile, inline on sm+ */}
             <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
               <button
                 ref={cancelRef}

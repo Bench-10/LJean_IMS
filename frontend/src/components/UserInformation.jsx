@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../authentication/Authentication';
 import { FiEdit } from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
 import { RxCross2 } from "react-icons/rx";
 import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
+import useModalLock from '../hooks/useModalLock';
 
 function UserInformation({ openUsers, userDetailes, onClose, handleUserModalOpen, deleteUser, deleteLoading }) {
   const { user } = useAuth();
@@ -21,15 +22,40 @@ function UserInformation({ openUsers, userDetailes, onClose, handleUserModalOpen
     return { label: 'Inactive', className: 'bg-gray-100 text-gray-600 border border-gray-300' };
   };
 
-  const handleClose = () => onClose();
+  // close ONLY the confirmation dialog
+  const handleCloseConfirm = useCallback(() => {
+    setDialog(false);
+  }, []);
 
-  // Close on ESC
+  // close ONLY the main user info modal
+  const handleCloseModalOnly = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  // unified close for ESC / overlay / Back button
+  // - if confirmation is open → close confirmation
+  // - else → close the user info modal
+  const handleClose = useCallback(() => {
+    if (openDialog) {
+      handleCloseConfirm();
+    } else {
+      handleCloseModalOnly();
+    }
+  }, [openDialog, handleCloseConfirm, handleCloseModalOnly]);
+
+  // Lock for main modal (only when confirm is NOT open)
+  useModalLock(openUsers && !openDialog, handleCloseModalOnly);
+
+  //  Lock for confirmation dialog when it is open
+  useModalLock(openDialog, handleCloseConfirm);
+
+  // Close on ESC (respect confirm vs main)
   useEffect(() => {
     if (!openUsers) return;
     const onKey = (e) => { if (e.key === 'Escape') handleClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [openUsers]);
+  }, [openUsers, handleClose]);
 
   return (
     <div>
@@ -40,21 +66,21 @@ function UserInformation({ openUsers, userDetailes, onClose, handleUserModalOpen
           mode="delete"
           message={message}
           submitFunction={() => { deleteUser(userDetailes.user_id); onClose(); }}
-          onClose={() => setDialog(false)}
+          onClose={handleCloseConfirm}  //uses confirm closer
         />
       )}
 
       {openUsers && (
         <div
           className="fixed inset-0 z-[9998] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={handleClose}
+          onClick={handleClose}  // overlay respects confirm vs main
           role="dialog"
           aria-modal="true"
           aria-labelledby="user-info-title"
         >
           {/* Modal Card (header + scrollable body + fixed footer) */}
           <div
-            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[900px] max-h-[90vh] flex flex-col overflow-hidden  animate-popup"
+            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[900px] max-h-[90vh] flex flex-col overflow-hidden animate-popup"
             onClick={(e) => e.stopPropagation()} // prevent outside-close when clicking inside
           >
             {/* HEADER (non-scrolling) */}

@@ -35,6 +35,18 @@ const normalizeDateValue = (value) => {
   return null;
 };
 
+// ✅ Robust truthy flag for near_expy / expy
+const isTruthyFlag = (value) => {
+  if (value === true || value === false) return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    if (!v || v === '0' || v === 'false' || v === 'no' || v === 'none' || v === 'n') return false;
+    return true; // '1', 'yes', 'y', 'expired', etc.
+  }
+  return false;
+};
+
 const matchesFocus = (entry, focus) => {
   if (!entry || !focus) return false;
 
@@ -121,7 +133,13 @@ const getEntryKey = (entry, fallbackIndex = 0) => {
   return `validity-row-${fallbackIndex}`;
 };
 
-function ProductValidity({ sanitizeInput, productValidityList: propValidityList, setProductValidityList: setPropValidityList, focusEntry, onClearFocus }) {
+function ProductValidity({
+  sanitizeInput,
+  productValidityList: propValidityList,
+  setProductValidityList: setPropValidityList,
+  focusEntry,
+  onClearFocus
+}) {
   const [productValidityList, setValidity] = useState(propValidityList || []);
   const [searchValidity, setSearchValidity] = useState('');
   const [loading, setLoading] = useState(false);
@@ -154,7 +172,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   };
 
   const getProductInfo = async ({ force = false } = {}) => {
-    // If we already have cached data and not forcing, show it immediately without spinner
     try {
       if (!force) {
         const cached = sessionStorage.getItem(cacheKey);
@@ -166,13 +183,11 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
               if (setPropValidityList) setPropValidityList(parsed);
             }
           } catch (e) {
-            // ignore parse errors and continue to fetch
             console.warn('Failed to parse product validity cache', e);
           }
         }
       }
 
-      // show spinner only when there's no cached data or when force is true
       const hasCache = Boolean(sessionStorage.getItem(cacheKey));
       if (!hasCache || force) setLoading(true);
 
@@ -195,7 +210,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   };
 
   useEffect(() => {
-    // On mount: show cache if available, then refresh in background
     getProductInfo({ force: false });
   }, [user.branch_id]);
 
@@ -243,7 +257,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     const targetElement = tableRowRefs.current[pendingRowKey] || cardRefs.current[pendingRowKey];
     if (!targetElement) return;
 
-    // prefer scrolling the inner container so the full page doesn't jump
     const container = desktopContainerRef.current && desktopContainerRef.current.contains(targetElement)
       ? desktopContainerRef.current
       : mobileContainerRef.current && mobileContainerRef.current.contains(targetElement)
@@ -253,7 +266,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     setHighlightedRowKey(pendingRowKey);
 
     if (container) {
-      // compute offset relative to container and smoothly scroll the container
       const containerRect = container.getBoundingClientRect();
       const targetRect = targetElement.getBoundingClientRect();
       const currentScrollTop = container.scrollTop;
@@ -263,11 +275,9 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       try {
         container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
       } catch (e) {
-        // fallback
         container.scrollTop = targetScrollTop;
       }
     } else {
-      // last resort: element scrollIntoView (may scroll page)
       targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     }
 
@@ -286,42 +296,37 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       console.log('Validity update received in component:', validityData);
 
       if (validityData.action === 'add') {
-        // ADD NEW VALIDITY ENTRY
-        const updateFunction = (prevValidity) => [validityData.product, ...prevValidity];
+        const updateFunction = (prevValidity) => [validityData.product, ...(prevValidity || [])];
         setValidity(updateFunction);
         if (setPropValidityList) setPropValidityList(updateFunction);
-        // persist cache
         try {
           const cur = JSON.parse(sessionStorage.getItem(cacheKey) || '[]');
           sessionStorage.setItem(cacheKey, JSON.stringify([validityData.product, ...cur]));
-        } catch (e) {
-          // ignore cache write errors
-        }
+        } catch (e) {}
       } else if (validityData.action === 'update') {
-        // UPDATE EXISTING VALIDITY ENTRY OR ADD NEW ONE
-        const updateFunction = (prevValidity) => {
+        const updateFunction = (prevValidity = []) => {
           const existingIndex = prevValidity.findIndex(
-            item => item.product_id === validityData.product.product_id &&
+            item =>
+              item.product_id === validityData.product.product_id &&
               item.date_added === validityData.product.date_added
           );
 
           if (existingIndex >= 0) {
-            // UPDATE EXISTING
             const updated = [...prevValidity];
             updated[existingIndex] = { ...updated[existingIndex], ...validityData.product };
             return updated;
           } else {
-            // ADD NEW
             return [validityData.product, ...prevValidity];
           }
         };
         setValidity(updateFunction);
         if (setPropValidityList) setPropValidityList(updateFunction);
-        // update cache
         try {
           const cur = JSON.parse(sessionStorage.getItem(cacheKey) || '[]');
           const existingIndex = cur.findIndex(
-            item => item.product_id === validityData.product.product_id && item.date_added === validityData.product.date_added
+            item =>
+              item.product_id === validityData.product.product_id &&
+              item.date_added === validityData.product.date_added
           );
           let updated;
           if (existingIndex >= 0) {
@@ -331,22 +336,19 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
             updated = [validityData.product, ...cur];
           }
           sessionStorage.setItem(cacheKey, JSON.stringify(updated));
-        } catch (e) {
-          // ignore cache write errors
-        }
-      } else if (validityData.action === 'inventory_changed_by_sale' ||
+        } catch (e) {}
+      } else if (
+        validityData.action === 'inventory_changed_by_sale' ||
         validityData.action === 'inventory_changed_by_delivery' ||
         validityData.action === 'stock_deducted' ||
-        validityData.action === 'stock_restored') {
-        // REFRESH DATA WHEN INVENTORY CHANGES AFFECT VALIDITY DISPLAY
+        validityData.action === 'stock_restored'
+      ) {
         console.log('Refreshing validity data due to inventory changes:', validityData.action);
-        // force refresh to get authoritative view
         getProductInfo({ force: true });
       }
     };
 
     window.addEventListener('validity-update', handleValidityUpdate);
-
     return () => {
       window.removeEventListener('validity-update', handleValidityUpdate);
     };
@@ -354,43 +356,58 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
   const handleSearch = (event) => {
     setSearchValidity(sanitizeInput(event.target.value));
-    setCurrentPage(1); // RESET TO FIRST PAGE WHEN SEARCHING
+    setCurrentPage(1);
   };
 
-  const filteredValidityData = productValidityList.filter(validity =>
-    // Basic search match
-    (validity.product_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
-      validity.category_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
-      validity.formated_date_added.toLowerCase().includes(searchValidity.toLowerCase()) ||
-      validity.formated_product_validity.toLowerCase().includes(searchValidity.toLowerCase()))
-  )
-    // Then apply expiry toggles and date filters
-    .filter(validity => {
-      // Expiry toggles: if either toggle is active, only include matching types
-      if (showNearExpiry || showExpired) {
-        const isNear = Boolean(validity.near_expy);
-        const isExp = Boolean(validity.expy);
-        if (!((isNear && showNearExpiry) || (isExp && showExpired))) {
-          return false;
-        }
-      }
+  // ✅ Centralized, safe filtering logic
+  const searchTerm = (searchValidity || '').trim().toLowerCase();
 
-      // Year filter (use DB `year` column)
-      if (selectedYear) {
-        if (validity.year == null || String(validity.year) !== String(selectedYear)) return false;
-      }
+  const filteredValidityData = (Array.isArray(productValidityList) ? productValidityList : []).filter((validity) => {
+    if (!validity) return false;
 
-      // Month filter (use DB `month` column)
-      if (selectedMonth) {
-        if (validity.month == null || String(Number(validity.month)) !== String(Number(selectedMonth))) return false;
-      }
+    // Search (skip if no term)
+    if (searchTerm) {
+      const haystack = [
+        validity.product_name,
+        validity.category_name,
+        validity.formated_date_added,
+        validity.formated_product_validity
+      ]
+        .map(v => (v == null ? '' : String(v)).toLowerCase())
+        .join(' | ');
 
-      return true;
-    });
+      if (!haystack.includes(searchTerm)) return false;
+    }
+
+    const isNear = isTruthyFlag(validity.near_expy);
+    const isExp = isTruthyFlag(validity.expy);
+
+    // Near Expiry / Expired chips
+    if (showNearExpiry || showExpired) {
+      const matchesAny =
+        (showNearExpiry && isNear) ||
+        (showExpired && isExp);
+      if (!matchesAny) return false;
+    }
+
+    // Year filter
+    if (selectedYear) {
+      const yearVal = validity.year != null ? String(validity.year) : '';
+      if (yearVal !== String(selectedYear)) return false;
+    }
+
+    // Month filter
+    if (selectedMonth) {
+      const monthVal = validity.month != null ? Number(validity.month) : null;
+      if (monthVal == null || String(monthVal) !== String(Number(selectedMonth))) return false;
+    }
+
+    return true;
+  });
 
   // PAGINATION LOGIC
   const totalItems = filteredValidityData.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentPageData = filteredValidityData.slice(startIndex, endIndex);
@@ -400,7 +417,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
   // Export functionality
   const handleExportValidity = (format) => {
-    // ensure exported quantity has no decimals too
     const exportSource = filteredValidityData.map(item => ({
       ...item,
       quantity_left: formatQuantity(item.quantity_left),
@@ -424,7 +440,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   };
 
   return (
-    <div className="pt-20 lg:pt-7 px-4 lg:px-8" >
+    <div className="pt-20 lg:pt-7 px-4 lg:px-8">
       {/*TITLE*/}
       <h1 className='text-[33px] leading-[36px] font-bold text-green-900'>
         PRODUCT VALIDITY
@@ -432,10 +448,9 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
       <hr className="mt-3 mb-6 border-t-4 border-green-800 rounded-lg" />
 
-      {/*SEARCH AND ADD*/}
-      {/* SEARCH + FILTERS (1 line on desktop; controls at right) */}
+      {/* SEARCH + FILTERS */}
       <div className="w-full lg:flex lg:items-center lg:flex-nowrap lg:gap-4">
-        {/* SEARCH (left) */}
+        {/* SEARCH */}
         <div className="w-full lg:basis-[360px] lg:flex-none text-sm lg:text-sm pb-3 lg:pb-0">
           <input
             type="text"
@@ -445,9 +460,9 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           />
         </div>
 
-        {/* RIGHT: chips + dropdowns (flush right on desktop) */}
+        {/* RIGHT: chips + dropdowns */}
         <div className="w-full lg:w-auto lg:ml-auto lg:flex lg:items-center lg:justify-end lg:gap-3">
-          {/* Chips: grid on mobile, inline on desktop */}
+          {/* Chips */}
           <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 lg:shrink-0">
             <button
               type="button"
@@ -474,7 +489,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
             </button>
           </div>
 
-          {/* Year/Month: grid on mobile, inline on desktop */}
+          {/* Year/Month */}
           <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-2 lg:ml-3 lg:shrink-0 mt-2 lg:mt-0">
             <div className="col-span-1 lg:w-40">
               <DropdownCustom
@@ -483,7 +498,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 variant="simple"
                 options={[
                   { value: '', label: 'All Years' },
-                  ...Array.from(new Set(productValidityList.map(v => v.year).filter(Boolean)))
+                  ...Array.from(new Set((productValidityList || []).map(v => v.year).filter(Boolean)))
                     .sort((a, b) => b - a)
                     .map(y => ({ value: y, label: y }))
                 ]}
@@ -498,7 +513,14 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                   { value: '', label: 'All Months' },
                   ...(() => {
                     const names = [null, 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                    const months = Array.from(new Set(productValidityList.map(v => v.month).filter(m => m != null).map(Number))).sort((a, b) => a - b);
+                    const months = Array.from(
+                      new Set(
+                        (productValidityList || [])
+                          .map(v => v.month)
+                          .filter(m => m != null)
+                          .map(Number)
+                      )
+                    ).sort((a, b) => a - b);
                     return months.map(m => ({ value: m, label: names[m] || m }));
                   })()
                 ]}
@@ -525,6 +547,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
             const globalIndex = startIndex + index;
             const rowKey = getEntryKey(validity, globalIndex);
             const isHighlighted = highlightedRowKey === rowKey;
+            const isExpired = isTruthyFlag(validity.expy);
+            const isNear = !isExpired && isTruthyFlag(validity.near_expy);
 
             return (
               <div
@@ -537,18 +561,18 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                   }
                 }}
                 className={`rounded-lg p-4 border-l-4 shadow-sm transition-[box-shadow] ${
-                  validity.expy
+                  isExpired
                     ? 'bg-[#bc2424] text-white border-red-700'
-                    : validity.near_expy
+                    : isNear
                       ? 'bg-[#FFF3C1] border-yellow-500'
                       : 'bg-white border-gray-300'
                 } ${isHighlighted ? 'bg-emerald-200 text-emerald-900 transition-colors' : ''}`}
               >
-                {(validity.expy || validity.near_expy) && (
+                {(isExpired || isNear) && (
                   <div className="flex items-center gap-2 mb-2">
                     <RiErrorWarningLine className="text-xl" />
                     <span className="font-semibold text-sm">
-                      {validity.expy ? 'EXPIRED' : 'NEAR EXPIRY'}
+                      {isExpired ? 'EXPIRED' : 'NEAR EXPIRY'}
                     </span>
                   </div>
                 )}
@@ -588,12 +612,13 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg lg:hidden" />
 
       {/*DESKTOP VIEW*/}
-      <div ref={desktopContainerRef} className="hidden lg:block overflow-x-auto overflow-y-auto h-[65vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+      <div
+        ref={desktopContainerRef}
+        className="hidden lg:block overflow-x-auto overflow-y-auto lg:h-[65vh] xl:h-[60vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6"
+      >
         <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 z-20">
-
             <tr>
-
               <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
                 DATE PURCHASED
               </th>
@@ -609,102 +634,85 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
               <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
                 QUANTITY
               </th>
-
             </tr>
           </thead>
 
           <tbody className="bg-white relative">
-            {loading ?
-              (
-                <tr>
-                  <td colSpan={5} className='h-96 text-center'>
-                    <ChartLoading message='Loading products...' />
-                  </td>
-                </tr>
+            {loading ? (
+              <tr>
+                <td colSpan={5} className='h-96 text-center'>
+                  <ChartLoading message='Loading products...' />
+                </td>
+              </tr>
+            ) : currentPageData.length === 0 ? (
+              <NoInfoFound col={5} />
+            ) : (
+              currentPageData.map((validity, index) => {
+                const globalIndex = startIndex + index;
+                const rowKey = getEntryKey(validity, globalIndex);
+                const isHighlighted = highlightedRowKey === rowKey;
+                const isExpired = isTruthyFlag(validity.expy);
+                const isNear = !isExpired && isTruthyFlag(validity.near_expy);
 
-              )
-              :
+                const baseRowClass = isExpired
+                  ? 'bg-[#bc2424] text-white hover:bg-[#bc2424]/90 h-14'
+                  : isNear
+                    ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
+                    : 'hover:bg-gray-200/70 h-14';
 
-              currentPageData.length === 0 ?
+                const highlightClass = isHighlighted ? 'bg-emerald-200 text-emerald-900 transition-colors' : '';
 
-                (
-                  <NoInfoFound col={5} />
-                ) :
+                return (
+                  <tr
+                    key={rowKey}
+                    ref={(element) => {
+                      if (element) {
+                        tableRowRefs.current[rowKey] = element;
+                      } else {
+                        delete tableRowRefs.current[rowKey];
+                      }
+                    }}
+                    className={`${baseRowClass} ${highlightClass}`}
+                  >
+                    {(isExpired || isNear) ? (
+                      <td className="flex px-4 py-2 text-center gap-x-5 items-center mt-[5%]">
+                        <div className='flex items-center'>
+                          <RiErrorWarningLine className='h-[100%]' />
+                        </div>
+                        <div>
+                          {validity.formated_date_added}
+                        </div>
+                      </td>
+                    ) : (
+                      <td className="px-4 py-2 text-center items-center">
+                        {validity.formated_date_added}
+                      </td>
+                    )}
 
-                (
-                  currentPageData.map((validity, index) => {
-                    const globalIndex = startIndex + index;
-                    const rowKey = getEntryKey(validity, globalIndex);
-                    const isHighlighted = highlightedRowKey === rowKey;
-
-                    const baseRowClass = validity.expy
-                      ? 'bg-[#bc2424] text-white hover:bg-[#bc2424]/90 h-14'
-                      : validity.near_expy
-                        ? 'bg-[#FFF3C1] hover:bg-yellow-100 h-14'
-                        : 'hover:bg-gray-200/70 h-14';
-
-                    // Use temporary green background for highlight (no border/outline)
-                    const highlightClass = isHighlighted ? 'bg-emerald-200 text-emerald-900 transition-colors' : '';
-
-                    return (
-                      <tr
-                        key={rowKey}
-                        ref={(element) => {
-                          if (element) {
-                            tableRowRefs.current[rowKey] = element;
-                          } else {
-                            delete tableRowRefs.current[rowKey];
-                          }
-                        }}
-                        className={`${baseRowClass} ${highlightClass}`}
-                      >
-                        {(validity.expy || validity.near_expy) ?
-
-                          (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
-
-                            <div className='flex items-center'>
-                              <RiErrorWarningLine className='h-[100%]' />
-                            </div>
-
-                            <div>
-                              {validity.formated_date_added}
-                            </div>
-
-                          </td>
-                          ) :
-
-                          (
-                            <td className="px-4 py-2 text-center items-center "  >
-                              {validity.formated_date_added}
-                            </td>
-                          )
-
-                        }
-
-                        <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
-                        <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
-                        <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
-                        <td className="px-4 py-2 text-center "  >
-                          {formatQuantity(validity.quantity_left)}
-                        </td>
-
-                      </tr>
-
-                    );
-                  })
-
-                )
-            }
-
+                    <td className="px-4 py-2 text-center font-medium whitespace-nowrap">
+                      {validity.formated_product_validity}
+                    </td>
+                    <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap">
+                      {validity.product_name}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {validity.category_name}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {formatQuantity(validity.quantity_left)}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
 
       {/*PAGINATION AND CONTROLS */}
       <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-3 pb-4 lg:pb-6 px-3'>
-        {/* TOP ROW ON MOBILE: ITEM COUNT + PAGINATION */}
+        {/* MOBILE: count + pagination */}
         <div className='flex justify-between items-center gap-2 sm:hidden'>
-          {/* LEFT: ITEM COUNT (MOBILE) */}
           <div className='text-xs text-gray-600 flex-shrink-0'>
             {filteredValidityData.length > 0 ? (
               <>Showing {startIndex + 1} to {Math.min(endIndex, filteredValidityData.length)} of {filteredValidityData.length}</>
@@ -713,7 +721,6 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
             )}
           </div>
 
-          {/* RIGHT: PAGINATION CONTROLS (MOBILE) */}
           {filteredValidityData.length > 0 && (
             <div className='flex items-center gap-1'>
               <button
@@ -737,8 +744,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           )}
         </div>
 
-        {/* DESKTOP LAYOUT: THREE COLUMNS */}
-        {/* LEFT: ITEM COUNT (DESKTOP) */}
+        {/* DESKTOP: left count */}
         <div className='hidden sm:block text-[13px] text-gray-600 sm:flex-1'>
           {filteredValidityData.length > 0 ? (
             <>Showing {startIndex + 1} to {Math.min(endIndex, filteredValidityData.length)} of {filteredValidityData.length} items</>
@@ -747,7 +753,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           )}
         </div>
 
-        {/* CENTER: PAGINATION CONTROLS (DESKTOP) */}
+        {/* DESKTOP: center pagination */}
         <div className='hidden sm:flex sm:justify-center sm:flex-1'>
           {filteredValidityData.length > 0 && (
             <div className='flex items-center gap-2'>
@@ -772,7 +778,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
           )}
         </div>
 
-        {/* RIGHT: EXPORT DROPDOWN */}
+        {/* RIGHT: EXPORT */}
         <div className='flex justify-center sm:justify-end w-full sm:flex-1'>
           <div className="relative group w-full sm:w-auto">
             <button className='bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 lg:px-5 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-[13px] w-full sm:w-auto'>

@@ -4,10 +4,13 @@ import { IoMdClose } from "react-icons/io";
 import { useAuth } from '../authentication/Authentication';
 import { toast } from 'react-hot-toast';
 import PushNotificationControls from '../components/PushNotificationControls';
+import useModalLock from "../hooks/useModalLock";
 
 function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNotificationNavigate }) {
 
   const { user } = useAuth();
+
+  useModalLock(openNotif, onClose);
   
 
   const [visibleCount, setVisibleCount] = useState(15);

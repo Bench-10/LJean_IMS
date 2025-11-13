@@ -10,8 +10,16 @@ import { useAuth } from '../authentication/Authentication';
 import { currencyFormat } from '../utils/formatCurrency.js';
 import ChartLoading from './common/ChartLoading.jsx';
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
+import useModalLock from "../hooks/useModalLock";
 
-function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInput, listCategories, focusEntry, onClearFocus }) {
+function ProductTransactionHistory({
+  isProductTransactOpen,
+  onClose,
+  sanitizeInput,
+  listCategories,
+  focusEntry,
+  onClearFocus
+}) {
 
   const [openFilter, setOpenFilter] = useState(false);
   const [startDate, setStartDate] = useState('');
@@ -143,6 +151,7 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     setStartDate('');
   };
 
+  // 🔒 Centralized close for overlay/back/close button/modal lock
   const handleClose = () => {
     setSearch('');
     setStartDate('');
@@ -151,8 +160,9 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     setHighlightedRowKey(null);
     setPendingRowKey(null);
     pendingFocusRef.current = null;
+    setProductHistory([]);
+    closeFilterValue();
     onClose();
-    setOpenFilter(false);
   };
 
   const applyFilter = () => {
@@ -165,10 +175,6 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     if ((startDate > endDate) && endDate) {
       alert('End date must not be before the Start date!');
       return;
-    }
-
-    if (startDate && !endDate) {
-      fetchProductHistory();
     }
 
     fetchProductHistory();
@@ -206,10 +212,8 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
       console.log('History update received in component:', historyData);
 
       if (historyData.action === 'add' || historyData.action === 'update') {
-        // ADD NEW HISTORY ENTRY AT THE TOP
         setProductHistory(prevHistory => [historyData.historyEntry, ...prevHistory]);
 
-        // SHOW A BRIEF VISUAL INDICATOR (if modal is open)
         if (isProductTransactOpen) {
           console.log(`📋 New history entry: ${historyData.historyEntry.product_name} (${historyData.historyEntry.quantity_added} units)`);
         }
@@ -320,6 +324,9 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     }
   };
 
+  // 🔒 Modal lock: no background scroll + Back closes via handleClose
+  useModalLock(isProductTransactOpen, handleClose);
+
   rowRefs.current = {};
 
   return (
@@ -327,23 +334,26 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
       {isProductTransactOpen && (
         <div
           className='fixed inset-0 bg-black/35 bg-opacity-50 z-[9998] backdrop-blur-sm'
-          onClick={() => { onClose(); closeFilterValue(); setProductHistory([]); }}
+          onClick={handleClose}
         />
       )}
 
-      <dialog className='bg-transparent fixed top-0 bottom-0 z-[9999]' open={isProductTransactOpen}>
+      <dialog
+        className='bg-transparent fixed top-0 bottom-0 z-[9999]'
+        open={isProductTransactOpen}
+      >
         <div className="relative flex flex-col border border-gray-600/40 bg-white h-[80vh] sm:h-[85vh] lg:h-[90vh] w-[96vw] sm:w-[95vw] max-h-none sm:max-h-[600px] max-w-none sm:max-w-[1000px] rounded-xl p-3 sm:p-4 lg:p-7 pb-4 sm:pb-8 border-gray-300 animate-popup mx-auto my-auto">
           <button
             type="button"
             className="absolute top-4 right-3 sm:top-4 w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors z-10"
-            onClick={() => { onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([]); }}
+            onClick={handleClose}
             aria-label="Close"
           >
             <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
 
           {/* TITLE AND FILTER SECTION */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-2  gap-4 sm:gap-0">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-2 gap-4 sm:gap-0">
             {/* LEFT SIDE */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 w-full pt-2">
               {/* TITLE */}
@@ -351,7 +361,7 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                 Product History
               </h1>
 
-              {/* SEARCH + CATEGORY */}
+              {/* SEARCH + CATEGORY + FILTER */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center w-full sm:w-auto gap-2 sm:gap-3">
                 <input
                   type="text"
@@ -389,7 +399,8 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                         sm:top-[100%] sm:left-auto sm:right-0 sm:translate-x-0"
                     >
                       <div className="w-[92vw] sm:w-[360px] max-w-[420px]
-                        border rounded-md px-3 py-4 shadow-lg text-xs bg-white">
+                        border rounded-md px-3 py-4 shadow-lg text-xs bg-white"
+                      >
                         <h1 className="font-bold text-md">Filter</h1>
 
                         <div className="w-full mt-3">
@@ -416,7 +427,8 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                           <button
                             className="flex-1 bg-white py-1.5 px-4 text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md transition-colors font-medium"
                             onClick={async () => {
-                              setEndDate(''); setStartDate('');
+                              setEndDate('');
+                              setStartDate('');
                               try {
                                 setLoading(true);
                                 const dates = { startDate: '', endDate: '' };
@@ -603,7 +615,7 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
             </div>
 
             {/* Desktop Layout */}
-            <div className='hidden sm:flex items-center justify-between  gap-4 w-full'>
+            <div className='hidden sm:flex items-center justify-between gap-4 w-full'>
               {/* Showing + Pagination */}
               <div className='flex items-center gap-4'>
                 {totalItems > 0 && (

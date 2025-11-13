@@ -5,6 +5,7 @@ import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 import FormLoading from './common/FormLoading';
 import DatePickerCustom from '../components/DatePickerCustom';
+import useModalLock from "../hooks/useModalLock"; 
 
 // SEARCHABLE DROPDOWN
 const SearchableSaleDropdown = React.memo(function SearchableSaleDropdown({ saleHeader = [], deliveryData = [], value, onChange }) {
@@ -231,7 +232,7 @@ const StatusDropdown = React.memo(function StatusDropdown({ status, onChange, mo
             ))}
           </div>
         )}
-      </div>
+      </div>                                                
     </div>
   );
 });
@@ -257,6 +258,13 @@ const AddDeliveryInformation = React.memo(function AddDeliveryInformation({
   const [address, setAddress] = useState('');
   const [deliveredDate, setDeliveredDate] = useState('');
   const [status, setStatus] = useState({ is_delivered: false, pending: true });
+
+
+    useEffect(() => {
+    if (!openAddDelivery) {
+      setDialog(false);
+    }
+  }, [openAddDelivery]);
 
   useEffect(() => {
     if (openAddDelivery) {
@@ -313,6 +321,8 @@ const AddDeliveryInformation = React.memo(function AddDeliveryInformation({
       setLoading(false);
     }
   }
+
+  useModalLock(openAddDelivery, onClose);
 
   if (!openAddDelivery) return null;
 

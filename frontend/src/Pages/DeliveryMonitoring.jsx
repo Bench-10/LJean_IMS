@@ -422,7 +422,7 @@ function DeliveryMonitoring({ setAddDelivery, deliveryData, sanitizeInput, deliv
                           <td className="px-4 py-2 text-left">{row.formated_delivered_date}</td>
                           <td className="px-4 py-2 text-center">
                             <button
-                              className={`${row.is_pending ? 'bg-amber-400 text-white' : row.is_delivered ? 'border-2 border-green-700/70 text-green-700/70 font-semibold' : 'border-2 border-red-700/70 text-red-700/70 font-semibold'} rounded-md px-4 py-2 transition-colors`}
+                              className={`${row.is_pending ? 'bg-amber-400 text-white hover:bg-amber-500' : row.is_delivered ? 'border-2 border-green-700/70 text-green-700/70 font-semibold hover:bg-green-500 hover:text-green-900/70' : 'border-2 border-red-700/70 text-red-700/70 font-semibold hover:bg-red-700 hover:text-red-100'} rounded-lg px-4 py-2 transition-colors`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 requestAnimationFrame(() => {

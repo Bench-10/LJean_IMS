@@ -6,6 +6,7 @@ import ChartLoading from '../common/ChartLoading.jsx';
 import DropdownCustom from '../DropdownCustom';
 import { IoMdClose } from "react-icons/io";
 import { MdRefresh } from 'react-icons/md';
+import useModalLock from '../../hooks/useModalLock'; 
 
 const toneStyles = {
   slate:   { badge: 'border-slate-200 bg-slate-50 text-slate-700',   dot: 'bg-slate-500' },
@@ -62,10 +63,14 @@ const InventoryRequestMonitorDialog = ({
   onCancelInventoryRequest,
   onCancelUserRequest
 }) => {
+  // Lock scroll + intercept BACK to close the modal instead of navigating away
+  useModalLock(open, onClose);  // important: pass onClose here
+
   const roleList = useMemo(() => {
     if (!user || !user.role) return [];
     return Array.isArray(user.role) ? user.role : [user.role];
   }, [user]);
+
 
   const isOwnerUser     = roleList.includes('Owner');
   const isBranchManager = roleList.includes('Branch Manager');
@@ -249,9 +254,9 @@ const InventoryRequestMonitorDialog = ({
   const normalizedUserRequests = useMemo(() => {
     if (!Array.isArray(userRequests)) return [];
     return userRequests.map((record) => {
-  const rawStatus = String(record?.request_status || record?.status || '').toLowerCase();
-  const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
-  if (!['pending', 'approved', 'rejected', 'cancelled'].includes(normalizedStatus)) return null;
+      const rawStatus = String(record?.request_status || record?.status || '').toLowerCase();
+      const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
+      if (!['pending', 'approved', 'rejected', 'cancelled'].includes(normalizedStatus)) return null;
 
       const branchName    = record?.branch || findBranchName(branches, record?.branch_id) || null;
       const createdAtIso  = toISOStringSafe(record?.request_created_at || record?.created_at || record?.createdAt || record?.formated_hire_date || null);
@@ -534,16 +539,16 @@ const InventoryRequestMonitorDialog = ({
 
   return (
     <div
-    className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-    onClick={onClose}
-  >
-      <div
-      className="relative flex h-[90vh] w/full max-w-4xl mx-2 lg:mx-4 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
     >
-      {/* Header: overflow-visible so dropdown menus aren't clipped on mobile */}
+      <div
+        className="relative flex h-[90vh] w-full max-w-4xl mx-2 lg:mx-4 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        {/* Header: overflow-visible so dropdown menus aren't clipped on mobile */}
         <div className="sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 sm:px-6 py-4 overflow-visible">
           <div className="flex items-start justify-between gap-3 sm:gap-4">
             <div>

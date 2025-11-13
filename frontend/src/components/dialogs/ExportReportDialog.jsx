@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { exportChartsAsPDF } from '../../utils/exportUtils';
 import { FaFileExport } from 'react-icons/fa';
 import { IoMdClose } from 'react-icons/io';
+import useModalLock from '../../hooks/useModalLock';
 
 function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
   const [selectedCharts, setSelectedCharts] = useState([]);
@@ -40,7 +41,7 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
 
       const chartIds = selectedChartData.map((chart) => chart.id);
       await exportChartsAsPDF(chartsToExport, 'analytics-report.pdf', chartIds);
-      onClose();
+      onClose?.();
       setSelectedCharts([]);
     } catch (error) {
       console.error('Export failed:', error);
@@ -50,12 +51,34 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
     }
   };
 
+  // unified close handler for overlay, X, Cancel, BACK, ESC
+  const handleClose = useCallback(() => {
+    if (exporting) return; // optional: block closing while exporting
+    onClose?.();
+  }, [exporting, onClose]);
+
+  // apply modal lock (no background scroll + back button closes this dialog)
+  useModalLock(isOpen, handleClose);
+
+  // ESC to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, handleClose]);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[3px]" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[3px]"
+        onClick={handleClose}
+      />
 
       {/* Modal panel */}
       <div
@@ -71,7 +94,7 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
             <h2 className="text-2xl font-bold text-gray-800">Export Report</h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-600 top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 "
             aria-label="Close"
           >
@@ -80,7 +103,9 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
         </div>
 
         {/* Description */}
-        <p className="text-sm text-gray-600 mb-4">Select the charts you want to include in your PDF report.</p>
+        <p className="text-sm text-gray-600 mb-4">
+          Select the charts you want to include in your PDF report.
+        </p>
 
         {/* Chart selection */}
         <div className="border border-gray-200 rounded-lg p-4 mb-6 max-h-[400px] overflow-y-auto">
@@ -123,7 +148,7 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
           </span>
           <div className="flex gap-3">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
               disabled={exporting}
             >
