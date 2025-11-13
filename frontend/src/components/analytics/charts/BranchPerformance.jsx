@@ -9,6 +9,8 @@ import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
 import { analyticsApi } from '../../../utils/api.js';
 
+const branchPerformanceCache = new Map();
+
 function BranchPerformance({
   Card,
   categoryFilter,
@@ -134,10 +136,27 @@ function BranchPerformance({
     );
   }, [splitTwoLines]);
 
+  const cacheKey = useMemo(
+    () => JSON.stringify({
+      start: startDate,
+      end: endDate,
+      category: categoryFilter || 'all'
+    }),
+    [categoryFilter, endDate, startDate]
+  );
+
   // Fetch branch performance data
   const fetchBranchPerformance = useCallback(async (signal) => {
     if (!user || !isOwner) {
       setBranchTotals([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    const cached = branchPerformanceCache.get(cacheKey);
+    if (cached) {
+      setBranchTotals(cached.data);
       setError(null);
       setLoading(false);
       return;
@@ -162,6 +181,7 @@ function BranchPerformance({
       
       const data = Array.isArray(response.data) ? response.data : [];
       setBranchTotals(data);
+      branchPerformanceCache.set(cacheKey, { data });
     } catch (e) {
       if (e?.code === 'ERR_CANCELED') return;
       console.error('Branch performance fetch error', e);
@@ -170,7 +190,7 @@ function BranchPerformance({
     } finally {
       setLoading(false);
     }
-  }, [user, isOwner, startDate, endDate, categoryFilter]);
+  }, [cacheKey, categoryFilter, endDate, isOwner, startDate, user]);
 
   // Fetch data when dependencies change
   useEffect(() => {
