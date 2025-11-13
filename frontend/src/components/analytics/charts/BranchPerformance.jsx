@@ -7,16 +7,20 @@ import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
+import { analyticsApi } from '../../../utils/api.js';
 
 function BranchPerformance({
   Card,
-  branchTotals,
-  loading,
-  error,
+  categoryFilter,
+  startDate,
+  endDate,
   branchPerformanceRef,
   revenueDistributionRef
 }) {
   const { user } = useAuth();
+  const [branchTotals, setBranchTotals] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [screenDimensions, setScreenDimensions] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -130,6 +134,52 @@ function BranchPerformance({
     );
   }, [splitTwoLines]);
 
+  // Fetch branch performance data
+  const fetchBranchPerformance = useCallback(async (signal) => {
+    if (!user || !isOwner) {
+      setBranchTotals([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = { 
+        start_date: startDate, 
+        end_date: endDate 
+      };
+      if (categoryFilter) {
+        params.category_id = categoryFilter;
+      }
+
+      const response = await analyticsApi.get(`/api/analytics/branches-summary`, { 
+        params, 
+        signal 
+      });
+      
+      const data = Array.isArray(response.data) ? response.data : [];
+      setBranchTotals(data);
+    } catch (e) {
+      if (e?.code === 'ERR_CANCELED') return;
+      console.error('Branch performance fetch error', e);
+      setBranchTotals([]);
+      setError('Failed to load branch performance data');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, isOwner, startDate, endDate, categoryFilter]);
+
+  // Fetch data when dependencies change
+  useEffect(() => {
+    if (!user || !isOwner) return;
+    const controller = new AbortController();
+    fetchBranchPerformance(controller.signal);
+    return () => controller.abort();
+  }, [fetchBranchPerformance, user, isOwner]);
+
   const showBarChart = !loading && !error && branchTotals.length > 0 && hasPositiveBarValues;
   const showPieChart = !loading && !error && processedPieData.length > 0;
   if (!isOwner) return null;
@@ -143,7 +193,11 @@ function BranchPerformance({
         exportRef={branchPerformanceRef}
       >
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
-          {loading && <ChartLoading message="Loading branch performance..." />}
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+              <ChartLoading message="Loading branch performance..." />
+            </div>
+          )}
           {error && !loading && (
             <ChartNoData message={error} hint="Please try refreshing the analytics page." />
           )}
@@ -215,7 +269,11 @@ function BranchPerformance({
         exportRef={revenueDistributionRef}
       >
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
-          {loading && <ChartLoading message="Loading distribution..." />}
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+              <ChartLoading message="Loading distribution..." />
+            </div>
+          )}
           {error && !loading && (
             <ChartNoData message={error} hint="Please try refreshing the analytics page." />
           )}

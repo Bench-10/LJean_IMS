@@ -325,9 +325,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const [inventoryLevels, setInventoryLevels] = useState([]);
   const [categoryDist, setCategoryDist] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
-  const [branchTotals, setBranchTotals] = useState([]);
-  const [branchError, setBranchError] = useState(null);
-  const [loadingBranchPerformance, setLoadingBranchPerformance] = useState(false);
   const [restockSuggestions, setRestockSuggestions] = useState([]);
   const [loadingRestockSuggestions, setLoadingRestockSuggestions] = useState(false);
 
@@ -533,9 +530,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     setLoadingTopProducts(false);
     setLoadingDelivery(false);
     setLoadingKPIs(false);
-    setBranchTotals([]);
-    setBranchError(null);
-    setLoadingBranchPerformance(false);
     setRestockSuggestions([]);
     setLoadingRestockSuggestions(false);
     clearAnalyticsCaches();
@@ -1034,48 +1028,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     loadDeliveryChunk({ cursor: 0, mode: 'replace' });
   }, [deliveryOldestCursor, loadDeliveryChunk, loadingDelivery]);
 
-  const fetchBranchPerformance = useCallback(async (signal) => {
-    if (!user || !isOwner || branchId) {
-      setBranchTotals([]);
-      setBranchError(null);
-      setLoadingBranchPerformance(false);
-      return;
-    }
-
-    setLoadingBranchPerformance(true);
-    setBranchError(null);
-
-    try {
-      const params = { start_date: resolvedRange.start_date, end_date: resolvedRange.end_date };
-      if (categoryFilter) params.category_id = categoryFilter;
-
-      const cacheParams = {
-        start: resolvedRange.start_date,
-        end: resolvedRange.end_date,
-        category: categoryFilter || 'all'
-      };
-
-      const cached = getCachedValue('branchesSummary', cacheParams);
-      if (cached) {
-        setBranchTotals(cached);
-        setLoadingBranchPerformance(false);
-        return;
-      }
-
-      const data = await fetchAndCache('branchesSummary', cacheParams, async () => {
-        const response = await analyticsApi.get(`/api/analytics/branches-summary`, { params, signal });
-        return Array.isArray(response.data) ? response.data : [];
-      });
-      setBranchTotals(data);
-    } catch (e) {
-      if (e?.code === 'ERR_CANCELED') return;
-      console.error('Branch performance fetch error', e);
-      setBranchTotals([]);
-      setBranchError('Failed to load branch performance data');
-    } finally {
-      setLoadingBranchPerformance(false);
-    }
-  }, [user, isOwner, branchId, resolvedRange, categoryFilter]);
 
   /* --------- Effects ---------- */
   useEffect(() => {
@@ -1131,13 +1083,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       clearTimeout(timer);
     };
   }, [loadDeliveryChunk, user]);
-
-  useEffect(() => {
-    if (!user || branchId || !isOwner) return;
-    const c = new AbortController();
-    const t = setTimeout(() => { fetchBranchPerformance(c.signal); }, FETCH_DEBOUNCE_MS);
-    return () => { c.abort(); clearTimeout(t); };
-  }, [branchId, fetchBranchPerformance, isOwner, user]);
 
   useEffect(() => {
     const c = new AbortController();
@@ -1471,9 +1416,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
             <>
               <BranchPerformance
                 Card={Card}
-                branchTotals={branchTotals}
-                loading={loadingBranchPerformance}
-                error={branchError}
+                categoryFilter={categoryFilter}
+                startDate={resolvedRange.start_date}
+                endDate={resolvedRange.end_date}
                 branchPerformanceRef={branchPerformanceRef}
                 revenueDistributionRef={revenueDistributionRef}
               />
@@ -1481,7 +1426,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
                 <BranchTimeline
                   Card={Card}
                   categoryFilter={categoryFilter}
-                  allBranches={allBranches}
                   branchTimelineRef={branchTimelineRef}
                 />
               </div>

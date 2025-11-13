@@ -864,17 +864,10 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
   // Determine date truncation based on interval
   const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : interval === 'yearly' ? 'year' : 'month';
   
-  // Build conditions and parameters
-  const conditions = ['s.date BETWEEN $1 AND $2', 's.branch_id = $3'];
+  // Build conditions and parameters - optimized for performance
+  const conditions = ['s.date BETWEEN $1 AND $2', 's.branch_id = $3', RESTORED_SALES_FILTER];
   const params = [start, end, branch_id];
   let idx = 4;
-  
-  // Include all sales except those where stock has been restored (canceled/undelivered)
-  conditions.push(`NOT EXISTS (
-    SELECT 1 FROM Sales_Stock_Usage ssu 
-    WHERE ssu.sales_information_id = s.sales_information_id 
-    AND ssu.is_restored = true
-  )`);
   
   if (category_id) { 
     conditions.push(`ip.category_id = $${idx++}`); 
@@ -896,14 +889,15 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
                   TO_CHAR(date_trunc('${dateTrunc}', s.date), 'Mon YYYY') AS formatted_period`;
   }
   
+  // Optimized query - reduced joins when category_id not needed
   const { rows } = await SQLquery(`
     SELECT ${dateSelect},
       SUM(si.amount) AS sales_amount,
       SUM(si.quantity_display) AS units_sold,
       COUNT(DISTINCT s.sales_information_id) AS transaction_count
-    FROM Sales_Items si
-    JOIN Sales_Information s USING(sales_information_id)
-    JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
+    FROM Sales_Information s
+    JOIN Sales_Items si USING(sales_information_id)
+    ${category_id ? 'JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id' : ''}
     ${where}
     GROUP BY date_trunc('${dateTrunc}', s.date)
     ORDER BY period;`, params);
@@ -911,7 +905,10 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
   // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
   const result = rows.map(row => ({
     ...row,
-    period: dayjs(row.period).format('YYYY-MM-DD')
+    period: dayjs(row.period).format('YYYY-MM-DD'),
+    sales_amount: Number(row.sales_amount || 0),
+    units_sold: Number(row.units_sold || 0),
+    transaction_count: Number(row.transaction_count || 0)
   }));
   setAnalyticsCache(cacheKey, result);
   return result;
@@ -941,46 +938,50 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
     return cached;
   }
 
-  // BUILD CATEGORY FILTER IF PROVIDED
-  let categoryJoin = '';
-  let categoryFilter = '';
   const params = [start, end];
   
   if (category_id) {
-    categoryJoin = `
-      LEFT JOIN Sales_Items si ON si.sales_information_id = s.sales_information_id
-      LEFT JOIN Inventory_Product ip ON ip.product_id = si.product_id AND ip.branch_id = s.branch_id
-    `;
-    categoryFilter = `AND (s.sales_information_id IS NULL OR ip.category_id = $3)`;
+    // Optimized query when filtering by category
     params.push(category_id);
+    const { rows } = await SQLquery(`
+      SELECT b.branch_id,
+             b.branch_name,
+             COALESCE(SUM(si.amount), 0) AS total_amount_due
+      FROM branch b
+      LEFT JOIN Sales_Information s ON s.branch_id = b.branch_id 
+        AND s.date BETWEEN $1 AND $2
+        AND ${RESTORED_SALES_FILTER}
+      LEFT JOIN Sales_Items si ON si.sales_information_id = s.sales_information_id
+      LEFT JOIN Inventory_Product ip ON ip.product_id = si.product_id 
+        AND ip.branch_id = s.branch_id
+        AND ip.category_id = $3
+      GROUP BY b.branch_id, b.branch_name
+      ORDER BY total_amount_due DESC, b.branch_name ASC;`, params);
+    
+    const result = rows.map(row => ({
+      ...row,
+      total_amount_due: Number(row.total_amount_due || 0)
+    }));
+    setAnalyticsCache(cacheKey, result);
+    return result;
   }
   
-  // Only include sales except those where stock has been restored (canceled/undelivered)
-  const deliveryFilter = `AND NOT EXISTS (
-    SELECT 1 FROM Sales_Stock_Usage ssu 
-    WHERE ssu.sales_information_id = s.sales_information_id 
-    AND ssu.is_restored = true
-  )`;
-
-  // RETURN TOTAL AMOUNT DUE PER BRANCH, INCLUDING BRANCHES WITH ZERO SALES
-  // WITH OPTIONAL CATEGORY FILTERING AND DELIVERY STATUS FILTERING
+  // Optimized query without category filter
   const { rows } = await SQLquery(`
     SELECT b.branch_id,
            b.branch_name,
-           ${category_id 
-             ? 'COALESCE(SUM(DISTINCT CASE WHEN ip.category_id = $3 THEN si.amount ELSE 0 END), 0) AS total_amount_due'
-             : 'COALESCE(SUM(s.total_amount_due), 0) AS total_amount_due'
-           }
+           COALESCE(SUM(s.total_amount_due), 0) AS total_amount_due
     FROM branch b
-    LEFT JOIN Sales_Information s
-      ON s.branch_id = b.branch_id
-     AND s.date BETWEEN $1 AND $2
-     ${deliveryFilter}
-    ${categoryJoin}
-    WHERE 1=1 ${categoryFilter}
+    LEFT JOIN Sales_Information s ON s.branch_id = b.branch_id
+      AND s.date BETWEEN $1 AND $2
+      AND ${RESTORED_SALES_FILTER}
     GROUP BY b.branch_id, b.branch_name
     ORDER BY total_amount_due DESC, b.branch_name ASC;`, params);
 
-  setAnalyticsCache(cacheKey, rows);
-  return rows;
+  const result = rows.map(row => ({
+    ...row,
+    total_amount_due: Number(row.total_amount_due || 0)
+  }));
+  setAnalyticsCache(cacheKey, result);
+  return result;
 }
