@@ -239,7 +239,7 @@ export const createUserAccount = async (UserData) => {
     const approvedBy = isOwnerCreator ? (creatorName || null) : null;
     const approvedAt = isOwnerCreator ? new Date() : null;
 
-    const { rows: branchRows } = await SQLquery('SELECT branch_name FROM Branch WHERE branch_id = $1 LIMIT 1', [branch]);
+    const { rows: branchRows } = await SQLquery('SELECT branch_name FROM branch WHERE branch_id = $1 LIMIT 1', [branch]);
     const targetBranchName = branchRows[0]?.branch_name || null;
     const normalizedTargetFullName = [first_name, last_name]
         .filter(Boolean)

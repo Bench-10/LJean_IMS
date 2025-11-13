@@ -19,7 +19,7 @@ function BranchTimeline({ Card, categoryFilter, allBranches, branchTimelineRef }
   const isOwner = useMemo(() => {
     if (!user) return false;
     const roles = Array.isArray(user.role) ? user.role : user?.role ? [user.role] : [];
-    return roles.includes('Owner');
+    return roles.some(role => role.toLowerCase() === 'owner');
   }, [user]);
 
   // FETCH BRANCH TIMELINE DATA WHEN COMPONENT MOUNTS OR PARAMETERS CHANGE

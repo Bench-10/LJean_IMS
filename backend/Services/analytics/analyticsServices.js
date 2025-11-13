@@ -832,7 +832,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
 
 
 export async function fetchBranches(){
-  const { rows } = await SQLquery('SELECT branch_id, branch_name, address FROM Branch ORDER BY branch_name ASC');
+  const { rows } = await SQLquery('SELECT branch_id, branch_name, address FROM branch ORDER BY branch_name ASC');
   return rows;
 }
 
@@ -971,7 +971,7 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
              ? 'COALESCE(SUM(DISTINCT CASE WHEN ip.category_id = $3 THEN si.amount ELSE 0 END), 0) AS total_amount_due'
              : 'COALESCE(SUM(s.total_amount_due), 0) AS total_amount_due'
            }
-    FROM Branch b
+    FROM branch b
     LEFT JOIN Sales_Information s
       ON s.branch_id = b.branch_id
      AND s.date BETWEEN $1 AND $2

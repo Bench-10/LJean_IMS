@@ -305,7 +305,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const isOwner = useMemo(() => {
     if (!user) return false;
     const roles = Array.isArray(user.role) ? user.role : user?.role ? [user.role] : [];
-    return roles.includes('Owner');
+    return roles.some(role => role.toLowerCase() === 'owner');
   }, [user]);
 
   // Refs (export)
@@ -390,7 +390,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
   const [currentCharts, setCurrentCharts] = useState(() => {
     if (persistedState?.currentCharts) return persistedState.currentCharts;
-    if (user && !branchId && user.role && user.role.some(role => role === 'Owner')) {
+    if (user && !branchId && user.role && user.role.some(role => role.toLowerCase() === 'owner')) {
       return 'branch';
     }
     return 'sale';
@@ -414,7 +414,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         setRestockInterval('monthly');
         setDeliveryInterval('monthly');
         setDeliveryStatus('delivered');
-        if (user && !branchId && user.role && user.role.some(role => role === 'Owner')) {
+        if (user && !branchId && user.role && user.role.some(role => role.toLowerCase() === 'owner')) {
           setCurrentCharts('branch');
         } else {
           setCurrentCharts('sale');

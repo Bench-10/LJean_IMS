@@ -121,7 +121,7 @@ export function requireRole(...allowedRoles) {
     }
 
     const userRoles = Array.isArray(req.user.role) ? req.user.role : [req.user.role];
-    const hasRole = userRoles.some(role => allowedRoles.includes(role));
+    const hasRole = userRoles.some(role => allowedRoles.some(allowed => allowed.toLowerCase() === role.toLowerCase()));
 
     if (!hasRole) {
       return res.status(403).json({ 

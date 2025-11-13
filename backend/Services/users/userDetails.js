@@ -78,7 +78,7 @@ export const getAllUsers = async (branchId, userId) =>{
 export const getAllBranches = async () =>{
     const { rows } = await SQLquery(`
             SELECT branch_id, branch_name
-            FROM Branch
+            FROM branch
             ORDER BY branch_id
         `);
 
