@@ -816,6 +816,10 @@ function App() {
     );
 
     if (looksLikeDeliveryNotification && (saleId || deliveryId)) {
+      if (!userRoles.includes('Sales Associate')) {
+        // For non-sales associates, just mark as read without navigation
+        return;
+      }
       setOpenNotif(false);
       navigate('/delivery');
 
@@ -838,6 +842,10 @@ function App() {
     }
 
     if (looksLikeSalesNotification && saleId) {
+      if (!userRoles.includes('Sales Associate')) {
+        // For non-sales associates, just mark as read without navigation
+        return;
+      }
       setOpenNotif(false);
       navigate('/sales');
 
