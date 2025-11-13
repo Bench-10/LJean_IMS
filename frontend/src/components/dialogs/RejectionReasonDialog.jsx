@@ -26,6 +26,7 @@ function RejectionReasonDialog({
   const [reason, setReason] = useState(initialReason ?? "");
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef(null);
+  const openRef = useRef(open);
 
   // unified loading flag (parent-controlled OR internal)
   const loading = useMemo(
@@ -47,6 +48,7 @@ function RejectionReasonDialog({
   // Focus textarea when opened
   useEffect(() => {
     if (open) textareaRef.current?.focus();
+    openRef.current = open;
   }, [open]);
 
   // ESC to close (unless loading)
@@ -78,7 +80,33 @@ function RejectionReasonDialog({
     try {
       // Show loading in the dialog BEFORE any background update occurs
       setSubmitting(true);
-      await Promise.resolve(onConfirm?.(trimmed));
+
+      // Call the parent handler. If it returns a promise, await it.
+      // If it returns synchronously (void), keep the dialog in a loading
+      // state until the parent closes the dialog (open -> false) or a
+      // sane timeout elapses. This covers cases where the parent fires an
+      // async background task but doesn't return a promise.
+      const maybePromise = onConfirm?.(trimmed);
+
+      if (maybePromise && typeof maybePromise.then === "function") {
+        await maybePromise;
+      } else {
+        // wait until parent closes dialog (open becomes false) or 10s timeout
+        await new Promise((resolve) => {
+          const interval = setInterval(() => {
+            if (!openRef.current) {
+              clearInterval(interval);
+              clearTimeout(timer);
+              resolve();
+            }
+          }, 150);
+
+          const timer = setTimeout(() => {
+            clearInterval(interval);
+            resolve();
+          }, 10000);
+        });
+      }
       // IMPORTANT: Do not auto-close here.
       // Let the parent close the dialog FIRST, then refresh + toast (see example below).
     } finally {

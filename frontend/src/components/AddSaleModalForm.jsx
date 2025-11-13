@@ -337,6 +337,13 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     setTotalAmountDue(Math.max(0, total));
   };
 
+  // Format display for monetary values: omit decimals when the value is a whole integer
+  const formatDisplayNumber = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '';
+    return Number.isInteger(n) ? String(n) : toTwoDecimals(n);
+  };
+
   //HANDLE DISCOUNT CHANGE
   const handleDiscountChange = (discountAmount) => {
     setAdditionalDiscount(discountAmount);
@@ -849,7 +856,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                                         }}
                                       >
                                         <div className="font-medium text-sm">{`${product.product_name} (${product.unit.toUpperCase()})`}</div>
-                                        <div className="font-light text-xs">Quantity: {product.quantity}</div>
+                                        <div className="font-light text-xs">Quantity: {formatDisplayNumber(product.quantity)}</div>
                                       </div>
                                     ))
                                   ) : (
@@ -900,23 +907,15 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
 
                           <td className="px-2 relative overflow-visible min-w-[140px]">
-                            <DropdownUnitSelect
-                              className="relative"                 // anchor the absolute-positioned menu
-                              label="Unit"
-                              labelClassName="sr-only"             // hide label in table
-                              placeholder={row.product_id ? 'Select unit' : 'Choose product first'}
+                            <input
+                              type="text"
+                              className="border w-full rounded-md px-2 py-1.5"
+                              placeholder={row.product_id ? 'Unit' : 'Choose product first'}
                               disabled={!row.product_id}
                               value={row.unit || ''}
                               onChange={(e) => handleUnitChange(idx, e.target.value)}
-                              options={
-                                !row.product_id
-                                  ? [{ value: '', label: 'Choose product first' }]
-                                  : (Array.isArray(row.sellingUnits) ? row.sellingUnits : [])
-                                      .map(u => ({ value: u.unit, label: u.unit }))
-                              }
                             />
                           </td>
-
 
 
                           <td className="px-2">

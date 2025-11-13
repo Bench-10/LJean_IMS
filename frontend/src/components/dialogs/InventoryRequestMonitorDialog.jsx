@@ -112,9 +112,9 @@ const InventoryRequestMonitorDialog = ({
   useEffect(() => {
     if (!open) return;
     setBranchFilter(''); // Clear branch filter to show ALL rejected users across all branches
-    // Default to showing rejected requests when the dialog opens so owners/managers
+    // Default to showing pending requests when the dialog opens so owners/managers
     // can immediately review rejected items (both inventory and user accounts).
-    setStatusFilter('rejected');
+    setStatusFilter('pending');
     setRequestTypeFilter('');
   }, [open]);
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../authentication/Authentication';
 import { IoMdClose } from 'react-icons/io';
+import { FaSpinner } from 'react-icons/fa';
 
 function Category({ isCategoryOpen, onClose, setListCategories, listCategories, fetchProductsData, sanitizeInput}) {
 
@@ -11,6 +12,10 @@ function Category({ isCategoryOpen, onClose, setListCategories, listCategories, 
   const [editCategory_name, setEditcategoryName] = useState('')
   const [openEdit, setOpenEdit] = useState(false);
   const [selectEditCategory, setSelectEditCategory] = useState({});
+  const [addLoading, setAddLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     if (openEdit)
@@ -33,37 +38,54 @@ function Category({ isCategoryOpen, onClose, setListCategories, listCategories, 
 
   const submitCategory = async (type) => {
     if (type === 'add') {
-      if (category_name.length === 0)
+      const trimmed = (category_name || '').trim();
+      setAddError('');
+      if (!trimmed) {
+        setAddError('Category name cannot be empty');
         return;
+      }
 
+      setAddLoading(true);
       try {
-        const response = await api.post(`/api/categories/`, { category_name });
+        const response = await api.post(`/api/categories/`, { category_name: trimmed });
         setListCategories((prevData) => [...prevData, response.data]);
         console.log('Category Added', response.data);
+        setCategoryName('');
       } catch (error) {
         console.error('Error adding Item', error);
+        setAddError(error?.response?.data?.message || error?.message || 'Failed to add category');
+      } finally {
+        setAddLoading(false);
       }
 
     } else if (type === 'edit') {
-      try {
-        if (editCategory_name.length === 0)
-          return
+      const trimmed = (editCategory_name || '').trim();
+      setEditError('');
+      if (!trimmed) {
+        setEditError('Category name cannot be empty');
+        return;
+      }
 
-        const category_name = editCategory_name;
+      setEditLoading(true);
+      try {
+        const category_name = trimmed;
         const response = await api.put(`/api/categories/${selectEditCategory.category_id}`, { category_name });
         setListCategories((prevData) =>
           prevData.map((cat) => (cat.category_id === selectEditCategory.category_id ? response.data : cat))
         );
 
         console.log('Item Updated', response.data);
+        // close edit modal on success
+        setOpenEdit(false);
+        setSelectEditCategory({});
+        setEditcategoryName('');
       } catch (error) {
-        console.error('Error adding Item', error);
+        console.error('Error updating Item', error);
+        setEditError(error?.response?.data?.message || error?.message || 'Failed to update category');
+      } finally {
+        setEditLoading(false);
       }
-
-      setOpenEdit(false);
     }
-
-    setCategoryName('');
   }
 
   return (
@@ -104,23 +126,32 @@ function Category({ isCategoryOpen, onClose, setListCategories, listCategories, 
                 value={category_name}
                 onChange={(e) => setCategoryName(sanitizeInput(e.target.value))}
               />
+              {addError && (
+                <p className="text-xs text-red-600 mt-1">{addError}</p>
+              )}
             </div>
 
             <div className='flex'>
               <button
-                className={`w-full sm:w-auto border rounded-lg px-4 py-2 text-sm sm:text-base font-medium text-white transition-colors ${category_name.trim()
+                className={`w-full sm:w-auto border rounded-lg px-4 py-2 text-sm sm:text-base font-medium text-white transition-colors ${category_name.trim() && !addLoading
                     ? 'bg-[#52b7e6] hover:bg-[#0EA5E9]'
                     : 'bg-gray-400 cursor-not-allowed'
                   }`}
                 onClick={e => {
                   e.preventDefault();
-                  if (category_name.trim()) {
+                  if (category_name.trim() && !addLoading) {
                     submitCategory('add');
                   }
                 }}
-                disabled={!category_name.trim()}
+                disabled={!category_name.trim() || addLoading}
               >
-                Add Category
+                {addLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <FaSpinner className="animate-spin" /> Adding...
+                  </span>
+                ) : (
+                  'Add Category'
+                )}
               </button>
             </div>
           </div>
@@ -163,6 +194,7 @@ function Category({ isCategoryOpen, onClose, setListCategories, listCategories, 
             <div
               className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]"
               onClick={() => {
+                if (editLoading) return; // prevent closing while editing
                 setOpenEdit(false);
                 setSelectEditCategory({});
                 setEditcategoryName('');
@@ -177,6 +209,7 @@ function Category({ isCategoryOpen, onClose, setListCategories, listCategories, 
                   type="button"
                   className="absolute right-2 top-2 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
                   onClick={() => {
+                    if (editLoading) return; // prevent closing while editing
                     setOpenEdit(false);
                     setSelectEditCategory({});
                     setEditcategoryName('');
@@ -192,13 +225,18 @@ function Category({ isCategoryOpen, onClose, setListCategories, listCategories, 
                     type="text"
                     className="border-2 rounded-lg text-sm lg:text-base px-3 py-2 border-gray-300 w-full"
                     value={editCategory_name}
-                    onChange={(e) => setEditcategoryName(sanitizeInput(e.target.value))}
+                    onChange={(e) => { setEditcategoryName(sanitizeInput(e.target.value)); if (editError) setEditError(''); }}
+                    disabled={editLoading}
                   />
+                  {editError && (
+                    <p className="text-xs text-red-600 mt-1">{editError}</p>
+                  )}
                   <button
-                    className="bg-[#007278] hover:bg-[#009097] text-white lg:text-base text-sm px-4 py-2 rounded-lg"
-                    onClick={() => submitCategory('edit')}
+                    className={`px-4 py-2 rounded-lg inline-flex items-center gap-2 text-white lg:text-base text-sm ${!editCategory_name.trim() || editLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#007278] hover:bg-[#009097]'}`}
+                    onClick={() => { if (!editLoading && editCategory_name.trim()) submitCategory('edit'); }}
+                    disabled={editLoading || !editCategory_name.trim()}
                   >
-                    Update Category
+                    {editLoading ? <><FaSpinner className="animate-spin" /> Updating...</> : 'Update Category'}
                   </button>
                 </div>
               </div>
