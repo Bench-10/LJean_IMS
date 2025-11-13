@@ -23,13 +23,12 @@ function Delivery({
   rangeLabel = '',
   windowLabel = ''
 }) {
-  const normalizedData = useMemo(
-    () => (Array.isArray(deliveryData) ? deliveryData : []),
-    [deliveryData]
-  );
+  // Expect incoming deliveryData to be an array of { date, delivered, undelivered }
+  const normalizedData = useMemo(() => (Array.isArray(deliveryData) ? deliveryData : []), [deliveryData]);
   const hasData = normalizedData.length > 0;
 
-  const barColor = deliveryStatus === 'undelivered' ? '#f87171' : '#4ade80';
+  const deliveredColor = '#4ade80';
+  const undeliveredColor = '#f87171';
 
   // Pretty month names for X-axis label formatting
   const MONTH = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -87,20 +86,6 @@ function Delivery({
             <div className="flex flex-wrap items-end gap-3">
               <div className="w-36">
                 <DropdownCustom
-                  value={deliveryStatus}
-                  onChange={(e) => setDeliveryStatus(e.target.value)}
-                  label="Status"
-                  variant="default"
-                  size="xs"
-                  options={[
-                    { value: 'delivered', label: 'Delivered' },
-                    { value: 'undelivered', label: 'Undelivered' },
-                  ]}
-                />
-              </div>
-
-              <div className="w-36">
-                <DropdownCustom
                   value={deliveryInterval}
                   onChange={(e) => setDeliveryInterval(e.target.value)}
                   label="Interval"
@@ -112,6 +97,18 @@ function Delivery({
                     { value: 'yearly', label: 'Yearly' },
                   ]}
                 />
+              </div>
+
+              {/* Legend: delivered vs undelivered for clarity */}
+              <div className="flex items-center gap-3 ml-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-3 h-3 rounded-sm" style={{ background: deliveredColor }} />
+                  <span className="text-gray-600">Delivered</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-3 h-3 rounded-sm" style={{ background: undeliveredColor }} />
+                  <span className="text-gray-600">Undelivered</span>
+                </div>
               </div>
             </div>
 
@@ -175,7 +172,7 @@ function Delivery({
 
                   {(() => {
                     const max = normalizedData.reduce(
-                      (m, p) => Math.max(m, Number(p.number_of_deliveries) || 0),
+                      (m, p) => Math.max(m, Number(p.delivered) || 0, Number(p.undelivered) || 0),
                       0
                     );
 
@@ -203,25 +200,41 @@ function Delivery({
                   })()}
 
                   <Tooltip
+                    cursor={false}
                     labelFormatter={(v) => formatTick(v)}
-                    formatter={(value) => [
-                      Number(value).toLocaleString(),
-                      deliveryStatus === 'undelivered' ? 'Undelivered' : 'Delivered',
-                    ]}
+                    formatter={(value, name) => [Number(value).toLocaleString(), name === 'undelivered' ? 'Undelivered' : 'Delivered']}
                   />
 
                   <Bar
-                    dataKey="number_of_deliveries"
-                    fill={barColor}
+                    dataKey="delivered"
+                    name="delivered"
+                    fill={deliveredColor}
                     radius={[4, 4, 0, 0]}
                     background={{ fill: '#F8FAFC' }}
                   >
                     {showBarLabels && (
                       <LabelList
-                        dataKey="number_of_deliveries"
+                        dataKey="delivered"
                         position="top"
                         formatter={(v) => (v == null ? '0' : String(v))}
-                        style={{ fontSize: 14, fill: '#0f172a', fontWeight: 600 }}
+                        style={{ fontSize: 12, fill: '#0f172a', fontWeight: 600 }}
+                      />
+                    )}
+                  </Bar>
+
+                  <Bar
+                    dataKey="undelivered"
+                    name="undelivered"
+                    fill={undeliveredColor}
+                    radius={[4, 4, 0, 0]}
+                    background={{ fill: '#F8FAFC' }}
+                  >
+                    {showBarLabels && (
+                      <LabelList
+                        dataKey="undelivered"
+                        position="top"
+                        formatter={(v) => (v == null ? '0' : String(v))}
+                        style={{ fontSize: 12, fill: '#0f172a', fontWeight: 600 }}
                       />
                     )}
                   </Bar>

@@ -856,43 +856,28 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     const range = computeDeliveryRange(cursor);
     if (!range) return;
 
-    const params = {
-      format: deliveryInterval,
-      status: deliveryStatus,
-      start_date: range.start_date,
-      end_date: range.end_date
-    };
+    // Helper to fetch one status (delivered/undelivered) and return filled series
+    const fetchStatus = async (status) => {
+      const params = {
+        format: deliveryInterval,
+        status,
+        start_date: range.start_date,
+        end_date: range.end_date
+      };
+      if (branchId) params.branch_id = branchId;
 
-    if (branchId) params.branch_id = branchId;
+      const cacheParams = {
+        branch: branchId ?? 'all',
+        interval: deliveryInterval,
+        status,
+        cursor,
+        start: range.start_date,
+        end: range.end_date
+      };
 
-    const cacheParams = {
-      branch: branchId ?? 'all',
-      interval: deliveryInterval,
-      status: deliveryStatus,
-      cursor,
-      start: range.start_date,
-      end: range.end_date
-    };
+      const cached = getCachedValue('delivery', cacheParams);
+      if (cached) return cached;
 
-    const cached = getCachedValue('delivery', cacheParams);
-    if (cached) {
-      if (mode === 'prepend') {
-        setDeliveryData((prev) => mergeDeliverySeries(cached.data, prev));
-        setDeliveryOldestCursor((prev) => Math.max(prev, cursor));
-      } else {
-        setDeliveryData(cached.data);
-        setDeliveryOldestCursor(cursor);
-      }
-      setDeliveryMeta(cached.meta ?? { ...DELIVERY_META_DEFAULT });
-      setLoadingDelivery(false);
-      return;
-    }
-
-    const requestId = deliveryRequestIdRef.current + 1;
-    deliveryRequestIdRef.current = requestId;
-    setLoadingDelivery(true);
-
-    try {
       const result = await fetchAndCache('delivery', cacheParams, async () => {
         const response = await analyticsApi.get(`/api/analytics/delivery`, { params, signal });
         const payload = response.data;
@@ -921,14 +906,65 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         return { data: filled, meta: metaPayload };
       });
 
+      return result;
+    };
+
+    const requestId = deliveryRequestIdRef.current + 1;
+    deliveryRequestIdRef.current = requestId;
+    setLoadingDelivery(true);
+
+    try {
+      // Fetch both delivered and undelivered in parallel, then merge into grouped series
+      const [deliveredRes, undeliveredRes] = await Promise.all([
+        fetchStatus('delivered'),
+        fetchStatus('undelivered')
+      ]);
+
+      const delivered = Array.isArray(deliveredRes?.data) ? deliveredRes.data : [];
+      const undelivered = Array.isArray(undeliveredRes?.data) ? undeliveredRes.data : [];
+
+      const mergedMap = new Map();
+      delivered.forEach((item) => {
+        const key = String(item.date);
+        mergedMap.set(key, {
+          date: key,
+          delivered: Number(item.number_of_deliveries) || 0,
+          undelivered: 0
+        });
+      });
+      undelivered.forEach((item) => {
+        const key = String(item.date);
+        const existing = mergedMap.get(key) || { date: key, delivered: 0, undelivered: 0 };
+        existing.undelivered = Number(item.number_of_deliveries) || 0;
+        mergedMap.set(key, existing);
+      });
+
+      const mergedSeries = Array.from(mergedMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([, v]) => v);
+
       if (mode === 'prepend') {
-        setDeliveryData((prev) => mergeDeliverySeries(result.data, prev));
+        setDeliveryData((prev) => {
+          // merge older (mergedSeries) before existing
+          const existing = Array.isArray(prev) ? prev : [];
+          const map = new Map();
+          existing.forEach(it => map.set(String(it.date), { date: String(it.date), delivered: Number(it.delivered)||0, undelivered: Number(it.undelivered)||0 }));
+          mergedSeries.forEach(it => {
+            const ex = map.get(it.date) || { date: it.date, delivered: 0, undelivered: 0 };
+            ex.delivered = (ex.delivered || 0) + (it.delivered || 0);
+            ex.undelivered = (ex.undelivered || 0) + (it.undelivered || 0);
+            map.set(it.date, ex);
+          });
+          return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0])).map(([,v])=>v);
+        });
         setDeliveryOldestCursor((prev) => Math.max(prev, cursor));
       } else {
-        setDeliveryData(result.data);
+        setDeliveryData(mergedSeries);
         setDeliveryOldestCursor(cursor);
       }
-      setDeliveryMeta(result.meta ?? { ...DELIVERY_META_DEFAULT });
+
+      // prefer delivered meta if available
+      setDeliveryMeta(deliveredRes?.meta ?? undeliveredRes?.meta ?? { ...DELIVERY_META_DEFAULT });
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Delivery analytics fetch error', e);
       if (mode === 'replace') setDeliveryData([]);
@@ -937,7 +973,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         setLoadingDelivery(false);
       }
     }
-  }, [branchId, computeDeliveryRange, deliveryInterval, deliveryStatus, user]);
+  }, [branchId, computeDeliveryRange, deliveryInterval, user]);
 
   const deliveryWindowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
 
