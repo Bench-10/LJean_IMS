@@ -162,14 +162,10 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
   };
 
   prefiltered.forEach((rec, index) => {
-    const rawId = rec?.pending_user_id ?? rec?.user_id ?? rec?.id ?? null;
-    const idNum = Number.isFinite(Number(rawId)) ? String(Number(rawId)) : null;
-
-    if (!idNum) {
-      // No usable id: store with a synthetic key to preserve these entries
-      byId.set(`__noid__${index}`, rec);
-      return;
-    }
+    // Accept any stable identifier (numeric or string). Prefer pending_user_id, then user_id, id,
+    // username or email. If none exist, generate a synthetic key so the record is preserved.
+    let rawId = rec?.pending_user_id ?? rec?.user_id ?? rec?.id ?? rec?.username ?? rec?.email ?? null;
+    let idKey = (rawId !== null && rawId !== undefined && String(rawId).trim() !== '') ? String(rawId) : null;
 
     const candidateTime = toTime(
       rec?.request_resolved_at ?? 
@@ -180,9 +176,13 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
       rec?.createdAt
     ) || 0;
 
-    const existing = byId.get(idNum);
+    if (!idKey) {
+      idKey = `anon-${index}-${candidateTime}`;
+    }
+
+    const existing = byId.get(idKey);
     if (!existing) {
-      byId.set(idNum, rec);
+      byId.set(idKey, rec);
       return;
     }
 
@@ -197,7 +197,7 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
 
     // Strategy: Always prefer the most recent timestamp
     if (candidateTime > existingTime) {
-      byId.set(idNum, rec);
+      byId.set(idKey, rec);
       return;
     }
 
@@ -207,7 +207,7 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
 
     // If timestamps are equal, use priority
     if (getPriority(rec) > getPriority(existing)) {
-      byId.set(idNum, rec);
+      byId.set(idKey, rec);
     }
   });
 
@@ -2482,7 +2482,8 @@ function App() {
 
     try {
       // Update local state immediately for better UX
-      const targetId = Number(userId);
+      const targetIdNum = Number(userId);
+      const targetIdStr = userId !== null && userId !== undefined ? String(userId) : '';
       const decisionTimestamp = new Date().toISOString();
 
       setUserCreationRequests((prev) => {
@@ -2491,8 +2492,18 @@ function App() {
         let changed = false;
 
         const mapped = prev.map((request) => {
-          const candidateId = Number(request?.pending_user_id ?? request?.user_id);
-          if (Number.isFinite(targetId) && Number.isFinite(candidateId) && candidateId === targetId) {
+          // Accept both numeric and string identifiers when matching requests. Some
+          // historical records use string-only pending ids (pending_user_id), so
+          // compare both numeric and string forms to ensure we find the correct record.
+          const candidateIdNum = Number(request?.pending_user_id ?? request?.user_id ?? null);
+          const candidateIdStr = (request?.pending_user_id ?? request?.user_id ?? request?.username ?? request?.email ?? null) !== null
+            ? String(request?.pending_user_id ?? request?.user_id ?? request?.username ?? request?.email)
+            : '';
+
+          const matchesNumeric = Number.isFinite(targetIdNum) && Number.isFinite(candidateIdNum) && candidateIdNum === targetIdNum;
+          const matchesString = targetIdStr && candidateIdStr && candidateIdStr === targetIdStr;
+
+          if (matchesNumeric || matchesString) {
             changed = true;
             return {
               ...request,
@@ -2523,7 +2534,17 @@ function App() {
         title: 'Account rejected'
       });
 
-      // WebSocket will update again if needed, but local update provides immediate feedback
+      // Fetch the latest user-creation feed immediately so the Request Status
+      // dialog (when open) receives fresh data just like other pages do.
+      // WebSocket will still provide updates, but this makes the UX immediate.
+      try {
+        await fetchUserCreationRequests();
+      } catch (e) {
+        // If the fetch fails, still bump the refresh token so any open dialogs
+        // that watch the token will attempt a refresh; log to console for diagnosis.
+        console.error('Failed to refresh user creation requests after rejection:', e);
+      }
+
       setRequestStatusRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error('Error rejecting user:', error);

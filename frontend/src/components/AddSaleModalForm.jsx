@@ -848,7 +848,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                                           selectProduct(idx, product);
                                         }}
                                       >
-                                        <div className="font-medium text-sm">{product.product_name}</div>
+                                        <div className="font-medium text-sm">{`${product.product_name} (${product.unit.toUpperCase()})`}</div>
                                         <div className="font-light text-xs">Quantity: {product.quantity}</div>
                                       </div>
                                     ))
