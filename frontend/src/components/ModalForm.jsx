@@ -557,6 +557,8 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
       {/* dialog */}
       <dialog
         className="bg-transparent fixed inset-0 z-[200]"
+        
+        
         open={mode === 'edit'
           ? isModalOpen && user && editChoice && user.role?.some(r => ['Inventory Staff'].includes(r))
           : isModalOpen && user && user.role?.some(r => ['Inventory Staff'].includes(r))}

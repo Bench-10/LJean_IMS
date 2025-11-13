@@ -48,12 +48,12 @@ function ProductInventory({
   }, [isPendingDialogOpen]);
 
   // Loading states for approve/reject actions (store pending_id while processing)
-const [approvingIds, setApprovingIds] = useState(() => new Set());
-const [rejectingIds, setRejectingIds] = useState(() => new Set());
+  const [approvingIds, setApprovingIds] = useState(() => new Set());
+  const [rejectingIds, setRejectingIds] = useState(() => new Set());
 
-const isApproving = (id) => approvingIds.has(id);
-const isRejecting = (id) => rejectingIds.has(id);
-const isBusy      = (id) => isApproving(id) || isRejecting(id);
+  const isApproving = (id) => approvingIds.has(id);
+  const isRejecting = (id) => rejectingIds.has(id);
+  const isBusy = (id) => isApproving(id) || isRejecting(id);
 
   const [highlightedPendingIds, setHighlightedPendingIds] = useState([]);
   const pendingRequestRefs = useRef(new Map());
@@ -77,27 +77,27 @@ const isBusy      = (id) => isApproving(id) || isRejecting(id);
     }
   };
 
-const handleApproveClick = (pendingId) => {
-  if (typeof approvePendingRequest !== 'function') return;
+  const handleApproveClick = (pendingId) => {
+    if (typeof approvePendingRequest !== 'function') return;
 
-  (async () => {
-    setApprovingIds(prev => {
-      const next = new Set(prev);
-      next.add(pendingId);
-      return next;
-    });
-
-    try {
-      await approvePendingRequest(pendingId);
-    } finally {
+    (async () => {
       setApprovingIds(prev => {
         const next = new Set(prev);
-        next.delete(pendingId);
+        next.add(pendingId);
         return next;
       });
-    }
-  })();
-};
+
+      try {
+        await approvePendingRequest(pendingId);
+      } finally {
+        setApprovingIds(prev => {
+          const next = new Set(prev);
+          next.delete(pendingId);
+          return next;
+        });
+      }
+    })();
+  };
 
   const handleRejectClick = (pendingId) => {
     if (typeof rejectPendingRequest !== 'function') return;
@@ -111,33 +111,33 @@ const handleApproveClick = (pendingId) => {
     setPendingRejectId(null);
   };
 
-const handleRejectDialogConfirm = (reason) => {
-  if (typeof rejectPendingRequest !== 'function' || pendingRejectId == null) {
-    setIsRejectDialogOpen(false);
-    setPendingRejectId(null);
-    return;
-  }
+  const handleRejectDialogConfirm = (reason) => {
+    if (typeof rejectPendingRequest !== 'function' || pendingRejectId == null) {
+      setIsRejectDialogOpen(false);
+      setPendingRejectId(null);
+      return;
+    }
 
-  (async () => {
-    setRejectingIds(prev => {
-      const next = new Set(prev);
-      next.add(pendingRejectId);
-      return next;
-    });
-
-    try {
-      await rejectPendingRequest(pendingRejectId, reason);
-    } finally {
+    (async () => {
       setRejectingIds(prev => {
         const next = new Set(prev);
-        next.delete(pendingRejectId);
+        next.add(pendingRejectId);
         return next;
       });
-    }
-    setIsRejectDialogOpen(false);
-    setPendingRejectId(null);
-  })();
-};
+
+      try {
+        await rejectPendingRequest(pendingRejectId, reason);
+      } finally {
+        setRejectingIds(prev => {
+          const next = new Set(prev);
+          next.delete(pendingRejectId);
+          return next;
+        });
+      }
+      setIsRejectDialogOpen(false);
+      setPendingRejectId(null);
+    })();
+  };
 
 
   // NEW: DIALOG STATE
@@ -296,7 +296,7 @@ const handleRejectDialogConfirm = (reason) => {
 
   return (
 
-    <div className="pt-20 lg:pt-8 px-4 lg:px-8 pb-6">
+    <div className="pt-20 lg:pt-7 px-4 lg:px-8 pb-6">
 
       {/*REJECTION REASON */}
       <RejectionReasonDialog
@@ -328,52 +328,52 @@ const handleRejectDialogConfirm = (reason) => {
       {/* ===================== PENDING REQUESTS MODAL ===================== */}
       {displayPendingApprovals && isPendingDialogOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-    {/* Backdrop: click to close */}
-    <div
-      className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-      onClick={() => setIsPendingDialogOpen(false)}
-    />
-
-    {/* Panel: stop clicks from bubbling to the backdrop */}
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="relative z-10 w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-popup"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="text-lg md:text-xl font-semibold text-gray-800">
-            Pending Inventory Requests
-          </h2>
-          <p className="text-xs md:text-sm text-gray-500">
-            Review inventory additions or updates awaiting your approval.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {typeof refreshPendingRequests === 'function' && (
-            <button
-              type="button"
-              className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={refreshPendingRequests}
-              disabled={pendingRequestsLoading}
-              aria-label="Refresh pending inventory requests"
-              title="Refresh pending inventory requests"
-            >
-              <MdRefresh className={`text-xl ${pendingRequestsLoading ? 'animate-spin' : ''}`} />
-              <span className="sr-only">Refresh</span>
-            </button>
-          )}
-          <button
-            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-lg transition"
+          {/* Backdrop: click to close */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setIsPendingDialogOpen(false)}
-            aria-label="Close"
+          />
+
+          {/* Panel: stop clicks from bubbling to the backdrop */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative z-10 w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-popup"
+            onClick={(e) => e.stopPropagation()}
           >
-            <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-        </div>
-      </div>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-lg md:text-xl font-semibold text-gray-800">
+                  Pending Inventory Requests
+                </h2>
+                <p className="text-xs md:text-sm text-gray-500">
+                  Review inventory additions or updates awaiting your approval.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {typeof refreshPendingRequests === 'function' && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={refreshPendingRequests}
+                    disabled={pendingRequestsLoading}
+                    aria-label="Refresh pending inventory requests"
+                    title="Refresh pending inventory requests"
+                  >
+                    <MdRefresh className={`text-xl ${pendingRequestsLoading ? 'animate-spin' : ''}`} />
+                    <span className="sr-only">Refresh</span>
+                  </button>
+                )}
+                <button
+                  className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-lg transition"
+                  onClick={() => setIsPendingDialogOpen(false)}
+                  aria-label="Close"
+                >
+                  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              </div>
+            </div>
 
             {/* Content */}
             <div
@@ -425,18 +425,18 @@ const handleRejectDialogConfirm = (reason) => {
                           <div className="flex flex-wrap gap-2 w-full md:w-auto">
                             <button
                               className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${isApproving === request.pending_id ||
-                                  rejectingIds === request.pending_id
-                                  ? 'bg-green-400 cursor-not-allowed'
-                                  : 'bg-green-600 hover:bg-green-700'
+                                rejectingIds === request.pending_id
+                                ? 'bg-green-400 cursor-not-allowed'
+                                : 'bg-green-600 hover:bg-green-700'
                                 }`}
                               onClick={() => handleApproveClick(request.pending_id)}
-  disabled={isBusy(request.pending_id)}
+                              disabled={isBusy(request.pending_id)}
                             >
                               {isApproving(request.pending_id) ? (
-    <span className="inline-flex items-center">
-      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-      Processing
-    </span>
+                                <span className="inline-flex items-center">
+                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                  Processing
+                                </span>
                               ) : (
                                 'Approve'
                               )}
@@ -444,18 +444,18 @@ const handleRejectDialogConfirm = (reason) => {
 
                             <button
                               className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${isRejecting === request.pending_id ||
-                                  isApproving === request.pending_id
-                                  ? 'bg-red-300 cursor-not-allowed'
-                                  : 'bg-red-500 hover:bg-red-600'
+                                isApproving === request.pending_id
+                                ? 'bg-red-300 cursor-not-allowed'
+                                : 'bg-red-500 hover:bg-red-600'
                                 }`}
                               onClick={() => handleRejectClick(request.pending_id)}
-  disabled={isBusy(request.pending_id)}
+                              disabled={isBusy(request.pending_id)}
                             >
                               {isRejecting(request.pending_id) ? (
-    <span className="inline-flex items-center">
-      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-      Processing
-    </span>
+                                <span className="inline-flex items-center">
+                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                  Processing
+                                </span>
                               ) : (
                                 'Reject'
                               )}
@@ -557,7 +557,7 @@ const handleRejectDialogConfirm = (reason) => {
           </div>
         </div>
       )}
-      {/* ===================== /PENDING REQUESTS MODAL ===================== */}
+      {/* ===================== /PENDING REQUESTS MODAL END ===================== */}
 
       {/* SEARCH + FILTERS + ACTIONS */}
       <div className="w-full lg:flex lg:items-center lg:gap-6">
@@ -678,7 +678,7 @@ const handleRejectDialogConfirm = (reason) => {
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
       {/*TABLE */}
-      <div className="overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+      <div className="overflow-x-auto overflow-y-auto h-[65vh] sm:h-[65vh] md:h-[70vh] lg:h-[75vh] xl:h-[60vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
         <table className={`w-full ${filteredData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 z-10">
             <tr>
@@ -758,27 +758,26 @@ const handleRejectDialogConfirm = (reason) => {
 
                       <td className="px-4 py-2 text-right"  >{Number(row.quantity).toLocaleString()}</td>
                       <td className="px-4 py-2 text-center w-36">
-  <div
-    className={`inline-flex items-center justify-center h-8 px-4 rounded-full text-[13px] font-medium whitespace-nowrap min-w-[110px] border
-      ${
-        Number(row.quantity) === 0
-          ? 'bg-gray-300 text-gray-800 border-gray-300'       // Out of Stock
-          : row.quantity <= row.min_threshold
-          ? 'bg-[#f05959] text-red-900 border-red-300'         // Low Stock
-          : row.quantity >= row.max_threshold
-          ? 'bg-[#1e5e1b] text-white border-green-900'         // Max Stock
-          : 'bg-[#61E85C] text-green-700 border-green-300'     // In Stock
-      }`}
-  >
-    {Number(row.quantity) === 0
-      ? 'Out of Stock'
-      : row.quantity <= row.min_threshold
-      ? 'Low Stock'
-      : row.quantity >= row.max_threshold
-      ? 'Max Stock'
-      : 'In Stock'}
-  </div>
-</td>
+                        <div
+                          className={`inline-flex items-center justify-center h-8 px-4 rounded-full text-[13px] font-medium whitespace-nowrap min-w-[110px] border
+      ${Number(row.quantity) === 0
+                              ? 'bg-gray-300 text-gray-800 border-gray-300'       // Out of Stock
+                              : row.quantity <= row.min_threshold
+                                ? 'bg-[#f05959] text-red-900 border-red-300'         // Low Stock
+                                : row.quantity >= row.max_threshold
+                                  ? 'bg-[#1e5e1b] text-white border-green-900'         // Max Stock
+                                  : 'bg-[#61E85C] text-green-700 border-green-300'     // In Stock
+                            }`}
+                        >
+                          {Number(row.quantity) === 0
+                            ? 'Out of Stock'
+                            : row.quantity <= row.min_threshold
+                              ? 'Low Stock'
+                              : row.quantity >= row.max_threshold
+                                ? 'Max Stock'
+                                : 'In Stock'}
+                        </div>
+                      </td>
 
                       {/*APEAR ONLY IF THE USER ROLE IS INVENTORY STAFF */}
                       {user && user.role && user.role.some(role => ['Inventory Staff'].includes(role)) &&

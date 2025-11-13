@@ -8,7 +8,7 @@ import { useAuth } from '../authentication/Authentication';
 import LogoutDialog from './dialogs/LogoutDialog';
 import BranchLogo from './BranchLogo';
 
-function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor }) {
+function NavBar({ setOpenNotif = () => { }, unreadCount = 0, onOpenRequestMonitor }) {
   const { user, logout } = useAuth();
 
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -32,8 +32,8 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
   const roles = Array.isArray(user?.role) ? user.role : (user?.role ? [user.role] : []);
   const canSeeRequestStatus = roles.some(r => ['Inventory Staff', 'Branch Manager'].includes(r));
   const canSeeNotifications = roles.some(r =>
-  ['Inventory Staff', 'Sales Associate', 'Branch Manager', 'Owner'].includes(r)
-);
+    ['Inventory Staff', 'Sales Associate', 'Branch Manager', 'Owner'].includes(r)
+  );
 
   const handleRequestClick = () => {
     if (typeof onOpenRequestMonitor === 'function') onOpenRequestMonitor();
@@ -92,17 +92,17 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
 
       {/* Sidebar */}
       <nav
-  role="navigation"
-  aria-label="Sidebar"
-  className={`fixed top-0 left-0 w-[var(--sidebar-width)] bg-navBackground text-white p-3 box-border
+        role="navigation"
+        aria-label="Sidebar"
+        className={`fixed top-0 left-0 w-[var(--sidebar-width)] bg-navBackground text-white p-3 box-border
   transition-transform duration-300 ease-in-out flex flex-col min-h-0
   ${showMobileMenu ? 'translate-x-0' : '-translate-x-full'} xl:translate-x-0 z-50`}
-  style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)' }}
->
+        style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)' }}
+      >
 
         {/* Desktop logo (>= xl) */}
         <div className="hidden xl:block flex-shrink-0">
-          <div className="flex justify-center pt-2">
+          <div className="flex justify-center pt-3">
             <BranchLogo branchName={user?.branch_name || 'L-Jean Trading'} className="h-16 w-auto" />
           </div>
         </div>
@@ -125,50 +125,50 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
 
         {/* Links */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-24">
-          <ul className="flex flex-col gap-2 [&>a]:py-2 [&>a]:px-3 [&>a]:rounded-md [&>a]:transition-all [&>a]:border-l-4-transparent [&>a]:cursor-pointer [&>a:hover]:bg-[#254717] [&>a]:flex [&>a]:items-center [&>a]:gap-x-[7px]">
+          <ul className="flex flex-col text-[15px]  gap-2 [&>a]:py-2 [&>a]:px-3 [&>a]:rounded-md [&>a]:transition-all [&>a]:border-l-4-transparent [&>a]:cursor-pointer [&>a:hover]:bg-[#254717] [&>a]:flex [&>a]:items-center [&>a]:gap-x-[7px]">
 
-            {roles.some(r => ['Branch Manager','Owner'].includes(r)) && (
+            {roles.some(r => ['Branch Manager', 'Owner'].includes(r)) && (
               <NavLink
                 to="/dashboard"
-                className={({ isActive }) => ((isActive || inBranchArea) ? "border-l-8 bg-[#254717] border-l-green-400" : "")}
+                className={({ isActive }) => ((isActive || inBranchArea) ? "text-[15px] border-l-8 bg-[#254717] border-l-green-400" : "")}
                 onClick={() => setShowMobileMenu(false)}
               >
                 <MdOutlineDashboard />Dashboard
               </NavLink>
             )}
 
-            {roles.some(r => ['Branch Manager','Owner','Inventory Staff'].includes(r)) && (
-              <NavLink to="/inventory" className={({ isActive }) => (isActive ? "border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
+            {roles.some(r => ['Branch Manager', 'Owner', 'Inventory Staff'].includes(r)) && (
+              <NavLink to="/inventory" className={({ isActive }) => (isActive ? "text-[15px]  border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
                 <MdOutlineInventory />Inventory
               </NavLink>
             )}
 
-            {roles.some(r => ['Branch Manager','Inventory Staff'].includes(r)) && (
-              <NavLink to="/product_validity" className={({ isActive }) => (isActive ? "border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
+            {roles.some(r => ['Branch Manager', 'Inventory Staff'].includes(r)) && (
+              <NavLink to="/product_validity" className={({ isActive }) => (isActive ? "text-[15px] border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
                 <PiSealWarningBold />Product Validity
               </NavLink>
             )}
 
-            {roles.some(r => ['Branch Manager','Owner'].includes(r)) && (
-              <NavLink to="/user_management" className={({ isActive }) => (isActive ? "border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
+            {roles.some(r => ['Branch Manager', 'Owner'].includes(r)) && (
+              <NavLink to="/user_management" className={({ isActive }) => (isActive ? "text-[15px]  border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
                 <FaUsersCog />User Management
               </NavLink>
             )}
 
             {roles.some(r => ['Sales Associate'].includes(r)) && (
-              <NavLink to="/sales" className={({ isActive }) => (isActive ? "border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
+              <NavLink to="/sales" className={({ isActive }) => (isActive ? "text-[15px]  border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
                 <FaMoneyBillWave />Sales Transactions
               </NavLink>
             )}
 
             {roles.some(r => ['Sales Associate'].includes(r)) && (
-              <NavLink to="/delivery" className={({ isActive }) => (isActive ? "border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
+              <NavLink to="/delivery" className={({ isActive }) => (isActive ? "text-[15px]  border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
                 <FaShippingFast />Deliveries
               </NavLink>
             )}
 
             {roles.some(r => ['Owner'].includes(r)) && (
-              <NavLink to="/approvals" className={({ isActive }) => (isActive ? "border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
+              <NavLink to="/approvals" className={({ isActive }) => (isActive ? "text-[15px]  border-l-8 bg-[#254717] border-l-green-400" : "")} onClick={() => setShowMobileMenu(false)}>
                 <FaClipboardCheck />Approvals
               </NavLink>
             )}
@@ -176,18 +176,18 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
         </div>
 
         {/* Logout Button - Sticky bottom (always visible) */}
-<div className="sticky bottom-0 left-0 right-0 bg-navBackground/95 backdrop-blur pt-2
+        <div className="sticky bottom-0 left-0 right-0 bg-navBackground/95 backdrop-blur pt-2
                 pb-[calc(env(safe-area-inset-bottom,0px)+10px)]">
-  <button
-    className="w-full text-[13px] bg-green-600 py-2 px-2 rounded-md flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
-    onClick={() => {
-      setShowLogoutDialog(true);
-      setShowMobileMenu(false);
-    }}
-  >
-    <MdOutlineLogout /> Logout
-  </button>
-</div>
+          <button
+            className="w-full text-[13px] bg-green-600 py-2 px-2 rounded-md flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
+            onClick={() => {
+              setShowLogoutDialog(true);
+              setShowMobileMenu(false);
+            }}
+          >
+            <MdOutlineLogout /> Logout
+          </button>
+        </div>
 
 
         {showLogoutDialog && (

@@ -2,33 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Global reset to prevent overflow issues START*/
-* {
+/* =========================================================
+   Global layout reset (safe for mobile + scrollable pages)
+   ========================================================= */
+
+/* Use border-box everywhere so padding doesn’t blow up sizes */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body {
+/* Make the document at least full height */
+html,
+body {
   margin: 0;
   padding: 0;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-x: hidden;          /* stop sideways scroll */
+  /* allow vertical scroll by default */
+  background-color: #f3f4f6;   /* optional: light gray app bg */
+
+  /* ==== HIDE GLOBAL SCROLLBAR (window scrollbar) ==== */
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE 10+ */
 }
 
+/* Hide scrollbar in WebKit browsers (Chrome, Edge, Safari) */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Root React container should stretch to viewport height */
 #root {
-  height: 100%;
-  overflow: hidden;
-} /* END */
+  min-height: 100vh;
+  /* For newer mobile browsers, you can use:
+     min-height: 100dvh;
+  */
+}
 
-.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+/* When you want to lock background scroll (e.g., modal open),
+   add/remove the "modal-open" class to <body> in your JS. */
+body.modal-open {
+  overflow-y: hidden;
+}
 
-.hide-scrollbar::-webkit-scrollbar { display: none; }
+/* =========================================================
+   Utilities
+   ========================================================= */
 
+/* Hide scrollbars but still allow scrolling on specific elements */
+.hide-scrollbar {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* IE 10+ */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;              /* Chrome, Safari, Edge */
+}
+
+/* For scrollable modal bodies */
 .modal-scroll {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
-/* WebSocket Real-time Update Animations */
+/* =========================================================
+   WebSocket Real-time Update Animations
+   ========================================================= */
+
 @keyframes slideInRight {
   from {
     transform: translateX(100%);
@@ -47,7 +90,6 @@ html, body {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 

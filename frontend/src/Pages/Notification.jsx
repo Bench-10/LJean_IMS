@@ -208,7 +208,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
 
             <button
               onClick={onClose}
-              className='absolute top-3 right-3 sm:top-4 sm:right-4 p-2 z-10 hover:bg-gray-100 rounded-lg transition-colors'
+              className='absolute  top-2 right-1 p-2 z-10 hover:bg-gray-100 rounded-lg transition-colors'
               aria-label="Close notifications"
             >
               <IoMdClose className='w-5 h-5 sm:w-6 sm:h-6' />
@@ -230,7 +230,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
-                      className='w-full sm:w-auto px-4 py-2 mr-0 sm:mr-6 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors'
+                      className='w-full sm:w-auto px-4 py-2 mr-0 sm:mr-3 bg-green-600 text-white text-[14px] lg:text-xs xl:text-sm font-medium rounded-lg hover:bg-green-700 transition-colors'
                     >
                       Mark All as Read
                     </button>

@@ -142,7 +142,7 @@ function Sales({ setOpenSaleModal, saleHeader = [], sanitizeInput, salesLoading 
   const currentPageData = filteredData.slice(startIndex, endIndex);
 
   return (
-    <div className='pt-20 lg:pt-8 px-4 lg:px-8'>
+    <div className='pt-20 lg:pt-7 px-4 lg:px-8'>
       <ViewingSalesAndDelivery
         openModal={openItems}
         type={modalType}
@@ -199,7 +199,7 @@ function Sales({ setOpenSaleModal, saleHeader = [], sanitizeInput, salesLoading 
 
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg"/>
 
-      <div className="overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+      <div className="overflow-x-auto overflow-y-auto h-[60vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
         <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 z-10">
             <tr>

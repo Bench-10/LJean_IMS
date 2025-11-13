@@ -21,7 +21,7 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false);
 
   const rowRefs = useRef({});
   const pendingFocusRef = useRef(null);
@@ -108,9 +108,8 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     return `history-row-${fallbackIndex}`;
   };
 
-
-  //PAGINATION LOGIC
-  const [currentPage, setCurrentPage] = useState(1)
+  // PAGINATION LOGIC
+  const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
 
   useEffect(() => {
@@ -138,7 +137,6 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     }
   }, [isProductTransactOpen]);
 
-
   const closeFilterValue = () => {
     setOpenFilter(false);
     setEndDate('');
@@ -157,30 +155,25 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     setOpenFilter(false);
   };
 
-
   const applyFilter = () => {
-
     if (!startDate && !endDate) {
       fetchProductHistory();
       setOpenFilter(false);
-      return
+      return;
     }
 
     if ((startDate > endDate) && endDate) {
       alert('End date must not be before the Start date!');
-      return
+      return;
     }
 
     if (startDate && !endDate) {
       fetchProductHistory();
     }
 
-
     fetchProductHistory();
     setOpenFilter(false);
-
   };
-
 
   const fetchProductHistory = async () => {
     const dates = { startDate, endDate };
@@ -196,12 +189,10 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
       setProductHistory(response.data);
     } catch (error) {
       setError(error.message);
-
     } finally {
       setLoading(false);
     }
   };
-
 
   useEffect(() => {
     if (isProductTransactOpen)
@@ -220,7 +211,6 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
         // SHOW A BRIEF VISUAL INDICATOR (if modal is open)
         if (isProductTransactOpen) {
-          // You could add a toast notification here or temporary visual feedback
           console.log(`📋 New history entry: ${historyData.historyEntry.product_name} (${historyData.historyEntry.quantity_added} units)`);
         }
       }
@@ -231,7 +221,7 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     return () => {
       window.removeEventListener('history-update', handleHistoryUpdate);
     };
-  }, []);
+  }, [isProductTransactOpen]);
 
   useEffect(() => {
     if (!isProductTransactOpen || !pendingFocusRef.current || loading) return;
@@ -263,18 +253,16 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
     }
   }, [productHistory, isProductTransactOpen, itemsPerPage, loading, onClearFocus]);
 
-
   const handleSearch = (event) => {
     setSearch(sanitizeInput(event.target.value));
-
-  }
+  };
 
   let filteredHistory = productHistory;
 
-
-  //FILTER BY CATEGORY
-  filteredHistory = selectedCategory ? productHistory.filter((items) => items.category_id === Number(selectedCategory)) : filteredHistory;
-
+  // FILTER BY CATEGORY
+  filteredHistory = selectedCategory
+    ? productHistory.filter((items) => items.category_id === Number(selectedCategory))
+    : filteredHistory;
 
   // PAGINATION: filter first, then paginate
   let filteredHistoryData = filteredHistory.filter(product =>
@@ -336,23 +324,25 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
   return (
     <div>
-
-      {isProductTransactOpen && <div className='fixed inset-0 bg-black/35 bg-opacity-50 z-[9998] backdrop-blur-sm' onClick={() => { onClose(); closeFilterValue(); setProductHistory([]) }} />}
+      {isProductTransactOpen && (
+        <div
+          className='fixed inset-0 bg-black/35 bg-opacity-50 z-[9998] backdrop-blur-sm'
+          onClick={() => { onClose(); closeFilterValue(); setProductHistory([]); }}
+        />
+      )}
 
       <dialog className='bg-transparent fixed top-0 bottom-0 z-[9999]' open={isProductTransactOpen}>
-
-
         <div className="relative flex flex-col border border-gray-600/40 bg-white h-[80vh] sm:h-[85vh] lg:h-[90vh] w-[96vw] sm:w-[95vw] max-h-none sm:max-h-[600px] max-w-none sm:max-w-[1000px] rounded-xl p-3 sm:p-4 lg:p-7 pb-4 sm:pb-8 border-gray-300 animate-popup mx-auto my-auto">
           <button
-  type="button"
-  className="absolute top-4 right-3 sm:top-4 w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors z-10"
-  onClick={() => { onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([]); }}
-  aria-label="Close"
->
-  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
-</button>
+            type="button"
+            className="absolute top-4 right-3 sm:top-4 w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors z-10"
+            onClick={() => { onClose(); setOpenFilter(false); closeFilterValue(); handleClose(); setProductHistory([]); }}
+            aria-label="Close"
+          >
+            <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
 
-          {/*TITLE AND FILTER SECTION*/}
+          {/* TITLE AND FILTER SECTION */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-2  gap-4 sm:gap-0">
             {/* LEFT SIDE */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 w-full pt-2">
@@ -373,7 +363,7 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
                 <div className='relative w-full'>
                   <DropdownCustom
-                  size="sm"
+                    size="sm"
                     value={selectedCategory}
                     onChange={(e) => {
                       setSelectedCategory(e.target.value);
@@ -391,80 +381,78 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
 
                 {/* RIGHT SIDE - FILTER BUTTON & POPUP */}
                 <div className="relative mt-2 sm:mt-0 w-full lg:w-auto overflow-visible">
-
                   {/* POPUP (no nested <dialog>) */}
-{openFilter && (
-  <div
-    className="absolute z-[10000]
-               top-[110%] left-1/2 -translate-x-1/2
-               sm:top-[100%] sm:left-auto sm:right-0 sm:translate-x-0"
-  >
-    <div className="w-[92vw] sm:w-[360px] max-w-[420px]
-                    border rounded-md px-3 py-4 shadow-lg text-xs bg-white">
-      <h1 className="font-bold text-md">Filter</h1>
+                  {openFilter && (
+                    <div
+                      className="absolute z-[10000]
+                        top-[110%] left-1/2 -translate-x-1/2
+                        sm:top-[100%] sm:left-auto sm:right-0 sm:translate-x-0"
+                    >
+                      <div className="w-[92vw] sm:w-[360px] max-w-[420px]
+                        border rounded-md px-3 py-4 shadow-lg text-xs bg-white">
+                        <h1 className="font-bold text-md">Filter</h1>
 
-      <div className="w-full mt-3">
-        <DatePickerCustom
-          label="Start date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          placeholder="Select start date"
-          id="start-date"
-        />
-      </div>
+                        <div className="w-full mt-3">
+                          <DatePickerCustom
+                            label="Start date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            placeholder="Select start date"
+                            id="start-date"
+                          />
+                        </div>
 
-      <div className="w-full mt-3">
-        <DatePickerCustom
-          label="End date"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          placeholder="Select end date"
-          id="end-date"
-        />
-      </div>
+                        <div className="w-full mt-3">
+                          <DatePickerCustom
+                            label="End date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            placeholder="Select end date"
+                            id="end-date"
+                          />
+                        </div>
 
-      <div className="w-full mt-4 flex gap-2">
-        <button
-          className="flex-1 bg-white py-1.5 px-4 text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md transition-colors font-medium"
-          onClick={async () => {
-            setEndDate(''); setStartDate('');
-            try {
-              setLoading(true);
-              const dates = { startDate: '', endDate: '' };
-              let response;
-              if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
-                response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
-              } else {
-                response = await api.post(`/api/product_history/`, dates);
-              }
-              setProductHistory(response.data);
-            } catch (error) {
-              setError(error.message);
-            } finally {
-              setLoading(false);
-            }
-            setOpenFilter(false);
-          }}
-        >
-          Clear
-        </button>
-        <button
-          className="flex-1 bg-gray-800 py-1.5 px-4 text-white hover:bg-gray-700 border border-gray-800 rounded-md transition-colors font-medium"
-          onClick={applyFilter}
-        >
-          Apply
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+                        <div className="w-full mt-4 flex gap-2">
+                          <button
+                            className="flex-1 bg-white py-1.5 px-4 text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md transition-colors font-medium"
+                            onClick={async () => {
+                              setEndDate(''); setStartDate('');
+                              try {
+                                setLoading(true);
+                                const dates = { startDate: '', endDate: '' };
+                                let response;
+                                if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
+                                  response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
+                                } else {
+                                  response = await api.post(`/api/product_history/`, dates);
+                                }
+                                setProductHistory(response.data);
+                              } catch (error) {
+                                setError(error.message);
+                              } finally {
+                                setLoading(false);
+                              }
+                              setOpenFilter(false);
+                            }}
+                          >
+                            Clear
+                          </button>
+                          <button
+                            className="flex-1 bg-gray-800 py-1.5 px-4 text-white hover:bg-gray-700 border border-gray-800 rounded-md transition-colors font-medium"
+                            onClick={applyFilter}
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     className={`h-9 w-full sm:w-9 flex items-center justify-center border border-gray-300 rounded-md 
-      hover:bg-gray-100 transition-colors flex-shrink-0 outline-none
-      ${openFilter ? 'ring-2 ring-blue-500 border-blue-500 bg-gray-50' : 'focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
-                    onClick={() => { openFilter ? closeFilterValue() : setOpenFilter(true) }}
+                      hover:bg-gray-100 transition-colors flex-shrink-0 outline-none
+                      ${openFilter ? 'ring-2 ring-blue-500 border-blue-500 bg-gray-50' : 'focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
+                    onClick={() => { openFilter ? closeFilterValue() : setOpenFilter(true); }}
                   >
                     <BsFunnelFill className='w-4 h-4 text-gray-700' />
                     <span className='ml-2 sm:hidden text-sm'>Filter</span>
@@ -475,14 +463,15 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
             </div>
           </div>
 
-
-          {/*HISTORY TABLE SECTION*/}
+          {/* HISTORY TABLE SECTION */}
           <div className='overflow-x-auto overflow-y-auto w-full flex-1 mt-4 rounded-lg shadow-sm border border-gray-200 hide-scrollbar'>
-            <table className='w-full min-w-[640px]'>
+            <table className='w-full min-w-[640px] table-fixed'>
               <thead className='sticky top-0 h-10 z-40'>
                 <tr className='bg-gray-200'>
                   <th className='px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Date</th>
-                  <th className='px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Item Name</th>
+                  <th className='px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-[30%]'>
+                    Item Name
+                  </th>
                   <th className='px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Category</th>
                   <th className='px-2 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Unit Cost</th>
                   <th className='px-2 sm:px-4 lg:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'>Quantity</th>
@@ -501,7 +490,6 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                     (
                       <NoInfoFound col={6} />
                     ) :
-
                     (
                       currentData.map((history, histoindx) => {
                         const rowKey = getEntryKey(history, startIndex + histoindx);
@@ -520,12 +508,29 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
                             data-alert-timestamp={history.alert_timestamp ?? undefined}
                             className={`transition-colors duration-300 ease-in-out border-b border-gray-100 ${isHighlighted ? 'bg-green-200' : 'hover:bg-gray-100'}`}
                           >
-                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.formated_date_added}</td>
-                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900'>{history.product_name}</td>
-                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>{history.category_name}</td>
-                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{currencyFormat(history.h_unit_cost)}</td>
-                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{history.quantity_added.toLocaleString()}</td>
-                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>{currencyFormat(history.value)}</td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>
+                              {history.formated_date_added}
+                            </td>
+
+                            {/* Item Name – wider and horizontally scrollable */}
+                            <td className="px-2 sm:px-4 lg:px-6 py-3 text-xs sm:text-sm font-medium text-gray-900 align-middle w-[30%]">
+                              <div className="max-w-[260px] sm:max-w-[320px] overflow-x-auto whitespace-nowrap hide-scrollbar">
+                                {history.product_name}
+                              </div>
+                            </td>
+
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500'>
+                              {history.category_name}
+                            </td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>
+                              {currencyFormat(history.h_unit_cost)}
+                            </td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>
+                              {history.quantity_added.toLocaleString()}
+                            </td>
+                            <td className='px-2 sm:px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right'>
+                              {currencyFormat(history.value)}
+                            </td>
                           </tr>
                         );
                       })
@@ -652,13 +657,10 @@ function ProductTransactionHistory({ isProductTransactOpen, onClose, sanitizeInp
             </div>
           </div>
 
-
         </div>
-
       </dialog>
     </div>
-
-  )
+  );
 }
 
-export default ProductTransactionHistory
+export default ProductTransactionHistory;

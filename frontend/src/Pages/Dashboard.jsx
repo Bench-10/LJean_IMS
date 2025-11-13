@@ -17,7 +17,7 @@ function Dashboard() {
 
 
   return (
-    <div className='pt-20 lg:pt-3 px-4 lg:px-8 pb-6 h-screen overflow-hidden bg-[#eef2ee] flex flex-col hide-scrollbar '>
+    <div className='pt-20 lg:pt-3 px-4 lg:px-8 pb-4 h-screen overflow-hidden bg-[#eef2ee] flex flex-col hide-scrollbar '>
       <AnalyticsDashboard branchId={branchId} />
     </div>
     

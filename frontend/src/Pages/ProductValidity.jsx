@@ -145,6 +145,14 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
   const [pendingRowKey, setPendingRowKey] = useState(null);
   const [highlightedRowKey, setHighlightedRowKey] = useState(null);
 
+  // ✅ Helper: format quantity with no decimals
+  const formatQuantity = (value) => {
+    if (value == null || value === '') return '0';
+    const num = Number(value);
+    if (Number.isNaN(num)) return String(value);
+    return num.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  };
+
   const getProductInfo = async ({ force = false } = {}) => {
     // If we already have cached data and not forcing, show it immediately without spinner
     try {
@@ -184,7 +192,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     // On mount: show cache if available, then refresh in background
@@ -344,21 +352,17 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     };
   }, []);
 
-
-
-
   const handleSearch = (event) => {
     setSearchValidity(sanitizeInput(event.target.value));
     setCurrentPage(1); // RESET TO FIRST PAGE WHEN SEARCHING
-  }
-
+  };
 
   const filteredValidityData = productValidityList.filter(validity =>
-  // Basic search match
-  (validity.product_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
-    validity.category_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
-    validity.formated_date_added.toLowerCase().includes(searchValidity.toLowerCase()) ||
-    validity.formated_product_validity.toLowerCase().includes(searchValidity.toLowerCase()))
+    // Basic search match
+    (validity.product_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
+      validity.category_name.toLowerCase().includes(searchValidity.toLowerCase()) ||
+      validity.formated_date_added.toLowerCase().includes(searchValidity.toLowerCase()) ||
+      validity.formated_product_validity.toLowerCase().includes(searchValidity.toLowerCase()))
   )
     // Then apply expiry toggles and date filters
     .filter(validity => {
@@ -396,7 +400,13 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
   // Export functionality
   const handleExportValidity = (format) => {
-    const exportData = formatForExport(filteredValidityData, []);
+    // ensure exported quantity has no decimals too
+    const exportSource = filteredValidityData.map(item => ({
+      ...item,
+      quantity_left: formatQuantity(item.quantity_left),
+    }));
+
+    const exportData = formatForExport(exportSource, []);
     const filename = `product_validity_export_${new Date().toISOString().split('T')[0]}`;
 
     const customHeaders = ['Product Name', 'Category', 'Date Added', 'Product Validity Date', 'Quantity Left'];
@@ -413,10 +423,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
     }
   };
 
-
-
   return (
-    <div className="pt-20 lg:pt-8 px-4 lg:px-8" >
+    <div className="pt-20 lg:pt-7 px-4 lg:px-8" >
       {/*TITLE*/}
       <h1 className='text-[33px] leading-[36px] font-bold text-green-900'>
         PRODUCT VALIDITY
@@ -426,85 +434,84 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
 
       {/*SEARCH AND ADD*/}
       {/* SEARCH + FILTERS (1 line on desktop; controls at right) */}
-<div className="w-full lg:flex lg:items-center lg:flex-nowrap lg:gap-4">
-  {/* SEARCH (left) */}
-  <div className="w-full lg:basis-[360px] lg:flex-none text-sm lg:text-sm pb-3 lg:pb-0">
-    <input
-      type="text"
-      placeholder="Search Item Name or Category"
-      className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:py-2 transition-all px-3 py-2 rounded-lg w-full h-9"
-      onChange={handleSearch}
-    />
-  </div>
+      <div className="w-full lg:flex lg:items-center lg:flex-nowrap lg:gap-4">
+        {/* SEARCH (left) */}
+        <div className="w-full lg:basis-[360px] lg:flex-none text-sm lg:text-sm pb-3 lg:pb-0">
+          <input
+            type="text"
+            placeholder="Search Item Name or Category"
+            className="border outline outline-1 outline-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:py-2 transition-all px-3 py-2 rounded-lg w-full h-9"
+            onChange={handleSearch}
+          />
+        </div>
 
-  {/* RIGHT: chips + dropdowns (flush right on desktop) */}
-  <div className="w-full lg:w-auto lg:ml-auto lg:flex lg:items-center lg:justify-end lg:gap-3">
-    {/* Chips: grid on mobile, inline on desktop */}
-    <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 lg:shrink-0">
-      <button
-        type="button"
-        onClick={() => { setShowNearExpiry(p => !p); setCurrentPage(1); }}
-        className={`w-full lg:w-auto flex h-[36px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
+        {/* RIGHT: chips + dropdowns (flush right on desktop) */}
+        <div className="w-full lg:w-auto lg:ml-auto lg:flex lg:items-center lg:justify-end lg:gap-3">
+          {/* Chips: grid on mobile, inline on desktop */}
+          <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 lg:shrink-0">
+            <button
+              type="button"
+              onClick={() => { setShowNearExpiry(p => !p); setCurrentPage(1); }}
+              className={`w-full lg:w-auto flex h-[36px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
           ${showNearExpiry
-            ? 'bg-[#FFF3C1] text-gray-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
-            : 'bg-white text-gray-700 border-gray-200 hover:bg-yellow-50'}`}
-      >
-        <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#f8e189]" />
-        <span className="whitespace-nowrap">Near Expiry</span>
-      </button>
+                  ? 'bg-[#FFF3C1] text-gray-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-yellow-50'}`}
+            >
+              <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#f8e189]" />
+              <span className="whitespace-nowrap">Near Expiry</span>
+            </button>
 
-      <button
-        type="button"
-        onClick={() => { setShowExpired(p => !p); setCurrentPage(1); }}
-        className={`w-full lg:w-auto flex h-[36px] lg:h-[38px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
+            <button
+              type="button"
+              onClick={() => { setShowExpired(p => !p); setCurrentPage(1); }}
+              className={`w-full lg:w-auto flex h-[36px] lg:h-[38px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
           ${showExpired
-            ? 'bg-[#FF3131] text-white border-red-500 ring-2 ring-red-400 ring-offset-2'
-            : 'bg-white text-gray-700 border-gray-200 hover:bg-red-50'}`}
-      >
-        <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#c32525]" />
-        <span className="whitespace-nowrap">Expired</span>
-      </button>
-    </div>
+                  ? 'bg-[#FF3131] text-white border-red-500 ring-2 ring-red-400 ring-offset-2'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-red-50'}`}
+            >
+              <span className="w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#c32525]" />
+              <span className="whitespace-nowrap">Expired</span>
+            </button>
+          </div>
 
-    {/* Year/Month: grid on mobile, inline on desktop */}
-    <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-2 lg:ml-3 lg:shrink-0 mt-2 lg:mt-0">
-      <div className="col-span-1 lg:w-40">
-        <DropdownCustom
-          value={selectedYear}
-          onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
-          variant="simple"
-          options={[
-            { value: '', label: 'All Years' },
-            ...Array.from(new Set(productValidityList.map(v => v.year).filter(Boolean)))
-              .sort((a, b) => b - a)
-              .map(y => ({ value: y, label: y }))
-          ]}
-        />
+          {/* Year/Month: grid on mobile, inline on desktop */}
+          <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-2 lg:ml-3 lg:shrink-0 mt-2 lg:mt-0">
+            <div className="col-span-1 lg:w-40">
+              <DropdownCustom
+                value={selectedYear}
+                onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
+                variant="simple"
+                options={[
+                  { value: '', label: 'All Years' },
+                  ...Array.from(new Set(productValidityList.map(v => v.year).filter(Boolean)))
+                    .sort((a, b) => b - a)
+                    .map(y => ({ value: y, label: y }))
+                ]}
+              />
+            </div>
+            <div className="col-span-1 lg:w-40">
+              <DropdownCustom
+                value={selectedMonth}
+                onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); }}
+                variant="simple"
+                options={[
+                  { value: '', label: 'All Months' },
+                  ...(() => {
+                    const names = [null, 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const months = Array.from(new Set(productValidityList.map(v => v.month).filter(m => m != null).map(Number))).sort((a, b) => a - b);
+                    return months.map(m => ({ value: m, label: names[m] || m }));
+                  })()
+                ]}
+              />
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="col-span-1 lg:w-40">
-        <DropdownCustom
-          value={selectedMonth}
-          onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); }}
-          variant="simple"
-          options={[
-            { value: '', label: 'All Months' },
-            ...(() => {
-              const names = [null,'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-              const months = Array.from(new Set(productValidityList.map(v => v.month).filter(m => m != null).map(Number))).sort((a,b)=>a-b);
-              return months.map(m => ({ value: m, label: names[m] || m }));
-            })()
-          ]}
-        />
-      </div>
-    </div>
-  </div>
-</div>
-
 
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
       {/* MOBILE CARD VIEW */}
-  <div ref={mobileContainerRef} className="block lg:hidden space-y-3 overflow-y-auto h-[55vh] pb-6 hide-scrollbar">
+      <div ref={mobileContainerRef} className="block lg:hidden space-y-3 overflow-y-auto h-[60vh] pb-6 hide-scrollbar">
         {loading ? (
           <div className='h-96 flex items-center justify-center'>
             <ChartLoading message='Loading products...' />
@@ -537,50 +544,51 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                       : 'bg-white border-gray-300'
                 } ${isHighlighted ? 'bg-emerald-200 text-emerald-900 transition-colors' : ''}`}
               >
-              {(validity.expy || validity.near_expy) && (
-                <div className="flex items-center gap-2 mb-2">
-                  <RiErrorWarningLine className="text-xl" />
-                  <span className="font-semibold text-sm">
-                    {validity.expy ? 'EXPIRED' : 'NEAR EXPIRY'}
-                  </span>
+                {(validity.expy || validity.near_expy) && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <RiErrorWarningLine className="text-xl" />
+                    <span className="font-semibold text-sm">
+                      {validity.expy ? 'EXPIRED' : 'NEAR EXPIRY'}
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-2 text-sm">
+                  <div className="font-bold text-base">{validity.product_name}</div>
+
+                  <div className="flex justify-between">
+                    <span className="text-white-600">Category:</span>
+                    <span className="font-medium">{validity.category_name}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-white-600">Date Purchased:</span>
+                    <span className="font-medium">{validity.formated_date_added}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-white-600">Expiry Date:</span>
+                    <span className="font-medium">{validity.formated_product_validity}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-white-600">Quantity:</span>
+                    <span className="font-bold text-base">
+                      {formatQuantity(validity.quantity_left)}
+                    </span>
+                  </div>
                 </div>
-              )}
-             
-              <div className="space-y-2 text-sm">
-                <div className="font-bold text-base">{validity.product_name}</div>
-               
-                <div className="flex justify-between">
-                  <span className="text-white-600">Category:</span>
-                  <span className="font-medium">{validity.category_name}</span>
-                </div>
-               
-                <div className="flex justify-between">
-                  <span className="text-white-600">Date Purchased:</span>
-                  <span className="font-medium">{validity.formated_date_added}</span>
-                </div>
-               
-                <div className="flex justify-between">
-                  <span className="text-white-600">Expiry Date:</span>
-                  <span className="font-medium">{validity.formated_product_validity}</span>
-                </div>
-               
-                <div className="flex justify-between">
-                  <span className="text-white-600">Quantity:</span>
-                  <span className="font-bold text-base">{validity.quantity_left}</span>
-                </div>
-              </div>
               </div>
             );
           })
         )}
-        
+
       </div>
 
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg lg:hidden" />
 
-
       {/*DESKTOP VIEW*/}
-  <div ref={desktopContainerRef} className="hidden lg:block overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
+      <div ref={desktopContainerRef} className="hidden lg:block overflow-x-auto overflow-y-auto h-[65vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
         <table className={`w-full ${currentPageData.length === 0 ? 'h-full' : ''} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 z-20">
 
@@ -602,10 +610,8 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                 QUANTITY
               </th>
 
-
             </tr>
           </thead>
-
 
           <tbody className="bg-white relative">
             {loading ?
@@ -652,36 +658,37 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
                         }}
                         className={`${baseRowClass} ${highlightClass}`}
                       >
-                      {(validity.expy || validity.near_expy) ?
+                        {(validity.expy || validity.near_expy) ?
 
-                        (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
+                          (<td className="flex px-4 py-2 text-center gap-x-10 items-center mt-[5%]"  >
 
-                          <div className='flex items-center'>
-                            <RiErrorWarningLine className='h-[100%]' />
-                          </div>
+                            <div className='flex items-center'>
+                              <RiErrorWarningLine className='h-[100%]' />
+                            </div>
 
-                          <div>
-                            {validity.formated_date_added}
-                          </div>
+                            <div>
+                              {validity.formated_date_added}
+                            </div>
 
-                        </td>
-                        ) :
-
-                        (
-                          <td className="px-4 py-2 text-center items-center "  >
-                            {validity.formated_date_added}
                           </td>
-                        )
+                          ) :
 
-                      }
+                          (
+                            <td className="px-4 py-2 text-center items-center "  >
+                              {validity.formated_date_added}
+                            </td>
+                          )
 
+                        }
 
-                      <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
-                      <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
-                      <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
-                      <td className="px-4 py-2 text-center "  >{validity.quantity_left}</td>
+                        <td className="px-4 py-2 text-center font-medium whitespace-nowrap" >{validity.formated_product_validity}</td>
+                        <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap" >{validity.product_name}</td>
+                        <td className="px-4 py-2 text-center "  >{validity.category_name}</td>
+                        <td className="px-4 py-2 text-center "  >
+                          {formatQuantity(validity.quantity_left)}
+                        </td>
 
-                    </tr>
+                      </tr>
 
                     );
                   })
@@ -789,7 +796,7 @@ function ProductValidity({ sanitizeInput, productValidityList: propValidityList,
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default ProductValidity
+export default ProductValidity;

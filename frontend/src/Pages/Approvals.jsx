@@ -434,7 +434,7 @@ function Approvals({
   };
 
   return (
-    <div className="pt-20 lg:pt-8 px-3 sm:px-4 lg:px-8 pb-6 min-h-screen bg-[#eef2ee]">
+    <div className="pt-20 lg:pt-7 px-3 sm:px-4 lg:px-8 pb-6 min-h-screen bg-[#eef2ee]">
       <div className="mb-4 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl lg:text-[33px] leading-[36px] font-bold text-green-900">APPROVAL CENTER</h1>
         <hr className="mt-2 sm:mt-3 mb-4 sm:mb-6 border-t-4 border-green-800 rounded-lg" />
@@ -469,17 +469,17 @@ function Approvals({
         )}
       </div>
 
-      <hr className="border-t-2 my-3 sm:my-4 w-full border-gray-500 rounded-lg" />
+      <hr className="border-t-2 my-3 sm:my-4 w-full border-green-800 rounded-lg" />
 
       {/* DESKTOP TABLE VIEW */}
       <div
-        className="hidden md:block overflow-x-auto overflow-y-auto h-[55vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6 bg-white"
+        className="hidden md:block overflow-x-auto overflow-y-auto h-[60vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6 bg-white"
         ref={tableScrollContainerRef}
       >
         <table className={`w-full ${combinedRequests.length === 0 ? "h-full" : ""} divide-y divide-gray-200 text-sm`}>
           <thead className="sticky top-0 bg-green-500 text-white z-10">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">Request</th>
+              <th className="px-4 py-2 text-left font-medium w-[260px]">Request</th>
               <th className="px-4 py-2 text-left font-medium w-48">Branch</th>
               <th className="px-4 py-2 text-left font-medium w-56">Requested By</th>
               <th className="px-4 py-2 text-left font-medium w-64">Details</th>
@@ -535,7 +535,7 @@ function Approvals({
                         <span className="text-sm">Roles: {rolesLabel || "—"}</span>
                       </td>
                       <td className="px-4 py-4 text-center align-top">
-                        <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-3 h-7 text-[13px] leading-none font-semibold text-amber-700 border border-amber-300 whitespace-nowrap">
+                        <span className="inline-flex items-center justify-center rounded-lg bg-amber-100 px-3 h-7 text-[13px] leading-none font-semibold text-amber-700 border border-amber-300 whitespace-nowrap">
                           For Approval
                         </span>
                       </td>
@@ -654,7 +654,7 @@ function Approvals({
 
       {/* MOBILE CARD VIEW */}
       <div
-        className="md:hidden space-y-3 sm:space-y-4 overflow-y-auto max-h-[60vh] pb-6 hide-scrollbar"
+        className="md:hidden space-y-3 sm:space-y-4 overflow-y-auto max-h-[70vh] pb-6 hide-scrollbar"
         ref={mobileScrollContainerRef}
       >
         {combinedLoading ? (
@@ -692,17 +692,23 @@ function Approvals({
                   onClick={() => navigate(`/user_management?selected=${pendingUser.user_id}`)}
                 >
                   <div className="flex flex-col gap-3">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">{pendingUser.full_name}</h3>
-                        <span className="inline-flex w-max items-center gap-2 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1 border border-amber-200">
-                          User Account Approval
-                        </span>
-                      </div>
-                      <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-3 h-7 text-[13px] leading-none font-semibold text-amber-700 border border-amber-300 whitespace-nowrap">
-                        For Approval
-                      </span>
-                    </div>
+                    <div className="flex flex-col gap-2">
+  {/* name + User Account Approval on the same top row */}
+  <div className="flex items-start justify-between gap-2">
+    <h3 className="flex-1 font-semibold text-base sm:text-lg text-gray-900">
+      {pendingUser.full_name}
+    </h3>
+    <span className="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1 border border-amber-200 whitespace-nowrap">
+      User Account Approval
+    </span>
+  </div>
+
+  {/* status chip below */}
+  <span className="inline-flex items-center justify-center rounded-lg bg-amber-100 px-3 h-7 text-[13px] leading-none font-semibold text-amber-700 border border-amber-300 whitespace-nowrap">
+    For Approval
+  </span>
+</div>
+
 
                     <div className="space-y-2 text-sm border-t border-gray-200 pt-3">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
@@ -762,22 +768,28 @@ function Approvals({
                 }`}
               >
                 <div className="flex flex-col gap-3">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
-                        {productData?.product_name || "Unnamed Product"}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs px-3 py-1 border border-blue-200">
-                          Inventory {request.action_type === "update" ? "Update" : "Addition"}
-                        </span>
-                        <span className="text-xs text-gray-500">{formatDateTime(request.created_at)}</span>
-                      </div>
-                    </div>
-                    <span className="inline-flex items-center justify-center rounded-lg bg-blue-100 px-3 h-7 text-[13px] leading-none font-semibold text-blue-700 border border-blue-200 whitespace-nowrap">
-                      Awaiting Owner Approval
-                    </span>
-                  </div>
+                  <div className="flex flex-col gap-2">
+  {/* title + Inventory Addition on the same top row */}
+  <div className="flex items-start justify-between gap-2">
+    <h3 className="flex-1 font-semibold text-base sm:text-lg text-gray-900">
+      {productData?.product_name || "Unnamed Product"}
+    </h3>
+    <span className="inline-flex items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold text-xs px-3 py-1 border border-blue-200 whitespace-nowrap">
+      Inventory {request.action_type === "update" ? "Update" : "Addition"}
+    </span>
+  </div>
+
+  {/* date under the title row */}
+  <span className="text-xs text-gray-500">
+    {formatDateTime(request.created_at)}
+  </span>
+
+  {/* status as a full-width bar */}
+  <span className="inline-flex w-full items-center justify-center rounded-lg bg-blue-100 px-3 py-2 text-[13px] leading-none font-semibold text-blue-700 border border-blue-200 text-center">
+    Awaiting Owner Approval
+  </span>
+</div>
+
 
                   <div className="space-y-2 text-sm border-t border-gray-200 pt-3">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
@@ -838,7 +850,7 @@ function Approvals({
         )}
       </div>
 
-      <hr className="border-t-2 my-3 sm:my-4 w-full border-gray-500 rounded-lg lg:hidden" />
+      <hr className="border-t-2 my-3 sm:my-4 w-full border-green-800 rounded-lg lg:hidden" />
 
       <RejectionReasonDialog
         open={rejectDialogOpen}
