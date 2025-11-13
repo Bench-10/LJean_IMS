@@ -29,8 +29,8 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
     min_date: null,
     max_date: null
   });
-  const [oldestCursor, setOldestCursor] = useState(0);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [totalPeriods, setTotalPeriods] = useState(TIMELINE_WINDOW_SIZES[timelineInterval] || TIMELINE_WINDOW_SIZES.monthly);
 
   const updateSelectedBranch = useCallback((value, options = {}) => {
     const normalized = value ? String(value) : '';
@@ -117,9 +117,9 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   // Reset pagination when branch or interval changes
   useEffect(() => {
     setBranchTimelineData([]);
-    setOldestCursor(0);
     setTimelineMeta({ min_date: null, max_date: null });
     setHasMoreHistory(true);
+    setTotalPeriods(TIMELINE_WINDOW_SIZES[timelineInterval] || TIMELINE_WINDOW_SIZES.monthly);
   }, [selectedBranch, timelineInterval]);
 
   const getIntervalUnit = useCallback(() => {
@@ -130,8 +130,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   }, [timelineInterval]);
 
   // Compute date range for pagination
-  const computeTimelineRange = useCallback(({ cursor = 0, endDate } = {}) => {
-    const windowSize = TIMELINE_WINDOW_SIZES[timelineInterval] || TIMELINE_WINDOW_SIZES.monthly;
+  const computeTimelineRange = useCallback(({ endDate } = {}) => {
     const unit = getIntervalUnit();
     let end = endDate ? dayjs(endDate) : dayjs();
     if (!end.isValid()) {
@@ -149,27 +148,13 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
       end = end.endOf('day');
     }
 
-    if (cursor > 0) {
-      end = end.subtract(cursor * windowSize, unit);
-      if (timelineInterval === 'weekly') {
-        end = end.endOf('week');
-      } else if (timelineInterval === 'monthly') {
-        end = end.endOf('month');
-      } else if (timelineInterval === 'yearly') {
-        end = end.endOf('year');
-      } else {
-        end = end.endOf('day');
-      }
-    }
-
-    const start = end.subtract(windowSize - 1, unit);
+    const start = end.subtract(totalPeriods - 1, unit);
     if (timelineInterval === 'weekly') {
       end = end.endOf('week');
       const alignedStart = start.startOf('week');
       return {
         start_date: alignedStart.format('YYYY-MM-DD'),
-        end_date: end.format('YYYY-MM-DD'),
-        windowSize
+        end_date: end.format('YYYY-MM-DD')
       };
     }
     if (timelineInterval === 'monthly') {
@@ -177,8 +162,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
       const alignedEnd = end.endOf('month');
       return {
         start_date: alignedStart.format('YYYY-MM-DD'),
-        end_date: alignedEnd.format('YYYY-MM-DD'),
-        windowSize
+        end_date: alignedEnd.format('YYYY-MM-DD')
       };
     }
     if (timelineInterval === 'yearly') {
@@ -186,33 +170,30 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
       const alignedEnd = end.endOf('year');
       return {
         start_date: alignedStart.format('YYYY-MM-DD'),
-        end_date: alignedEnd.format('YYYY-MM-DD'),
-        windowSize
+        end_date: alignedEnd.format('YYYY-MM-DD')
       };
     }
 
     return {
       start_date: start.startOf('day').format('YYYY-MM-DD'),
-      end_date: end.endOf('day').format('YYYY-MM-DD'),
-      windowSize
+      end_date: end.endOf('day').format('YYYY-MM-DD')
     };
-  }, [getIntervalUnit, timelineInterval]);
+  }, [getIntervalUnit, timelineInterval, totalPeriods]);
 
   // Fetch timeline data with pagination
-  const loadTimelineChunk = useCallback(async ({ cursor = 0, mode = 'replace', signal, rangeOverride } = {}) => {
+  const loadTimelineChunk = useCallback(async ({ mode = 'replace', signal, rangeOverride } = {}) => {
     if (!isOwner || !selectedBranch) {
       setBranchTimelineData([]);
       setLoading(false);
       return;
     }
 
-    const range = rangeOverride ?? computeTimelineRange({ cursor });
+    const range = rangeOverride ?? computeTimelineRange();
     if (!range) return;
 
     try {
       setLoading(true);
       setError(null);
-      const windowSize = TIMELINE_WINDOW_SIZES[timelineInterval] || TIMELINE_WINDOW_SIZES.monthly;
 
       const params = {
         branch_id: selectedBranch,
@@ -231,103 +212,50 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
       });
 
       const timelineData = Array.isArray(response.data) ? response.data : [];
-      // Update meta info
-      if (mode === 'prepend') {
-        let addedNewData = false;
-        let merged = [];
-        setBranchTimelineData((prev) => {
-          const existingMap = new Map(prev.map((item) => [item.period, item]));
-          timelineData.forEach((item) => {
-            if (!existingMap.has(item.period)) {
-              existingMap.set(item.period, item);
-              addedNewData = true;
-            }
-          });
-          merged = Array.from(existingMap.values()).sort((a, b) =>
-            (a.period || '').localeCompare(b.period || '')
-          );
-          return merged;
-        });
-
-        if (merged.length) {
-          const dates = merged.map((d) => d.period).filter(Boolean);
-          const meta = {
-            min_date: dates[0] || null,
-            max_date: dates[dates.length - 1] || null
-          };
-          setTimelineMeta(meta);
-
-          let nextHasMore = false;
-          let nextCursor = oldestCursor;
-          if (addedNewData && timelineData.length > 0) {
-            nextCursor = oldestCursor + 1;
-            setOldestCursor(nextCursor);
-            nextHasMore = timelineData.length >= windowSize;
-          } else {
-            nextHasMore = false;
-          }
-          if (!addedNewData && timelineData.length === 0) {
-            nextHasMore = false;
-          }
-          setHasMoreHistory(nextHasMore);
-          TIMELINE_CACHE.set(cacheKey, {
-            data: merged,
-            meta,
-            hasMoreHistory: nextHasMore,
-            oldestCursor: nextCursor
-          });
-        } else {
-          setHasMoreHistory(false);
-        }
-      } else {
-        const sorted = timelineData
-          .slice()
-          .sort((a, b) => (a.period || '').localeCompare(b.period || ''));
-        const dates = sorted.map((d) => d.period).filter(Boolean);
-        const meta = {
-          min_date: dates[0] || null,
-          max_date: dates[dates.length - 1] || null
-        };
-        setTimelineMeta(meta);
-        setBranchTimelineData(sorted);
-        setOldestCursor(0);
-        const nextHasMore = sorted.length >= windowSize;
-        setHasMoreHistory(nextHasMore);
-        TIMELINE_CACHE.set(cacheKey, {
-          data: sorted,
-          meta,
-          hasMoreHistory: nextHasMore,
-          oldestCursor: 0
-        });
-      }
+      const sorted = timelineData
+        .slice()
+        .sort((a, b) => (a.period || '').localeCompare(b.period || ''));
+      const dates = sorted.map((d) => d.period).filter(Boolean);
+      const meta = {
+        min_date: dates[0] || null,
+        max_date: dates[dates.length - 1] || null
+      };
+      setTimelineMeta(meta);
+      setBranchTimelineData(sorted);
+      setHasMoreHistory(sorted.length >= totalPeriods);
+      TIMELINE_CACHE.set(cacheKey, {
+        data: sorted,
+        meta,
+        hasMoreHistory: sorted.length >= totalPeriods,
+        totalPeriods
+      });
 
     } catch (e) {
       if (e?.code === 'ERR_CANCELED') return;
       console.error('Branch timeline fetch error:', e);
       setError('Failed to load branch timeline data');
-      if (mode === 'replace') setBranchTimelineData([]);
+      setBranchTimelineData([]);
     } finally {
       setLoading(false);
     }
-  }, [cacheKey, categoryFilter, computeTimelineRange, isOwner, oldestCursor, selectedBranch, timelineInterval]);
+  }, [cacheKey, categoryFilter, computeTimelineRange, isOwner, selectedBranch, timelineInterval, totalPeriods]);
 
   // Load initial data
   useEffect(() => {
     if (!selectedBranch || loadingBranches) return;
     const cached = TIMELINE_CACHE.get(cacheKey);
-    if (cached) {
+    if (cached && cached.totalPeriods === totalPeriods) {
       setBranchTimelineData(Array.isArray(cached.data) ? cached.data : []);
       setTimelineMeta(cached.meta ?? { min_date: null, max_date: null });
       setHasMoreHistory(cached.hasMoreHistory ?? true);
-      setOldestCursor(cached.oldestCursor ?? 0);
       setError(null);
       setLoading(false);
       return;
     }
     const controller = new AbortController();
-    loadTimelineChunk({ cursor: 0, mode: 'replace', signal: controller.signal });
+    loadTimelineChunk({ mode: 'replace', signal: controller.signal });
     return () => controller.abort();
-  }, [cacheKey, loadingBranches, loadTimelineChunk, selectedBranch]);
+  }, [cacheKey, loadingBranches, loadTimelineChunk, selectedBranch, totalPeriods]);
 
   // IF NOT OWNER, RETURN NULL (COMPONENT WON'T RENDER)
   if (!isOwner) return null;
@@ -348,11 +276,11 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   // Pagination helpers
   const windowSize = TIMELINE_WINDOW_SIZES[timelineInterval] || TIMELINE_WINDOW_SIZES.monthly;
   const windowLabel = useMemo(() => {
-    if (timelineInterval === 'yearly') return `${windowSize} years`;
-    if (timelineInterval === 'weekly') return `${windowSize} weeks`;
-    if (timelineInterval === 'daily') return `${windowSize} days`;
-    return `${windowSize} months`;
-  }, [timelineInterval, windowSize]);
+    if (timelineInterval === 'yearly') return `${totalPeriods} years`;
+    if (timelineInterval === 'weekly') return `${totalPeriods} weeks`;
+    if (timelineInterval === 'daily') return `${totalPeriods} days`;
+    return `${totalPeriods} months`;
+  }, [timelineInterval, totalPeriods]);
 
   const rangeLabel = useMemo(() => {
     if (!branchTimelineData.length) return '';
@@ -365,29 +293,20 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
     if (loading) return false;
     if (!hasMoreHistory) return false;
     if (!branchTimelineData.length) return false;
-    const earliest = branchTimelineData[0]?.period;
-    return Boolean(earliest);
+    return true;
   }, [branchTimelineData, hasMoreHistory, loading]);
 
-  const hasExtendedRange = oldestCursor > 0;
+  const hasExtendedRange = totalPeriods > windowSize;
 
   const handleLoadOlder = useCallback(() => {
     if (loading || !canLoadOlder) return;
-    const earliestPeriod = branchTimelineData[0]?.period;
-    if (!earliestPeriod) return;
-    const unit = getIntervalUnit();
-    const previousEnd = dayjs(earliestPeriod).subtract(1, unit);
-    if (!previousEnd.isValid()) return;
-    const range = computeTimelineRange({ endDate: previousEnd.format('YYYY-MM-DD') });
-    if (!range) return;
-    loadTimelineChunk({ mode: 'prepend', rangeOverride: range });
-  }, [branchTimelineData, canLoadOlder, computeTimelineRange, getIntervalUnit, loadTimelineChunk, loading]);
+    setTotalPeriods(prev => prev + windowSize);
+  }, [canLoadOlder, loading, windowSize]);
 
   const handleResetRange = useCallback(() => {
-    if (loading || oldestCursor === 0) return;
-    setHasMoreHistory(true);
-    loadTimelineChunk({ cursor: 0, mode: 'replace' });
-  }, [loading, loadTimelineChunk, oldestCursor]);
+    if (loading) return;
+    setTotalPeriods(windowSize);
+  }, [loading, windowSize]);
 
   return (
     <>
