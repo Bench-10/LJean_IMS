@@ -5,7 +5,8 @@ import { useAuth } from '../authentication/Authentication';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 import FormLoading from './common/FormLoading';
 import DatePickerCustom from '../components/DatePickerCustom';
-import useModalLock from "../hooks/useModalLock"; 
+import useModalLock from "../hooks/useModalLock";
+import toast from 'react-hot-toast'; 
 
 // SEARCHABLE DROPDOWN
 const SearchableSaleDropdown = React.memo(function SearchableSaleDropdown({ saleHeader = [], deliveryData = [], value, onChange }) {
@@ -302,6 +303,7 @@ const AddDeliveryInformation = React.memo(function AddDeliveryInformation({
       if (mode === 'add') {
         const response = await api.post(`/api/delivery/`, payload);
         getDeliveries((prevData) => [...prevData, response.data]);
+        toast.success('Successfully added delivery');
       } else {
         const delivery = await api.put(`/api/delivery/${deliveryEditData.sales_information_id}`, payload);
         getDeliveries((prevData) =>
@@ -312,6 +314,10 @@ const AddDeliveryInformation = React.memo(function AddDeliveryInformation({
           )
         );
         if (fetchProductsData) await fetchProductsData();
+        
+        // Show success toast for delivery status change
+        const statusText = status.is_delivered ? 'delivered' : status.pending ? 'out for delivery' : 'undelivered';
+        toast.success(`Delivery status changed to ${statusText}`);
       }
 
       onClose();

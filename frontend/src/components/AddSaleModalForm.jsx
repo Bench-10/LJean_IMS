@@ -15,7 +15,8 @@ import {
   allowsFractional
 } from '../utils/unitConversion';
 import { IoMdClose } from "react-icons/io";
-import useModalLock from "../hooks/useModalLock"; 
+import useModalLock from "../hooks/useModalLock";
+import toast from 'react-hot-toast'; 
 
 
 
@@ -621,6 +622,9 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
       //RE-FETCH WITH THE LATEST PRODUCT DATA(FRONTEND)
       fetchProductsData();
+
+      // Show success toast notification
+      toast.success('Successfully added sale');
     } catch (error) {
       console.error('Error submitting sale:', error);
     } finally {

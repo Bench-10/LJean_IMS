@@ -397,7 +397,7 @@ export const addSale = async (headerAndProducts = {}) => {
                         sales_information_id: saleId,
                         category: 'sales',
                         highlight_context: { reason: 'new-sale', sale_id: saleId },
-                        target_roles: ['Sales Associate', 'Branch Manager'],
+                        target_roles: ['Sales Associate'],
                         creator_id: headerInformationAndTotal.userID
                     },
                     { category: 'sales' }

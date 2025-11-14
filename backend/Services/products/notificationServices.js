@@ -116,6 +116,14 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
     disallowedTypes.add('Inventory Approval Needed');
   }
 
+  // Filter sales and delivery notifications by role
+  if (!roleSet.has('Sales Associate')) {
+    disallowedTypes.add('New Sale');
+    disallowedTypes.add('Delivery Status Update');
+    disallowedTypes.add('New Delivery');
+    disallowedTypes.add('Inventory Update'); // This covers delivery stock notifications
+  }
+
   const { rows } = await SQLquery(`
     SELECT 
       ia.alert_id, 
