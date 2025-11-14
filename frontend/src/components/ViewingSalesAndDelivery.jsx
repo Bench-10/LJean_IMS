@@ -9,6 +9,7 @@ import api from '../utils/api';
 import { currencyFormat } from '../utils/formatCurrency';
 import ChartLoading from './common/ChartLoading';
 import useModalLock from '../hooks/useModalLock';
+import toTwoDecimals from '../utils/fixedDecimalPlaces';
 
 const escapeHtml = (value) => {
   if (value === null || value === undefined) return '';
@@ -19,6 +20,14 @@ const escapeHtml = (value) => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 };
+
+// Format display for monetary values: omit decimals when the value is a whole integer
+const formatDisplayNumber = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  return Number.isInteger(n) ? String(n) : toTwoDecimals(n);
+};
+
 
 function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInformation, sale_id }) {
   const [soldItems, setSoldItems] = useState([]);
@@ -533,7 +542,7 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
                           <span className="text-gray-600">Quantity:</span>
-                          <div className="font-semibold">{item.quantity.toLocaleString()} {item.unit}</div>
+                          <div className="font-semibold">{formatDisplayNumber(item.quantity)} {item.unit}</div>
                         </div>
                         {type === "sales" && (
                           <>
@@ -588,7 +597,7 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
                       soldItems.map((item, itemIndex) => (
                         <tr key={itemIndex} className="hover:bg-gray-50 text-xs sm:text-sm">
                           <td className="px-2 md:px-3 py-2 text-left">{item.product_name}</td>
-                          <td className="px-2 md:px-3 py-2 text-center">{item.quantity.toLocaleString()}</td>
+                          <td className="px-2 md:px-3 py-2 text-center">{formatDisplayNumber(item.quantitY)}</td>
                           <td className="px-2 md:px-3 py-2 text-center">{item.unit}</td>
                           {type === "sales" && (
                             <>

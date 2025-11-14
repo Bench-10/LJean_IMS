@@ -1027,7 +1027,7 @@ useModalLock(canOpenSaleModal, closeModal);
                                     }}
                                   >
                                     <div className='font-medium text-sm'>{product.product_name}</div>
-                                    <div className='font-light text-xs'>Quantity: {product.quantity}</div>
+                                    <div className='font-light text-xs'>Quantity: {formatDisplayNumber(product.quantity)}</div>
                                   </div>
                                 ))
                               ) : (
