@@ -197,7 +197,21 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
         <head>
           <title>${escapeHtml(type === 'sales' ? 'Charge Sales Invoice' : 'Delivery Details')}</title>
           <style>
-            @page { margin: 10mm 8mm; }
+            @page { margin: 10mm 8mm; size: auto; }
+            @media print {
+              body { font-size: 10px; }
+              .header .title { font-size: 14px; }
+              .header .subtitle { font-size: 10px; }
+              .contacts { font-size: 9px; }
+              .section-label { font-size: 11px; }
+              table { font-size: 9px; }
+              th { font-size: 9px; }
+              .meta-table { font-size: 9px; }
+              .summary-table { font-size: 9px; width: 300px; }
+              .summary-table .total-row .value { font-size: 11px; }
+              .status-line { font-size: 10px; }
+              .notes { font-size: 9px; }
+            }
             body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; color: #000; }
             .align-center { text-align: center; }
             .header { text-align: center; margin-bottom: 8px; }
@@ -274,66 +288,97 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
 
     try {
       setPrinting(true);
-      const printWindow = window.open('', '_blank', 'width=900,height=700');
-      if (!printWindow) {
-        throw new Error('Unable to open print window. Check popup blockers.');
-      }
 
-      printWindow.document.open();
-      printWindow.document.write(printableMarkup);
-      printWindow.document.close();
+      // Detect mobile devices
+      const isMobile = window.innerWidth < 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-      const finalizePrint = () => {
-        try {
+      if (isMobile) {
+        // Mobile-friendly printing: use a new window without dimensions
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+          throw new Error('Unable to open print window. Check popup blockers.');
+        }
+
+        printWindow.document.open();
+        printWindow.document.write(printableMarkup);
+        printWindow.document.close();
+
+        printWindow.onload = () => {
           printWindow.focus();
-          
-          // Close window after print dialog is dismissed (print/cancel/close)
-          printWindow.addEventListener('afterprint', () => {
-            try {
-              printWindow.close();
-            } catch (err) {
-              console.error('Unable to close print window:', err);
-            }
-          });
-
-          // Fallback: close if window loses focus after a delay
-          const handleBlur = () => {
-            setTimeout(() => {
-              try {
-                if (printWindow && !printWindow.closed) {
-                  printWindow.close();
-                }
-              } catch (err) {
-                console.error('Unable to close print window on blur:', err);
-              }
-            }, 500);
-          };
-          printWindow.addEventListener('blur', handleBlur, { once: true });
-
           printWindow.print();
           setPrinting(false);
-        } catch (err) {
-          console.error('Printing failed:', err);
-          setPrinting(false);
-          try {
-            if (printWindow && !printWindow.closed) {
-              printWindow.close();
-            }
-          } catch (closeErr) {
-            console.error('Unable to close print window after error:', closeErr);
-          }
-        }
-      };
+        };
 
-      if (printWindow.document.readyState === 'complete') {
-        finalizePrint();
-      } else {
-        printWindow.addEventListener('load', finalizePrint, { once: true });
+        // Fallback timeout
         setTimeout(() => {
           if (printWindow && !printWindow.closed) {
-            finalizePrint();
+            printWindow.print();
+            setPrinting(false);
           }
-        }, 1500);
+        }, 1000);
+      } else {
+        // Desktop: use popup window
+        const printWindow = window.open('', '_blank', 'width=900,height=700');
+        if (!printWindow) {
+          throw new Error('Unable to open print window. Check popup blockers.');
+        }
+
+        printWindow.document.open();
+        printWindow.document.write(printableMarkup);
+        printWindow.document.close();
+
+        const finalizePrint = () => {
+          try {
+            printWindow.focus();
+            
+            // Close window after print dialog is dismissed (print/cancel/close)
+            printWindow.addEventListener('afterprint', () => {
+              try {
+                printWindow.close();
+              } catch (err) {
+                console.error('Unable to close print window:', err);
+              }
+            });
+
+            // Fallback: close if window loses focus after a delay
+            const handleBlur = () => {
+              setTimeout(() => {
+                try {
+                  if (printWindow && !printWindow.closed) {
+                    printWindow.close();
+                  }
+                } catch (err) {
+                  console.error('Unable to close print window on blur:', err);
+                }
+              }, 500);
+            };
+            printWindow.addEventListener('blur', handleBlur, { once: true });
+
+            printWindow.print();
+            setPrinting(false);
+          } catch (err) {
+            console.error('Printing failed:', err);
+            setPrinting(false);
+            try {
+              if (printWindow && !printWindow.closed) {
+                printWindow.close();
+              }
+            } catch (closeErr) {
+              console.error('Unable to close print window after error:', closeErr);
+            }
+          }
+        };
+
+        if (printWindow.document.readyState === 'complete') {
+          finalizePrint();
+        } else {
+          printWindow.addEventListener('load', finalizePrint, { once: true });
+          setTimeout(() => {
+            if (printWindow && !printWindow.closed) {
+              finalizePrint();
+            }
+          }, 1500);
+        }
       }
     } catch (error) {
       console.error('Failed to open printable invoice:', error);

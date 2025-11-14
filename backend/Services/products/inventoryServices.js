@@ -924,7 +924,7 @@ export const addProductItem = async (productData, options = {}) => {
             action: 'add',
             product: {
                 product_id: product_id,
-                product_name: product_name,
+                product_name: prodzuct_name,
                 category_name: categoryName,
                 quantity_added: quantity_added,
                 quantity_left: quantity_added,
