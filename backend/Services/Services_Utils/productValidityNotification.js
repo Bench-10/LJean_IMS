@@ -29,9 +29,11 @@ export const notifyProductShelfLife = async() =>{
         if (row.expy){
             //NUMBER OF QUANTITY EXPIRED (already calculated in the query)
             const totalQuantity = row.total_quantity || 0;
+            // Format quantity as whole number if no decimals or .000
+            const formattedQuantity = totalQuantity % 1 === 0 ? Math.floor(totalQuantity) : totalQuantity;
 
             //EXPIRED NOTIFICATTION MESSAGE
-            const notificationMessage = `${totalQuantity} of ${row.product_name} has reached the end of shelf life`;
+            const notificationMessage = `${formattedQuantity} of ${row.product_name} has reached the end of shelf life`;
 
 
             // CHECK IF THE PRODUCT EXPIRED IS ALREADY NOTIFIED
@@ -80,9 +82,11 @@ export const notifyProductShelfLife = async() =>{
         if (row.near_expy && !row.expy){
             //NUMBER OF QUANTITY NEAR EXPIRY (already calculated in the query)
             const totalQuantity = row.total_quantity || 0;
+            // Format quantity as whole number if no decimals or .000
+            const formattedQuantity = totalQuantity % 1 === 0 ? Math.floor(totalQuantity) : totalQuantity;
 
             //EXPIRED NOTIFICATTION MESSAGE
-            const notificationMessage = `${totalQuantity} of ${row.product_name} is reaching the end of shelf life`;
+            const notificationMessage = `${formattedQuantity} of ${row.product_name} is reaching the end of shelf life`;
 
 
             const existing = await SQLquery(

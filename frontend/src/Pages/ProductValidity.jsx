@@ -632,10 +632,10 @@ function ProductValidity({
               <th className="bg-green-500 pl-7 pr-4 py-2 text-left text-sm font-medium text-white">
                 ITEM NAME
               </th>
-              <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
+              <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-72">
                 CATEGORY
               </th>
-              <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-72">
+              <th className="bg-green-500 px-4 py-2 text-center text-sm font-medium text-white w-56">
                 QUANTITY
               </th>
             </tr>
@@ -699,7 +699,7 @@ function ProductValidity({
                     <td className="pl-7 pr-4 py-2 text-left whitespace-nowrap">
                       {validity.product_name}
                     </td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-4 py-2 text-left">
                       {validity.category_name}
                     </td>
                     <td className="px-4 py-2 text-center">
