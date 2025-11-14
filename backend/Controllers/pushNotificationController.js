@@ -15,7 +15,9 @@ import {
 export const subscribe = async (req, res) => {
     try {
         const { subscription, deviceInfo } = req.body;
-        const { userId, adminId, role } = req.user;
+        const userId = req.user.userId || req.user.id || req.user.user_id;
+        const adminId = req.user.adminId || req.user.admin_id;
+        const role = req.user.role;
 
         // Determine user type based on role
         const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
@@ -75,7 +77,9 @@ export const unsubscribe = async (req, res) => {
  */
 export const getSubscriptions = async (req, res) => {
     try {
-        const { userId, adminId, role } = req.user;
+        const userId = req.user.userId || req.user.id || req.user.user_id;
+        const adminId = req.user.adminId || req.user.admin_id;
+        const role = req.user.role;
 
         // Determine user type based on role
         const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
@@ -106,7 +110,9 @@ export const getSubscriptions = async (req, res) => {
 export const sendTestNotification = async (req, res) => {
     try {
         const { title, message } = req.body;
-        const { userId, adminId, role } = req.user;
+        const userId = req.user.userId || req.user.id || req.user.user_id;
+        const adminId = req.user.adminId || req.user.admin_id;
+        const role = req.user.role;
 
         // Determine user type based on role
         const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
