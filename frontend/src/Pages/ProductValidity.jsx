@@ -431,10 +431,14 @@ function ProductValidity({
     if (format === 'csv') {
       exportToCSV(exportData, filename, customHeaders, dataKeys);
     } else if (format === 'pdf') {
+      // Custom column widths: expand Product Name and Category, minimize Quantity
+      const columnWidths = [85, 70, 40, 40, 20]; // Product Name, Category, Date Added, Validity Date, Quantity in mm
       exportToPDF(exportData, filename, {
         title: 'Product Validity Report',
         customHeaders: customHeaders,
-        dataKeys: dataKeys
+        dataKeys: dataKeys,
+        columnWidths: columnWidths,
+        disableTextTruncation: true
       });
     }
   };

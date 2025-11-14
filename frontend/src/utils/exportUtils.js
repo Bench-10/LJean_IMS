@@ -50,7 +50,7 @@ export const exportToPDF = (data, filename, options = {}) => {
     return;
   }
 
-  const { title = filename, customHeaders = null, dataKeys = null, showCategorySummary = false } = options;
+  const { title = filename, customHeaders = null, dataKeys = null, showCategorySummary = false, columnWidths = null, disableTextTruncation = false } = options;
 
   // CREATE PDF
   const pdf = new jsPDF({
@@ -177,7 +177,15 @@ export const exportToPDF = (data, filename, options = {}) => {
   // PRODUCT TABLE
   const keys = dataKeys || Object.keys(data[0]);
   const colCount = keys.length;
-  const colWidth = (pageWidth - margin * 2) / colCount;
+  
+  // Use custom column widths if provided, otherwise equal widths
+  let colWidths;
+  if (columnWidths && Array.isArray(columnWidths) && columnWidths.length === colCount) {
+    colWidths = columnWidths;
+  } else {
+    const colWidth = (pageWidth - margin * 2) / colCount;
+    colWidths = new Array(colCount).fill(colWidth);
+  }
 
   // GET HEADERS AND FORMAT THEM
   const formattedHeaders = customHeaders || keys.map(h => h.replace(/_/g, ' ').toUpperCase());
@@ -186,9 +194,9 @@ export const exportToPDF = (data, filename, options = {}) => {
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'bold');
   let xPosition = margin;
-  formattedHeaders.forEach(header => {
+  formattedHeaders.forEach((header, index) => {
     pdf.text(header, xPosition, yPosition);
-    xPosition += colWidth;
+    xPosition += colWidths[index];
   });
 
   // DRAW THICK LINE BELOW HEADERS
@@ -210,9 +218,9 @@ export const exportToPDF = (data, filename, options = {}) => {
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'bold');
       xPosition = margin;
-      formattedHeaders.forEach(header => {
+      formattedHeaders.forEach((header, index) => {
         pdf.text(header, xPosition, yPosition);
-        xPosition += colWidth;
+        xPosition += colWidths[index];
       });
 
       // DRAW THICK LINE BELOW HEADERS ON NEW PAGE
@@ -224,15 +232,22 @@ export const exportToPDF = (data, filename, options = {}) => {
     }
 
     xPosition = margin;
-    keys.forEach(key => {
+    keys.forEach((key, index) => {
       let value = row[key];
       if (value === null || value === undefined) value = '';
-      // LIMIT TEXT LENGTH EXCEPT FOR DATES
-      if (typeof value === 'string' && value.length > 15 && !key.toLowerCase().includes('date')) {
+      
+      // Special formatting for quantity fields - show decimals only if present
+      if (key.toLowerCase().includes('quantity') && !isNaN(value) && value !== '') {
+        const numValue = Number(value);
+        value = numValue % 1 === 0 ? numValue.toString() : numValue.toString();
+      }
+      
+      // LIMIT TEXT LENGTH EXCEPT FOR DATES, PRODUCT NAMES, AND CATEGORIES (unless disabled)
+      if (!disableTextTruncation && typeof value === 'string' && value.length > 15 && !key.toLowerCase().includes('date') && !key.toLowerCase().includes('product_name') && !key.toLowerCase().includes('category')) {
         value = value.substring(0, 15) + '...';
       }
       pdf.text(String(value), xPosition, yPosition);
-      xPosition += colWidth;
+      xPosition += colWidths[index];  
     });
 
     // DRAW THIN LINE AFTER EACH ROW

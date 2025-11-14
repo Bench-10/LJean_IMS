@@ -345,11 +345,14 @@ function ProductInventory({
     if (format === 'csv') {
       exportToCSV(exportData, filename, customHeaders, dataKeys);
     } else if (format === 'pdf') {
+      // Custom column widths: expand Product Name and Category, minimize others
+      const columnWidths = [85, 70, 25, 30, 30, 20]; // in mm
       exportToPDF(exportData, filename, {
         title: 'Product Inventory Report',
         customHeaders: customHeaders,
         dataKeys: dataKeys,
-        showCategorySummary: exportData.length > 0 && !!exportData[0].category_name
+        showCategorySummary: exportData.length > 0 && !!exportData[0].category_name,
+        columnWidths: columnWidths
       });
     }
   };

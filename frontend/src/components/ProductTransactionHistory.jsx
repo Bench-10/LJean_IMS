@@ -316,10 +316,13 @@ function ProductTransactionHistory({
     if (format === 'csv') {
       exportToCSV(exportData, filename, customHeaders, dataKeys);
     } else if (format === 'pdf') {
+      // Custom column widths: expand Product Name and Category, minimize Cost and Quantity
+      const columnWidths = [45, 80, 80, 30, 30]; // Date, Product Name, Category, Cost, Quantity in mm
       exportToPDF(exportData, filename, {
         title: 'Product Transaction History Report',
         customHeaders: customHeaders,
-        dataKeys: dataKeys
+        dataKeys: dataKeys,
+        columnWidths: columnWidths
       });
     }
   };
