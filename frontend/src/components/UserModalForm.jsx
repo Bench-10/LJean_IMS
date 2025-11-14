@@ -7,7 +7,8 @@ import ConfirmationDialog from './dialogs/ConfirmationDialog';
 import FormLoading from './common/FormLoading';
 import DropdownCustom from './DropdownCustom';
 import DropdownCheckbox from './DropdownCheckbox';
-import useModalLock from '../hooks/useModalLock'; 
+import useModalLock from '../hooks/useModalLock';
+import toast from 'react-hot-toast'; 
 
 function UserModalForm({
   branches,
@@ -209,16 +210,21 @@ function UserModalForm({
         creator_roles: user?.role || [],
       };
 
-      if (mode === 'add') await api.post(`/api/create_account`, userData);
+      if (mode === 'add') {
+        await api.post(`/api/create_account`, userData);
+        toast.success('User account requested successfully for approval!');
+      }
       if (mode === 'edit') {
         const response = await api.put(`/api/update_account/${userDetailes.user_id}`, userData);
         await setUserDetailes(response.data);
+        toast.success('User account updated successfully!');
       }
 
       onClose();
       setCellCheck(false);
     } catch (error) {
       console.error('Error submitting user:', error);
+      toast.error('Failed to submit user request. Please try again.');
     } finally {
       setLoading(false);
       setButtonLoading(false);

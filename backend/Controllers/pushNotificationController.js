@@ -16,15 +16,24 @@ export const subscribe = async (req, res) => {
     try {
         const { subscription, deviceInfo } = req.body;
         const userId = req.user.userId || req.user.id || req.user.user_id;
-        const adminId = req.user.adminId || req.user.admin_id;
+        const adminId = req.user.adminId || req.user.admin_id || null;
         const role = req.user.role;
 
-        // Determine user type based on role
-        const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
+        // Prefer storing subscriptions against the Users table unless a real admin_id exists
+        // Owners are regular users with the "Owner" role and typically do not have an Administrator.admin_id
+        // So only treat an account as 'admin' when an explicit adminId is present.
+        const userType = adminId ? 'admin' : 'user';
+
+        // Fallback: if frontend provided userId/adminId in the body, accept it (helps some clients)
+        const bodyUserId = req.body.userId || req.body.user_id || null;
+        const bodyAdminId = req.body.adminId || req.body.admin_id || null;
+
+        const resolvedAdminId = adminId || bodyAdminId || null;
+        const resolvedUserId = userId || bodyUserId || null;
 
         const result = await subscribeToPush({
-            userId: userType === 'user' ? userId : null,
-            adminId: userType === 'admin' ? adminId : null,
+            userId: userType === 'user' ? resolvedUserId : null,
+            adminId: userType === 'admin' ? resolvedAdminId : null,
             userType,
             subscription,
             deviceInfo
@@ -78,15 +87,21 @@ export const unsubscribe = async (req, res) => {
 export const getSubscriptions = async (req, res) => {
     try {
         const userId = req.user.userId || req.user.id || req.user.user_id;
-        const adminId = req.user.adminId || req.user.admin_id;
+        const adminId = req.user.adminId || req.user.admin_id || null;
         const role = req.user.role;
 
-        // Determine user type based on role
-        const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
+        const bodyUserId = req.query.userId || req.query.user_id || null;
+        const bodyAdminId = req.query.adminId || req.query.admin_id || null;
+
+        const resolvedAdminId = adminId || bodyAdminId || null;
+        const resolvedUserId = userId || bodyUserId || null;
+
+        // Treat as 'admin' only when an admin id exists; Owners remain 'user' entries in the Users table
+        const userType = resolvedAdminId ? 'admin' : 'user';
 
         const result = await getUserSubscriptions(
-            userType === 'user' ? userId : null,
-            userType === 'admin' ? adminId : null,
+            userType === 'user' ? resolvedUserId : null,
+            userType === 'admin' ? resolvedAdminId : null,
             userType
         );
 
@@ -111,11 +126,17 @@ export const sendTestNotification = async (req, res) => {
     try {
         const { title, message } = req.body;
         const userId = req.user.userId || req.user.id || req.user.user_id;
-        const adminId = req.user.adminId || req.user.admin_id;
+        const adminId = req.user.adminId || req.user.admin_id || null;
         const role = req.user.role;
 
-        // Determine user type based on role
-        const userType = role?.includes('Owner') || role?.includes('Admin') ? 'admin' : 'user';
+        const bodyUserId = req.body.userId || req.body.user_id || null;
+        const bodyAdminId = req.body.adminId || req.body.admin_id || null;
+
+        const resolvedAdminId = adminId || bodyAdminId || null;
+        const resolvedUserId = userId || bodyUserId || null;
+
+        // Treat as 'admin' only when an admin id exists
+        const userType = resolvedAdminId ? 'admin' : 'user';
 
         const notificationData = {
             title: title || 'Test Notification',
@@ -130,8 +151,8 @@ export const sendTestNotification = async (req, res) => {
         };
 
         const result = await sendPushNotification({
-            userId: userType === 'user' ? userId : null,
-            adminId: userType === 'admin' ? adminId : null,
+            userId: userType === 'user' ? resolvedUserId : null,
+            adminId: userType === 'admin' ? resolvedAdminId : null,
             userType,
             notificationData
         });

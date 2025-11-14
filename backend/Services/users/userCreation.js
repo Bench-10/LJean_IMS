@@ -2,7 +2,7 @@ import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
 import { broadcastUserUpdate, broadcastOwnerNotification, broadcastUserApprovalRequest, broadcastUserApprovalUpdate } from "../../server.js";
-import { sendPushNotification } from "../pushNotificationService.js";
+import { sendPushNotification, sendAlertPushNotification } from "../pushNotificationService.js";
 
 const getUserFullName = async (userId) => {
     if (!userId) return null;
@@ -374,6 +374,13 @@ export const createUserAccount = async (UserData) => {
             );
 
             if (alertResult.rows[0]) {
+                // Send push notifications for this alert (owners/admins) if subscriptions exist
+                try {
+                    await sendAlertPushNotification(alertResult.rows[0]);
+                } catch (err) {
+                    console.error('Failed to send push notifications for owner alert:', err);
+                }
+
                 broadcastOwnerNotification({
                     alert_id: alertResult.rows[0].alert_id,
                     alert_type: 'User Approval Needed',
