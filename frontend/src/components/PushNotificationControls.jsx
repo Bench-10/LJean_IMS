@@ -11,7 +11,7 @@ function PushNotificationControls() {
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [permissionState, setPermissionState] = useState(() => (SUPPORTS_PUSH ? Notification.permission : 'unsupported'));
-  const [isTesting, setIsTesting] = useState(false);
+  // removed: isTesting (test push button removed)
   const [persisted, setPersisted] = useState(false);
 
   useEffect(() => {
@@ -29,6 +29,31 @@ function PushNotificationControls() {
       }
 
       checkSubscription();
+      // If the user has denied notifications at the browser level,
+      // try to clean up any existing push subscription and notify the server.
+      if (Notification.permission === 'denied') {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          const existing = await registration.pushManager.getSubscription();
+          if (existing) {
+            // Unsubscribe locally
+            try {
+              await existing.unsubscribe();
+            } catch (e) {
+              console.warn('Failed to unsubscribe locally from denied permission:', e);
+            }
+            // Tell server to mark it inactive so it doesn't receive pushes
+            try {
+              await api.post('/api/push/unsubscribe', { endpoint: existing.endpoint });
+            } catch (e) {
+              console.warn('Failed to notify server about unsubscription on denied permission:', e);
+            }
+            setIsEnabled(false);
+          }
+        } catch (err) {
+          console.warn('Service worker not ready while auto-unsubscribing denied client', err);
+        }
+      }
     };
 
     init();
@@ -71,7 +96,8 @@ function PushNotificationControls() {
 
   const handleToggle = async () => {
     if (isEnabled) {
-      await handleDisable();
+      // Disable across all devices (global) when toggling off
+      await handleDisableAll();
     } else {
       await handleEnable();
     }
@@ -126,7 +152,10 @@ function PushNotificationControls() {
   setIsEnabled(true);
 
   const persistenceMessage = storagePersisted ? '' : '\nEnsure Edge/Chrome "Continue running background apps" (desktop) or App > Notifications (mobile) is enabled so pushes arrive when closed.';
-      toast.success(`✅ Push notifications enabled!${persistenceMessage}`);
+      toast.success(`Push notifications enabled!${persistenceMessage}`);
+      if (window.confirm('Push notifications enabled. Please refresh the page to apply changes.')) {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Enable error:', error);
       toast.error(`Failed to enable: ${error.message}`);
@@ -136,20 +165,21 @@ function PushNotificationControls() {
   };
 
   const handleDisable = async () => {
+    // kept for backward compatibility; will not be used directly anymore in the UI
     if (!SUPPORTS_PUSH) return;
     setIsLoading(true);
-
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-
       if (subscription) {
         await subscription.unsubscribe();
         await api.post('/api/push/unsubscribe', { endpoint: subscription.endpoint });
       }
-
       setIsEnabled(false);
       toast.success('Push notifications disabled');
+      if (window.confirm('Push notifications disabled. Please refresh the page to apply changes.')) {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Disable error:', error);
       toast.error('Failed to disable push notifications');
@@ -158,21 +188,38 @@ function PushNotificationControls() {
     }
   };
 
-  const handleSendTest = async () => {
-    setIsTesting(true);
+  // Disable push for all devices associated with the account
+  const handleDisableAll = async () => {
+    if (!SUPPORTS_PUSH) return;
+    setIsLoading(true);
     try {
-      await api.post('/api/push/test', {
-        title: 'Push Test',
-        message: 'If you see this while the app is closed, background push works!'
-      });
-      toast.success('Test notification sent. Close the app and check your notification tray.');
+      // First attempt to unsubscribe locally
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+      } catch (localErr) {
+        console.warn('Local unsubscribe error in handleDisableAll:', localErr);
+      }
+
+      // Then tell server to mark all subscription records for this account inactive
+      await api.post('/api/push/unsubscribe', { global: true });
+      setIsEnabled(false);
+      toast.success('Push notifications disabled for all devices');
+      if (window.confirm('Push notifications disabled. Please refresh the page to apply changes.')) {
+        window.location.reload();
+      }
     } catch (error) {
-      console.error('Test push error:', error);
-      toast.error('Failed to send test notification');
+      console.error('Disable all error:', error);
+      toast.error('Failed to disable push notifications for all devices');
     } finally {
-      setIsTesting(false);
+      setIsLoading(false);
     }
   };
+
+  // send test removed on request
 
   if (!SUPPORTS_PUSH) {
     return null;
@@ -197,33 +244,12 @@ function PushNotificationControls() {
           ) : (
             <IoNotificationsOffOutline className="w-5 h-5" />
           )}
-          <span>{isLoading ? 'Processing…' : isEnabled ? 'Push Enabled' : 'Enable Push'}</span>
+          <span>{isLoading ? 'Processing…' : isEnabled ? 'Disable Push Notifications' : 'Enable Push Notifications'}</span>
         </button>
 
-        <button
-          onClick={handleSendTest}
-          disabled={!isEnabled || isTesting}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isTesting ? 'Sending…' : 'Send Test Notification'}
-        </button>
+        {/* Disable all is now performed by toggling off the button */}
       </div>
 
-      <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-        <div className="font-medium text-slate-700 mb-1">Status: {statusLabel}</div>
-        {permissionState === 'denied' ? (
-          <div>
-            Enable notifications in your browser settings (Edge/Chrome → Site permissions → Notifications) and try again.
-          </div>
-        ) : (
-          <ul className="list-disc pl-4 space-y-1">
-            <li>Close and reopen the app after enabling to confirm push delivery.</li>
-            <li>Desktop Edge/Chrome: enable "Continue running background apps" so pushes arrive when the window is closed.</li>
-            <li>Android: long-press the app icon → Notifications → allow background & notification access.</li>
-            <li>If pushes still fail, the server may be unable to send (check PM2 logs for push errors).</li>
-          </ul>
-        )}
-      </div>
     </div>
   );
 }

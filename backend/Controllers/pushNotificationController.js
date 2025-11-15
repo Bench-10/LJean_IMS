@@ -58,7 +58,31 @@ export const subscribe = async (req, res) => {
  */
 export const unsubscribe = async (req, res) => {
     try {
-        const { endpoint } = req.body;
+        const { endpoint, global } = req.body;
+
+        // Global unsubscribe: deactivate all push subscriptions for the current user
+        if (global === true) {
+            const userId = req.user.userId || req.user.id || req.user.user_id;
+            const adminId = req.user.adminId || req.user.admin_id || null;
+
+            let query = '';
+            let params = [];
+            if (adminId) {
+                query = `UPDATE push_subscriptions SET is_active = FALSE WHERE admin_id = $1 RETURNING *`;
+                params = [adminId];
+            } else {
+                query = `UPDATE push_subscriptions SET is_active = FALSE WHERE user_id = $1 RETURNING *`;
+                params = [userId];
+            }
+
+            const { SQLquery } = await import('../db.js');
+            const result = await SQLquery(query, params);
+            return res.status(200).json({
+                success: true,
+                message: `Unsubscribed ${result.rows.length} subscriptions for this account`,
+                affected: result.rows.length
+            });
+        }
 
         if (!endpoint) {
             return res.status(400).json({

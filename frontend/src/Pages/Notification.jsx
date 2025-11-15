@@ -14,12 +14,28 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
   
 
   const [visibleCount, setVisibleCount] = useState(15);
+  const [hasActivePushSubscription, setHasActivePushSubscription] = useState(false);
   const principalId = user?.user_id ?? user?.admin_id ?? null;
   const isAdminUser = Boolean(user?.admin_id);
   const prevLengthRef = useRef(notify.length);
   const currentUserRef = useRef(principalId);
 
   // RESET REFERENCE WHEN USER CHANGES
+  useEffect(() => {
+    // Check if user has any active push subscriptions (if not, suppress in-app toasts by default)
+    const checkSubscriptions = async () => {
+      try {
+        const result = await notificationApi.get('/push/subscriptions');
+        const active = Array.isArray(result.data?.subscriptions) && result.data.subscriptions.length > 0;
+        setHasActivePushSubscription(active);
+      } catch (err) {
+        console.warn('Failed to fetch push subscriptions', err);
+      }
+    };
+
+    checkSubscriptions();
+  }, []);
+
   useEffect(() => {
     if (principalId !== currentUserRef.current) {
       // RESET REFERENCE TO CURRENT NOTIFICATION COUNT TO PREVENT FALSE POPUPS
@@ -56,13 +72,17 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
           </div>
         );
 
-        toast(toastContent, {
+        // Only show toast in-app if the user has active push subscriptions (i.e. they enabled notifications)
+        if (hasActivePushSubscription) {
+          toast(toastContent, {
           id: toastId,
           duration: 5200
-        });
+          });
+        }
 
         //  BROWSER NOTIFICATION - Mobile-safe implementation
-        if ('Notification' in window && window.Notification.permission === 'granted') {
+        // Only show browser/OS notifications if a push subscription exists for this user and permission is granted
+        if (hasActivePushSubscription && 'Notification' in window && window.Notification.permission === 'granted') {
           try {
             // Check if we have service worker support (mobile-friendly)
             if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
