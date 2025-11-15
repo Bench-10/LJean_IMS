@@ -153,6 +153,9 @@ function PushNotificationControls() {
 
   const persistenceMessage = storagePersisted ? '' : '\nEnsure Edge/Chrome "Continue running background apps" (desktop) or App > Notifications (mobile) is enabled so pushes arrive when closed.';
       toast.success(`Push notifications enabled!${persistenceMessage}`);
+      if (window.confirm('Push notifications enabled. Please refresh the page to apply changes.')) {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Enable error:', error);
       toast.error(`Failed to enable: ${error.message}`);
@@ -174,6 +177,9 @@ function PushNotificationControls() {
       }
       setIsEnabled(false);
       toast.success('Push notifications disabled');
+      if (window.confirm('Push notifications disabled. Please refresh the page to apply changes.')) {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Disable error:', error);
       toast.error('Failed to disable push notifications');
@@ -202,6 +208,9 @@ function PushNotificationControls() {
       await api.post('/api/push/unsubscribe', { global: true });
       setIsEnabled(false);
       toast.success('Push notifications disabled for all devices');
+      if (window.confirm('Push notifications disabled. Please refresh the page to apply changes.')) {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Disable all error:', error);
       toast.error('Failed to disable push notifications for all devices');
