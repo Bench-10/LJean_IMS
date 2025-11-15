@@ -201,6 +201,8 @@ export const sendPushToSubscription = async (subscription, payload) => {
             }
         };
 
+        console.log('[Push Service] Sending notification with payload:', JSON.stringify(payload, null, 2));
+
         const notificationPayload = JSON.stringify(payload);
 
         await webPush.sendNotification(pushSubscription, notificationPayload);
