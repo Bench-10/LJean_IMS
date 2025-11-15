@@ -141,8 +141,8 @@ export const sendTestNotification = async (req, res) => {
         const notificationData = {
             title: title || 'Test Notification',
             body: message || 'This is a test push notification',
-            icon: '/icon-192x192.png',
-            badge: '/badge-72x72.png',
+            icon: '/LOGO.png', // App logo icon for notifications
+            badge: '/LOGO.png', // Badge icon for notifications
             tag: `test-${Date.now()}`,
             data: {
                 url: '/notifications',

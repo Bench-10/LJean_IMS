@@ -295,8 +295,8 @@ export const sendAlertPushNotification = async (alert) => {
         const notificationPayload = {
             title: alert_type || 'Inventory Alert',
             body: message,
-            icon: 'frontend/public/LOGO.png', // Add your app icon path
-            badge: 'frontend/public/LOGO.png', // Add your badge icon path
+            icon: '/LOGO.png', // App logo icon for notifications
+            badge: '/LOGO.png', // Badge icon for notifications
             tag: `alert-${alert_id}`,
             data: {
                 alert_id,
