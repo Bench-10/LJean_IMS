@@ -70,9 +70,9 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
               navigator.serviceWorker.ready.then((registration) => {
                 registration.showNotification('LJean Notification', {
                   body: newNotification.message,
-                  icon: '/vite.svg',
+                  icon: '/LOGO.png',
                   tag: String(newNotification.alert_id || Date.now()),
-                  badge: '/vite.svg',
+                  badge: '/LOGO.png',
                   vibrate: [200, 100, 200],
                   requireInteraction: false,
                   data: {
@@ -89,7 +89,7 @@ function Notification({ openNotif, notify, setNotify, unreadCount, onClose, onNo
               // Fallback to direct notification (desktop browsers)
               const notification = new window.Notification('LJean Notification', {
                 body: newNotification.message,
-                icon: '/vite.svg',
+                icon: '/LOGO.png',
                 tag: String(newNotification.alert_id || Date.now())
               });
 

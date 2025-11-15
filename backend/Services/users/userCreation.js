@@ -729,8 +729,8 @@ export const approvePendingUser = async (userId, approverId, approverName) => {
                     notificationData: {
                         title: 'User Request Approved ✅',
                         body: `Your request to create user "${approvedUser.full_name}" has been approved by ${approverName || 'Owner'}.`,
-                        icon: '/vite.svg',
-                        badge: '/vite.svg',
+                            icon: '/LOGO.png',
+                            badge: '/LOGO.png',
                         tag: `user-approved-${userIdInt}`,
                         data: {
                             type: 'user-approval',
@@ -874,8 +874,8 @@ export const rejectPendingUser = async (userId, approverId, options = {}) => {
                 notificationData: {
                     title: 'User Request Rejected ❌',
                     body: `Your request to create user "${rejectedUser.full_name}" has been rejected.${reasonText}`,
-                    icon: '/vite.svg',
-                    badge: '/vite.svg',
+                        icon: '/LOGO.png',
+                        badge: '/LOGO.png',
                     tag: `user-rejected-${userIdInt}`,
                     data: {
                         type: 'user-rejection',

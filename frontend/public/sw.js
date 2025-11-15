@@ -1,7 +1,8 @@
 // Service Worker for LJean Centralized
 // Handles push notifications and offline support
+// Version: 2.1 - Updated notification icons to use LOGO.png
 
-const CACHE_NAME = 'ljean-cache-v1';
+const CACHE_NAME = 'ljean-cache-v2';
 const urlsToCache = [
   '/',
   '/index.html'
@@ -89,12 +90,13 @@ self.addEventListener('fetch', (event) => {
 // Push event - handle push notifications
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push received:', event);
+  console.log('[Service Worker] Push data available:', !!event.data);
 
   let notificationData = {
     title: 'New Notification',
     body: 'You have a new notification',
-    icon: '/vite.svg',
-    badge: '/vite.svg',
+    icon: '/LOGO.png',
+    badge: '/LOGO.png',
     tag: 'default',
     requireInteraction: false,
     data: {}
@@ -102,23 +104,30 @@ self.addEventListener('push', (event) => {
 
   if (event.data) {
     try {
-      notificationData = event.data.json();
+      const parsedData = event.data.json();
+      console.log('[Service Worker] Parsed notification data:', parsedData);
+      notificationData = { ...notificationData, ...parsedData };
     } catch (error) {
       console.error('[Service Worker] Error parsing push data:', error);
       try {
         notificationData.body = event.data.text();
+        console.log('[Service Worker] Using text fallback:', notificationData.body);
       } catch (textError) {
         console.error('[Service Worker] Error reading push text:', textError);
       }
     }
+  } else {
+    console.log('[Service Worker] No push data received, using defaults');
   }
 
   const { title, body, icon, badge, tag, data, requireInteraction, vibrate } = notificationData;
 
+  console.log('[Service Worker] Notification data:', { title, body, icon, badge, tag });
+
   const options = {
     body: body || 'You have a new notification',
-    icon: icon || '/vite.svg',
-    badge: badge || '/vite.svg',
+    icon: icon || '/LOGO.png',
+    badge: badge || '/LOGO.png',
     tag: tag || 'default',
     data: data || {},
     requireInteraction: requireInteraction || false,
