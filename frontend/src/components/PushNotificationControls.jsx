@@ -152,7 +152,7 @@ function PushNotificationControls() {
   setIsEnabled(true);
 
   const persistenceMessage = storagePersisted ? '' : '\nEnsure Edge/Chrome "Continue running background apps" (desktop) or App > Notifications (mobile) is enabled so pushes arrive when closed.';
-      toast.success(`✅ Push notifications enabled!${persistenceMessage}`);
+      toast.success(`Push notifications enabled!${persistenceMessage}`);
     } catch (error) {
       console.error('Enable error:', error);
       toast.error(`Failed to enable: ${error.message}`);
@@ -235,15 +235,12 @@ function PushNotificationControls() {
           ) : (
             <IoNotificationsOffOutline className="w-5 h-5" />
           )}
-          <span>{isLoading ? 'Processing…' : isEnabled ? 'Push Enabled' : 'Enable Push'}</span>
+          <span>{isLoading ? 'Processing…' : isEnabled ? 'Disable Push Notifications' : 'Enable Push Notifications'}</span>
         </button>
 
         {/* Disable all is now performed by toggling off the button */}
       </div>
 
-      <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-        <div className="font-medium text-slate-700 mb-1">Status: {statusLabel}</div>
-      </div>
     </div>
   );
 }
