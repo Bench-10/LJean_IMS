@@ -20,7 +20,6 @@ function ProductTransactionHistory({
   focusEntry,
   onClearFocus
 }) {
-
   const [openFilter, setOpenFilter] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -28,7 +27,6 @@ function ProductTransactionHistory({
   const [productHistory, setProductHistory] = useState([]);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-
   const [loading, setLoading] = useState(false);
 
   const rowRefs = useRef({});
@@ -45,9 +43,11 @@ function ProductTransactionHistory({
       if (!first || !second) return false;
       const firstDate = new Date(first);
       const secondDate = new Date(second);
-      return !Number.isNaN(firstDate.getTime())
-        && !Number.isNaN(secondDate.getTime())
-        && firstDate.getTime() === secondDate.getTime();
+      return (
+        !Number.isNaN(firstDate.getTime()) &&
+        !Number.isNaN(secondDate.getTime()) &&
+        firstDate.getTime() === secondDate.getTime()
+      );
     };
 
     const entryAlertValue = entry.alert_timestamp || entry.alertTimestamp;
@@ -104,7 +104,6 @@ function ProductTransactionHistory({
     }
 
     const entryAddId = entry.add_id ?? entry.add_stock_id ?? entry.addStockId;
-
     if (entryAddId !== undefined && entryAddId !== null) {
       return `history-add-${entryAddId}`;
     }
@@ -116,7 +115,7 @@ function ProductTransactionHistory({
     return `history-row-${fallbackIndex}`;
   };
 
-  // PAGINATION LOGIC
+  // PAGINATION
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
 
@@ -142,6 +141,7 @@ function ProductTransactionHistory({
       setHighlightedRowKey(null);
       setPendingRowKey(null);
       pendingFocusRef.current = null;
+      return;
     }
   }, [isProductTransactOpen]);
 
@@ -151,7 +151,6 @@ function ProductTransactionHistory({
     setStartDate('');
   };
 
-  // 🔒 Centralized close for overlay/back/close button/modal lock
   const handleClose = () => {
     setSearch('');
     setStartDate('');
@@ -172,7 +171,7 @@ function ProductTransactionHistory({
       return;
     }
 
-    if ((startDate > endDate) && endDate) {
+    if (startDate > endDate && endDate) {
       alert('End date must not be before the Start date!');
       return;
     }
@@ -187,8 +186,11 @@ function ProductTransactionHistory({
     try {
       setLoading(true);
       let response;
-      if (!user || !user.role || !user.role.some(role => ['Owner'].includes(role))) {
-        response = await api.post(`/api/product_history?branch_id=${user.branch_id}`, dates);
+      if (!user || !user.role || !user.role.some((role) => ['Owner'].includes(role))) {
+        response = await api.post(
+          `/api/product_history?branch_id=${user.branch_id}`,
+          dates
+        );
       } else {
         response = await api.post(`/api/product_history/`, dates);
       }
@@ -201,30 +203,21 @@ function ProductTransactionHistory({
   };
 
   useEffect(() => {
-    if (isProductTransactOpen)
-      fetchProductHistory();
+    if (isProductTransactOpen) fetchProductHistory();
   }, [isProductTransactOpen]);
 
-  // LISTEN FOR REAL-TIME HISTORY UPDATES
+  // REAL-TIME UPDATES
   useEffect(() => {
     const handleHistoryUpdate = (event) => {
       const historyData = event.detail;
-      console.log('History update received in component:', historyData);
 
       if (historyData.action === 'add' || historyData.action === 'update') {
-        setProductHistory(prevHistory => [historyData.historyEntry, ...prevHistory]);
-
-        if (isProductTransactOpen) {
-          console.log(`📋 New history entry: ${historyData.historyEntry.product_name} (${historyData.historyEntry.quantity_added} units)`);
-        }
+        setProductHistory((prevHistory) => [historyData.historyEntry, ...prevHistory]);
       }
     };
 
     window.addEventListener('history-update', handleHistoryUpdate);
-
-    return () => {
-      window.removeEventListener('history-update', handleHistoryUpdate);
-    };
+    return () => window.removeEventListener('history-update', handleHistoryUpdate);
   }, [isProductTransactOpen]);
 
   useEffect(() => {
@@ -232,11 +225,11 @@ function ProductTransactionHistory({
     if (!Array.isArray(productHistory) || productHistory.length === 0) return;
 
     const activeFocus = pendingFocusRef.current;
-    const matchIndex = productHistory.findIndex(entry => matchesFocus(entry, activeFocus));
+    const matchIndex = productHistory.findIndex((entry) =>
+      matchesFocus(entry, activeFocus)
+    );
 
-    if (matchIndex === -1) {
-      return;
-    }
+    if (matchIndex === -1) return;
 
     const targetEntry = productHistory[matchIndex];
     const targetKey = getEntryKey(targetEntry, matchIndex);
@@ -261,15 +254,12 @@ function ProductTransactionHistory({
     setSearch(sanitizeInput(event.target.value));
   };
 
-  let filteredHistory = productHistory;
-
-  // FILTER BY CATEGORY
-  filteredHistory = selectedCategory
+  // FILTER & PAGINATE
+  let filteredHistory = selectedCategory
     ? productHistory.filter((items) => items.category_id === Number(selectedCategory))
-    : filteredHistory;
+    : productHistory;
 
-  // PAGINATION: filter first, then paginate
-  let filteredHistoryData = filteredHistory.filter(product =>
+  let filteredHistoryData = filteredHistory.filter((product) =>
     product.product_name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -283,10 +273,7 @@ function ProductTransactionHistory({
     if (!pendingRowKey) return;
 
     const targetRow = rowRefs.current[pendingRowKey];
-
-    if (!targetRow) {
-      return;
-    }
+    if (!targetRow) return;
 
     setHighlightedRowKey(pendingRowKey);
     targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -296,40 +283,41 @@ function ProductTransactionHistory({
       setPendingRowKey(null);
     }, 2000);
 
-    return () => {
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, [currentData, pendingRowKey]);
 
-  // Friendly display bounds
   const displayStart = totalItems === 0 ? 0 : startIndex + 1;
   const displayEnd = endIndex;
 
-  // Export functionality
   const handleExportHistory = (format) => {
     const exportData = formatForExport(filteredHistoryData, []);
-    const filename = `product_history_export_${new Date().toISOString().split('T')[0]}`;
+    const filename = `product_history_export_${new Date()
+      .toISOString()
+      .split('T')[0]}`;
 
     const customHeaders = ['Date Added', 'Product Name', 'Category', 'Cost', 'Quantity'];
-    const dataKeys = ['formated_date_added', 'product_name', 'category_name', 'h_unit_cost', 'quantity_added'];
+    const dataKeys = [
+      'formated_date_added',
+      'product_name',
+      'category_name',
+      'h_unit_cost',
+      'quantity_added'
+    ];
 
     if (format === 'csv') {
       exportToCSV(exportData, filename, customHeaders, dataKeys);
     } else if (format === 'pdf') {
-      // Custom column widths: expand Product Name and Category, minimize Cost and Quantity
-      const columnWidths = [45, 80, 80, 30, 30]; // Date, Product Name, Category, Cost, Quantity in mm
       exportToPDF(exportData, filename, {
         title: 'Product Transaction History Report',
-        customHeaders: customHeaders,
-        dataKeys: dataKeys,
-        columnWidths: columnWidths
+        customHeaders,
+        dataKeys
       });
     }
   };
 
-  // 🔒 Modal lock: no background scroll + Back closes via handleClose
   useModalLock(isProductTransactOpen, handleClose);
 
+  // reset refs each render before mapping
   rowRefs.current = {};
 
   return (
@@ -500,7 +488,7 @@ function ProductTransactionHistory({
           {/* HISTORY SECTION */}
           <div className="w-full flex-1 mt-4 rounded-lg shadow-sm border border-gray-200 bg-white flex flex-col overflow-hidden">
             {/* Desktop / Tablet table */}
-            <div className="hidden sm:block h-full overflow-x-auto overflow-y-auto rounded-lg hide-scrollbar">
+            <div className="hidden sm:block h-full overflow-x-auto overflow-y-auto rounded-lg">
               {/* xl+: give extra width; below xl, table just fits container */}
               <table className="w-full table-fixed xl:min-w-[1100px]">
                 <thead className="sticky top-0 h-10 z-40">
@@ -705,61 +693,58 @@ function ProductTransactionHistory({
             </div>
 
             {/* Desktop/Tablet */}
-            {/* Desktop/Tablet */}
-<div className="hidden sm:flex items-center justify-between gap-4 w-full">
-  <div className="flex items-center gap-4">
-    {totalItems > 0 && (
-      <div className="text-sm text-gray-600 flex-shrink-0">
-        Showing {displayStart}-{displayEnd} of {totalItems}
-      </div>
-    )}
-  </div>
+            <div className="hidden sm:flex items-center justify-between gap-4 w-full">
+              <div className="flex items-center gap-4">
+                {totalItems > 0 && (
+                  <div className="text-sm text-gray-600 flex-shrink-0">
+                    Showing {displayStart}-{displayEnd} of {totalItems}
+                  </div>
+                )}
+              </div>
 
-  <div className="flex-1 flex justify-center items-center space-x-2">
-    <button
-      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-      disabled={currentPage === 1}
-      className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      Previous
-    </button>
-    <span className="text-sm text-gray-600 whitespace-nowrap px-1">
-      Page {currentPage} of {totalPages}
-    </span>
-    <button
-      onClick={() =>
-        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-      }
-      disabled={currentPage === totalPages}
-      className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      Next
-    </button>
-  </div>
+              <div className="flex-1 flex justify-center items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-600 whitespace-nowrap px-1">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
 
-  {/* Drop-UP so it doesn't get cut by modal bottom */}
-  <div className="relative group">
-    <button className="bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md transition-all flex items-center justify-center gap-2 text-sm">
-      <TbFileExport className="text-base" />
-      <span>Export History</span>
-    </button>
-    <div className="absolute right-0 bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 min-w-full">
-      <button
-        onClick={() => handleExportHistory('csv')}
-        className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-      >
-        Export as CSV
-      </button>
-      <button
-        onClick={() => handleExportHistory('pdf')}
-        className="block w-full rounded-lg text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-      >
-        Export as PDF
-      </button>
-    </div>
-  </div>
-</div>
-
+              <div className="relative group">
+                <button className="bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md transition-all flex items-center justify-center gap-2 text-sm">
+                  <TbFileExport className="text-base" />
+                  <span>Export History</span>
+                </button>
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 min-w-full">
+                  <button
+                    onClick={() => handleExportHistory('csv')}
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                  >
+                    Export as CSV
+                  </button>
+                  <button
+                    onClick={() => handleExportHistory('pdf')}
+                    className="block w-full rounded-lg text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                  >
+                    Export as PDF
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </dialog>

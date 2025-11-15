@@ -84,7 +84,7 @@ function UserModalForm({
   }, [openDialog, handleCloseConfirm, handleCloseModalOnly]);
 
   // Modal lock for MAIN user modal (only when confirm is NOT open)
-  useModalLock(openUserModal && !openDialog, handleCloseModalOnly);
+  useModalLock(openUserModal || openDialog, handleClose);
 
   // Modal lock for CONFIRMATION dialog when it's open
   useModalLock(openDialog, handleCloseConfirm);
@@ -131,11 +131,11 @@ function UserModalForm({
 
   // ESC to close (respect confirm vs modal)
   useEffect(() => {
-    if (!openUserModal) return;
+    if (!openUserModal && !openDialog) return;
     const onKey = (e) => { if (e.key === 'Escape') handleClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [openUserModal, handleClose]);
+  }, [openUserModal, openDialog, handleClose]);
 
   if (!user || !user.role) return null;
 
@@ -275,190 +275,196 @@ function UserModalForm({
   };
 
   return (
-    <div>
-      {loading && (
-        <FormLoading message={mode === 'add' ? "Creating user..." : "Updating user..."} />
-      )}
-
-      {openDialog && (
-        <ConfirmationDialog
-          mode={mode}
-          message={message}
-          submitFunction={async () => { await submitUserConfirmation(); setOpenUsers(false); }}
-          onClose={handleCloseConfirm} 
-        />
-      )}
-
-      {openUserModal && (
-        // Backdrop container catches outside clicks
-        <div
-          className="fixed inset-0 z-[9999] p-2 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={handleClose}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="user-modal-title"
-        >
-          {/* Modal card; stop propagation so inside clicks don't close */}
+      <div>
+        {loading && (
+          <FormLoading message={mode === 'add' ? "Creating user..." : "Updating user..."} />
+        )}
+  
+        {openDialog && (
+          <ConfirmationDialog
+            mode={mode}
+            message={message}
+            submitFunction={async () => { await submitUserConfirmation(); setOpenUsers(false); }}
+            onClose={handleCloseConfirm}
+          />
+        )}
+  
+        {openUserModal && (
+          // Backdrop container catches outside clicks
           <div
-            className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] overflow-y-auto hide-scrollbar flex flex-col animate-popup"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[9999] p-2 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            onClick={handleClose}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="user-modal-title"
           >
-            {/* Header */}
-            <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-start sm:items-center gap-3 flex-shrink-0 sticky top-0 z-10">
-              <h1 id="user-modal-title" className="text-white font-bold text-2xl">
-                {mode === 'add' ? 'ADD NEW USER' : 'Edit User Information'}
-              </h1>
-              <button
-                onClick={handleClose}
-                className="text-white hover:bg-green-600 p-1.5 rounded-lg"
-                aria-label="Close"
-                title="Close"
+            {/* Modal card; stop propagation so inside clicks don't close */}
+            <div
+              className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[700px] max-h-[90vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header (sticky) */}
+              <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-start sm:items-center gap-3 flex-shrink-0 sticky top-0 z-10">
+                <h1 id="user-modal-title" className="text-white font-bold text-2xl">
+                  {mode === 'add' ? 'ADD NEW USER' : 'Edit User Information'}
+                </h1>
+                <button
+                  onClick={handleClose}
+                  className="text-white hover:bg-green-600 p-1.5 rounded-lg"
+                  aria-label="Close"
+                  title="Close"
+                >
+                  <IoMdClose className="text-2xl" />
+                </button>
+              </div>
+  
+              {/* Form: body scrolls, footer stays fixed */}
+              <form
+                onSubmit={(e) => { e.preventDefault(); validateInputs(); }}
+                className="flex-1 flex flex-col overflow-hidden"
               >
-                <IoMdClose className="text-2xl" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6 space-y-5">
-              <form onSubmit={(e) => { e.preventDefault(); validateInputs(); }}>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-green-50/30 p-5 rounded-xl shadow-inner">
-                  {/* First Name */}
-                  <div className="relative">
-                    <h2 className="font-medium text-green-900 mb-2">First Name</h2>
-                    <input
-                      type="text"
-                      className={inputDesign('first_name')}
-                      value={first_name}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                    {errorflag('first_name', 'First Name')}
-                  </div>
-
-                  {/* Last Name */}
-                  <div className="relative">
-                    <h2 className="font-medium text-green-900 mb-2">Last Name</h2>
-                    <input
-                      type="text"
-                      className={inputDesign('last_name')}
-                      value={last_name}
-                      onChange={(e) => setLastname(e.target.value)}
-                    />
-                    {errorflag('last_name', 'Last Name')}
-                  </div>
-
-                  {/* Branch */}
-                  <div className="relative">
-                    {user.role.some(role => ['Branch Manager'].includes(role)) ? (
-                      <>
-                        <h2 className="font-medium text-green-900 mb-2">Branch</h2>
-                        <input
-                          type="text"
-                          className={inputDesign('branch')}
-                          value={branches.find(b => b.branch_id === branch)?.branch_name || ''}
-                          readOnly
-                        />
-                      </>
-                    ) : (
-                      <DropdownCustom
-                        label="Branch"
-                        value={branch}
-                        onChange={(e) => setBranch(e.target.value)}
-                        options={branchOptions}
-                        variant="simple"
-                        error={emptyField.branch}
-                        labelClassName="block font-medium text-green-900 mb-2"
+                {/* Scrollable content */}
+                <div className="p-6 space-y-5 flex-1 overflow-y-auto hide-scrollbar">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-green-50/30 p-5 rounded-xl shadow-inner">
+                    {/* First Name */}
+                    <div className="relative">
+                      <h2 className="font-medium text-green-900 mb-2">First Name</h2>
+                      <input
+                        type="text"
+                        className={inputDesign('first_name')}
+                        value={first_name}
+                        onChange={(e) => setFirstName(e.target.value)}
                       />
-                    )}
-                    {errorflag('branch', 'Branch')}
-                  </div>
-
-                  {/* User Role */}
-                  <div className="relative">
-                    <DropdownCheckbox
-                      label="User Role"
-                      values={selectedRoles}
-                      options={roleOptions}
-                      onChange={handleRoleChange}
-                      error={emptyField.role}
-                    />
-                    {errorflag('role', 'User Role')}
-                  </div>
-
-                  {/* Cell Number */}
-                  <div className="relative">
-                    <h2 className="font-medium text-green-900 mb-2">Cellphone Number</h2>
-                    <input
-                      type="text"
-                      className={inputDesign('cell_number')}
-                      value={cell_number}
-                      onChange={(e) => setCellNumber(e.target.value)}
-                    />
-                    {errorflag('cell_number', 'Cellphone Number')}
-                  </div>
-
-                  {/* Address */}
-                  <div className="relative">
-                    <h2 className="font-medium text-green-900 mb-2">Address</h2>
-                    <input
-                      type="text"
-                      className={inputDesign('address')}
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                    />
-                    {errorflag('address', 'Address')}
-                  </div>
-
-                  {/* Email */}
-                  <div className="relative">
-                    <h2 className="font-medium text-green-900 mb-2">Email</h2>
-                    <input
-                      type="text"
-                      className={inputDesign('username')}
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                    />
-                    {errorflag('username', 'Email')}
-                  </div>
-
-                  {/* Password */}
-                  <div className="relative">
-                    <h2 className="font-medium text-green-900 mb-2">Password</h2>
-                    <input
-                      type="text"
-                      className={inputDesign('password')}
-                      value={password}
-                      onChange={(e) => { setPassword(e.target.value); passwordStrength(e.target.value); }}
-                    />
-                    {errorflag('password', 'Password')}
+                      {errorflag('first_name', 'First Name')}
+                    </div>
+  
+                    {/* Last Name */}
+                    <div className="relative">
+                      <h2 className="font-medium text-green-900 mb-2">Last Name</h2>
+                      <input
+                        type="text"
+                        className={inputDesign('last_name')}
+                        value={last_name}
+                        onChange={(e) => setLastname(e.target.value)}
+                      />
+                      {errorflag('last_name', 'Last Name')}
+                    </div>
+  
+                    {/* Branch */}
+                    <div className="relative">
+                      {user.role.some(role => ['Branch Manager'].includes(role)) ? (
+                        <>
+                          <h2 className="font-medium text-green-900 mb-2">Branch</h2>
+                          <input
+                            type="text"
+                            className={inputDesign('branch')}
+                            value={branches.find(b => b.branch_id === branch)?.branch_name || ''}
+                            readOnly
+                          />
+                        </>
+                      ) : (
+                        <DropdownCustom
+                          label="Branch"
+                          value={branch}
+                          onChange={(e) => setBranch(e.target.value)}
+                          options={branchOptions}
+                          variant="simple"
+                          error={emptyField.branch}
+                          labelClassName="block font-medium text-green-900 mb-2"
+                        />
+                      )}
+                      {errorflag('branch', 'Branch')}
+                    </div>
+  
+                    {/* User Role */}
+                    <div className="relative">
+                      <DropdownCheckbox
+                        label="User Role"
+                        values={selectedRoles}
+                        options={roleOptions}
+                        onChange={handleRoleChange}
+                        error={emptyField.role}
+                      />
+                      {errorflag('role', 'User Role')}
+                    </div>
+  
+                    {/* Cell Number */}
+                    <div className="relative">
+                      <h2 className="font-medium text-green-900 mb-2">Cellphone Number</h2>
+                      <input
+                        type="text"
+                        className={inputDesign('cell_number')}
+                        value={cell_number}
+                        onChange={(e) => setCellNumber(e.target.value)}
+                      />
+                      {errorflag('cell_number', 'Cellphone Number')}
+                    </div>
+  
+                    {/* Address */}
+                    <div className="relative">
+                      <h2 className="font-medium text-green-900 mb-2">Address</h2>
+                      <input
+                        type="text"
+                        className={inputDesign('address')}
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                      />
+                      {errorflag('address', 'Address')}
+                    </div>
+  
+                    {/* Email */}
+                    <div className="relative">
+                      <h2 className="font-medium text-green-900 mb-2">Email</h2>
+                      <input
+                        type="text"
+                        className={inputDesign('username')}
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                      />
+                      {errorflag('username', 'Email')}
+                    </div>
+  
+                    {/* Password */}
+                    <div className="relative">
+                      <h2 className="font-medium text-green-900 mb-2">Password</h2>
+                      <input
+                        type="text"
+                        className={inputDesign('password')}
+                        value={password}
+                        onChange={(e) => { setPassword(e.target.value); passwordStrength(e.target.value); }}
+                      />
+                      {errorflag('password', 'Password')}
+                    </div>
                   </div>
                 </div>
-
-                {/* Submit Button */}
-                <div className="flex justify-center mt-8">
-                  <button
-                    type="submit"
-                    className="flex items-center justify-center gap-2 px-8 py-2.5 bg-green-700 hover:bg-green-800 text-white font-medium rounded-lg shadow-md transition-all duration-200 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
-                    disabled={buttonLoading || loading}
-                    aria-busy={buttonLoading || loading}
-                  >
-                    {buttonLoading || loading ? (
-                      <>
-                        <FaSpinner className="animate-spin" />
-                        <span>{mode === 'add' ? 'Creating...' : 'Updating...'}</span>
-                      </>
-                    ) : (
-                      <span>{mode === 'add' ? 'Register User' : 'Update User'}</span>
-                    )}
-                  </button>
+  
+                {/* Fixed footer with button */}
+                <div className="flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4">
+                  <div className="flex justify-center">
+                    <button
+                      type="submit"
+                      className="flex items-center justify-center gap-2 px-8 py-2.5 bg-green-700 hover:bg-green-800 text-white font-medium rounded-lg shadow-md transition-all duration-200 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={buttonLoading || loading}
+                      aria-busy={buttonLoading || loading}
+                    >
+                      {buttonLoading || loading ? (
+                        <>
+                          <FaSpinner className="animate-spin" />
+                          <span>{mode === 'add' ? 'Creating...' : 'Updating...'}</span>
+                        </>
+                      ) : (
+                        <span>{mode === 'add' ? 'Register User' : 'Update User'}</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
+            {/* end card */}
           </div>
-          {/* end card */}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default UserModalForm;
+        )}
+      </div>
+    );
+  }
+  
+  export default UserModalForm;
