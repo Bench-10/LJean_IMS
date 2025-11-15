@@ -11,7 +11,7 @@ const BTN_BASE =
   "h-9 min-w-[140px] px-4 rounded-lg text-white font-semibold text-sm " +
   "shadow-sm disabled:opacity-70 disabled:cursor-not-allowed transition-colors whitespace-nowrap";
 const BTN_APPROVE_GREEN  = `${BTN_BASE} bg-green-600 hover:bg-green-700`;
-const BTN_APPROVE_ORANGE = `${BTN_BASE} bg-amber-500 hover:bg-amber-600`;
+
 const BTN_REJECT_RED     = `${BTN_BASE} bg-red-600 hover:bg-red-700`;
 
 /**
@@ -542,7 +542,7 @@ function Approvals({
                       <td className="px-4 py-4 text-center align-top">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            className={BTN_APPROVE_ORANGE}
+                            className={BTN_APPROVE_GREEN}
                             onClick={(e) => handleApprove(e, pendingUser)}
                             disabled={approvingInProgress || rejectingInProgress}
                           >
@@ -728,7 +728,7 @@ function Approvals({
                     {/* Actions — side-by-side */}
                     <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
                       <button
-                        className={BTN_APPROVE_ORANGE}
+                        className={BTN_APPROVE_GREEN}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleApprove(e, pendingUser);

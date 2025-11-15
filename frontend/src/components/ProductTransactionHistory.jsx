@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react'; 
 import api from '../utils/api.js';
 import DropdownCustom from '../components/DropdownCustom';
 import DatePickerCustom from '../components/DatePickerCustom.jsx';
@@ -116,6 +116,15 @@ function ProductTransactionHistory({
     return `history-row-${fallbackIndex}`;
   };
 
+  // helper to make quantity non-decimal
+  const formatQuantity = (value) => {
+    if (value === null || value === undefined || value === '') return '';
+    const num = Number(value);
+    if (!Number.isFinite(num)) return value;
+    const intVal = Math.trunc(num);
+    return intVal.toLocaleString();
+  };
+
   // PAGINATION LOGIC
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
@@ -142,7 +151,7 @@ function ProductTransactionHistory({
       setHighlightedRowKey(null);
       setPendingRowKey(null);
       pendingFocusRef.current = null;
-    }
+      }
   }, [isProductTransactOpen]);
 
   const closeFilterValue = () => {
@@ -151,7 +160,7 @@ function ProductTransactionHistory({
     setStartDate('');
   };
 
-  // 🔒 Centralized close for overlay/back/close button/modal lock
+  // Centralized close for overlay/back/close button/modal lock
   const handleClose = () => {
     setSearch('');
     setStartDate('');
@@ -215,7 +224,7 @@ function ProductTransactionHistory({
         setProductHistory(prevHistory => [historyData.historyEntry, ...prevHistory]);
 
         if (isProductTransactOpen) {
-          console.log(`📋 New history entry: ${historyData.historyEntry.product_name} (${historyData.historyEntry.quantity_added} units)`);
+          console.log(`New history entry: ${historyData.historyEntry.product_name} (${historyData.historyEntry.quantity_added} units)`);
         }
       }
     };
@@ -327,7 +336,7 @@ function ProductTransactionHistory({
     }
   };
 
-  // 🔒 Modal lock: no background scroll + Back closes via handleClose
+  // Modal lock: no background scroll + Back closes via handleClose
   useModalLock(isProductTransactOpen, handleClose);
 
   rowRefs.current = {};
@@ -576,7 +585,7 @@ function ProductTransactionHistory({
 
                           {/* QUANTITY */}
                           <td className="w-[8%] px-4 lg:px-6 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right">
-                            {history.quantity_added.toLocaleString()}
+                            {formatQuantity(history.quantity_added)}
                           </td>
 
                           {/* VALUE */}
@@ -633,7 +642,7 @@ function ProductTransactionHistory({
                         <div className="truncate">Category: {history.category_name}</div>
                         <div className="flex justify-between">
                           <span>Unit: {currencyFormat(history.h_unit_cost)}</span>
-                          <span>Qty: {history.quantity_added.toLocaleString()}</span>
+                          <span>Qty: {formatQuantity(history.quantity_added)}</span>
                         </div>
                         <div className="text-right text-gray-900 font-semibold">
                           {currencyFormat(history.value)}
@@ -705,60 +714,59 @@ function ProductTransactionHistory({
             </div>
 
             {/* Desktop/Tablet */}
-            {/* Desktop/Tablet */}
-<div className="hidden sm:flex items-center justify-between gap-4 w-full">
-  <div className="flex items-center gap-4">
-    {totalItems > 0 && (
-      <div className="text-sm text-gray-600 flex-shrink-0">
-        Showing {displayStart}-{displayEnd} of {totalItems}
-      </div>
-    )}
-  </div>
+            <div className="hidden sm:flex items-center justify-between gap-4 w-full">
+              <div className="flex items-center gap-4">
+                {totalItems > 0 && (
+                  <div className="text-sm text-gray-600 flex-shrink-0">
+                    Showing {displayStart}-{displayEnd} of {totalItems}
+                  </div>
+                )}
+              </div>
 
-  <div className="flex-1 flex justify-center items-center space-x-2">
-    <button
-      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-      disabled={currentPage === 1}
-      className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      Previous
-    </button>
-    <span className="text-sm text-gray-600 whitespace-nowrap px-1">
-      Page {currentPage} of {totalPages}
-    </span>
-    <button
-      onClick={() =>
-        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-      }
-      disabled={currentPage === totalPages}
-      className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      Next
-    </button>
-  </div>
+              <div className="flex-1 flex justify-center items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-600 whitespace-nowrap px-1">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
 
-  {/* Drop-UP so it doesn't get cut by modal bottom */}
-  <div className="relative group">
-    <button className="bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md transition-all flex items-center justify-center gap-2 text-sm">
-      <TbFileExport className="text-base" />
-      <span>Export History</span>
-    </button>
-    <div className="absolute right-0 bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 min-w-full">
-      <button
-        onClick={() => handleExportHistory('csv')}
-        className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-      >
-        Export as CSV
-      </button>
-      <button
-        onClick={() => handleExportHistory('pdf')}
-        className="block w-full rounded-lg text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
-      >
-        Export as PDF
-      </button>
-    </div>
-  </div>
-</div>
+              {/* Drop-UP so it doesn't get cut by modal bottom */}
+              <div className="relative group">
+                <button className="bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-md transition-all flex items-center justify-center gap-2 text-sm">
+                  <TbFileExport className="text-base" />
+                  <span>Export History</span>
+                </button>
+                <div className="absolute right-0 bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 min-w-full">
+                  <button
+                    onClick={() => handleExportHistory('csv')}
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                  >
+                    Export as CSV
+                  </button>
+                  <button
+                    onClick={() => handleExportHistory('pdf')}
+                    className="block w-full rounded-lg text-left px-4 py-2 hover:bg-gray-100 text-sm whitespace-nowrap"
+                  >
+                    Export as PDF
+                  </button>
+                </div>
+              </div>
+            </div>
 
           </div>
         </div>
