@@ -1056,6 +1056,10 @@ function App() {
         : (user?.role ? [user.role] : []);
 
       const canAcceptNotification = () => {
+        if (notification?.is_targeted) {
+          return true; // Accept all targeted notifications, let other logic handle
+        }
+
         if (notification?.creator_id && user?.user_id === notification.creator_id) {
           return false;
         }
@@ -1082,9 +1086,7 @@ function App() {
           ? prevNotify.some(existing => normalizeAlertId(existing?.alert_id) === incomingAlertId)
           : false;
 
-        const isSelfNotification = notification?.user_id !== undefined && notification?.user_id !== null
-          ? String(notification.user_id) === String(user?.user_id)
-          : false;
+        const isSelfNotification = notification?.is_targeted ? false : (notification?.user_id !== undefined && notification?.user_id !== null ? String(notification.user_id) === String(user?.user_id) : false);
 
         if (!alreadyExists && !isSelfNotification) {
           // Add isDateToday: true for WebSocket notifications to place them in Today section
@@ -2544,7 +2546,8 @@ function App() {
       await api.patch(`/api/users/${userId}/rejection`, {
         admin_id: user.admin_id ?? null,
         approver_roles: user.role || [],
-        reason
+        reason,
+        approverName: user.full_name ?? null
       });
 
       addToNotificationQueue('User account request rejected.', {

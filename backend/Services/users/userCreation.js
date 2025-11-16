@@ -1,7 +1,7 @@
 import { SQLquery } from "../../db.js";
 import * as passwordEncryption from "../Services_Utils/passwordEncryption.js";
 import { correctDateFormat } from "../Services_Utils/convertRedableDate.js";
-import { broadcastUserUpdate, broadcastOwnerNotification, broadcastUserApprovalRequest, broadcastUserApprovalUpdate } from "../../server.js";
+import { broadcastUserUpdate, broadcastOwnerNotification, broadcastUserApprovalRequest, broadcastUserApprovalUpdate, broadcastToUser } from "../../server.js";
 import { sendPushNotification, sendAlertPushNotification } from "../pushNotificationService.js";
 
 const getUserFullName = async (userId) => {
@@ -720,6 +720,27 @@ export const approvePendingUser = async (userId, approverId, approverName) => {
             });
         }
 
+        // Send targeted WebSocket notification to the creator (branch manager)
+        if (approvedUser.created_by_id) {
+            broadcastToUser(approvedUser.created_by_id, {
+                alert_type: 'User Request Approved',
+                message: `Your request to create user "${approvedUser.full_name}" has been approved by the owner (${approverName}).`,
+                banner_color: 'green',
+                user_full_name: 'System',
+                alert_date: new Date().toISOString(),
+                product_id: null,
+                isDateToday: true,
+                alert_date_formatted: 'Just now',
+                is_targeted: true,
+                data: {
+                    type: 'user-approval',
+                    user_id: userIdInt,
+                    status: 'approved',
+                    url: '/user-management'
+                }
+            }); // Persist to database for notification history
+        }
+
         // Send push notification to the requester (creator of the user account)
         if (approvedUser.created_by_id) {
             try {
@@ -728,7 +749,7 @@ export const approvePendingUser = async (userId, approverId, approverName) => {
                     userType: 'user',
                     notificationData: {
                         title: 'User Request Approved ✅',
-                        body: `Your request to create user "${approvedUser.full_name}" has been approved by ${approverName || 'Owner'}.`,
+                        body: `Your request to create user "${approvedUser.full_name}" has been approved by the owner (${approverName}).`,
                             icon: '/LOGO.png',
                             badge: '/LOGO.png',
                         tag: `user-approved-${userIdInt}`,
@@ -753,7 +774,7 @@ export const approvePendingUser = async (userId, approverId, approverName) => {
 };
 
 
-export const rejectPendingUser = async (userId, approverId, options = {}) => {
+export const rejectPendingUser = async (userId, approverId, approverName, options = {}) => {
     const userIdInt = parseInt(userId, 10);
     const approverIdInt = approverId !== null && approverId !== undefined ? parseInt(approverId, 10) : null;
 
@@ -864,6 +885,29 @@ export const rejectPendingUser = async (userId, approverId, options = {}) => {
         });
     }
 
+    // Send targeted WebSocket notification to the creator (branch manager)
+    if (rejectedUser?.created_by_id) {
+        const reasonText = resolvedReason ? ` Reason: ${resolvedReason}` : '';
+        broadcastToUser(rejectedUser.created_by_id, {
+            alert_type: 'User Request Rejected',
+            message: `Your request to create user "${rejectedUser.full_name}" has been rejected by the owner (${approverName}).${reasonText}`,
+            banner_color: 'red',
+            user_full_name: 'System',
+            alert_date: new Date().toISOString(),
+            product_id: null,
+            isDateToday: true,
+            alert_date_formatted: 'Just now',
+            is_targeted: true,
+            data: {
+                type: 'user-rejection',
+                user_id: userIdInt,
+                status: 'rejected',
+                reason: resolvedReason,
+                url: '/user-management'
+            }
+        }); // Persist to database for notification history
+    }
+
     // Send push notification to the requester (creator of the user account)
     if (rejectedUser?.created_by_id) {
         try {
@@ -873,7 +917,7 @@ export const rejectPendingUser = async (userId, approverId, options = {}) => {
                 userType: 'user',
                 notificationData: {
                     title: 'User Request Rejected ❌',
-                    body: `Your request to create user "${rejectedUser.full_name}" has been rejected.${reasonText}`,
+                    body: `Your request to create user "${rejectedUser.full_name}" has been rejected by the owner (${approverName}).${reasonText}`,
                         icon: '/LOGO.png',
                         badge: '/LOGO.png',
                     tag: `user-rejected-${userIdInt}`,
@@ -997,6 +1041,28 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
         reason: resolvedReason || null,
         request: null // No request snapshot because it's deleted
     });
+
+    // Send targeted notification to the creator if they didn't cancel their own request
+    if (cancelledUser?.created_by_id && Number(cancelledUser.created_by_id) !== cancellerIdInt) {
+        broadcastToUser(cancelledUser.created_by_id, {
+            alert_type: 'User Request Cancelled',
+            message: `Your request to create user "${cancelledUser.full_name}" has been cancelled.`,
+            banner_color: 'orange',
+            user_full_name: 'System',
+            alert_date: new Date().toISOString(),
+            product_id: null,
+            isDateToday: true,
+            alert_date_formatted: 'Just now',
+            is_targeted: true,
+            data: {
+                type: 'user-cancellation',
+                user_id: userIdInt,
+                status: 'cancelled',
+                reason: resolvedReason,
+                url: '/user-management'
+            }
+        }); // Persist to database for notification history
+    }
 
     return cancelledUser;
 };

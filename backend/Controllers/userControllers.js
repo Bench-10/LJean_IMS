@@ -207,7 +207,7 @@ export const approvePendingUser = async (req, res) => {
 export const rejectPendingUser = async (req, res) => {
     try {
         const userID = req.params.id;
-        const { admin_id, approver_roles, reason } = req.body;
+        const { admin_id, approver_roles, reason, approverName } = req.body;
 
         let isOwner = false;
 
@@ -225,7 +225,7 @@ export const rejectPendingUser = async (req, res) => {
             return res.status(403).json({ message: 'Only owners can reject accounts' });
         }
 
-        const result = await userCreation.rejectPendingUser(userID, admin_id ?? null, { reason: reason ?? null });
+        const result = await userCreation.rejectPendingUser(userID, admin_id ?? null, approverName ?? null, { reason: reason ?? null });
         res.status(200).json(result);
     } catch (error) {
         console.error('Error rejecting user: ', error);
