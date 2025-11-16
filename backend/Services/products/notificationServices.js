@@ -176,12 +176,13 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
         ia.user_id = 0 OR ia.user_id IS NULL
         OR (ia.user_id = $4 AND ia.alert_type NOT IN ('New Sale', 'Delivery Status Update', 'New Delivery', 'Inventory Update'))
         OR (ia.user_id != $4 AND ia.alert_type IN ('New Sale', 'Delivery Status Update', 'New Delivery', 'Inventory Update'))
+        OR (ia.alert_type IN ('Low Stock Alert', 'Near Expired', 'Expired') AND $6 = TRUE)
       )
       ${disallowedTypes.size > 0 ? 'AND NOT (ia.alert_type = ANY($5::text[]))' : ''}
     ORDER BY ia.alert_date DESC;
-  `, disallowedTypes.size > 0
-      ? [userId, branchId, hireDate, userId, Array.from(disallowedTypes)]
-      : [userId, branchId, hireDate, userId]
+    `, disallowedTypes.size > 0
+      ? [userId, branchId, hireDate, userId, Array.from(disallowedTypes), (roleSet.has('Branch Manager') || roleSet.has('Inventory Staff'))]
+      : [userId, branchId, hireDate, userId, (roleSet.has('Branch Manager') || roleSet.has('Inventory Staff'))]
   );
 
   return rows.map((row) => {
@@ -269,9 +270,10 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
           ia.user_id = 0 OR ia.user_id IS NULL
           OR (ia.user_id = $1 AND ia.alert_type NOT IN ('New Sale', 'Delivery Status Update', 'New Delivery', 'Inventory Update'))
           OR (ia.user_id != $1 AND ia.alert_type IN ('New Sale', 'Delivery Status Update', 'New Delivery', 'Inventory Update'))
+          OR (ia.alert_type IN ('Low Stock Alert', 'Near Expired', 'Expired') AND $4 = TRUE)
         )
         AND COALESCE(un.is_read, false) = FALSE
-  `, [userId, branchId, hireDate]);
+  `, [userId, branchId, hireDate, (roleSet.has('Branch Manager') || roleSet.has('Inventory Staff'))]);
 
   if (unreadAlerts.length === 0) {
     return 0;
