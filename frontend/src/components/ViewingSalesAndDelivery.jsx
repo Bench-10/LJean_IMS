@@ -407,7 +407,7 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
       )}
 
       <dialog className="bg-transparent fixed top-0 bottom-0 z-[9999]" open={openModal}>
-        <div className="relative flex flex-col border border-gray-600/40 bg-white h-[95vh] sm:h-[90vh] w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[1100px] max-h-none sm:max-h-[700px] rounded-lg py-2 sm:py-3 md:py-5 px-2 sm:px-3 animate-popup overflow-hidden overflow-y-auto hide-scrollbar">
+        <div className="relative flex flex-col border border-gray-600/40 bg-white h-[95vh] sm:h-[90vh] w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[1100px] lg:max-h-[100vh]  sm:max-h-[700px] rounded-lg py-2 sm:py-3 md:py-5 px-2 sm:px-3 animate-popup overflow-hidden overflow-y-auto hide-scrollbar">
           
           <button
             type="button"
