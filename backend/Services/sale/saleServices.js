@@ -277,7 +277,7 @@ export const addSale = async (headerAndProducts = {}) => {
             try {
                 for (const pid of productsToCheck) {
                     try {
-                        await checkAndHandleLowStock(pid, branchId, { triggeredByUserId: headerInformationAndTotal.userID });
+                        await checkAndHandleLowStock(pid, branchId, { triggeredByUserId: headerInformationAndTotal.userID, triggerUserName: 'System' });
                     } catch (notifyErr) {
                         console.error(`Post-commit checkAndHandleLowStock failed for product=${pid} branch=${branchId}:`, notifyErr?.message || notifyErr);
                         // continue with other products
@@ -604,7 +604,7 @@ export const restoreStockFromSale = async (
 
         const restoredProductIds = [...new Set(stockUsage.map((usage) => usage.product_id))];
         for (const productId of restoredProductIds) {
-            await checkAndHandleLowStock(productId, branchId, { triggeredByUserId: userID });
+            await checkAndHandleLowStock(productId, branchId, { triggeredByUserId: userID, triggerUserName: 'System' });
         }
 
         broadcastValidityUpdate(branchId, {

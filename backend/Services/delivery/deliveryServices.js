@@ -453,7 +453,7 @@ export const setToDelivered = async(saleID, update) => {
             if (branchIdForCheck && productsToCheck && productsToCheck.size > 0) {
                 for (const pid of productsToCheck) {
                     try {
-                        await checkAndHandleLowStock(pid, branchIdForCheck, { broadcast: true });
+                        await checkAndHandleLowStock(pid, branchIdForCheck, { triggeredByUserId: null, triggerUserName: 'System', broadcast: true });
                     } catch (innerErr) {
                         console.error(`Error running low-stock check for product ${pid} after delivery update:`, innerErr);
                     }

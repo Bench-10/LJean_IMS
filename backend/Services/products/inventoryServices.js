@@ -507,7 +507,7 @@ const createPendingInventoryAction = async ({
                         adminNotificationMessage,
                         'orange',
                         managerId || sanitizedPayload?.userID || null,
-                        managerName
+                        'System'
                     ]
                 );
 
@@ -535,7 +535,7 @@ const createPendingInventoryAction = async ({
                 (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 RETURNING *`,
-                [productId ?? sanitizedPayload?.product_id ?? null, branchId, 'Inventory Approval Needed', notificationMessage, 'orange', 0, requesterName]
+                [productId ?? sanitizedPayload?.product_id ?? null, branchId, 'Inventory Approval Needed', notificationMessage, 'orange', 0, 'System']
             );
 
             if (alertResult.rows[0]) {
@@ -545,7 +545,7 @@ const createPendingInventoryAction = async ({
                     message: notificationMessage,
                     banner_color: 'orange',
                     user_id: alertResult.rows[0].user_id,
-                    user_full_name: requesterName,
+                    user_full_name: 'System',
                     alert_date: alertResult.rows[0].alert_date,
                     alert_timestamp: alertResult.rows[0].alert_date,
                     add_stock_id: null,
@@ -864,7 +864,7 @@ export const addProductItem = async (productData, options = {}) => {
         (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
-        [product_id, branch_id, productAddedNotifheader, notifMessage, color, 0, fullName]
+        [product_id, branch_id, productAddedNotifheader, notifMessage, color, 0, 'System']
     );
 
     if (alertResult.rows[0] && addedStockRow?.add_id) {
@@ -895,7 +895,7 @@ export const addProductItem = async (productData, options = {}) => {
             message: notifMessage,
             banner_color: color,
             user_id: alertResult.rows[0].user_id,
-            user_full_name: fullName,
+            user_full_name: 'System',
             alert_date: alertResult.rows[0].alert_date,
             product_id: product_id,
             add_stock_id: addedStockRow?.add_id ?? null,
@@ -903,14 +903,14 @@ export const addProductItem = async (productData, options = {}) => {
             alert_timestamp: alertTimestamp,
             isDateToday: true,
             alert_date_formatted: 'Just now'
-        }, { excludeUserId: requestedBy?.userID });
+        }); // Removed excludeUserId so all users including requester see the new product notification
     }
 
     const newProductRow = await getUpdatedInventoryList(product_id, branch_id);
 
     await checkAndHandleLowStock(product_id, branch_id, {
         triggeredByUserId: userID,
-        triggerUserName: fullName
+        triggerUserName: 'System'
     });
 
     broadcastInventoryUpdate(branch_id, {
@@ -1071,11 +1071,14 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
 
     let alertResult = null;
     let finalMessage = '';
+    let hasQuantityChange = false;
+    let hasInfoChange = false;
 
     let addedStockRow = null;
 
     if (quantity_added !== 0) {
         addedStockRow = await addStocksQuery();
+        hasQuantityChange = true;
     }
 
     if (priceChanged) {
@@ -1087,22 +1090,30 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
         );
     }
 
+    // Build combined message
+    const messages = [];
+
     if (quantity_added !== 0 && priceChanged) {
-        finalMessage = `${addqQuantityNotifMessage} and ${changePriceNotifMessage}`;
+        messages.push(`${addqQuantityNotifMessage} and ${changePriceNotifMessage}`);
     } else if (quantity_added !== 0 && !priceChanged) {
-        finalMessage = addqQuantityNotifMessage;
+        messages.push(addqQuantityNotifMessage);
     } else if (quantity_added === 0 && priceChanged) {
-        finalMessage = changePriceNotifMessage;
+        messages.push(changePriceNotifMessage);
     }
 
-    if (finalMessage) {
-        finalMessage = `${finalMessage}${requestSuffix}`;
+    if (productInfoChanged) {
+        messages.push(`Product information for ${product_name} has been updated.`);
+        hasInfoChange = true;
+    }
+
+    if (messages.length > 0) {
+        finalMessage = messages.join(' ') + requestSuffix;
         alertResult = await SQLquery(
             `INSERT INTO Inventory_Alerts 
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [itemId, returnBranchId, productAddedNotifheader, finalMessage, color, 0, fullName]
+            [itemId, returnBranchId, productAddedNotifheader, finalMessage, color, 0, 'System']
         );
 
         if (alertResult?.rows[0]) {
@@ -1131,7 +1142,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
                 message: finalMessage,
                 banner_color: color,
                 user_id: alertResult.rows[0].user_id,
-                user_full_name: fullName,
+                user_full_name: 'System',
                 alert_date: alertResult.rows[0].alert_date,
                 product_id: itemId,
                 add_stock_id: addedStockRow?.add_id ?? null,
@@ -1139,11 +1150,11 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
                 alert_timestamp: alertTimestamp,
                 isDateToday: true,
                 alert_date_formatted: 'Just now'
-            }, { excludeUserId: requestedBy?.userID });
+            }); // Removed excludeUserId so inventory staff sees the update
         }
 
-        if (requestedBy?.userID) {
-            const approvalMessage = `Your product update request for ${product_name} has been approved by the manager.`;
+        if (requestedBy?.userID && !bypassApproval) {
+            const approvalMessage = `Your product update request for ${product_name} has been approved by the branch manager (${actingUser?.fullName}).`;
             const privateAlert = await createSystemInventoryNotification({
                 productId: itemId,
                 branchId: returnBranchId,
@@ -1179,33 +1190,6 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
             WHERE product_id = $8 AND branch_id = $9 AND max_threshold = $10`,
             [product_name, unit, min_threshold, category_id, unit_cost, unitConversion.base_unit, unitConversion.conversion_factor, itemId, branch_id, max_threshold]
         );
-
-        const updateMessage = `Product information for ${product_name} has been updated.${requestSuffix}`;
-        const infoAlertResult = await SQLquery(
-            `INSERT INTO Inventory_Alerts 
-            (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *`,
-            [itemId, returnBranchId, productAddedNotifheader, updateMessage, color, 0, fullName]
-        );
-
-        if (infoAlertResult.rows[0]) {
-            broadcastNotification(returnBranchId, {
-                alert_id: infoAlertResult.rows[0].alert_id,
-                alert_type: productAddedNotifheader,
-                message: updateMessage,
-                banner_color: color,
-                user_id: infoAlertResult.rows[0].user_id,
-                user_full_name: fullName,
-                alert_date: infoAlertResult.rows[0].alert_date,
-                product_id: itemId,
-                add_stock_id: null,
-                history_timestamp: null,
-                alert_timestamp: infoAlertResult.rows[0].alert_date,
-                isDateToday: true,
-                alert_date_formatted: 'Just now'
-            }, { excludeUserId: requestedBy?.userID });
-        }
     }
 
     await SQLquery('COMMIT');
@@ -1214,7 +1198,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
 
     await checkAndHandleLowStock(itemId, branch_id, {
         triggeredByUserId: userID,
-        triggerUserName: fullName
+        triggerUserName: 'System'
     });
 
     broadcastInventoryUpdate(branch_id, {
@@ -1502,7 +1486,7 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
         const productName = productPayload.product_name || 'Inventory item';
 
         if (requestedBy.userID) {
-            const approvalMessage = `Your inventory request for ${productName} has been approved by the owner.`;
+            const approvalMessage = `Your inventory request for owner acceptance has been approved by the owner (${adminName}).`;
             const privateAlert = await createSystemInventoryNotification({
                 productId: pending.product_id || productPayload.product_id || null,
                 branchId: pending.branch_id,
@@ -1527,8 +1511,9 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
             }
         }
 
-        if (pending.manager_approver_id) {
-            const managerApprovalMessage = `${productName} was approved by the owner.`;
+        // Only send manager notification if the manager is different from the requester
+        if (pending.manager_approver_id && pending.manager_approver_id !== requestedBy.userID) {
+            const managerApprovalMessage = `${productName} was approved by the owner (${adminName}).`;
             const managerAlert = await createSystemInventoryNotification({
                 productId: pending.product_id || productPayload.product_id || null,
                 branchId: pending.branch_id,
@@ -1588,14 +1573,14 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
         };
         const productName = productPayload.product_name || 'Inventory item';
         const requesterName = requestedBy.fullName || 'Inventory staff member';
-        const message = `${approverName || 'Branch Manager'} approved ${productName}. Awaiting owner confirmation.`;
+        const message = `System approved ${productName}. Awaiting owner confirmation.`;
 
         const alertResult = await SQLquery(
             `INSERT INTO Inventory_Alerts 
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [pending.product_id || productPayload.product_id || null, pending.branch_id, 'Inventory Admin Approval Needed', message, 'orange', approverId, approverName]
+            [pending.product_id || productPayload.product_id || null, pending.branch_id, 'Inventory Admin Approval Needed', message, 'orange', approverId, 'System']
         );
 
         if (alertResult.rows[0]) {
@@ -1616,7 +1601,7 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
             broadcastToUser(requestedBy.userID, {
                 alert_id: `inventory-forwarded-${pendingId}-${Date.now()}`,
                 alert_type: 'Inventory Request Forwarded',
-                message: `${productName} was approved by ${approverName || 'Branch Manager'} and is awaiting owner approval.`,
+                message: `${productName} was approved by System and is awaiting owner approval.`,
                 banner_color: 'blue',
                 created_at: new Date().toISOString()
             });
@@ -1695,7 +1680,7 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
 
     if (requestedBy.userID) {
         const productName = productPayload.product_name || 'Inventory item';
-        const approvalMessage = `Your product update request for ${productName} has been approved by the manager.`;
+        const approvalMessage = `Your product update request for ${productName} has been approved by the branch manager (${approverName}).`;
         const privateAlert = await createSystemInventoryNotification({
             productId: pending.product_id || productPayload.product_id || null,
             branchId: pending.branch_id,
@@ -1756,6 +1741,8 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
             throw new Error('Pending inventory request is not awaiting owner approval');
         }
 
+        const adminName = await getAdminFullName(approverId);
+
         const { rows } = await SQLquery(
             `UPDATE Inventory_Pending_Actions
              SET status = 'rejected',
@@ -1779,13 +1766,13 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
         });
 
         const rejectionMessage = reason
-            ? `Inventory request was rejected by the owner: ${reason}`
-            : 'Inventory request was rejected by the owner.';
+            ? `Inventory request was rejected by the owner (${adminName}): ${reason}`
+            : `Inventory request was rejected by the owner (${adminName}).`;
 
         if (requestedBy.userID) {
             const privateRejectionMessage = reason
-                ? `Your inventory request was rejected by the owner: ${reason}`
-                : 'Your inventory request was rejected by the owner.';
+                ? `Your inventory request was rejected by the owner (${adminName}): ${reason}`
+                : `Your inventory request was rejected by the owner (${adminName}).`;
             let persistedRejectionNotification = null;
             try {
                 persistedRejectionNotification = await createSystemInventoryNotification({
@@ -1818,7 +1805,8 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
             }, { persist: false });
         }
 
-        if (pending.manager_approver_id) {
+        // Only send manager notification if the manager is different from the requester
+        if (pending.manager_approver_id && pending.manager_approver_id !== requestedBy.userID) {
             const managerRejectionMessage = rejectionMessage;
             let managerRejectionNotification = null;
             try {
@@ -1885,9 +1873,10 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
 
     if (requestedBy.userID) {
         const productName = pending.payload?.productData?.product_name || 'inventory item';
+        const approverName = await getUserFullName(approverId);
         const rejectionMessage = reason 
-            ? `Your request to ${pending.action_type} ${productName} was rejected by the branch manager: ${reason}`
-            : `Your request to ${pending.action_type} ${productName} was rejected by the branch manager.`;
+            ? `Your request to ${pending.action_type} ${productName} was rejected by the branch manager (${approverName}): ${reason}`
+            : `Your request to ${pending.action_type} ${productName} was rejected by the branch manager (${approverName}).`;
 
         let persistedRejectionNotification = null;
         try {

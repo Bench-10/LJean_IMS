@@ -465,7 +465,8 @@ export const markAllRead = async (req, res) => {
             userId: user_id,
             branchId: branch_id,
             hireDate: hire_date,
-            userType: 'user'
+            userType: 'user',
+            roles: req.user.role
         });
 
         res.status(200).json({ 

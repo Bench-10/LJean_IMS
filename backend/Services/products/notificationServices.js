@@ -229,7 +229,7 @@ export const markAsRead = async (userAndAlertID) =>{
 };
 
 //MARKS ALL NOTIFICATIONS AS READ FOR A USER
-export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'user', adminId = null }) => {
+export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'user', adminId = null, roles = [] }) => {
   if (userType === 'admin' && adminId) {
     const { rows: adminAlerts } = await SQLquery(`
       SELECT alert_id
@@ -252,6 +252,9 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
 
     return adminAlerts.length;
   }
+
+  const normalizedRoles = normalizeRoles(roles);
+  const roleSet = new Set(normalizedRoles);
 
   const { rows: unreadAlerts } = await SQLquery(`
       SELECT ia.alert_id
