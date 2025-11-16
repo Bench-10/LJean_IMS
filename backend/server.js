@@ -19,6 +19,7 @@ import cron from "node-cron";
 import { notifyProductShelfLife } from './Services/Services_Utils/productValidityNotification.js';
 import { loadUnitConversionCache } from './Services/Services_Utils/unitConversion.js';
 import { SQLquery } from './db.js';
+import { createSystemInventoryNotification } from './Services/products/inventoryServices.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -340,11 +341,14 @@ const extractTargetRoles = (notification, options = {}) => {
   return normalized.length > 0 ? normalized : null;
 };
 
-const dispatchRoleBasedNotification = ({ branchId = null, notification, category = 'inventory', targetRoles = null }) => {
+const dispatchRoleBasedNotification = ({ branchId = null, notification, category = 'inventory', targetRoles = null, excludeUserId = null }) => {
   const normalizedCategory = category;
   const normalizedTargetRoles = targetRoles ? normalizeRoles(targetRoles) : null;
 
   for (const [socketId, subscriber] of connectedUsers.entries()) {
+    if (excludeUserId && String(subscriber.userId) === String(excludeUserId)) {
+      continue;
+    }
     if (shouldDispatchNotification(subscriber, {
       category: normalizedCategory,
       branchId,
@@ -468,7 +472,8 @@ export const broadcastNotification = (branchId, notification, options = {}) => {
     branchId,
     notification,
     category,
-    targetRoles
+    targetRoles,
+    excludeUserId: options.excludeUserId
   });
 };
 
@@ -534,8 +539,47 @@ export const broadcastUserStatusUpdate = (branchId, statusData) => {
 
 
 // SENDS NOTIFICATION TO SPECIFIC USER
-export const broadcastToUser = (userId, notification, options = {}) => {
+export const broadcastToUser = async (userId, notification, options = {}) => {
   const targetType = options.userType ?? 'user';
+
+  // Persist notification to database if requested
+  if (options.persist !== false) { // Default to true for persistence
+    try {
+      // Get user's branch information for persistence
+      let userBranchId = null;
+      if (targetType === 'user') {
+        const userResult = await SQLquery(
+          'SELECT branch_id FROM Users WHERE user_id = $1',
+          [userId]
+        );
+        if (userResult.rows.length > 0) {
+          userBranchId = userResult.rows[0].branch_id;
+        }
+      }
+
+      if (userBranchId) {
+        const persistedNotification = await createSystemInventoryNotification({
+          productId: notification.product_id || null,
+          branchId: userBranchId,
+          alertType: notification.alert_type || notification.type || 'System Notification',
+          message: notification.message,
+          bannerColor: notification.banner_color || 'blue',
+          targetUserId: userId
+        });
+
+        // Update notification with persisted data
+        notification.alert_id = persistedNotification.alert_id;
+        notification.alert_date = persistedNotification.alert_date;
+        notification.isDateToday = true;
+        notification.alert_date_formatted = 'Just now';
+      }
+    } catch (error) {
+      console.error('Failed to persist notification for user', userId, ':', error);
+      // Continue with broadcasting even if persistence fails
+    }
+  }
+
+  // Broadcast to connected user
   for (const [socketId, userData] of connectedUsers) {
     if (userData.userType === targetType && String(userData.userId) === String(userId)) {
       io.to(socketId).emit('new-notification', notification);

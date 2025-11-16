@@ -1087,11 +1087,21 @@ function App() {
           : false;
 
         if (!alreadyExists && !isSelfNotification) {
-          return dedupeNotifications([notification, ...prevNotify]);
+          // Add isDateToday: true for WebSocket notifications to place them in Today section
+          const notificationWithDate = {
+            ...notification,
+            isDateToday: true
+          };
+          return dedupeNotifications([notificationWithDate, ...prevNotify]);
         }
 
         if (!incomingAlertId) {
-          return dedupeNotifications([notification, ...prevNotify]);
+          // Add isDateToday: true for WebSocket notifications to place them in Today section
+          const notificationWithDate = {
+            ...notification,
+            isDateToday: true
+          };
+          return dedupeNotifications([notificationWithDate, ...prevNotify]);
         }
 
         return prevNotify;

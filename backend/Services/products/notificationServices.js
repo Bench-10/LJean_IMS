@@ -154,7 +154,7 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
     ) un ON TRUE
     WHERE ia.branch_id = $2
       AND ia.alert_date >= $3
-      AND ia.user_id != $4
+      AND (ia.user_id = 0 OR ia.user_id IS NULL OR ia.user_id = $4)
       ${disallowedTypes.size > 0 ? 'AND NOT (ia.alert_type = ANY($5::text[]))' : ''}
     ORDER BY ia.alert_date DESC;
   `, disallowedTypes.size > 0
@@ -243,7 +243,7 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
       ) un ON TRUE
       WHERE ia.branch_id = $2
         AND ia.alert_date >= $3
-        AND ia.user_id != $1
+        AND (ia.user_id = 0 OR ia.user_id IS NULL OR ia.user_id = $1)
         AND COALESCE(un.is_read, false) = FALSE
   `, [userId, branchId, hireDate]);
 

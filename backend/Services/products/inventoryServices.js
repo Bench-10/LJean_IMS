@@ -26,12 +26,13 @@ const normalizeWhitespace = (value) => typeof value === 'string' ? value.replace
 const normalizeProductNameKey = (value) => normalizeWhitespace(value).toLowerCase();
 
 
-const createSystemInventoryNotification = async ({
+export const createSystemInventoryNotification = async ({
     productId = null,
     branchId,
     alertType,
     message,
-    bannerColor = 'blue'
+    bannerColor = 'blue',
+    targetUserId = null
 }) => {
     if (!branchId || !alertType || !message) {
         return null;
@@ -42,7 +43,7 @@ const createSystemInventoryNotification = async ({
          (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING alert_id, alert_date` ,
-        [productId, branchId, alertType, message, bannerColor, 0, 'System']
+        [productId, branchId, alertType, message, bannerColor, targetUserId || 0, 'System']
     );
 
     if (alertResult.rowCount === 0) {
@@ -106,6 +107,16 @@ const sanitizeProductPayload = (productData) => {
         sanitizedUnitPrice = Number(productData.unit_price);
     }
 
+    let dateAdded = productData.date_added;
+    if (!dateAdded || (typeof dateAdded === 'string' && dateAdded.trim() === '')) {
+        dateAdded = new Date().toISOString();
+    }
+
+    let productValidity = productData.product_validity;
+    if (!productValidity || productValidity === '' || (typeof productValidity === 'string' && productValidity.trim() === '')) {
+        productValidity = '9999-12-31';
+    }
+
     return {
         product_id: productData.product_id ?? null,
     product_name: sanitizedName,
@@ -117,8 +128,8 @@ const sanitizeProductPayload = (productData) => {
         quantity_added: Number(productData.quantity_added),
         min_threshold: Number(productData.min_threshold),
         max_threshold: Number(productData.max_threshold),
-        date_added: productData.date_added,
-        product_validity: productData.product_validity,
+        date_added: dateAdded,
+        product_validity: productValidity,
         userID: productData.userID,
         fullName: productData.fullName,
         requestor_roles: normalizeRoles(productData.requestor_roles || productData.userRoles),
@@ -524,7 +535,7 @@ const createPendingInventoryAction = async ({
                 (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 RETURNING *`,
-                [productId ?? sanitizedPayload?.product_id ?? null, branchId, 'Inventory Approval Needed', notificationMessage, 'orange', sanitizedPayload?.userID || null, requesterName]
+                [productId ?? sanitizedPayload?.product_id ?? null, branchId, 'Inventory Approval Needed', notificationMessage, 'orange', 0, requesterName]
             );
 
             if (alertResult.rows[0]) {
@@ -853,7 +864,7 @@ export const addProductItem = async (productData, options = {}) => {
         (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
-        [product_id, branch_id, productAddedNotifheader, notifMessage, color, userID, fullName]
+        [product_id, branch_id, productAddedNotifheader, notifMessage, color, 0, fullName]
     );
 
     if (alertResult.rows[0] && addedStockRow?.add_id) {
@@ -892,7 +903,7 @@ export const addProductItem = async (productData, options = {}) => {
             alert_timestamp: alertTimestamp,
             isDateToday: true,
             alert_date_formatted: 'Just now'
-        });
+        }, { excludeUserId: requestedBy?.userID });
     }
 
     const newProductRow = await getUpdatedInventoryList(product_id, branch_id);
@@ -912,7 +923,7 @@ export const addProductItem = async (productData, options = {}) => {
     const categoryName = await getCategoryName(category_id);
     const addedDateObj = new Date(date_added);
 
-    if (product_validity) {
+    if (product_validity && product_validity !== '9999-12-31') {
         const validityDateObj = new Date(product_validity);
         const currentDate = new Date();
         
@@ -1091,7 +1102,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [itemId, returnBranchId, productAddedNotifheader, finalMessage, color, userID, fullName]
+            [itemId, returnBranchId, productAddedNotifheader, finalMessage, color, 0, fullName]
         );
 
         if (alertResult?.rows[0]) {
@@ -1128,7 +1139,33 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
                 alert_timestamp: alertTimestamp,
                 isDateToday: true,
                 alert_date_formatted: 'Just now'
+            }, { excludeUserId: requestedBy?.userID });
+        }
+
+        if (requestedBy?.userID) {
+            const approvalMessage = `Your product update request for ${product_name} has been approved by the manager.`;
+            const privateAlert = await createSystemInventoryNotification({
+                productId: itemId,
+                branchId: returnBranchId,
+                alertType: 'Product Update Approved',
+                message: approvalMessage,
+                bannerColor: 'blue',
+                targetUserId: requestedBy.userID
             });
+
+            if (privateAlert) {
+                broadcastToUser(requestedBy.userID, {
+                    alert_id: privateAlert.alert_id,
+                    alert_type: 'Product Update Approved',
+                    message: approvalMessage,
+                    banner_color: 'blue',
+                    user_full_name: 'System',
+                    alert_date: privateAlert.alert_date,
+                    product_id: itemId,
+                    isDateToday: true,
+                    alert_date_formatted: 'Just now'
+                }, { persist: false }); // Skip persistence since already created
+            }
         }
     }
 
@@ -1149,7 +1186,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [itemId, returnBranchId, productAddedNotifheader, updateMessage, color, userID, fullName]
+            [itemId, returnBranchId, productAddedNotifheader, updateMessage, color, 0, fullName]
         );
 
         if (infoAlertResult.rows[0]) {
@@ -1167,7 +1204,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
                 alert_timestamp: infoAlertResult.rows[0].alert_date,
                 isDateToday: true,
                 alert_date_formatted: 'Just now'
-            });
+            }, { excludeUserId: requestedBy?.userID });
         }
     }
 
@@ -1191,7 +1228,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
         const categoryName = await getCategoryName(category_id);
         const addedDateObj = new Date(date_added);
 
-        if (product_validity) {
+        if (product_validity && product_validity !== '9999-12-31') {
             const validityDateObj = new Date(product_validity);
             const currentDate = new Date();
             const daysUntilExpiry = Math.ceil((validityDateObj - currentDate) / (1000 * 60 * 60 * 24));
@@ -1463,43 +1500,58 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
         });
 
         const productName = productPayload.product_name || 'Inventory item';
-    const notificationRecipients = [...new Set([requestedBy.userID, pending.manager_approver_id].filter(Boolean))];
-        let persistedApprovalNotification = null;
 
-        if (notificationRecipients.length > 0) {
-            try {
-                persistedApprovalNotification = await createSystemInventoryNotification({
-                    productId: pending.product_id || productPayload.product_id || null,
-                    branchId: pending.branch_id,
-                    alertType: 'Inventory Request Approved',
-                    message: `${productName} was approved by the owner.`,
-                    bannerColor: 'green'
-                });
-            } catch (error) {
-                console.error('Failed to persist owner approval notification', {
-                    pendingId,
-                    error: error?.message || error
-                });
+        if (requestedBy.userID) {
+            const approvalMessage = `Your inventory request for ${productName} has been approved by the owner.`;
+            const privateAlert = await createSystemInventoryNotification({
+                productId: pending.product_id || productPayload.product_id || null,
+                branchId: pending.branch_id,
+                alertType: 'Inventory Request Approved',
+                message: approvalMessage,
+                bannerColor: 'green',
+                targetUserId: requestedBy.userID
+            });
+
+            if (privateAlert) {
+                broadcastToUser(requestedBy.userID, {
+                    alert_id: privateAlert.alert_id,
+                    alert_type: 'Inventory Request Approved',
+                    message: approvalMessage,
+                    banner_color: 'green',
+                    user_full_name: 'System',
+                    alert_date: privateAlert.alert_date,
+                    product_id: pending.product_id || productPayload.product_id || null,
+                    isDateToday: true,
+                    alert_date_formatted: 'Just now'
+                }, { persist: false });
             }
         }
 
-        const approvalTimestamp = persistedApprovalNotification?.alert_date || new Date().toISOString();
+        if (pending.manager_approver_id) {
+            const managerApprovalMessage = `${productName} was approved by the owner.`;
+            const managerAlert = await createSystemInventoryNotification({
+                productId: pending.product_id || productPayload.product_id || null,
+                branchId: pending.branch_id,
+                alertType: 'Inventory Request Approved',
+                message: managerApprovalMessage,
+                bannerColor: 'green',
+                targetUserId: pending.manager_approver_id
+            });
 
-        const realTimeApprovalPayload = {
-            alert_id: persistedApprovalNotification?.alert_id || `inventory-final-approved-${pendingId}-${Date.now()}`,
-            alert_type: 'Inventory Request Approved',
-            message: `${productName} was approved by the owner.`,
-            banner_color: 'green',
-            created_at: approvalTimestamp,
-            alert_date: approvalTimestamp,
-            user_full_name: 'System',
-            isDateToday: true,
-            alert_date_formatted: 'Just now'
-        };
-
-        notificationRecipients.forEach(userId => {
-            broadcastToUser(userId, { ...realTimeApprovalPayload });
-        });
+            if (managerAlert) {
+                broadcastToUser(pending.manager_approver_id, {
+                    alert_id: managerAlert.alert_id,
+                    alert_type: 'Inventory Request Approved',
+                    message: managerApprovalMessage,
+                    banner_color: 'green',
+                    user_full_name: 'System',
+                    alert_date: managerAlert.alert_date,
+                    product_id: pending.product_id || productPayload.product_id || null,
+                    isDateToday: true,
+                    alert_date_formatted: 'Just now'
+                }, { persist: false });
+            }
+        }
 
 
         return {
@@ -1642,13 +1694,30 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
     });
 
     if (requestedBy.userID) {
-        broadcastToUser(requestedBy.userID, {
-            alert_id: `inventory-approval-${pendingId}-${Date.now()}`,
-            alert_type: 'Inventory Request Approved',
-            message: `${productPayload.product_name || 'Inventory item'} request has been approved by ${approverName || 'Branch Manager'}.`,
-            banner_color: 'green',
-            created_at: new Date().toISOString()
+        const productName = productPayload.product_name || 'Inventory item';
+        const approvalMessage = `Your product update request for ${productName} has been approved by the manager.`;
+        const privateAlert = await createSystemInventoryNotification({
+            productId: pending.product_id || productPayload.product_id || null,
+            branchId: pending.branch_id,
+            alertType: 'Product Update Approved',
+            message: approvalMessage,
+            bannerColor: 'blue',
+            targetUserId: requestedBy.userID
         });
+
+        if (privateAlert) {
+            broadcastToUser(requestedBy.userID, {
+                alert_id: privateAlert.alert_id,
+                alert_type: 'Product Update Approved',
+                message: approvalMessage,
+                banner_color: 'blue',
+                user_full_name: 'System',
+                alert_date: privateAlert.alert_date,
+                product_id: pending.product_id || productPayload.product_id || null,
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            }, { persist: false }); // Skip persistence since already created
+        }
     }
 
     return {
@@ -1713,17 +1782,19 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
             ? `Inventory request was rejected by the owner: ${reason}`
             : 'Inventory request was rejected by the owner.';
 
-    const rejectionRecipients = [...new Set([requestedBy.userID, pending.manager_approver_id].filter(Boolean))];
-        let persistedRejectionNotification = null;
-
-        if (rejectionRecipients.length > 0) {
+        if (requestedBy.userID) {
+            const privateRejectionMessage = reason
+                ? `Your inventory request was rejected by the owner: ${reason}`
+                : 'Your inventory request was rejected by the owner.';
+            let persistedRejectionNotification = null;
             try {
                 persistedRejectionNotification = await createSystemInventoryNotification({
                     productId: pending.product_id || null,
                     branchId: pending.branch_id,
                     alertType: 'Inventory Request Rejected',
-                    message: rejectionMessage,
-                    bannerColor: 'red'
+                    message: privateRejectionMessage,
+                    bannerColor: 'red',
+                    targetUserId: requestedBy.userID
                 });
             } catch (error) {
                 console.error('Failed to persist owner rejection notification', {
@@ -1731,25 +1802,55 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
                     error: error?.message || error
                 });
             }
+
+            const rejectionTimestamp = persistedRejectionNotification?.alert_date || new Date().toISOString();
+
+            broadcastToUser(requestedBy.userID, {
+                alert_id: persistedRejectionNotification?.alert_id || `inventory-admin-reject-${pendingId}-${Date.now()}`,
+                alert_type: 'Inventory Request Rejected',
+                message: privateRejectionMessage,
+                banner_color: 'red',
+                created_at: rejectionTimestamp,
+                alert_date: rejectionTimestamp,
+                user_full_name: 'System',
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            }, { persist: false });
         }
 
-        const rejectionTimestamp = persistedRejectionNotification?.alert_date || new Date().toISOString();
+        if (pending.manager_approver_id) {
+            const managerRejectionMessage = rejectionMessage;
+            let managerRejectionNotification = null;
+            try {
+                managerRejectionNotification = await createSystemInventoryNotification({
+                    productId: pending.product_id || null,
+                    branchId: pending.branch_id,
+                    alertType: 'Inventory Request Rejected',
+                    message: managerRejectionMessage,
+                    bannerColor: 'red',
+                    targetUserId: pending.manager_approver_id
+                });
+            } catch (error) {
+                console.error('Failed to persist manager rejection notification', {
+                    pendingId,
+                    error: error?.message || error
+                });
+            }
 
-        const realTimeRejectionPayload = {
-            alert_id: persistedRejectionNotification?.alert_id || `inventory-admin-reject-${pendingId}-${Date.now()}`,
-            alert_type: 'Inventory Request Rejected',
-            message: rejectionMessage,
-            banner_color: 'red',
-            created_at: rejectionTimestamp,
-            alert_date: rejectionTimestamp,
-            user_full_name: 'System',
-            isDateToday: true,
-            alert_date_formatted: 'Just now'
-        };
+            const rejectionTimestamp = managerRejectionNotification?.alert_date || new Date().toISOString();
 
-        rejectionRecipients.forEach(userId => {
-            broadcastToUser(userId, { ...realTimeRejectionPayload });
-        });
+            broadcastToUser(pending.manager_approver_id, {
+                alert_id: managerRejectionNotification?.alert_id || `inventory-admin-reject-manager-${pendingId}-${Date.now()}`,
+                alert_type: 'Inventory Request Rejected',
+                message: managerRejectionMessage,
+                banner_color: 'red',
+                created_at: rejectionTimestamp,
+                alert_date: rejectionTimestamp,
+                user_full_name: 'System',
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            }, { persist: false });
+        }
 
         return mapPendingRequest(updated);
     }
@@ -1783,15 +1884,41 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
     });
 
     if (requestedBy.userID) {
-        const rejectionMessage = reason ? `Inventory request was rejected: ${reason}` : 'Inventory request was rejected by the branch manager.';
+        const productName = pending.payload?.productData?.product_name || 'inventory item';
+        const rejectionMessage = reason 
+            ? `Your request to ${pending.action_type} ${productName} was rejected by the branch manager: ${reason}`
+            : `Your request to ${pending.action_type} ${productName} was rejected by the branch manager.`;
+
+        let persistedRejectionNotification = null;
+        try {
+            persistedRejectionNotification = await createSystemInventoryNotification({
+                productId: pending.product_id || null,
+                branchId: pending.branch_id,
+                alertType: 'Inventory Request Rejected',
+                message: rejectionMessage,
+                bannerColor: 'red',
+                targetUserId: requestedBy.userID
+            });
+        } catch (error) {
+            console.error('Failed to persist branch manager rejection notification', {
+                pendingId,
+                error: error?.message || error
+            });
+        }
+
+        const rejectionTimestamp = persistedRejectionNotification?.alert_date || new Date().toISOString();
 
         broadcastToUser(requestedBy.userID, {
-            alert_id: `inventory-reject-${pendingId}-${Date.now()}`,
+            alert_id: persistedRejectionNotification?.alert_id || `inventory-reject-${pendingId}-${Date.now()}`,
             alert_type: 'Inventory Request Rejected',
             message: rejectionMessage,
             banner_color: 'red',
-            created_at: new Date().toISOString()
-        });
+            created_at: rejectionTimestamp,
+            alert_date: rejectionTimestamp,
+            user_full_name: 'System',
+            isDateToday: true,
+            alert_date_formatted: 'Just now'
+        }, { persist: false }); // Skip persistence since already created
     }
 
     return mapPendingRequest(updated);
