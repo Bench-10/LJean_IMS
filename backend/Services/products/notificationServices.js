@@ -117,7 +117,25 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
   }
 
   // Filter sales and delivery notifications by role
-  if (!roleSet.has('Sales Associate')) {
+  if (roleSet.has('Sales Associate')) {
+    // Sales associates should only see sales-related notifications
+    disallowedTypes.add('New Product');
+    disallowedTypes.add('Product Update');
+    disallowedTypes.add('Inventory Approval Needed');
+    disallowedTypes.add('Inventory Admin Approval Needed');
+    disallowedTypes.add('Product Update Approved');
+    disallowedTypes.add('Inventory Request Approved');
+    disallowedTypes.add('Inventory Request Rejected');
+    disallowedTypes.add('Inventory Update');
+    disallowedTypes.add('Near Expired');
+    disallowedTypes.add('Expired');
+    disallowedTypes.add('Low Stock Alert');
+    
+
+  }
+
+  if (roleSet.has('Branch Manager') || roleSet.has('Inventory Staff')) {
+    // Branch managers and inventory staff should not see sales and delivery notifications
     disallowedTypes.add('New Sale');
     disallowedTypes.add('Delivery Status Update');
     disallowedTypes.add('New Delivery');
@@ -154,7 +172,11 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
     ) un ON TRUE
     WHERE ia.branch_id = $2
       AND ia.alert_date >= $3
-      AND (ia.user_id = 0 OR ia.user_id IS NULL OR ia.user_id = $4)
+      AND (
+        ia.user_id = 0 OR ia.user_id IS NULL
+        OR (ia.user_id = $4 AND ia.alert_type NOT IN ('New Sale', 'Delivery Status Update', 'New Delivery', 'Inventory Update'))
+        OR (ia.user_id != $4 AND ia.alert_type IN ('New Sale', 'Delivery Status Update', 'New Delivery', 'Inventory Update'))
+      )
       ${disallowedTypes.size > 0 ? 'AND NOT (ia.alert_type = ANY($5::text[]))' : ''}
     ORDER BY ia.alert_date DESC;
   `, disallowedTypes.size > 0
@@ -243,7 +265,11 @@ export const markAllAsRead = async ({ userId, branchId, hireDate, userType = 'us
       ) un ON TRUE
       WHERE ia.branch_id = $2
         AND ia.alert_date >= $3
-        AND (ia.user_id = 0 OR ia.user_id IS NULL OR ia.user_id = $1)
+        AND (
+          ia.user_id = 0 OR ia.user_id IS NULL
+          OR (ia.user_id = $1 AND ia.alert_type NOT IN ('New Sale', 'Delivery Status Update', 'New Delivery', 'Inventory Update'))
+          OR (ia.user_id != $1 AND ia.alert_type IN ('New Sale', 'Delivery Status Update', 'New Delivery', 'Inventory Update'))
+        )
         AND COALESCE(un.is_read, false) = FALSE
   `, [userId, branchId, hireDate]);
 

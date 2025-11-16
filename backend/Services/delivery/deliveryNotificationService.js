@@ -82,7 +82,7 @@ export const createDeliveryNotification = async (notificationData) => {
                 },
                 target_roles: targetRoles,
                 creator_id: creatorId
-            }, { category });
+            }, { category, excludeUserId: creatorId });
 
             console.log(`📡 Delivery notification broadcast via WebSocket to branch ${branchId}`);
             

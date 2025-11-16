@@ -452,7 +452,7 @@ function App() {
   const isBranchManager = useMemo(() => userRoles.includes('Branch Manager'), [userRoles]);
   const isSalesAssociate = useMemo(() => userRoles.includes('Sales Associate'), [userRoles]);
   const shouldFetchNotifications = useMemo(
-    () => userRoles.some(role => ['Branch Manager', 'Inventory Staff', 'Owner'].includes(role)),
+    () => userRoles.some(role => ['Branch Manager', 'Inventory Staff', 'Owner', 'Sales Associate'].includes(role)),
     [userRoles]
   );
   const canOpenRequestMonitor = useMemo(

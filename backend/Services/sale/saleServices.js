@@ -400,7 +400,7 @@ export const addSale = async (headerAndProducts = {}) => {
                         target_roles: ['Sales Associate'],
                         creator_id: headerInformationAndTotal.userID
                     },
-                    { category: 'sales' }
+                    { category: 'sales', excludeUserId: headerInformationAndTotal.userID }
                 );
             }
 

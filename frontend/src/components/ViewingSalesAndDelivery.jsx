@@ -597,7 +597,7 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
                       soldItems.map((item, itemIndex) => (
                         <tr key={itemIndex} className="hover:bg-gray-50 text-xs sm:text-sm">
                           <td className="px-2 md:px-3 py-2 text-left">{item.product_name}</td>
-                          <td className="px-2 md:px-3 py-2 text-center">{formatDisplayNumber(item.quantitY)}</td>
+                          <td className="px-2 md:px-3 py-2 text-center">{formatDisplayNumber(item.quantity)}</td>
                           <td className="px-2 md:px-3 py-2 text-center">{item.unit}</td>
                           {type === "sales" && (
                             <>
