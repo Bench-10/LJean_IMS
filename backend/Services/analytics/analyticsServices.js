@@ -154,11 +154,11 @@ function computeHistoryStart(start, end, interval) {
 }
 
 
-const RESTORED_SALES_FILTER = `NOT EXISTS (
-    SELECT 1 FROM Sales_Stock_Usage ssu 
-    WHERE ssu.sales_information_id = s.sales_information_id 
-    AND ssu.is_restored = true
-  )`;
+const RESTORED_SALES_FILTER = `(s.is_for_delivery = false OR EXISTS (
+    SELECT 1 FROM Delivery d 
+    WHERE d.sales_information_id = s.sales_information_id 
+    AND (COALESCE(d.is_delivered,false) = true OR COALESCE(d.is_pending,false) = true)
+  ))`;
 
 const ANALYTICS_CACHE_TTL_MS = 2 * 60 * 1000;
 const ANALYTICS_CACHE_MAX_ENTRIES = 128;
