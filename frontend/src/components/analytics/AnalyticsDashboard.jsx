@@ -954,6 +954,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
   const fetchKPIsData = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
+    console.log('[AnalyticsDashboard] fetchKPIsData called with silent:', silent);
     const params = {
       start_date: resolvedRange.start_date,
       end_date: resolvedRange.end_date,
@@ -974,6 +975,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
     const cached = getCachedValue('kpis', cacheParams);
     if (cached) {
+      console.log('[AnalyticsDashboard] Using cached KPI data:', cached);
       setKpis(maybeDecompress(cached));
       if (silent) {
         fetchAndCache('kpis', cacheParams, async () => {
@@ -987,6 +989,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
             prev_total_profit: 0,
             inventory_count: 0
           };
+          console.log('[AnalyticsDashboard] Background refresh fetched new KPI data:', payload);
           return maybeCompress(payload);
         }, { forceRefresh: true, background: true })
           .then((data) => { if (data) setKpis(maybeDecompress(data)); })
@@ -1010,6 +1013,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
           prev_total_profit: 0,
           inventory_count: 0
         };
+        console.log('[AnalyticsDashboard] Fetched fresh KPI data:', payload);
         return maybeCompress(payload);
       }, silent ? { forceRefresh: true, background: true } : undefined);
       setKpis(maybeDecompress(data));
@@ -1068,7 +1072,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     };
   }, [deliveryInterval]);
 
-  const loadDeliveryChunk = useCallback(async ({ cursor = 0, mode = 'replace', signal, silent = false } = {}) => {
+  const loadDeliveryChunk = useCallback(async ({ cursor = 0, mode = 'replace', signal, silent = false, forceRefresh = false } = {}) => {
     if (!user) return;
     const range = computeDeliveryRange(cursor);
     if (!range) return;
@@ -1092,9 +1096,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         end: range.end_date
       };
 
-      const cached = getCachedValue('delivery', cacheParams);
-      if (cached) {
-        return maybeDecompress(cached);
+      if (!forceRefresh) {
+        const cached = getCachedValue('delivery', cacheParams);
+        if (cached) {
+          return maybeDecompress(cached);
+        }
       }
 
       const result = await fetchAndCache(
@@ -1115,7 +1121,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
           }));
           const metaPayload = payload?.meta ?? {};
           return maybeCompress({ data: filled, meta: metaPayload });
-        }
+        },
+        forceRefresh ? { forceRefresh: true } : undefined
       );
 
       return maybeDecompress(result);
@@ -1314,20 +1321,30 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       fetchInventoryLevels(c.signal, { silent: true });
       fetchCategoryDistribution(c.signal, { silent: true });
       fetchTopProductsData(c.signal, { silent: true });
+      fetchKPIsData(c.signal, { silent: true });
     };
-    const onDelivery = () => {
+    const onDelivery = (options = {}) => {
       const c = new AbortController();
-      loadDeliveryChunk({ cursor: deliveryOldestCursor || 0, mode: 'replace', signal: c.signal, silent: true });
+      loadDeliveryChunk({
+        cursor: deliveryOldestCursor || 0,
+        mode: 'replace',
+        signal: c.signal,
+        silent: true,
+        forceRefresh: options.forceRefresh === true
+      });
     };
 
     const saleHandler = (e) => {
       const action = e?.detail?.action;
       onSale();
       if (action && (action.includes('delivery') || action === 'delivery_status_change')) {
-        onDelivery();
+        onDelivery({ forceRefresh: true });
       }
     };
-    const inventoryHandler = () => onInventory();
+    const inventoryHandler = () => {
+    console.log('[AnalyticsDashboard] Received analytics-inventory-update event, calling fetchKPIsData');
+    onInventory();
+  };
 
     window.addEventListener('analytics-sale-update', saleHandler);
     window.addEventListener('analytics-inventory-update', inventoryHandler);

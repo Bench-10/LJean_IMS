@@ -1113,12 +1113,19 @@ function App() {
     // LISTEN FOR INVENTORY UPDATES
     newSocket.on('inventory-update', (inventoryData) => {
       console.log('Inventory update received:', inventoryData);
-      
-      // ONLY UPDATE IF THE UPDATE WASN'T MADE BY THE CURRENT USER
-      if (user.user_id !== inventoryData.user_id) {
-        try {
-          window.dispatchEvent(new CustomEvent('analytics-inventory-update', { detail: inventoryData }));
-        } catch (e) { /* ignore non-browser env */ }
+
+      // Always push analytics updates so KPI cards refresh even for the acting user
+      try {
+        console.log('[App.jsx] Dispatching analytics-inventory-update event');
+        window.dispatchEvent(new CustomEvent('analytics-inventory-update', { detail: inventoryData }));
+      } catch (e) { /* ignore non-browser env */ }
+
+      // Avoid duplicating list adjustments for the actor who already has fresh state locally
+      const currentUserId = user?.user_id != null ? String(user.user_id) : null;
+      const eventUserId = inventoryData?.user_id != null ? String(inventoryData.user_id) : null;
+      const isSelfEvent = currentUserId && eventUserId ? currentUserId === eventUserId : false;
+
+      if (!isSelfEvent) {
         if (inventoryData.action === 'add') {
           setProductsData(prevData => [...prevData, inventoryData.product]);
           // notify UI components to reapply their local filters (e.g. branch filter)

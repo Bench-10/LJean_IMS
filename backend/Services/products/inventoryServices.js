@@ -2,6 +2,7 @@ import { SQLquery } from "../../db.js";
 import { broadcastNotification, broadcastOwnerNotification, broadcastInventoryUpdate, broadcastValidityUpdate, broadcastHistoryUpdate, broadcastInventoryApprovalRequest, broadcastInventoryApprovalRequestToOwners, broadcastInventoryApprovalUpdate, broadcastToUser } from "../../server.js";
 import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.js";
 import { convertToBaseUnit, getUnitConversion } from "../Services_Utils/unitConversion.js";
+import { invalidateAnalyticsCache } from "../analytics/analyticsServices.js";
 
 //HELPER FUNCTION TO GET CATEGORY NAME
 const getCategoryName = async (categoryId) => {
@@ -886,6 +887,8 @@ export const addProductItem = async (productData, options = {}) => {
 
     await SQLquery('COMMIT');
 
+    invalidateAnalyticsCache();
+
     const alertTimestamp = alertResult.rows[0]?.alert_date ?? null;
 
     if (alertResult.rows[0]) {
@@ -1193,6 +1196,8 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
     }
 
     await SQLquery('COMMIT');
+
+    invalidateAnalyticsCache();
 
     const updatedProductRow = await getUpdatedInventoryList(itemId, branch_id);
 
