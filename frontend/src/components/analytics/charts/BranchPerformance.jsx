@@ -21,7 +21,7 @@ function BranchPerformance({
 }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [screenDimensions, setScreenDimensions] = useState({
     width: window.innerWidth,

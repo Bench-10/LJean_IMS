@@ -1052,9 +1052,9 @@ const handleModalClose = useCallback(() => {
     </div>
   )}
 
-  {/* Quantity — RIGHT (row 2) */}
+  {/* Quantity — LEFT (row 2) */}
   {!(mode === 'edit' && editChoice === 'edit') && (
-    <div className="md:col-start-2">
+    <div className="md:col-start-1">
       <label className={label('quantity_added')}>Quantity</label>
       <input
         type="number"
@@ -1072,9 +1072,9 @@ const handleModalClose = useCallback(() => {
     </div>
   )}
 
-  {/* Unit cost — LEFT (row 3) */}
+  {/* Unit cost — RIGHT (row 3) */}
   {!(mode === 'edit' && editChoice === 'edit') && (
-    <div className="md:col-start-1">
+    <div className="md:col-start-2">
       <label className={label('unit_cost')}>Unit cost</label>
       <input
         placeholder="Cost"

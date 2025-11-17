@@ -212,7 +212,14 @@ function UserModalForm({
 
       if (mode === 'add') {
         await api.post(`/api/create_account`, userData);
-        toast.success('User account requested successfully for approval!');
+        
+        // Check if current user is Owner (owners don't need approval)
+        const isOwner = user.role.some(role => ['Owner'].includes(role));
+        const toastMessage = isOwner 
+          ? 'User account created successfully!' 
+          : 'User account requested successfully for approval!';
+        
+        toast.success(toastMessage);
       }
       if (mode === 'edit') {
         const response = await api.put(`/api/update_account/${userDetailes.user_id}`, userData);

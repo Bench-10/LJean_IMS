@@ -946,7 +946,7 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
     const { rows } = await SQLquery(`
       SELECT b.branch_id,
              b.branch_name,
-             COALESCE(SUM(si.amount), 0) AS total_amount_due
+             COALESCE(SUM(CASE WHEN ip.category_id = $3 THEN si.amount ELSE 0 END), 0) AS total_amount_due
       FROM branch b
       LEFT JOIN Sales_Information s ON s.branch_id = b.branch_id 
         AND s.date BETWEEN $1 AND $2
@@ -954,7 +954,6 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
       LEFT JOIN Sales_Items si ON si.sales_information_id = s.sales_information_id
       LEFT JOIN Inventory_Product ip ON ip.product_id = si.product_id 
         AND ip.branch_id = s.branch_id
-        AND ip.category_id = $3
       GROUP BY b.branch_id, b.branch_name
       ORDER BY total_amount_due DESC, b.branch_name ASC;`, params);
     

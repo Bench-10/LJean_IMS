@@ -3,7 +3,7 @@ import { broadcastNotification } from "../../server.js";
 
 /**
  * SERVICE FOR HANDLING DELIVERY-RELATED NOTIFICATIONS
- * Ensures all delivery notifications are properly saved to database and broadcast
+ * Ensures all delivery notifications are properly saved to database and broadcast  
  */
 
 export const createDeliveryNotification = async (notificationData) => {
