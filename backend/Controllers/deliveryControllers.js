@@ -26,7 +26,10 @@ export const addDeliveries = async (req, res) => {
 
     } catch (error) {
         console.error('Error adding new delivery data: ', error);
-        res.status(500).json({message: 'Internal Server Error'});
+        const status = error.statusCode || 500;
+        res.status(status).json({
+            message: error.message || 'Internal Server Error'
+        });
 
     }
     
@@ -42,7 +45,10 @@ export const updateDeliveries = async (req, res) => {
 
     } catch (error) {
         console.error('Error setting to delivered data: ', error);
-        res.status(500).json({message: 'Internal Server Error'});
+        const status = error.statusCode || 500;
+        res.status(status).json({
+            message: error.message || 'Internal Server Error'
+        });
 
     }
     

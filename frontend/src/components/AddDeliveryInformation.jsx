@@ -259,6 +259,7 @@ const AddDeliveryInformation = React.memo(function AddDeliveryInformation({
   const [address, setAddress] = useState('');
   const [deliveredDate, setDeliveredDate] = useState('');
   const [status, setStatus] = useState({ is_delivered: false, pending: true });
+  const [errorDialog, setErrorDialog] = useState({ open: false, message: '' });
 
 
     useEffect(() => {
@@ -323,6 +324,11 @@ const AddDeliveryInformation = React.memo(function AddDeliveryInformation({
       onClose();
     } catch (error) {
       console.error('Error submitting delivery:', error);
+      const serverMessage = error?.response?.data?.message;
+      setErrorDialog({
+        open: true,
+        message: serverMessage || 'Failed to update delivery status. Please try again.'
+      });
     } finally {
       setLoading(false);
     }
@@ -343,6 +349,77 @@ const AddDeliveryInformation = React.memo(function AddDeliveryInformation({
           submitFunction={() => handleSubmit(mode)}
           onClose={() => setDialog(false)}
         />
+      )}
+
+      {errorDialog.open && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setErrorDialog({ open: false, message: '' })} />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            className="relative w-full max-w-lg bg-white shadow-2xl rounded-2xl border border-red-100 overflow-hidden"
+          >
+            {/* Header with warning icon */}
+            <div className="bg-gradient-to-r from-red-50 to-orange-50 px-6 py-4 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-red-800">Action Blocked</h2>
+                  <p className="text-sm text-red-600 font-medium">Insufficient Stock</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5">
+              <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                {errorDialog.message}
+              </div>
+
+              {/* Additional help text */}
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="text-xs text-amber-800">
+                    <p className="font-medium mb-1">What you can do:</p>
+                    <ul className="space-y-1 text-amber-700">
+                      <li>• Add more stock to the affected products</li>
+                      <li>• Cancel this delivery and create a new one with reduced quantities</li>
+                      <li>• Contact inventory manager for assistance</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+              <button
+                type="button"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition"
+                onClick={() => setErrorDialog({ open: false, message: '' })}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition"
+                onClick={() => setErrorDialog({ open: false, message: '' })}
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Understood
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />

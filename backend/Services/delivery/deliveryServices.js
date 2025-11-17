@@ -7,6 +7,81 @@ import { createNewDeliveryNotification, createDeliveryStatusNotification, create
 import { invalidateAnalyticsCache } from "../analytics/analyticsServices.js";
 
 
+const formatQuantity = (value) => {
+    if (!Number.isFinite(value)) return '0';
+    const rounded = Math.round(value);
+    if (Math.abs(value - rounded) < 0.0005) return String(rounded);
+    return Number(value.toFixed(3)).toString();
+};
+
+const getInventorySnapshot = async (productId, branchId) => {
+    const { rows } = await SQLquery(
+        `SELECT 
+            ip.product_name,
+            ip.unit AS inventory_unit,
+            COALESCE(SUM(ast.quantity_left_base), 0) AS available_base,
+            COALESCE(SUM(ast.quantity_left_display), 0) AS available_display
+         FROM inventory_product ip
+         LEFT JOIN add_stocks ast ON ast.product_id = ip.product_id AND ast.branch_id = ip.branch_id
+         WHERE ip.product_id = $1 AND ip.branch_id = $2
+         GROUP BY ip.product_name, ip.unit`,
+        [productId, branchId]
+    );
+
+    return rows[0] || {
+        product_name: null,
+        inventory_unit: null,
+        available_base: 0,
+        available_display: 0
+    };
+};
+
+const ensureSufficientStockForDelivery = async (items, branchId, targetLabel) => {
+    if (!items || items.length === 0) return;
+
+    const insufficient = [];
+
+    for (const item of items) {
+        const snapshot = await getInventorySnapshot(item.product_id, branchId);
+
+        const requiredDisplay = Number(item.quantity);
+        const requiredBase = Number(item.quantity_base ?? 0);
+        const saleUnit = item.unit || snapshot.inventory_unit || '';
+        const basePerSaleUnit = (requiredDisplay > 0 && requiredBase > 0)
+            ? requiredBase / requiredDisplay
+            : null;
+        const availableBase = Number(snapshot.available_base ?? 0);
+        let availableLabel;
+
+        if (basePerSaleUnit && basePerSaleUnit > 0) {
+            const availableSaleUnit = availableBase / basePerSaleUnit;
+            availableLabel = `${formatQuantity(Math.max(availableSaleUnit, 0))} ${saleUnit}`.trim();
+        } else {
+            availableLabel = `${formatQuantity(Number(snapshot.available_display ?? 0))} ${snapshot.inventory_unit || saleUnit}`.trim();
+        }
+
+        if (requiredBase > availableBase + 1e-9) {
+            insufficient.push({
+                product_id: item.product_id,
+                product_name: snapshot.product_name || item.product_name || `Product ${item.product_id}`,
+                required_label: `${formatQuantity(requiredDisplay)} ${saleUnit}`.trim(),
+                available_label: availableLabel
+            });
+        }
+    }
+
+    if (insufficient.length) {
+        const lines = insufficient.map((prod) => `• ${prod.product_name} — needs ${prod.required_label}, available ${prod.available_label}`);
+        const message = `Cannot set this delivery to ${targetLabel} because there is not enough stock:\n${lines.join('\n')}`;
+        const error = new Error(message);
+        error.statusCode = 400;
+        error.code = 'INSUFFICIENT_STOCK_FOR_DELIVERY';
+        error.details = insufficient;
+        throw error;
+    }
+};
+
+
 
 // GET DELIVERY DATA
 export const getDeliveryData = async(branchId) =>{
@@ -209,20 +284,37 @@ export const setToDelivered = async(saleID, update) => {
             // UNDELIVERED → OUT FOR DELIVERY - RE-DEDUCT STOCK (REACTIVATING CANCELED ORDER)
                 const {rows: itemsToRededuct} = await SQLquery(`
                     SELECT 
-                        product_id,
-                        quantity_display AS quantity,
-                        unit
-                    FROM Sales_Items
-                    WHERE sales_information_id = $1`,
+                        si_items.product_id,
+                        si_items.quantity_display AS quantity,
+                        si_items.quantity_base,
+                        si_items.unit,
+                        inventory_product.product_name,
+                        inventory_product.unit AS inventory_unit
+                    FROM Sales_Items si_items
+                    JOIN Sales_Information si ON si.sales_information_id = si_items.sales_information_id
+                    JOIN inventory_product ON inventory_product.product_id = si_items.product_id AND inventory_product.branch_id = si.branch_id
+                    WHERE si_items.sales_information_id = $1`,
                 [saleID]
             );
 
             const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
             const branchId = branchInfo[0]?.branch_id;
 
+        await ensureSufficientStockForDelivery(itemsToRededuct, branchId, 'out for delivery');
+
         for (const product of itemsToRededuct) {
-            await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
-            productsToCheck.add(product.product_id);
+            try {
+                await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
+                productsToCheck.add(product.product_id);
+            } catch (error) {
+                if (error?.code === 'INSUFFICIENT_STOCK_FOR_DELIVERY') throw error;
+                const msg = String(error?.message || '').toLowerCase();
+                if (msg.includes('insufficient') || msg.includes('no available stock')) {
+                    await ensureSufficientStockForDelivery([product], branchId, 'out for delivery');
+                    throw error;
+                }
+                throw error;
+            }
             }
             console.log(`Stock re-deducted for sale ID: ${saleID} due to reactivating delivery from undelivered to out for delivery`);
 
@@ -273,20 +365,37 @@ export const setToDelivered = async(saleID, update) => {
                 if (stockUsage.length > 0 && stockUsage[0].is_restored === true) {
                     const {rows: itemsToDeduct} = await SQLquery(`
                         SELECT 
-                            product_id,
-                            quantity_display AS quantity,
-                            unit
-                        FROM Sales_Items
-                        WHERE sales_information_id = $1`,
+                            si_items.product_id,
+                            si_items.quantity_display AS quantity,
+                            si_items.quantity_base,
+                            si_items.unit,
+                            inventory_product.product_name,
+                            inventory_product.unit AS inventory_unit
+                        FROM Sales_Items si_items
+                        JOIN Sales_Information si ON si.sales_information_id = si_items.sales_information_id
+                        JOIN inventory_product ON inventory_product.product_id = si_items.product_id AND inventory_product.branch_id = si.branch_id
+                        WHERE si_items.sales_information_id = $1`,
                         [saleID]
                     );
 
                     const {rows: branchInfo} = await SQLquery('SELECT branch_id FROM Sales_Information WHERE sales_information_id = $1', [saleID]);
                     const branchId = branchInfo[0]?.branch_id;
 
+                    await ensureSufficientStockForDelivery(itemsToDeduct, branchId, 'delivered');
+
                     for (const product of itemsToDeduct) {
-                        await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
-                        productsToCheck.add(product.product_id);
+                        try {
+                            await deductStockAndTrackUsage(saleID, product.product_id, Number(product.quantity), branchId, userID, product.unit);
+                            productsToCheck.add(product.product_id);
+                        } catch (error) {
+                            if (error?.code === 'INSUFFICIENT_STOCK_FOR_DELIVERY') throw error;
+                            const msg = String(error?.message || '').toLowerCase();
+                            if (msg.includes('insufficient') || msg.includes('no available stock')) {
+                                await ensureSufficientStockForDelivery([product], branchId, 'delivered');
+                                throw error;
+                            }
+                            throw error;
+                        }
                     }
                     console.log(`Stock re-deducted for sale ID: ${saleID} (was previously restored)`);
                 } else {
