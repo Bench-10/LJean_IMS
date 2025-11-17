@@ -57,7 +57,7 @@ function PushNotificationControls() {
     };
 
     init();
-  }, []);
+  }, [user]); // Re-run when user changes
 
   const statusLabel = useMemo(() => {
     if (!SUPPORTS_PUSH) return 'Notifications not supported in this browser.';
@@ -68,15 +68,131 @@ function PushNotificationControls() {
     return 'Push notifications active and ready to work in the background.';
   }, [isEnabled, permissionState, persisted]);
 
+  // Additional status for debugging
+  const debugInfo = useMemo(() => {
+    if (!SUPPORTS_PUSH) return null;
+    return {
+      permission: permissionState,
+      hasSubscription: isEnabled,
+      persisted,
+      userAgent: navigator.userAgent.substring(0, 50) + '...'
+    };
+  }, [isEnabled, permissionState, persisted]);
+
   const checkSubscription = async () => {
-    if (!SUPPORTS_PUSH) return;
+    if (!SUPPORTS_PUSH || !user) return;
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      setIsEnabled(Boolean(subscription));
+      const localSubscription = await registration.pushManager.getSubscription();
+      
+      if (!localSubscription) {
+        setIsEnabled(false);
+        return;
+      }
+
+      // Check if subscription is active on server
+      try {
+        const { data } = await api.get('/api/push/subscriptions');
+        const serverSubscriptions = data?.subscriptions || [];
+        
+        // Check if current endpoint exists and is active on server
+        const serverSubscription = serverSubscriptions.find(sub => 
+          sub.endpoint === localSubscription.endpoint && sub.is_active
+        );
+
+        if (serverSubscription) {
+          // Subscription is active on both client and server
+          setIsEnabled(true);
+        } else {
+          // Local subscription exists but server says it's inactive
+          // Try to re-subscribe automatically
+          console.log('Local subscription found but inactive on server, attempting auto-repair...');
+          await autoRepairSubscription(localSubscription);
+        }
+      } catch (serverError) {
+        console.warn('Failed to check server subscription status:', serverError);
+        // If we can't check server status, assume local subscription is valid
+        // but mark as potentially needing repair
+        setIsEnabled(true);
+      }
     } catch (error) {
       console.error('Check subscription error:', error);
+      setIsEnabled(false);
+    }
+  };
+
+  const autoRepairSubscription = async (existingSubscription) => {
+    if (!user) return;
+
+    try {
+      // Try to re-subscribe with existing endpoint
+      await api.post('/api/push/subscribe', {
+        userId: user?.user_id,
+        adminId: user?.admin_id,
+        userType: user?.admin_id ? 'admin' : 'user',
+        subscription: existingSubscription.toJSON(),
+        deviceInfo: {
+          userAgent: navigator.userAgent,
+          deviceName: /Mobile/.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
+        }
+      });
+
+      console.log('Auto-repaired push subscription');
+      setIsEnabled(true);
+    } catch (repairError) {
+      console.warn('Failed to auto-repair subscription:', repairError);
+      // If auto-repair fails, try full re-subscription
+      try {
+        await performSilentResubscription();
+      } catch (resubError) {
+        console.warn('Failed to perform silent resubscription:', resubError);
+        setIsEnabled(false);
+      }
+    }
+  };
+
+  const performSilentResubscription = async () => {
+    if (!user || !SUPPORTS_PUSH) return;
+
+    try {
+      // Check permission first
+      if (Notification.permission !== 'granted') {
+        setIsEnabled(false);
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Get VAPID key
+      const { data } = await api.get('/api/push/vapid-public-key');
+      if (!data?.publicKey) {
+        throw new Error('Server did not return VAPID public key');
+      }
+
+      // Create new subscription
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(data.publicKey)
+      });
+
+      // Subscribe on server
+      await api.post('/api/push/subscribe', {
+        userId: user?.user_id,
+        adminId: user?.admin_id,
+        userType: user?.admin_id ? 'admin' : 'user',
+        subscription: subscription.toJSON(),
+        deviceInfo: {
+          userAgent: navigator.userAgent,
+          deviceName: /Mobile/.test(navigator.userAgent) ? 'Mobile' : 'Desktop'
+        }
+      });
+
+      console.log('Performed silent resubscription');
+      setIsEnabled(true);
+    } catch (error) {
+      console.error('Silent resubscription failed:', error);
+      setIsEnabled(false);
     }
   };
 
@@ -219,7 +335,26 @@ function PushNotificationControls() {
     }
   };
 
-  // send test removed on request
+  // Test notification function to verify push notifications are working
+  const testNotification = async () => {
+    if (!isEnabled || !user) return;
+
+    try {
+      await api.post('/api/push/test', {
+        title: 'Test Notification',
+        message: 'This is a test to verify push notifications are working.'
+      });
+      toast.success('Test notification sent! Check if you received it.');
+    } catch (error) {
+      console.error('Test notification failed:', error);
+      toast.error('Test notification failed. Push notifications may not be working properly.');
+      
+      // If test fails, try to repair subscription
+      if (window.confirm('Push notifications appear to not be working. Would you like to try repairing them?')) {
+        await performSilentResubscription();
+      }
+    }
+  };
 
   if (!SUPPORTS_PUSH) {
     return null;
@@ -247,9 +382,35 @@ function PushNotificationControls() {
           <span>{isLoading ? 'Processing…' : isEnabled ? 'Disable Push Notifications' : 'Enable Push Notifications'}</span>
         </button>
 
+        {/* Test notification button when enabled */}
+        {isEnabled && (
+          <button
+            onClick={testNotification}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Test Notification
+          </button>
+        )}
+
         {/* Disable all is now performed by toggling off the button */}
       </div>
 
+      {/* Status and debug info */}
+      <div className="text-xs text-gray-600">
+        <div>{statusLabel}</div>
+        {debugInfo && (
+          <details className="mt-1">
+            <summary className="cursor-pointer text-gray-500 hover:text-gray-700">Debug Info</summary>
+            <div className="mt-1 pl-2 border-l-2 border-gray-200 text-xs">
+              <div>Permission: {debugInfo.permission}</div>
+              <div>Has Subscription: {debugInfo.hasSubscription ? 'Yes' : 'No'}</div>
+              <div>Persistent Storage: {debugInfo.persisted ? 'Yes' : 'No'}</div>
+              <div>User Agent: {debugInfo.userAgent}</div>
+            </div>
+          </details>
+        )}
+      </div>
     </div>
   );
 }
