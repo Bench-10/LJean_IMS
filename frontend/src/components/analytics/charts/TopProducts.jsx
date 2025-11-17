@@ -11,6 +11,38 @@ import { FaLightbulb } from 'react-icons/fa';
 
 import DropdownCustom from '../../../components/DropdownCustom';
 
+const TOP_PRODUCTS_LIMIT = 24;
+const SALES_SERIES_LIMIT = 480;
+const FORECAST_SERIES_LIMIT = 360;
+const PROGRESSIVE_SEGMENTS = 6;
+const PROGRESSIVE_INTERVAL_MS = 90;
+const MIN_PROGRESSIVE_CHUNK = 6;
+
+const buildSampledIndices = (length, limit, includeIndices = []) => {
+  if (!Number.isFinite(length) || length <= 0) return [];
+  if (!limit || length <= limit) {
+    return Array.from({ length }, (_, index) => index);
+  }
+
+  const step = Math.ceil(length / limit);
+  const indices = new Set(includeIndices.filter((index) => index >= 0 && index < length));
+  for (let i = 0; i < length; i += step) indices.add(i);
+  indices.add(length - 1);
+  return Array.from(indices).sort((a, b) => a - b);
+};
+
+const sampleArray = (input, limit, includeIndices = []) => {
+  if (!Array.isArray(input)) return [];
+  const indices = buildSampledIndices(input.length, limit, includeIndices);
+  return indices.map((index) => input[index]).filter((item) => item !== undefined);
+};
+
+const getProgressiveChunkSize = (length) => {
+  if (!Number.isFinite(length) || length <= 0) return 0;
+  const base = Math.ceil(length / PROGRESSIVE_SEGMENTS);
+  return Math.max(MIN_PROGRESSIVE_CHUNK, base);
+};
+
 // For Y-axis ticks (compact ₱60M, ₱1.2B, etc.)
 const pesoAxis = (v) =>
   new Intl.NumberFormat('en-PH', {
@@ -87,13 +119,28 @@ function TopProducts({
     ? topProducts?.find(p => p.product_id === parseInt(productIdFilter))?.product_name
     : null;
 
+  const selectedProductIndex = useMemo(() => {
+    if (!productIdFilter || !Array.isArray(topProducts)) return -1;
+    return topProducts.findIndex((p) => p?.product_id === parseInt(productIdFilter, 10));
+  }, [productIdFilter, topProducts]);
+
+  const virtualizedTopProducts = useMemo(() => {
+    if (!Array.isArray(topProducts) || !topProducts.length) return [];
+    const include = selectedProductIndex >= 0 ? [selectedProductIndex] : [];
+    const sampled = sampleArray(topProducts, TOP_PRODUCTS_LIMIT, include);
+    return sampled.length ? sampled : topProducts.slice(0, TOP_PRODUCTS_LIMIT);
+  }, [selectedProductIndex, topProducts]);
+
+  const totalTopProducts = Array.isArray(topProducts) ? topProducts.length : 0;
+  const topProductsDisplay = virtualizedTopProducts.length ? virtualizedTopProducts : topProducts || [];
+
   const VISIBLE_ROWS = 7;
   const BAR_SIZE = 30;
   const ROW_GAP = 44;
   const MARGIN_TOP = 10;
   const MARGIN_BOTTOM = 10;
 
-  const itemsCount = Array.isArray(topProducts) ? topProducts.length : 0;
+  const itemsCount = Array.isArray(topProductsDisplay) ? topProductsDisplay.length : 0;
 
   const visibleHeight = (VISIBLE_ROWS * BAR_SIZE) + ((VISIBLE_ROWS - 1) * ROW_GAP) + MARGIN_TOP + MARGIN_BOTTOM;
   const totalHeight = Math.max(
@@ -159,6 +206,44 @@ function TopProducts({
     return displayCombinedSeries.filter(item => item && item.is_forecast === true);
   }, [displayCombinedSeries, forecastSeries, historicalLimit, actualSeries.length]);
 
+  const [progressiveCount, setProgressiveCount] = useState(() => {
+    if (!displayActualSeries.length) return 0;
+    return Math.min(getProgressiveChunkSize(displayActualSeries.length), displayActualSeries.length);
+  });
+
+  useEffect(() => {
+    if (!displayActualSeries.length) {
+      setProgressiveCount(0);
+      return;
+    }
+    const initial = Math.min(getProgressiveChunkSize(displayActualSeries.length), displayActualSeries.length);
+    setProgressiveCount(initial || displayActualSeries.length);
+  }, [displayActualSeries.length]);
+
+  useEffect(() => {
+    if (!displayActualSeries.length) return;
+    if (progressiveCount >= displayActualSeries.length) return;
+    const chunk = Math.max(getProgressiveChunkSize(displayActualSeries.length), MIN_PROGRESSIVE_CHUNK);
+    const timer = setInterval(() => {
+      setProgressiveCount((prev) => {
+        if (prev >= displayActualSeries.length) return prev;
+        return Math.min(prev + chunk, displayActualSeries.length);
+      });
+    }, PROGRESSIVE_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [displayActualSeries.length, progressiveCount]);
+
+  const progressiveActualSeries = useMemo(() => {
+    if (!displayActualSeries.length) return [];
+    if (!progressiveCount) return displayActualSeries.slice(0, getProgressiveChunkSize(displayActualSeries.length) || displayActualSeries.length);
+    return displayActualSeries.slice(0, Math.min(progressiveCount, displayActualSeries.length));
+  }, [displayActualSeries, progressiveCount]);
+
+  const lineChartData = progressiveActualSeries.length ? progressiveActualSeries : displayActualSeries;
+  const progressiveProgress = displayActualSeries.length
+    ? Math.min(100, Math.round((Math.min(progressiveCount, displayActualSeries.length) / displayActualSeries.length) * 100))
+    : 100;
+
   const lastActualPeriod = hasActualData ? actualSeries[actualSeries.length - 1]?.period : null;
 
   const mapForecastSeriesToChart = (series) => series.map(item => {
@@ -221,12 +306,12 @@ function TopProducts({
             data-chart-container="top-products"
             style={{ height: visibleHeight, scrollbarColor: 'transparent transparent', scrollbarWidth: 'thin' }}
           >
-            {(!topProducts || topProducts.length === 0) ? (
+            {(!topProductsDisplay || topProductsDisplay.length === 0) ? (
               <ChartNoData message="No top products for the selected filters." />
             ) : (
               <ResponsiveContainer width="100%" height={totalHeight}>
                 <BarChart
-                  data={topProducts}
+                  data={topProductsDisplay}
                   margin={{ top: MARGIN_TOP, right: 15, left: 15, bottom: MARGIN_BOTTOM }}
                   layout="vertical"
                   barCategoryGap={itemsCount === 1 ? 20 : ROW_GAP}
@@ -234,7 +319,7 @@ function TopProducts({
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                   {(() => {
-                    const max = topProducts.reduce((m, p) => Math.max(m, Number(p.sales_amount) || 0), 0);
+                    const max = topProductsDisplay.reduce((m, p) => Math.max(m, Number(p.sales_amount) || 0), 0);
                     const padded = max === 0 ? 1 : Math.ceil((max * 1.1) / 100) * 100;
                     return (
                       <XAxis
@@ -273,7 +358,7 @@ function TopProducts({
                     barSize={itemsCount === 1 ? Math.min(BAR_SIZE, 40) : BAR_SIZE}
                     background={{ fill: '#F8FAFC' }}
                   >
-                    {topProducts.map((entry, idx) => {
+                    {topProductsDisplay.map((entry, idx) => {
                       const isSelected = productIdFilter && entry.product_id === parseInt(productIdFilter);
                       let fillColor;
                       if (isSelected) {
@@ -289,6 +374,11 @@ function TopProducts({
                 </BarChart>
               </ResponsiveContainer>
             )}
+            {totalTopProducts > topProductsDisplay.length && (
+              <div className="mt-1 text-[10px] text-gray-500" data-export-exclude>
+                Showing a sampled subset of {topProductsDisplay.length} out of {totalTopProducts} products for smoother rendering.
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -301,6 +391,11 @@ function TopProducts({
       >
         <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
           {loadingSalesPerformance && <ChartLoading message="Loading sales performance..." />}
+          {progressiveProgress < 100 && !loadingSalesPerformance && (
+            <div className="absolute top-2 right-3 z-10 px-2 py-1 text-[10px] rounded-md bg-white/90 border border-gray-200 shadow-sm" data-export-exclude>
+              Rendering {progressiveProgress}% of series…
+            </div>
+          )}
 
           {/* Controls row (Interval + bulb) — aligned & tidy */}
           <div data-export-exclude className="flex justify-end items-end gap-3 mt-1">
@@ -346,7 +441,7 @@ function TopProducts({
               />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={displayActualSeries} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                <LineChart data={lineChartData} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
                   <defs>
                     <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#0f766e" stopOpacity={0.3} />

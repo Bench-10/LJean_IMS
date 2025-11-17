@@ -1,4 +1,13 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
+  useCallback,
+  Suspense,
+  lazy,
+  useTransition
+} from 'react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 dayjs.extend(isoWeek);
@@ -7,10 +16,10 @@ import api, { analyticsApi } from '../../utils/api.js';
 import { currencyFormat } from '../../utils/formatCurrency.js';
 import { NavLink } from "react-router-dom";
 
-import TopProducts from './charts/TopProducts.jsx';
-import Delivery from './charts/Delivery.jsx';
-import BranchPerformance from './charts/BranchPerformance.jsx';
-import BranchTimeline from './charts/BranchTimeline.jsx';
+const TopProducts = lazy(() => import('./charts/TopProducts.jsx'));
+const Delivery = lazy(() => import('./charts/Delivery.jsx'));
+const BranchPerformance = lazy(() => import('./charts/BranchPerformance.jsx'));
+const BranchTimeline = lazy(() => import('./charts/BranchTimeline.jsx'));
 import ExportReportDialog from '../dialogs/ExportReportDialog.jsx';
 
 import { TbTruckDelivery } from "react-icons/tb";
@@ -20,6 +29,7 @@ import { AiFillProduct } from "react-icons/ai";
 
 import { useAuth } from '../../authentication/Authentication.jsx';
 import ChartLoading from '../common/ChartLoading.jsx';
+import ChartNoData from '../common/ChartNoData.jsx';
 import DropdownCustom from '../DropdownCustom.jsx';
 import DatePickerCustom from '../DatePickerCustom.jsx';
 
@@ -33,7 +43,23 @@ const DELIVERY_META_DEFAULT = {
   step: 'day'
 };
 
-const CACHE_TTL_MS = Number.POSITIVE_INFINITY;
+const PERFORMANCE_CONFIG = {
+  cacheTTL: 1000 * 60 * 5,
+  cacheStaleThreshold: 1000 * 60 * 2,
+  enableBackgroundRefresh: true,
+  backgroundRefreshInterval: 1000 * 60 * 3,
+  enableBatchRequests: true,
+  virtualizationThreshold: 1000,
+  salesSamplingLimit: 600,
+  timelineSamplingLimit: 700,
+  progressiveEnhanceDelay: 180,
+  enableCompression: true,
+  compressionThreshold: 250,
+  virtualizationStrategy: 'sample',
+  debugMode: false
+};
+
+const CACHE_TTL_MS = PERFORMANCE_CONFIG.cacheTTL;
 
 const analyticsCaches = {
   branches: new Map(),
@@ -52,7 +78,85 @@ const pendingRequests = new Map();
 
 const buildCacheKey = (name, params) => `${name}::${JSON.stringify(params)}`;
 
-const getCachedValue = (name, params) => {
+const COMPRESSION_MARKER = '__compressed';
+
+const sampleArray = (input, limit) => {
+  if (!Array.isArray(input) || !limit || input.length <= limit) return input;
+  const step = Math.ceil(input.length / limit);
+  const result = [];
+  for (let i = 0; i < input.length; i += step) {
+    result.push(input[i]);
+  }
+  const last = input[input.length - 1];
+  if (result[result.length - 1] !== last) {
+    result.push(last);
+  }
+  return result;
+};
+
+const compressArray = (input) => {
+  if (!Array.isArray(input) || input.length < PERFORMANCE_CONFIG.compressionThreshold) {
+    return input;
+  }
+  const first = input.find((item) => item && typeof item === 'object');
+  if (!first) return input;
+  const keys = Array.from(new Set(input.flatMap((item) => (item && typeof item === 'object') ? Object.keys(item) : [])));
+  if (!keys.length) return input;
+  const rows = keys.map((key) => input.map((item) => (item && typeof item === 'object') ? item[key] ?? null : item));
+  return {
+    [COMPRESSION_MARKER]: true,
+    type: 'object-array',
+    keys,
+    rows,
+    length: input.length
+  };
+};
+
+const decompressArray = (input) => {
+  if (!input || input[COMPRESSION_MARKER] !== true || input.type !== 'object-array') {
+    return input;
+  }
+  const { keys, rows, length } = input;
+  const result = Array.from({ length }, (_, index) => {
+    const record = {};
+    keys.forEach((key, keyIndex) => {
+      record[key] = rows[keyIndex]?.[index] ?? null;
+    });
+    return record;
+  });
+  return result;
+};
+
+const maybeCompress = (value) => {
+  if (!PERFORMANCE_CONFIG.enableCompression) return value;
+  if (Array.isArray(value)) return compressArray(value);
+  if (value && typeof value === 'object') {
+    const next = {};
+    Object.entries(value).forEach(([key, val]) => {
+      next[key] = maybeCompress(val);
+    });
+    return next;
+  }
+  return value;
+};
+
+const maybeDecompress = (value) => {
+  if (!PERFORMANCE_CONFIG.enableCompression) return value;
+  if (Array.isArray(value)) return value.map((item) => maybeDecompress(item));
+  if (value && value[COMPRESSION_MARKER]) {
+    return maybeDecompress(decompressArray(value));
+  }
+  if (value && typeof value === 'object') {
+    const next = {};
+    Object.entries(value).forEach(([key, val]) => {
+      next[key] = maybeDecompress(val);
+    });
+    return next;
+  }
+  return value;
+};
+
+const getCacheEntry = (name, params) => {
   const cache = analyticsCaches[name];
   if (!cache) return null;
   const key = JSON.stringify(params);
@@ -62,8 +166,10 @@ const getCachedValue = (name, params) => {
     cache.delete(key);
     return null;
   }
-  return entry.value;
+  return entry;
 };
+
+const getCachedValue = (name, params) => getCacheEntry(name, params)?.value ?? null;
 
 const setCachedValue = (name, params, value) => {
   const cache = analyticsCaches[name];
@@ -72,10 +178,25 @@ const setCachedValue = (name, params, value) => {
   cache.set(key, { value, timestamp: Date.now() });
 };
 
-const fetchAndCache = async (name, params, fetcher) => {
-  const cached = getCachedValue(name, params);
-  if (cached) {
-    return cached;
+const shouldRefreshEntry = (entry) => {
+  if (!entry) return false;
+  if (!PERFORMANCE_CONFIG.enableBackgroundRefresh) return false;
+  return Date.now() - entry.timestamp > PERFORMANCE_CONFIG.cacheStaleThreshold;
+};
+
+const fetchAndCache = async (name, params, fetcher, { forceRefresh = false, background = false } = {}) => {
+  const existingEntry = forceRefresh ? null : getCacheEntry(name, params);
+  if (existingEntry && !forceRefresh) {
+    if (!background && shouldRefreshEntry(existingEntry)) {
+      setTimeout(() => {
+        fetchAndCache(name, params, fetcher, { forceRefresh: true, background: true }).catch((err) => {
+          if (PERFORMANCE_CONFIG.debugMode) {
+            console.debug(`[AnalyticsDashboard] Background refresh failed for ${name}`, err);
+          }
+        });
+      }, 0);
+    }
+    return existingEntry.value;
   }
 
   const cacheKey = buildCacheKey(name, params);
@@ -87,9 +208,17 @@ const fetchAndCache = async (name, params, fetcher) => {
     const result = await fetcher();
     setCachedValue(name, params, result);
     return result;
-  })().finally(() => {
-    pendingRequests.delete(cacheKey);
-  });
+  })()
+    .catch((error) => {
+      if (!background) throw error;
+      if (PERFORMANCE_CONFIG.debugMode) {
+        console.debug(`[AnalyticsDashboard] Background fetch error for ${name}`, error);
+      }
+      return existingEntry?.value;
+    })
+    .finally(() => {
+      pendingRequests.delete(cacheKey);
+    });
 
   pendingRequests.set(cacheKey, promise);
   return promise;
@@ -289,6 +418,18 @@ function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, d
 
 export default function AnalyticsDashboard({ branchId, canSelectBranch = false }) {
   const { user } = useAuth();
+  const [isPending, startTransition] = useTransition();
+  const [optimizationsEnabled, setOptimizationsEnabled] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const raw = window.localStorage.getItem('analytics:optimizations');
+    if (!raw) return true;
+    try {
+      const parsed = JSON.parse(raw);
+      return typeof parsed === 'boolean' ? parsed : true;
+    } catch (err) {
+      return true;
+    }
+  });
 
   const storageKey = useMemo(() => getDashboardStorageKey(branchId), [branchId]);
   const persistedState = useMemo(() => {
@@ -496,15 +637,16 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     const cacheParams = { scope: 'all' };
     const cached = getCachedValue('branches', cacheParams);
     if (cached) {
-      setAllBranches(cached);
+      setAllBranches(maybeDecompress(cached));
       return;
     }
     try {
       const data = await fetchAndCache('branches', cacheParams, async () => {
         const res = await analyticsApi.get(`/api/analytics/branches`, { signal });
-        return Array.isArray(res.data) ? res.data : [];
+        const payload = Array.isArray(res.data) ? res.data : [];
+        return maybeCompress(payload);
       });
-      setAllBranches(data);
+      setAllBranches(maybeDecompress(data));
     } catch (e) {
       if (e?.code === 'ERR_CANCELED') return;
       console.error('Branches fetch error', e);
@@ -540,7 +682,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     resetAnalyticsState();
   }, [resetAnalyticsState, user]);
 
-  const fetchSalesPerformance = useCallback(async (signal) => {
+  const fetchSalesPerformance = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
     const params = { interval: salesInterval };
     if (branchId) params.branch_id = branchId;
@@ -554,32 +696,65 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     };
     const cached = getCachedValue('salesPerformance', cacheParams);
     if (cached) {
-      setSalesPerformance(cached);
-      setLoadingSalesPerformance(false);
-      return;
+      setSalesPerformance(maybeDecompress(cached));
+      if (silent) {
+        // Background refresh to update cache and state silently
+        fetchAndCache('salesPerformance', cacheParams, async () => {
+          const response = await analyticsApi.get(`/api/analytics/sales-performance`, { params, signal });
+          const payload = Array.isArray(response.data)
+            ? { history: response.data, forecast: [], series: response.data }
+            : {
+                history: response.data?.history ?? [],
+                forecast: response.data?.forecast ?? [],
+                series: response.data?.series ?? response.data?.history ?? []
+              };
+          if (optimizationsEnabled && PERFORMANCE_CONFIG.salesSamplingLimit) {
+            const sampledHistory = sampleArray(payload.history, PERFORMANCE_CONFIG.salesSamplingLimit);
+            const sampledSeries = sampleArray(payload.series, PERFORMANCE_CONFIG.salesSamplingLimit);
+            return maybeCompress({ ...payload, history: sampledHistory, series: sampledSeries });
+          }
+          return maybeCompress(payload);
+        }, { forceRefresh: true, background: true })
+          .then((normalized) => {
+            if (normalized) setSalesPerformance(maybeDecompress(normalized));
+          })
+          .catch(() => {});
+      } else {
+        setLoadingSalesPerformance(false);
+      }
+      if (!silent) return;
     }
-    setLoadingSalesPerformance(true);
+    if (!silent) setLoadingSalesPerformance(true);
     try {
       const normalized = await fetchAndCache('salesPerformance', cacheParams, async () => {
         const response = await analyticsApi.get(`/api/analytics/sales-performance`, { params, signal });
-        if (Array.isArray(response.data)) {
-          return { history: response.data, forecast: [], series: response.data };
+        const payload = Array.isArray(response.data)
+          ? { history: response.data, forecast: [], series: response.data }
+          : {
+              history: response.data?.history ?? [],
+              forecast: response.data?.forecast ?? [],
+              series: response.data?.series ?? response.data?.history ?? []
+            };
+        if (optimizationsEnabled && PERFORMANCE_CONFIG.salesSamplingLimit) {
+          const sampledHistory = sampleArray(payload.history, PERFORMANCE_CONFIG.salesSamplingLimit);
+          const sampledSeries = sampleArray(payload.series, PERFORMANCE_CONFIG.salesSamplingLimit);
+          return maybeCompress({
+            ...payload,
+            history: sampledHistory,
+            series: sampledSeries
+          });
         }
-        return {
-          history: response.data?.history ?? [],
-          forecast: response.data?.forecast ?? [],
-          series: response.data?.series ?? response.data?.history ?? []
-        };
-      });
-      setSalesPerformance(normalized);
+        return maybeCompress(payload);
+      }, silent ? { forceRefresh: true, background: true } : undefined);
+      setSalesPerformance(maybeDecompress(normalized));
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Sales performance fetch error', e);
     } finally {
-      setLoadingSalesPerformance(false);
+      if (!silent) setLoadingSalesPerformance(false);
     }
-  }, [branchId, categoryFilter, productIdFilter, salesInterval, user]);
+  }, [branchId, categoryFilter, productIdFilter, salesInterval, user, optimizationsEnabled]);
 
-  const fetchTopProductsData = useCallback(async (signal) => {
+  const fetchTopProductsData = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
 
     const paramsTop = {
@@ -587,7 +762,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       category_id: categoryFilter || undefined,
       start_date: resolvedRange.start_date,
       end_date: resolvedRange.end_date,
-      limit: 50,
+      limit: optimizationsEnabled ? 40 : 50,
       interval: 'monthly',
       include_forecast: false
     };
@@ -611,18 +786,22 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     const cachedTop = getCachedValue('topProducts', topKey);
     const cachedRestock = getCachedValue('restockTrends', restockKey);
 
-    if (cachedTop) setTopProducts(cachedTop);
-    if (cachedRestock) setRestockTrends(cachedRestock);
+    if (cachedTop) setTopProducts(maybeDecompress(cachedTop));
+    if (cachedRestock) setRestockTrends(maybeDecompress(cachedRestock));
 
     const tasks = [];
 
-    if (!cachedTop) {
+    if (!cachedTop || silent) {
       tasks.push(
         fetchAndCache('topProducts', topKey, async () => {
           const response = await analyticsApi.get(`/api/analytics/top-products`, { params: paramsTop, signal });
-          return Array.isArray(response.data) ? response.data : [];
-        })
-          .then((data) => setTopProducts(data))
+          const data = Array.isArray(response.data) ? response.data : [];
+          const payload = optimizationsEnabled && PERFORMANCE_CONFIG.virtualizationThreshold
+            ? sampleArray(data, PERFORMANCE_CONFIG.virtualizationThreshold)
+            : data;
+          return maybeCompress(payload);
+        }, silent ? { forceRefresh: true, background: true } : undefined)
+          .then((data) => setTopProducts(maybeDecompress(data)))
           .catch((err) => {
             if (err?.code === 'ERR_CANCELED') return;
             console.error('Top products fetch error', err);
@@ -631,13 +810,15 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       );
     }
 
-    if (!cachedRestock) {
+    if (!cachedRestock || silent) {
       tasks.push(
         fetchAndCache('restockTrends', restockKey, async () => {
           const response = await analyticsApi.get(`/api/analytics/restock-trends`, { params: paramsRestock, signal });
-          return Array.isArray(response.data) ? response.data : [];
-        })
-          .then((data) => setRestockTrends(data))
+          const data = Array.isArray(response.data) ? response.data : [];
+          const payload = optimizationsEnabled ? sampleArray(data, 200) : data;
+          return maybeCompress(payload);
+        }, silent ? { forceRefresh: true, background: true } : undefined)
+          .then((data) => setRestockTrends(maybeDecompress(data)))
           .catch((err) => {
             if (err?.code === 'ERR_CANCELED') return;
             console.error('Restock trends fetch error', err);
@@ -647,17 +828,17 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     }
 
     if (tasks.length === 0) {
-      setLoadingTopProducts(false);
+      if (!silent) setLoadingTopProducts(false);
       return;
     }
 
-    setLoadingTopProducts(true);
+    if (!silent) setLoadingTopProducts(true);
     try {
       await Promise.all(tasks);
     } finally {
-      setLoadingTopProducts(false);
+      if (!silent) setLoadingTopProducts(false);
     }
-  }, [branchId, categoryFilter, resolvedRange, restockInterval, user]);
+  }, [branchId, categoryFilter, resolvedRange, restockInterval, user, optimizationsEnabled]);
 
   const fetchRestockSuggestionsData = useCallback(async (signal) => {
     if (!user) return;
@@ -683,7 +864,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
     const cached = getCachedValue('restockSuggestions', cacheParams);
     if (cached) {
-      setRestockSuggestions(cached);
+      setRestockSuggestions(maybeDecompress(cached));
       setLoadingRestockSuggestions(false);
       return;
     }
@@ -692,9 +873,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     try {
       const data = await fetchAndCache('restockSuggestions', cacheParams, async () => {
         const response = await analyticsApi.get(`/api/analytics/top-products`, { params, signal });
-        return Array.isArray(response.data) ? response.data : [];
+        const payload = Array.isArray(response.data) ? response.data : [];
+        return maybeCompress(payload);
       });
-      setRestockSuggestions(data);
+      setRestockSuggestions(maybeDecompress(data));
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Restock suggestions fetch error', e);
       setRestockSuggestions([]);
@@ -703,7 +885,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     }
   }, [branchId, categoryFilter, resolvedRange, salesInterval, user]);
 
-  const fetchInventoryLevels = useCallback(async (signal) => {
+  const fetchInventoryLevels = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
     const params = {};
     if (branchId) params.branch_id = branchId;
@@ -712,21 +894,33 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     };
     const cached = getCachedValue('inventoryLevels', cacheParams);
     if (cached) {
-      setInventoryLevels(cached);
-      return;
+      setInventoryLevels(maybeDecompress(cached));
+      if (silent) {
+        fetchAndCache('inventoryLevels', cacheParams, async () => {
+          const response = await analyticsApi.get(`/api/analytics/inventory-levels`, { params, signal });
+          const payload = Array.isArray(response.data) ? response.data : [];
+          return maybeCompress(payload);
+        }, { forceRefresh: true, background: true })
+          .then((data) => {
+            if (data) setInventoryLevels(maybeDecompress(data));
+          })
+          .catch(() => {});
+      }
+      if (!silent) return;
     }
     try {
       const data = await fetchAndCache('inventoryLevels', cacheParams, async () => {
         const response = await analyticsApi.get(`/api/analytics/inventory-levels`, { params, signal });
-        return Array.isArray(response.data) ? response.data : [];
-      });
-      setInventoryLevels(data);
+        const payload = Array.isArray(response.data) ? response.data : [];
+        return maybeCompress(payload);
+      }, silent ? { forceRefresh: true, background: true } : undefined);
+      setInventoryLevels(maybeDecompress(data));
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Inventory levels fetch error', e);
     }
   }, [branchId, user]);
 
-  const fetchCategoryDistribution = useCallback(async (signal) => {
+  const fetchCategoryDistribution = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
     const params = branchId ? { branch_id: branchId } : {};
     const cacheParams = {
@@ -734,21 +928,31 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     };
     const cached = getCachedValue('categoryDistribution', cacheParams);
     if (cached) {
-      setCategoryDist(cached);
-      return;
+      setCategoryDist(maybeDecompress(cached));
+      if (silent) {
+        fetchAndCache('categoryDistribution', cacheParams, async () => {
+          const response = await analyticsApi.get(`/api/analytics/category-distribution`, { params, signal });
+          const payload = Array.isArray(response.data) ? response.data : [];
+          return maybeCompress(payload);
+        }, { forceRefresh: true, background: true })
+          .then((data) => { if (data) setCategoryDist(maybeDecompress(data)); })
+          .catch(() => {});
+      }
+      if (!silent) return;
     }
     try {
       const data = await fetchAndCache('categoryDistribution', cacheParams, async () => {
         const response = await analyticsApi.get(`/api/analytics/category-distribution`, { params, signal });
-        return Array.isArray(response.data) ? response.data : [];
-      });
-      setCategoryDist(data);
+        const payload = Array.isArray(response.data) ? response.data : [];
+        return maybeCompress(payload);
+      }, silent ? { forceRefresh: true, background: true } : undefined);
+      setCategoryDist(maybeDecompress(data));
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Category distribution fetch error', e);
     }
   }, [branchId, user]);
 
-  const fetchKPIsData = useCallback(async (signal) => {
+  const fetchKPIsData = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
     const params = {
       start_date: resolvedRange.start_date,
@@ -770,16 +974,34 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
     const cached = getCachedValue('kpis', cacheParams);
     if (cached) {
-      setKpis(cached);
-      setLoadingKPIs(false);
-      return;
+      setKpis(maybeDecompress(cached));
+      if (silent) {
+        fetchAndCache('kpis', cacheParams, async () => {
+          const response = await analyticsApi.get(`/api/analytics/kpis`, { params, signal });
+          const payload = response.data || {
+            total_sales: 0,
+            total_investment: 0,
+            total_profit: 0,
+            prev_total_sales: 0,
+            prev_total_investment: 0,
+            prev_total_profit: 0,
+            inventory_count: 0
+          };
+          return maybeCompress(payload);
+        }, { forceRefresh: true, background: true })
+          .then((data) => { if (data) setKpis(maybeDecompress(data)); })
+          .catch(() => {});
+      } else {
+        setLoadingKPIs(false);
+      }
+      if (!silent) return;
     }
 
-    setLoadingKPIs(true);
+    if (!silent) setLoadingKPIs(true);
     try {
       const data = await fetchAndCache('kpis', cacheParams, async () => {
         const response = await analyticsApi.get(`/api/analytics/kpis`, { params, signal });
-        return response.data || {
+        const payload = response.data || {
           total_sales: 0,
           total_investment: 0,
           total_profit: 0,
@@ -788,8 +1010,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
           prev_total_profit: 0,
           inventory_count: 0
         };
-      });
-      setKpis(data);
+        return maybeCompress(payload);
+      }, silent ? { forceRefresh: true, background: true } : undefined);
+      setKpis(maybeDecompress(data));
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('KPIs fetch error', e);
       setKpis({
@@ -802,7 +1025,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         inventory_count: 0
       });
     } finally {
-      setLoadingKPIs(false);
+      if (!silent) setLoadingKPIs(false);
     }
   }, [branchId, categoryFilter, productIdFilter, resolvedRange, user]);
 
@@ -845,7 +1068,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     };
   }, [deliveryInterval]);
 
-  const loadDeliveryChunk = useCallback(async ({ cursor = 0, mode = 'replace', signal } = {}) => {
+  const loadDeliveryChunk = useCallback(async ({ cursor = 0, mode = 'replace', signal, silent = false } = {}) => {
     if (!user) return;
     const range = computeDeliveryRange(cursor);
     if (!range) return;
@@ -870,42 +1093,37 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       };
 
       const cached = getCachedValue('delivery', cacheParams);
-      if (cached) return cached;
+      if (cached) {
+        return maybeDecompress(cached);
+      }
 
-      const result = await fetchAndCache('delivery', cacheParams, async () => {
-        const response = await analyticsApi.get(`/api/analytics/delivery`, { params, signal });
-        const payload = response.data;
-        const rawRows = Array.isArray(payload?.data)
-          ? payload.data
-          : Array.isArray(payload)
-            ? payload
-            : [];
+      const result = await fetchAndCache(
+        'delivery',
+        cacheParams,
+        async () => {
+          const response = await analyticsApi.get(`/api/analytics/delivery`, { params, signal });
+          const payload = response.data;
+          const rawRows = Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload)
+              ? payload
+              : [];
+          const filled = fillDeliverySeries(rawRows, deliveryInterval, range.start_date, range.end_date).map((entry) => ({
+            ...entry,
+            delivered: status === 'delivered' ? Number(entry.number_of_deliveries ?? entry.delivered ?? 0) : 0,
+            undelivered: status === 'undelivered' ? Number(entry.number_of_deliveries ?? entry.undelivered ?? 0) : 0
+          }));
+          const metaPayload = payload?.meta ?? {};
+          return maybeCompress({ data: filled, meta: metaPayload });
+        }
+      );
 
-        const normalized = rawRows
-          .map(normalizeDeliveryEntry)
-          .filter(Boolean);
-
-        const filled = fillDeliverySeries(normalized, deliveryInterval, range.start_date, range.end_date);
-
-        const metaPayload = payload?.meta
-          ? {
-              min_bucket: payload.meta.min_bucket ?? null,
-              max_bucket: payload.meta.max_bucket ?? null,
-              min_reference: payload.meta.min_reference ?? null,
-              max_reference: payload.meta.max_reference ?? null,
-              step: payload.meta.step ?? 'day'
-            }
-          : { ...DELIVERY_META_DEFAULT };
-
-        return { data: filled, meta: metaPayload };
-      });
-
-      return result;
+      return maybeDecompress(result);
     };
 
     const requestId = deliveryRequestIdRef.current + 1;
     deliveryRequestIdRef.current = requestId;
-    setLoadingDelivery(true);
+    if (!silent) setLoadingDelivery(true);
 
     try {
       // Fetch both delivered and undelivered in parallel, then merge into grouped series
@@ -914,22 +1132,20 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         fetchStatus('undelivered')
       ]);
 
-      const delivered = Array.isArray(deliveredRes?.data) ? deliveredRes.data : [];
-      const undelivered = Array.isArray(undeliveredRes?.data) ? undeliveredRes.data : [];
+      const deliveredSeries = deliveredRes?.data ?? [];
+      const undeliveredSeries = undeliveredRes?.data ?? [];
 
       const mergedMap = new Map();
-      delivered.forEach((item) => {
-        const key = String(item.date);
-        mergedMap.set(key, {
-          date: key,
-          delivered: Number(item.number_of_deliveries) || 0,
-          undelivered: 0
-        });
-      });
-      undelivered.forEach((item) => {
+      deliveredSeries.forEach((item) => {
         const key = String(item.date);
         const existing = mergedMap.get(key) || { date: key, delivered: 0, undelivered: 0 };
-        existing.undelivered = Number(item.number_of_deliveries) || 0;
+        existing.delivered = Number(item.delivered ?? item.number_of_deliveries ?? 0) || 0;
+        mergedMap.set(key, existing);
+      });
+      undeliveredSeries.forEach((item) => {
+        const key = String(item.date);
+        const existing = mergedMap.get(key) || { date: key, delivered: 0, undelivered: 0 };
+        existing.undelivered = Number(item.undelivered ?? item.number_of_deliveries ?? 0) || 0;
         mergedMap.set(key, existing);
       });
 
@@ -963,7 +1179,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       if (e?.code !== 'ERR_CANCELED') console.error('Delivery analytics fetch error', e);
       if (mode === 'replace') setDeliveryData([]);
     } finally {
-      if (deliveryRequestIdRef.current === requestId) {
+      if (!silent && deliveryRequestIdRef.current === requestId) {
         setLoadingDelivery(false);
       }
     }
@@ -1083,6 +1299,44 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       clearTimeout(timer);
     };
   }, [loadDeliveryChunk, user]);
+
+  // Real-time updates: listen for socket-driven analytics events and refresh silently
+  useEffect(() => {
+    const onSale = () => {
+      const c = new AbortController();
+      fetchKPIsData(c.signal, { silent: true });
+      fetchSalesPerformance(c.signal, { silent: true });
+      fetchCategoryDistribution(c.signal, { silent: true });
+      fetchTopProductsData(c.signal, { silent: true });
+    };
+    const onInventory = () => {
+      const c = new AbortController();
+      fetchInventoryLevels(c.signal, { silent: true });
+      fetchCategoryDistribution(c.signal, { silent: true });
+      fetchTopProductsData(c.signal, { silent: true });
+    };
+    const onDelivery = () => {
+      const c = new AbortController();
+      loadDeliveryChunk({ cursor: deliveryOldestCursor || 0, mode: 'replace', signal: c.signal, silent: true });
+    };
+
+    const saleHandler = (e) => {
+      const action = e?.detail?.action;
+      onSale();
+      if (action && (action.includes('delivery') || action === 'delivery_status_change')) {
+        onDelivery();
+      }
+    };
+    const inventoryHandler = () => onInventory();
+
+    window.addEventListener('analytics-sale-update', saleHandler);
+    window.addEventListener('analytics-inventory-update', inventoryHandler);
+
+    return () => {
+      window.removeEventListener('analytics-sale-update', saleHandler);
+      window.removeEventListener('analytics-inventory-update', inventoryHandler);
+    };
+  }, [deliveryOldestCursor, fetchCategoryDistribution, fetchInventoryLevels, fetchKPIsData, fetchSalesPerformance, fetchTopProductsData, loadDeliveryChunk]);
 
   useEffect(() => {
     const c = new AbortController();

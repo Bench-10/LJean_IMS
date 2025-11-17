@@ -146,11 +146,11 @@ function BranchPerformance({
   );
 
   // Fetch branch performance data
-  const fetchBranchPerformance = useCallback(async (signal) => {
+  const fetchBranchPerformance = useCallback(async (signal, { silent = false } = {}) => {
     if (!user || !isOwner) {
       setBranchTotals([]);
       setError(null);
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
 
@@ -158,11 +158,12 @@ function BranchPerformance({
     if (cached) {
       setBranchTotals(cached.data);
       setError(null);
-      setLoading(false);
-      return;
+      if (!silent) setLoading(false);
+      // For real-time updates, proceed to refresh in background when silent
+      if (!silent) return;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -188,7 +189,7 @@ function BranchPerformance({
       setBranchTotals([]);
       setError('Failed to load branch performance data');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [cacheKey, categoryFilter, endDate, isOwner, startDate, user]);
 
@@ -199,6 +200,24 @@ function BranchPerformance({
     fetchBranchPerformance(controller.signal);
     return () => controller.abort();
   }, [fetchBranchPerformance, user, isOwner]);
+
+  // Real-time analytics updates: refresh silently on sale/inventory events
+  useEffect(() => {
+    if (!user || !isOwner) return undefined;
+    const handler = () => {
+      const c = new AbortController();
+      fetchBranchPerformance(c.signal, { silent: true });
+      return () => c.abort();
+    };
+    const saleListener = () => handler();
+    const inventoryListener = () => handler();
+    window.addEventListener('analytics-sale-update', saleListener);
+    window.addEventListener('analytics-inventory-update', inventoryListener);
+    return () => {
+      window.removeEventListener('analytics-sale-update', saleListener);
+      window.removeEventListener('analytics-inventory-update', inventoryListener);
+    };
+  }, [fetchBranchPerformance, isOwner, user]);
 
   const showBarChart = !loading && !error && branchTotals.length > 0 && hasPositiveBarValues;
   const showPieChart = !loading && !error && processedPieData.length > 0;

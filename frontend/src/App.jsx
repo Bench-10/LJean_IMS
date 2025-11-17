@@ -1116,6 +1116,9 @@ function App() {
       
       // ONLY UPDATE IF THE UPDATE WASN'T MADE BY THE CURRENT USER
       if (user.user_id !== inventoryData.user_id) {
+        try {
+          window.dispatchEvent(new CustomEvent('analytics-inventory-update', { detail: inventoryData }));
+        } catch (e) { /* ignore non-browser env */ }
         if (inventoryData.action === 'add') {
           setProductsData(prevData => [...prevData, inventoryData.product]);
           // notify UI components to reapply their local filters (e.g. branch filter)
@@ -1555,6 +1558,10 @@ function App() {
     // LISTEN FOR SALES UPDATES
     newSocket.on('sale-update', (saleData) => {
       console.log('Sale update received:', saleData);
+      // notify analytics listeners immediately
+      try {
+        window.dispatchEvent(new CustomEvent('analytics-sale-update', { detail: saleData }));
+      } catch (e) { /* ignore non-browser env */ }
       
       // ONLY UPDATE IF THE UPDATE WASN'T MADE BY THE CURRENT USER
       if (user.user_id !== saleData.user_id) {

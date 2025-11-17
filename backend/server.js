@@ -495,6 +495,8 @@ export const broadcastOwnerNotification = (notification, options = {}) => {
 // BROADCAST INVENTORY UPDATE TO ALL USERS IN BRANCH
 export const broadcastInventoryUpdate = (branchId, inventoryData) => {
   io.to(`branch-${branchId}`).emit('inventory-update', inventoryData);
+  // Also notify all Owners (cross-branch aggregate views)
+  io.to('owners').emit('inventory-update', { ...inventoryData, __source_branch_id: branchId });
 };
 
 
@@ -502,6 +504,8 @@ export const broadcastInventoryUpdate = (branchId, inventoryData) => {
 // BROADCAST PRODUCT VALIDITY UPDATE TO ALL USERS IN BRANCH
 export const broadcastValidityUpdate = (branchId, validityData) => {
   io.to(`branch-${branchId}`).emit('validity-update', validityData);
+  // Also notify Owners for aggregate monitoring
+  io.to('owners').emit('validity-update', { ...validityData, __source_branch_id: branchId });
 };
 
 
@@ -514,6 +518,8 @@ export const broadcastHistoryUpdate = (branchId, historyData) => {
 // BROADCAST SALES UPDATE TO ALL USERS IN BRANCH
 export const broadcastSaleUpdate = (branchId, saleData) => {
   io.to(`branch-${branchId}`).emit('sale-update', saleData);
+  // Also notify Owners for cross-branch analytics
+  io.to('owners').emit('sale-update', { ...saleData, __source_branch_id: branchId });
 };
 
 

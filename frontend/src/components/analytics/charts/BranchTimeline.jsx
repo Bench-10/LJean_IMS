@@ -12,10 +12,40 @@ import dayjs from 'dayjs';
 const TIMELINE_WINDOW_SIZES = { daily: 7, weekly: 5, monthly: 5 };
 const TIMELINE_CACHE = new Map();
 const TIMELINE_SELECTION_KEY = 'analytics:branchTimeline:lastSelection';
+const TIMELINE_VIRTUALIZATION_LIMIT = 360;
+const PROGRESSIVE_SEGMENTS = 5;
+const PROGRESSIVE_INTERVAL_MS = 120;
+const MIN_PROGRESSIVE_CHUNK = 6;
+
+const buildSampledIndices = (length, limit) => {
+  if (!Number.isFinite(length) || length <= 0) return [];
+  if (!limit || length <= limit) {
+    return Array.from({ length }, (_, index) => index);
+  }
+
+  const step = Math.ceil(length / limit);
+  const indices = new Set();
+  for (let i = 0; i < length; i += step) indices.add(i);
+  indices.add(length - 1);
+  return Array.from(indices).sort((a, b) => a - b);
+};
+
+const sampleArray = (input, limit) => {
+  if (!Array.isArray(input)) return [];
+  const indices = buildSampledIndices(input.length, limit);
+  return indices.map((index) => input[index]).filter((item) => item !== undefined);
+};
+
+const getProgressiveChunkSize = (length) => {
+  if (!Number.isFinite(length) || length <= 0) return 0;
+  const base = Math.ceil(length / PROGRESSIVE_SEGMENTS);
+  return Math.max(MIN_PROGRESSIVE_CHUNK, base);
+};
 
 function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   const { user } = useAuth();
   const [branchTimelineData, setBranchTimelineData] = useState([]);
+  const [displayTimelineData, setDisplayTimelineData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedBranch, setSelectedBranch] = useState(() => {
@@ -31,6 +61,8 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   });
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [totalPeriods, setTotalPeriods] = useState(TIMELINE_WINDOW_SIZES[timelineInterval] || TIMELINE_WINDOW_SIZES.monthly);
+  const [rawTimelineLength, setRawTimelineLength] = useState(0);
+  const [progressiveCount, setProgressiveCount] = useState(0);
 
   const updateSelectedBranch = useCallback((value, options = {}) => {
     const normalized = value ? String(value) : '';
@@ -181,10 +213,25 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   }, [getIntervalUnit, timelineInterval, totalPeriods]);
 
   // Fetch timeline data with pagination
-  const loadTimelineChunk = useCallback(async ({ mode = 'replace', signal, rangeOverride } = {}) => {
+  const initializeTimelineData = useCallback((data) => {
+    if (!Array.isArray(data) || !data.length) {
+      setBranchTimelineData([]);
+      setDisplayTimelineData([]);
+      setProgressiveCount(0);
+      return;
+    }
+    const initial = Math.min(getProgressiveChunkSize(data.length), data.length);
+    const safeInitial = initial || data.length;
+    setBranchTimelineData(data);
+    setDisplayTimelineData(data.slice(0, safeInitial));
+    setProgressiveCount(safeInitial);
+  }, []);
+
+  const loadTimelineChunk = useCallback(async ({ mode = 'replace', signal, rangeOverride, silent = false } = {}) => {
     if (!isOwner || !selectedBranch) {
       setBranchTimelineData([]);
-      setLoading(false);
+      setDisplayTimelineData([]);
+      if (!silent) setLoading(false);
       return;
     }
 
@@ -192,7 +239,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
     if (!range) return;
 
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       const params = {
@@ -215,18 +262,27 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
       const sorted = timelineData
         .slice()
         .sort((a, b) => (a.period || '').localeCompare(b.period || ''));
-      const dates = sorted.map((d) => d.period).filter(Boolean);
+      const normalized = sorted.map((entry) => ({
+        ...entry,
+        sales_amount: Number(entry.sales_amount ?? entry.total_sales ?? entry.sales ?? 0),
+        units_sold: Number(entry.units_sold ?? entry.total_units ?? entry.units ?? 0)
+      }));
+      const sampled = sampleArray(normalized, TIMELINE_VIRTUALIZATION_LIMIT);
+      const nextData = sampled.length ? sampled : normalized;
+      const dates = normalized.map((d) => d.period).filter(Boolean);
       const meta = {
         min_date: dates[0] || null,
         max_date: dates[dates.length - 1] || null
       };
       setTimelineMeta(meta);
-      setBranchTimelineData(sorted);
-      setHasMoreHistory(sorted.length >= totalPeriods);
+      setRawTimelineLength(normalized.length);
+      initializeTimelineData(nextData);
+      setHasMoreHistory(normalized.length >= totalPeriods);
       TIMELINE_CACHE.set(cacheKey, {
-        data: sorted,
+        data: nextData,
+        rawLength: normalized.length,
         meta,
-        hasMoreHistory: sorted.length >= totalPeriods,
+        hasMoreHistory: normalized.length >= totalPeriods,
         totalPeriods
       });
 
@@ -235,19 +291,22 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
       console.error('Branch timeline fetch error:', e);
       setError('Failed to load branch timeline data');
       setBranchTimelineData([]);
+      setDisplayTimelineData([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [cacheKey, categoryFilter, computeTimelineRange, isOwner, selectedBranch, timelineInterval, totalPeriods]);
+  }, [cacheKey, categoryFilter, computeTimelineRange, initializeTimelineData, isOwner, selectedBranch, timelineInterval, totalPeriods]);
 
   // Load initial data
   useEffect(() => {
-    if (!selectedBranch || loadingBranches) return;
+    if (!selectedBranch) return;
     const cached = TIMELINE_CACHE.get(cacheKey);
     if (cached && cached.totalPeriods === totalPeriods) {
-      setBranchTimelineData(Array.isArray(cached.data) ? cached.data : []);
+      const cachedData = Array.isArray(cached.data) ? cached.data : [];
+      initializeTimelineData(cachedData);
       setTimelineMeta(cached.meta ?? { min_date: null, max_date: null });
-      setHasMoreHistory(cached.hasMoreHistory ?? true);
+      setHasMoreHistory(cached.hasMoreHistory ?? (Array.isArray(cachedData) && cachedData.length >= totalPeriods));
+      setRawTimelineLength(cached.rawLength ?? (Array.isArray(cachedData) ? cachedData.length : 0));
       setError(null);
       setLoading(false);
       return;
@@ -255,7 +314,40 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
     const controller = new AbortController();
     loadTimelineChunk({ mode: 'replace', signal: controller.signal });
     return () => controller.abort();
-  }, [cacheKey, loadingBranches, loadTimelineChunk, selectedBranch, totalPeriods]);
+  }, [cacheKey, initializeTimelineData, loadTimelineChunk, selectedBranch, totalPeriods]);
+
+  // Real-time: refresh silently on analytics sale/inventory events
+  useEffect(() => {
+    if (!isOwner) return undefined;
+    const handler = () => {
+      const c = new AbortController();
+      loadTimelineChunk({ mode: 'replace', signal: c.signal, silent: true });
+      return () => c.abort();
+    };
+    const saleListener = () => handler();
+    const inventoryListener = () => handler();
+    window.addEventListener('analytics-sale-update', saleListener);
+    window.addEventListener('analytics-inventory-update', inventoryListener);
+    return () => {
+      window.removeEventListener('analytics-sale-update', saleListener);
+      window.removeEventListener('analytics-inventory-update', inventoryListener);
+    };
+  }, [isOwner, loadTimelineChunk]);
+
+  useEffect(() => {
+    if (!branchTimelineData.length) return;
+    if (progressiveCount >= branchTimelineData.length) return;
+    const chunk = Math.max(getProgressiveChunkSize(branchTimelineData.length), MIN_PROGRESSIVE_CHUNK);
+    const timer = setInterval(() => {
+      setProgressiveCount((prev) => {
+        if (prev >= branchTimelineData.length) return prev;
+        const next = Math.min(prev + chunk, branchTimelineData.length);
+        setDisplayTimelineData(branchTimelineData.slice(0, next));
+        return next;
+      });
+    }, PROGRESSIVE_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [branchTimelineData, progressiveCount]);
 
   // IF NOT OWNER, RETURN NULL (COMPONENT WON'T RENDER)
   if (!isOwner) return null;
@@ -271,7 +363,11 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   }, [allBranches, selectedBranch]);
 
   const hasTimelineData = branchTimelineData.length > 0;
-  const shouldShowChart = selectedBranch && hasTimelineData && !loading && !error;
+  const hasDisplayData = displayTimelineData.length > 0;
+  const shouldShowChart = selectedBranch && hasDisplayData && !loading && !error;
+  const progressiveProgress = branchTimelineData.length
+    ? Math.min(100, Math.round((displayTimelineData.length / branchTimelineData.length) * 100))
+    : 100;
 
   // Pagination helpers
   const windowSize = TIMELINE_WINDOW_SIZES[timelineInterval] || TIMELINE_WINDOW_SIZES.monthly;
@@ -316,7 +412,16 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
       exportRef={branchTimelineRef}>
 
         <div className="flex flex-col h-full overflow-hidden relative">
-          {loading && <ChartLoading message="Loading branch timeline..." />}
+          {loading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/85 backdrop-blur-sm">
+              <ChartLoading message="Loading branch timeline..." />
+            </div>
+          )}
+          {progressiveProgress < 100 && !loading && hasTimelineData && (
+            <div className="absolute top-2 right-3 z-10 px-2 py-1 text-[10px] rounded-md bg-white/90 border border-gray-200 shadow-sm" data-export-exclude>
+              Rendering {progressiveProgress}% of series…
+            </div>
+          )}
           {error && !loading && (
             <ChartNoData
               message={error}
@@ -422,7 +527,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="branch-timeline">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={branchTimelineData}
+                  data={displayTimelineData}
                   margin={{ top: 10, right: 15, left: 0, bottom: 25 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
@@ -433,8 +538,8 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
                     tickLine={false}
                   />
                   {(() => {
-                    const maxSales = branchTimelineData.reduce((m,p) => Math.max(m, Number(p.sales_amount)||0), 0);
-                    const maxUnits = branchTimelineData.reduce((m,p) => Math.max(m, Number(p.units_sold)||0), 0);
+                    const maxSales = displayTimelineData.reduce((m,p) => Math.max(m, Number(p.sales_amount)||0), 0);
+                    const maxUnits = displayTimelineData.reduce((m,p) => Math.max(m, Number(p.units_sold)||0), 0);
                     const overallMax = Math.max(maxSales, maxUnits);
                     
                     if (overallMax <= 0) return <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 1]} />;
@@ -489,6 +594,11 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
                   />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          )}
+          {rawTimelineLength > displayTimelineData.length && !loading && !error && (
+            <div className="mt-1 text-[10px] text-gray-500 px-2" data-export-exclude>
+              Showing a sampled subset of {displayTimelineData.length} out of {rawTimelineLength} timeline points for smoother rendering.
             </div>
           )}
         </div>
