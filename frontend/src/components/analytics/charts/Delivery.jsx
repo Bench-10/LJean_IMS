@@ -74,7 +74,12 @@ function Delivery({
 
   return (
     <>
-      <Card title="Delivery Analytics" className="col-span-full h-[500px]" exportRef={deliveryChartRef}>
+      <Card
+        title="Delivery Analytics"
+        className="col-span-full h-[500px]"
+        exportRef={deliveryChartRef}
+        exportId="delivery"
+      >
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {loadingDelivery && <ChartLoading message="Loading delivery data..." />}
 

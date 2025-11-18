@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  BarChart, Bar, Legend, PieChart, Pie, Cell
+  BarChart, Bar, Legend, PieChart, Pie, Cell, LabelList
 } from 'recharts';
 import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
@@ -230,6 +230,8 @@ function BranchPerformance({
         title={"BRANCH SALES PERFORMANCE COMPARISON"}
         className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]"
         exportRef={branchPerformanceRef}
+        exportId="branch-performance"
+        exportSpans={{ lg: 8 }}
       >
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {loading && (
@@ -238,7 +240,7 @@ function BranchPerformance({
             </div>
           )}
           {error && !loading && (
-            <ChartNoData message={error} hint="Please try refreshing the analytics page." />
+            <ChartNoData message={error} hint="Please try refreshing the analytics page." onRetry={() => fetchBranchPerformance()} />
           )}
 
           {showBarChart && (
@@ -286,7 +288,14 @@ function BranchPerformance({
                     fill="#3b82f6"
                     radius={[4, 4, 0, 0]}
                     minPointSize={2}      // ensure tiny values still show
-                  />
+                  >
+                    <LabelList
+                      dataKey="total_amount_due"
+                      position="top"
+                      formatter={(value) => currencyFormat(value)}
+                      style={{ fontSize: 10, fill: '#0f172a', fontWeight: 600 }}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -306,6 +315,8 @@ function BranchPerformance({
         title={"REVENUE DISTRIBUTION (%)"}
         className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]"
         exportRef={revenueDistributionRef}
+        exportId="revenue-distribution"
+        exportSpans={{ lg: 4 }}
       >
         <div className="flex flex-col h-full max-h-full overflow-hidden relative">
           {loading && (
@@ -314,7 +325,7 @@ function BranchPerformance({
             </div>
           )}
           {error && !loading && (
-            <ChartNoData message={error} hint="Please try refreshing the analytics page." />
+            <ChartNoData message={error} hint="Please try refreshing the analytics page." onRetry={() => fetchBranchPerformance()} />
           )}
 
           {showPieChart && (

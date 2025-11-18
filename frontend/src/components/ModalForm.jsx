@@ -840,7 +840,7 @@ const handleModalClose = useCallback(() => {
           <div className="grow min-h-0 overflow-y-auto px-4 sm:px-6 md:px-10 py-4 sm:py-6 hide-scrollbar">
             <form id="modal-form" onSubmit={(e) => { e.preventDefault(); validateInputs(); }}>
               {/* PRODUCT NAME + BROWSE */}
-              <div className="relative mb-4">
+              <div className="relative mb-3">
                 <label className={label('product_name')}>Product name</label>
                 <div className="flex gap-2 items-center">
                   <div className="relative flex-1">
@@ -952,7 +952,7 @@ const handleModalClose = useCallback(() => {
 
               {/* DESCRIPTION */}
               {!(mode === 'edit' && editChoice === 'addStocks') && (
-                <div className="mb-4">
+                <div className="mb-3">
                   <label className={label('description')}>Description</label>
                   <textarea
                     placeholder="Enter product description"
@@ -965,8 +965,8 @@ const handleModalClose = useCallback(() => {
               )}
 
               {/* GRID */}
-              {/* GRID — desktop matches screenshot, mobile in your custom order */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-4">
+                            {/* GRID — desktop matches screenshot, mobile in your custom order */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-3">
   {/* Category — LEFT (row 1) */}
   {!(mode === 'edit' && editChoice === 'addStocks') && (
     <div className="md:col-start-1">
@@ -1052,9 +1052,9 @@ const handleModalClose = useCallback(() => {
     </div>
   )}
 
-  {/* Quantity — LEFT (row 2) */}
+  {/* Quantity — column varies: Add -> right under Unit; Edit+addStocks -> keep current (left); Edit+edit -> hidden */}
   {!(mode === 'edit' && editChoice === 'edit') && (
-    <div className="md:col-start-1">
+    <div className={mode !== 'edit' ? 'md:col-start-2' : 'md:col-start-1'}>
       <label className={label('quantity_added')}>Quantity</label>
       <input
         type="number"
@@ -1072,34 +1072,67 @@ const handleModalClose = useCallback(() => {
     </div>
   )}
 
-  {/* Unit cost — RIGHT (row 3) */}
-  {!(mode === 'edit' && editChoice === 'edit') && (
-    <div className="md:col-start-2">
-      <label className={label('unit_cost')}>Unit cost</label>
-      <input
-        placeholder="Cost"
-        className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
-        value={unit_cost}
-        onChange={(e) => setPurchasedPrice(e.target.value)}
-        inputMode="decimal"
-      />
-      {errorflag('unit_cost', 'value')}
-    </div>
-  )}
+  {/* Price and Unit cost — swap positions between create vs edit modes to match requested UI */}
+  {mode === 'edit' ? (
+    <>
+      {!(mode === 'edit' && editChoice === 'addStocks') && (
+        <div className={editChoice === 'edit' ? 'md:col-start-2' : 'md:col-start-1'}>
+          <label className={label('unit_price')}>Price</label>
+          <input
+            placeholder="Price"
+            className={`${inputClass('unit_price')} focus:border-2 focus:border-green-500`}
+            value={unit_price}
+            onChange={(e) => setPrice(e.target.value)}
+            inputMode="decimal"
+          />
+          {errorflag('unit_price', 'value')}
+        </div>
+      )}
 
-  {/* Price — RIGHT (row 3) */}
-  {!(mode === 'edit' && editChoice === 'addStocks') && (
-    <div className="md:col-start-2">
-      <label className={label('unit_price')}>Price</label>
-      <input
-        placeholder="Price"
-        className={`${inputClass('unit_price')} focus:border-2 focus:border-green-500`}
-        value={unit_price}
-        onChange={(e) => setPrice(e.target.value)}
-        inputMode="decimal"
-      />
-      {errorflag('unit_price', 'value')}
-    </div>
+      {!(mode === 'edit' && editChoice === 'edit') && (
+        <div className="md:col-start-2">
+          <label className={label('unit_cost')}>Unit cost</label>
+          <input
+            placeholder="Cost"
+            className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
+            value={unit_cost}
+            onChange={(e) => setPurchasedPrice(e.target.value)}
+            inputMode="decimal"
+          />
+          {errorflag('unit_cost', 'value')}
+        </div>
+      )}
+    </>
+  ) : (
+    <>
+      {!(mode === 'edit' && editChoice === 'edit') && (
+        <div className="md:col-start-1">
+          <label className={label('unit_cost')}>Unit cost</label>
+          <input
+            placeholder="Cost"
+            className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
+            value={unit_cost}
+            onChange={(e) => setPurchasedPrice(e.target.value)}
+            inputMode="decimal"
+          />
+          {errorflag('unit_cost', 'value')}
+        </div>
+      )}
+
+      {!(mode === 'edit' && editChoice === 'addStocks') && (
+        <div className="md:col-start-2">
+          <label className={label('unit_price')}>Price</label>
+          <input
+            placeholder="Price"
+            className={`${inputClass('unit_price')} focus:border-2 focus:border-green-500`}
+            value={unit_price}
+            onChange={(e) => setPrice(e.target.value)}
+            inputMode="decimal"
+          />
+          {errorflag('unit_price', 'value')}
+        </div>
+      )}
+    </>
   )}
 
   {/* Date Added — LEFT (row 4) */}

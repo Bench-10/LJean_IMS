@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, LabelList } from 'recharts';
 import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
@@ -407,9 +407,12 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   return (
     <>
       {/* BRANCH TIMELINE CHART */}
-      <Card title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`} 
-      className="col-span-full h-[calc(100vh-260px)] min-h-[420px]"
-      exportRef={branchTimelineRef}>
+      <Card
+        title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`}
+        className="col-span-full mt-5 lg:mt-0 mb-8 h-[calc(100vh-260px)] min-h-[420px]"
+        exportRef={branchTimelineRef}
+        exportId="branch-timeline"
+      >
 
         <div className="flex flex-col h-full overflow-hidden relative">
           {loading && (
@@ -426,6 +429,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
             <ChartNoData
               message={error}
               hint="Please try selecting a different branch or refresh the page."
+              onRetry={() => loadTimelineChunk()}
             />
           )}
           
@@ -528,7 +532,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={displayTimelineData}
-                  margin={{ top: 10, right: 15, left: 0, bottom: 25 }}
+                  margin={{ top: 30, right: 15, left: 0, bottom: 25 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                   <XAxis 
@@ -585,13 +589,27 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
                     name="Sales Amount"
                     fill="#0f766e" 
                     radius={[4,4,0,0]}
-                  />
+                  >
+                    <LabelList
+                      dataKey="sales_amount"
+                      position="top"
+                      formatter={(value) => currencyFormat(value)}
+                      style={{ fontSize: 9, fill: '#0f172a', fontWeight: 600 }}
+                    />
+                  </Bar>
                   <Bar 
                     dataKey="units_sold" 
                     name="Units Sold"
                     fill="#0891b2" 
                     radius={[4,4,0,0]}
-                  />
+                  >
+                    <LabelList
+                      dataKey="units_sold"
+                      position="top"
+                      formatter={(value) => `${value}`}
+                      style={{ fontSize: 9, fill: '#0f172a', fontWeight: 600 }}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

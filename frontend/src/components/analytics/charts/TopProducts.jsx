@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { currencyFormat } from '../../../utils/formatCurrency';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, BarChart, Bar, Area, Legend, Cell, ReferenceLine, ComposedChart
+  CartesianGrid, BarChart, Bar, Area, Legend, Cell, ReferenceLine, ComposedChart, LabelList
 } from 'recharts';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
@@ -11,6 +11,7 @@ import { FaLightbulb } from 'react-icons/fa';
 
 import DropdownCustom from '../../../components/DropdownCustom';
 
+const INITIAL_TOP_PRODUCTS_PAGE = 10;
 const TOP_PRODUCTS_LIMIT = 24;
 const SALES_SERIES_LIMIT = 480;
 const FORECAST_SERIES_LIMIT = 360;
@@ -86,9 +87,11 @@ function TopProducts({
   topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName,
   salesInterval, setSalesInterval, restockInterval, setRestockInterval,
   setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts,
-  loadingRestockSuggestions, restockSuggestions, dateRangeDisplay, topProductsRef, salesChartRef
+  loadingRestockSuggestions, restockSuggestions, dateRangeDisplay, topProductsRef, salesChartRef,
+  onRetryTopProducts, onRetrySalesPerformance
 }) {
   const [showRestockDialog, setShowRestockDialog] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_TOP_PRODUCTS_PAGE);
 
   // NEW (debug heights)
   useEffect(() => {
@@ -124,6 +127,10 @@ function TopProducts({
     return topProducts.findIndex((p) => p?.product_id === parseInt(productIdFilter, 10));
   }, [productIdFilter, topProducts]);
 
+  useEffect(() => {
+    setVisibleCount(INITIAL_TOP_PRODUCTS_PAGE);
+  }, [categoryName, productIdFilter]);
+
   const virtualizedTopProducts = useMemo(() => {
     if (!Array.isArray(topProducts) || !topProducts.length) return [];
     const include = selectedProductIndex >= 0 ? [selectedProductIndex] : [];
@@ -132,7 +139,8 @@ function TopProducts({
   }, [selectedProductIndex, topProducts]);
 
   const totalTopProducts = Array.isArray(topProducts) ? topProducts.length : 0;
-  const topProductsDisplay = virtualizedTopProducts.length ? virtualizedTopProducts : topProducts || [];
+  const baseDisplay = virtualizedTopProducts.length ? virtualizedTopProducts : topProducts || [];
+  const topProductsDisplay = baseDisplay.slice(0, Math.min(visibleCount, baseDisplay.length));
 
   const VISIBLE_ROWS = 7;
   const BAR_SIZE = 30;
@@ -286,6 +294,8 @@ function TopProducts({
         title={selectedProductName ? `${categoryName} - ${selectedProductName}` : categoryName}
         className="relative col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]"
         exportRef={topProductsRef}
+        exportId="top-products"
+        exportSpans={{ lg: 4 }}
       >
         <div className="flex flex-col h-full">
           {loadingTopProducts && <ChartLoading message="Loading top products..." />}
@@ -307,7 +317,7 @@ function TopProducts({
             style={{ height: visibleHeight, scrollbarColor: 'transparent transparent', scrollbarWidth: 'thin' }}
           >
             {(!topProductsDisplay || topProductsDisplay.length === 0) ? (
-              <ChartNoData message="No top products for the selected filters." />
+              <ChartNoData message="No top products for the selected filters." onRetry={onRetryTopProducts} />
             ) : (
               <ResponsiveContainer width="100%" height={totalHeight}>
                 <BarChart
@@ -370,15 +380,30 @@ function TopProducts({
                       }
                       return <Cell key={`cell-${idx}`} fill={fillColor} />;
                     })}
+                    <LabelList
+                      dataKey="sales_amount"
+                      position="right"
+                      formatter={(value) => currencyFormat(value)}
+                      style={{ fontSize: 10, fill: '#0f172a', fontWeight: 600 }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
-            {totalTopProducts > topProductsDisplay.length && (
-              <div className="mt-1 text-[10px] text-gray-500" data-export-exclude>
-                Showing a sampled subset of {topProductsDisplay.length} out of {totalTopProducts} products for smoother rendering.
-              </div>
-            )}
+            <div className="mt-2 flex items-center justify-between text-[10px] text-gray-500" data-export-exclude>
+              <span>
+                Showing {topProductsDisplay.length} of {totalTopProducts} products
+              </span>
+              {topProductsDisplay.length < totalTopProducts && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => Math.min(prev + INITIAL_TOP_PRODUCTS_PAGE, totalTopProducts))}
+                  className="ml-2 inline-flex items-center px-2 py-1 rounded border border-gray-300 bg-white text-[10px] font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Show more
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </Card>
@@ -388,6 +413,8 @@ function TopProducts({
         title={selectedProductName ? `Sales Performance - ${selectedProductName}` : 'Sales Performance'}
         className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]"
         exportRef={salesChartRef}
+        exportId="sales-performance"
+        exportSpans={{ lg: 8 }}
       >
         <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
           {loadingSalesPerformance && <ChartLoading message="Loading sales performance..." />}
@@ -438,6 +465,7 @@ function TopProducts({
               <ChartNoData
                 message={selectedProductName ? `No sales performance data for ${selectedProductName}.` : 'No sales performance data for the selected filters.'}
                 hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY."
+                onRetry={onRetrySalesPerformance}
               />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -512,6 +540,7 @@ function TopProducts({
                 <ChartNoData
                   message={selectedProductName ? `No units sold data for ${selectedProductName}.` : 'No units sold data for the selected filters.'}
                   hint="TRY ADJUSTING THE DATE RANGE OR CATEGORY."
+                  onRetry={onRetrySalesPerformance}
                 />
               </div>
             ) : (

@@ -61,6 +61,18 @@ const PERFORMANCE_CONFIG = {
 
 const CACHE_TTL_MS = PERFORMANCE_CONFIG.cacheTTL;
 
+const PRESET_LABELS = {
+  current_day: 'Current Day',
+  current_week: 'Current Week',
+  current_month: 'Current Month',
+  current_year: 'Current Year'
+};
+
+const capitalizeLabel = (value) => {
+  if (!value) return '—';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
 const analyticsCaches = {
   branches: new Map(),
   salesPerformance: new Map(),
@@ -324,10 +336,21 @@ const mergeDeliverySeries = (older, current) => {
 };
 
 /* ---------- Small utility card ---------- */
-const Card = ({ title, children, className = '', exportRef, bodyClassName = '' }) => {
+const Card = ({ title, children, className = '', exportRef, bodyClassName = '', exportId, exportSpans = {} }) => {
   const bodyClasses = ['flex-1', 'min-h-0', bodyClassName].filter(Boolean).join(' ');
+  const dataAttrs = {};
+  if (exportId) {
+    dataAttrs['data-export-section'] = exportId;
+  }
+  if (exportSpans && typeof exportSpans === 'object') {
+    Object.entries(exportSpans).forEach(([key, value]) => {
+      if (value == null) return;
+      const attrKey = `data-export-span-${key}`;
+      dataAttrs[attrKey] = String(value);
+    });
+  }
   return (
-    <div ref={exportRef} className={`flex flex-col border border-gray-200 rounded-md bg-white p-4 shadow-sm ${className}`}>
+    <div ref={exportRef} {...dataAttrs} className={`flex flex-col border border-gray-200 rounded-md bg-white p-4 shadow-sm ${className}`}>
       {title && <h2 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase mb-2">{title}</h2>}
       <div className={bodyClasses}>{children}</div>
     </div>
@@ -382,7 +405,7 @@ const CategorySelect = ({ categoryFilter, setCategoryFilter, onCategoryNameChang
 /* ---------- Responsive KPI tile ---------- */
 function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, dateRangeDisplay }) {
   return (
-    <div className="h-full bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 relative overflow-hidden">
+    <div className="h-full bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 relative overflow-hidden" data-kpi-card>
       {loading && <ChartLoading message={title} type="kpi" />}
       <div className={`absolute left-0 top-0 bottom-0 w-1.5 sm:w-2 ${accentClass}`} />
       
@@ -404,10 +427,10 @@ function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, d
             )}
           </div>
 
-          <p className="text-[clamp(18px,5vw,26px)] font-bold leading-tight truncate">
+          <p className="text-[clamp(18px,5vw,26px)] font-bold leading-tight break-words">
             {value}
           </p>
-          <p className="text-[11px] text-gray-400 font-medium mt-1 truncate">
+          <p className="text-[11px] text-gray-400 font-medium mt-1 break-words">
             {sub}
           </p>
         </div>
@@ -450,6 +473,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   }, [user]);
 
   // Refs (export)
+  const analyticsExportRef = useRef(null);
   const salesChartRef = useRef(null);
   const topProductsRef = useRef(null);
   const deliveryChartRef = useRef(null);
@@ -617,6 +641,169 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   }, [rangeMode, preset, startDate, endDate]);
 
   const [allBranches, setAllBranches] = useState([]);
+
+  const branchLabelForExport = useMemo(() => {
+    if (!branchId) return 'All Branches';
+    const idAsString = String(branchId);
+    const match = allBranches.find((branch) => {
+      if (!branch) return false;
+      const candidates = [branch.branch_id, branch.id, branch.branchId, branch.branchID]
+        .filter((value) => value !== undefined && value !== null)
+        .map((value) => String(value));
+      return candidates.includes(idAsString);
+    });
+    if (match) {
+      return match.branch_name || match.name || match.label || match.title || `Branch #${branchId}`;
+    }
+    if (user) {
+      const possibleUserIds = [user.branch_id, user.branchId, user.branchID].filter((value) => value !== undefined && value !== null);
+      if (possibleUserIds.map((value) => String(value)).includes(idAsString) && user.branch_name) {
+        return user.branch_name;
+      }
+    }
+    return `Branch #${branchId}`;
+  }, [branchId, allBranches, user]);
+
+  const selectedProductNameForExport = useMemo(() => {
+    if (!productIdFilter) return null;
+    const numericId = Number(productIdFilter);
+    const match = topProducts.find((product) => {
+      if (!product) return false;
+      const candidates = [product.product_id, product.id, product.productId]
+        .filter((value) => value !== undefined && value !== null)
+        .map((value) => Number(value));
+      return candidates.includes(numericId);
+    });
+    return match?.product_name || null;
+  }, [productIdFilter, topProducts]);
+
+  const dateRangeLabelForExport = useMemo(() => {
+    if (rangeMode === 'preset') {
+      return dateRangeDisplay || PRESET_LABELS[preset] || 'Preset Range';
+    }
+    const startLabel = startDate && dayjs(startDate).isValid() ? dayjs(startDate).format('MMM DD, YYYY') : startDate || '—';
+    const endLabel = endDate && dayjs(endDate).isValid() ? dayjs(endDate).format('MMM DD, YYYY') : endDate || '—';
+    return `${startLabel} - ${endLabel}`;
+  }, [rangeMode, dateRangeDisplay, startDate, endDate, preset]);
+
+  const currentViewLabel = useMemo(() => {
+    if (currentCharts === 'branch') return 'Branch Performance';
+    if (currentCharts === 'delivery') return 'Delivery Analytics';
+    return 'Sales & Forecast';
+  }, [currentCharts]);
+
+  const exportFilters = useMemo(() => {
+    const filters = [
+      { label: 'Branch', value: branchLabelForExport },
+      { label: 'Category', value: categoryName },
+      { label: 'Date Range', value: dateRangeLabelForExport },
+      { label: 'View', value: currentViewLabel },
+      { label: 'Sales Interval', value: capitalizeLabel(salesInterval) },
+      { label: 'Restock Interval', value: capitalizeLabel(restockInterval) },
+      { label: 'Delivery Interval', value: capitalizeLabel(deliveryInterval) }
+    ];
+
+    if (deliveryStatus) {
+      filters.push({ label: 'Delivery Status', value: capitalizeLabel(deliveryStatus) });
+    }
+
+    if (productIdFilter) {
+      const labelValue = selectedProductNameForExport
+        ? `${selectedProductNameForExport} (#${productIdFilter})`
+        : `Product ID ${productIdFilter}`;
+      filters.push({ label: 'Product Filter', value: labelValue });
+    }
+
+    return filters;
+  }, [branchLabelForExport, categoryName, currentViewLabel, dateRangeLabelForExport, deliveryInterval, deliveryStatus, productIdFilter, restockInterval, salesInterval, selectedProductNameForExport]);
+
+  const exportKpiSummary = useMemo(() => {
+    const toNumber = (value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const entries = [
+      {
+        key: 'total_sales',
+        label: 'Total Sales',
+        value: toNumber(kpis.total_sales),
+        previous: toNumber(kpis.prev_total_sales),
+        format: 'currency'
+      },
+      {
+        key: 'total_investment',
+        label: 'Total Investment',
+        value: toNumber(kpis.total_investment),
+        previous: toNumber(kpis.prev_total_investment),
+        format: 'currency'
+      },
+      {
+        key: 'total_profit',
+        label: 'Total Profit',
+        value: toNumber(kpis.total_profit),
+        previous: toNumber(kpis.prev_total_profit),
+        format: 'currency'
+      },
+      {
+        key: 'inventory_count',
+        label: 'Inventory Items',
+        value: toNumber(kpis.inventory_count),
+        previous: null,
+        format: 'number'
+      }
+    ];
+
+    return entries.filter((entry) => Number.isFinite(entry.value));
+  }, [kpis]);
+
+  const exportMeta = useMemo(() => {
+    const generatedAt = new Date().toISOString();
+    const subtitle = currentCharts === 'branch'
+      ? 'Branch Performance Overview'
+      : currentCharts === 'delivery'
+        ? 'Delivery Performance Overview'
+        : 'Sales & Forecast Overview';
+
+    return {
+      title: 'Analytics Intelligence Report',
+      subtitle,
+      branchName: branchLabelForExport,
+      categoryName,
+      dateRange: dateRangeLabelForExport,
+      generatedAt,
+      filters: exportFilters,
+      kpis: exportKpiSummary,
+      intervals: {
+        sales: salesInterval,
+        restock: restockInterval,
+        delivery: deliveryInterval
+      },
+      deliveryStatus,
+      currentView: currentViewLabel,
+      productFilter: productIdFilter ? {
+        id: productIdFilter,
+        name: selectedProductNameForExport || null
+      } : null
+    };
+  }, [branchLabelForExport, categoryName, currentCharts, dateRangeLabelForExport, deliveryInterval, deliveryStatus, exportFilters, exportKpiSummary, currentViewLabel, productIdFilter, restockInterval, salesInterval, selectedProductNameForExport]);
+
+  const exportableCharts = useMemo(() => {
+    const charts = [{ id: 'kpi-summary', label: 'KPI Summary', ref: kpiRef }];
+    if (currentCharts === 'sale') {
+      charts.push({ id: 'sales-performance', label: 'Sales Performance & Forecast', ref: salesChartRef });
+      charts.push({ id: 'top-products', label: 'Top Products', ref: topProductsRef });
+    }
+    if (currentCharts === 'delivery') {
+      charts.push({ id: 'delivery', label: 'Delivery Analytics', ref: deliveryChartRef });
+    }
+    if (currentCharts === 'branch' && !branchId && isOwner) {
+      charts.push({ id: 'branch-performance', label: 'Branch Performance', ref: branchPerformanceRef });
+      charts.push({ id: 'revenue-distribution', label: 'Revenue Distribution', ref: revenueDistributionRef });
+      charts.push({ id: 'branch-timeline', label: 'Branch Timeline', ref: branchTimelineRef });
+    }
+    return charts;
+  }, [branchId, currentCharts, isOwner]);
 
   useEffect(() => {
     setDeliveryData([]);
@@ -1372,7 +1559,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       return day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
     if (intervalType === 'yearly') return d.toLocaleDateString('en-US', { year: 'numeric' });
-    return d.toLocaleDateString('en-US', { month: 'short' });
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
 
   const formatPeriod = (raw) => {
@@ -1391,7 +1578,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     const ymMatch = p.match(/^(\d{4})-(\d{2})$/);
     if (ymMatch) {
       const d = dayjs(`${ymMatch[1]}-${ymMatch[2]}-01`, 'YYYY-MM-DD');
-      if (d.isValid()) return d.format('MMM');
+      if (d.isValid()) return d.format('MMM YYYY');
     }
     return p;
   };
@@ -1413,26 +1600,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       <ExportReportDialog
         isOpen={showExportDialog}
         onClose={() => setShowExportDialog(false)}
-        availableCharts={useMemo(() => {
-          const charts = [{ id: 'kpi-summary', label: 'KPI Summary', ref: kpiRef }];
-          if (currentCharts === 'sale') {
-            charts.push({ id: 'sales-performance', label: 'Sales Performance & Forecast', ref: salesChartRef });
-            charts.push({ id: 'top-products', label: 'Top Products', ref: topProductsRef });
-          }
-          if (currentCharts === 'delivery') {
-            charts.push({ id: 'delivery', label: 'Delivery Analytics', ref: deliveryChartRef });
-          }
-          if (currentCharts === 'branch' && !branchId && isOwner) {
-            charts.push({ id: 'branch-performance', label: 'Branch Performance', ref: branchPerformanceRef });
-            charts.push({ id: 'revenue-distribution', label: 'Revenue Distribution', ref: revenueDistributionRef });
-            charts.push({ id: 'branch-timeline', label: 'Branch Timeline', ref: branchTimelineRef });
-          }
-          return charts;
-        }, [currentCharts, branchId, isOwner])}
+        availableCharts={exportableCharts}
+        meta={exportMeta}
+        exportContainerRef={analyticsExportRef}
       />
 
       {/* Sticky header: View Branch Analytics (mobile top) + Tabs + Export */}
-      <div className="sticky top-0 z-30 bg-white/95 supports-[backdrop-filter]:bg-white/60 backdrop-blur border-b py-3 px-3 sm:px-5 rounded-md">
+      <div className="sticky top-0 z-30 bg-white/95 supports-[backdrop-filter]:bg-white/60 backdrop-blur border-b py-3 px-3 sm:px-5 rounded-md" data-export-exclude>
 
         {/* Mobile: View Branch Analytics at the very top */}
         {!branchId && (
@@ -1589,11 +1763,16 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 min-h-0 overflow-y-auto min-w-0 pb-20 px-2 sm:px-0 hide-scrollbar">
+      <div
+        ref={analyticsExportRef}
+        data-analytics-root="true"
+        className="flex-1 min-h-0 overflow-y-auto min-w-0 pb-20 px-2 sm:px-0 hide-scrollbar"
+      >
 
         {/* KPI CARDS */}
         <div
           ref={kpiRef}
+          data-export-section="kpi-summary"
           className="grid w-full gap-3 sm:gap-4 lg:gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-4 auto-rows-fr relative mb-4 sm:mb-2"
         >
           <KPI
@@ -1639,7 +1818,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         </div>
 
         {/* CHARTS */}
-        <div className="grid grid-cols-12 gap-2 sm:gap-3 flex-1 min-h-0 min-w-0">
+        <div className="grid grid-cols-12 gap-2 sm:gap-3 flex-1 min-h-0 min-w-0" data-export-grid="analytics-charts">
           {currentCharts === "sale" && (
             <TopProducts
               topProducts={topProducts}
@@ -1661,6 +1840,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
               topProductsRef={topProductsRef}
               restockSuggestions={restockSuggestions}
               loadingRestockSuggestions={loadingRestockSuggestions}
+              onRetryTopProducts={() => fetchTopProductsData()}
+              onRetrySalesPerformance={() => fetchSalesPerformance()}
             />
           )}
 
@@ -1693,13 +1874,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
                 branchPerformanceRef={branchPerformanceRef}
                 revenueDistributionRef={revenueDistributionRef}
               />
-              <div className="col-span-12 mt-5 lg:mt-0 min-h-[420px] mb-8">
-                <BranchTimeline
-                  Card={Card}
-                  categoryFilter={categoryFilter}
-                  branchTimelineRef={branchTimelineRef}
-                />
-              </div>
+              <BranchTimeline
+                Card={Card}
+                categoryFilter={categoryFilter}
+                branchTimelineRef={branchTimelineRef}
+              />
             </>
           )}
         </div>

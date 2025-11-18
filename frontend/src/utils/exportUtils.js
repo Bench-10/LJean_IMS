@@ -273,265 +273,277 @@ export const formatForExport = (data, excludeFields = []) => {
 };
 
 
-// MULTI-CHART PDF EXPORT WITH DASHBOARD LAYOUT PRESERVATION
-export const exportChartsAsPDF = async (chartRefs = [], filename = 'analytics-report.pdf', chartIds = []) => {
-  if (!chartRefs || chartRefs.length === 0) {
-    alert('No charts selected for export');
+const QUALITY_SCALE = {
+  low: 2,
+  medium: 2,
+  high: 3,
+  ultra: 4
+};
+
+// ANALYTICS EXPORT: SINGLE-PAGE DASHBOARD SNAPSHOT (SCREENSHOT STYLE)
+// Instead of exporting individual charts, this captures the main dashboard
+// container as one image (minus any elements marked data-export-exclude), so
+// the PDF mirrors the desktop layout the user sees.
+export const exportChartsAsPDF = async (chartRefs = [], filename = 'analytics-report.pdf', chartConfigs = [], options = {}) => {
+  const {
+    meta: rawMeta = {},
+    quality = 'high',
+    title: fallbackTitle = 'Analytics Report',
+    pageSize = 'a4',
+    orientation = 'landscape',
+    margin = 10,
+    // optional: pass the main container ref explicitly as options.containerRef
+    containerRef,
+    selectedChartIds = []
+  } = options ?? {};
+
+  const selectedIds = new Set(
+    Array.isArray(selectedChartIds) && selectedChartIds.length
+      ? selectedChartIds.filter(Boolean)
+      : chartConfigs.map((cfg) => cfg?.id).filter(Boolean)
+  );
+
+  // Determine what to capture. Prefer a dedicated containerRef if provided.
+  // Otherwise, fall back to the first chartRef's parent node.
+  let targetElement = containerRef?.current || null;
+  if (!targetElement && Array.isArray(chartRefs) && chartRefs[0]?.current) {
+    const node = chartRefs[0].current;
+    // Walk up to a reasonably large wrapper (e.g., analytics root)
+    targetElement = node.closest?.('[data-analytics-root]') || node.parentElement || node;
+  }
+
+  if (!targetElement) {
+    alert('Analytics view is not ready to export.');
     return;
   }
 
-  const pdf = new jsPDF({
-    orientation: 'landscape',
-    unit: 'mm',
-    format: 'a4'
-  });
+  const resolveScale = (value) => {
+    if (typeof value === 'number' && value > 0) return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (QUALITY_SCALE[normalized]) return QUALITY_SCALE[normalized];
+    }
+    return QUALITY_SCALE.medium;
+  };
+
+  const scale = resolveScale(quality);
+  const pdf = new jsPDF({ orientation, unit: 'mm', format: pageSize });
+
+  const removeUnselectedSections = (root, allowedIds) => {
+    if (!(root instanceof HTMLElement) || !allowedIds?.size) return;
+    Array.from(root.querySelectorAll('[data-export-section]')).forEach((node) => {
+      const sectionId = node.getAttribute('data-export-section');
+      if (!sectionId) return;
+      if (!allowedIds.has(sectionId)) {
+        node.remove();
+      }
+    });
+  };
+
+  const cleanupEmptyContainers = (root) => {
+    if (!(root instanceof HTMLElement)) return;
+    Array.from(root.querySelectorAll('[data-export-grid]')).forEach((grid) => {
+      if (!grid.querySelector('[data-export-section]')) {
+        grid.remove();
+      }
+    });
+  };
+
+  const adjustGridLayouts = (root) => {
+    if (!(root instanceof HTMLElement)) return;
+    
+    // Adjust chart grids
+    Array.from(root.querySelectorAll('[data-export-grid]')).forEach((grid) => {
+      const directSections = Array.from(grid.children).filter((child) => child.matches('[data-export-section]'));
+      if (!directSections.length) return;
+      if (directSections.length === 1) {
+        const onlySection = directSections[0];
+        onlySection.style.setProperty('grid-column', '1 / -1', 'important');
+        onlySection.style.setProperty('width', '100%', 'important');
+      } else {
+        directSections.forEach((section) => {
+          section.style.removeProperty('grid-column');
+          section.style.removeProperty('width');
+        });
+      }
+    });
+
+    // Preserve KPI grid layout when KPI section is included
+    Array.from(root.querySelectorAll('[data-export-section="kpi-summary"]')).forEach((kpiGrid) => {
+      const kpiCards = kpiGrid.querySelectorAll('[data-kpi-card]');
+      if (kpiCards.length > 0) {
+        // Ensure grid stays as is (4 columns on desktop)
+        kpiGrid.style.setProperty('display', 'grid', 'important');
+        kpiGrid.style.setProperty('grid-template-columns', 'repeat(auto-fit, minmax(200px, 1fr))', 'important');
+        kpiGrid.style.setProperty('gap', '1rem', 'important');
+      }
+    });
+  };
+
+  const toDateTimeString = (value) => {
+    const dateValue = value ? new Date(value) : new Date();
+    if (Number.isNaN(dateValue.getTime())) {
+      return new Date().toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    return dateValue.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const normalizeFilters = (filters) => {
+    if (!Array.isArray(filters)) return [];
+    return filters
+      .map((entry) => ({
+        label: entry?.label ?? '',
+        value: entry?.value != null ? String(entry.value) : ''
+      }))
+      .filter((entry) => entry.label || entry.value);
+  };
+
+  const normalizeKpis = (kpis) => {
+    if (!Array.isArray(kpis)) return [];
+    return kpis
+      .map((entry) => ({
+        key: entry?.key ?? '',
+        label: entry?.label ?? '',
+        value: Number(entry?.value ?? 0),
+        previous: (() => {
+          const numeric = Number(entry?.previous);
+          return Number.isFinite(numeric) ? numeric : null;
+        })(),
+        format: entry?.format ?? 'number'
+      }))
+      .filter((entry) => entry.label);
+  };
+
+  const meta = {
+    title: rawMeta.title || fallbackTitle,
+    subtitle: rawMeta.subtitle || '',
+    generatedAt: toDateTimeString(rawMeta.generatedAt)
+  };
 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  
-  // CAPTURE ALL CHARTS FIRST WITH METADATA
-  const capturedCharts = [];
-  
-  for (let i = 0; i < chartRefs.length; i++) {
-    const chartRef = chartRefs[i];
-    const chartId = chartIds[i] || `chart-${i}`;
-    
-    if (!chartRef || !chartRef.current) continue;
+  const contentWidth = pageWidth - (margin * 2);
 
-    const containerNode = chartRef.current;
-    const excludedElements = Array.from(containerNode.querySelectorAll('[data-export-exclude]'));
-    const previousDisplays = excludedElements.map(element => element.style.display);
-    const restoreExcludedElements = () => {
-      excludedElements.forEach((element, index) => {
-        const previousDisplay = previousDisplays[index];
-        if (previousDisplay) {
-          element.style.display = previousDisplay;
-        } else {
-          element.style.removeProperty('display');
-        }
-      });
-    };
+  // Clone the target element into an off-screen staging area and strip filters
+  const staging = document.createElement('div');
+  const rect = targetElement.getBoundingClientRect();
+  const widthPx = Math.ceil(rect.width || targetElement.scrollWidth || targetElement.offsetWidth || 1200);
+  let heightPx = Math.ceil(rect.height || targetElement.scrollHeight || targetElement.offsetHeight || 600);
 
-    try {
-      // HIDE EXCLUDED ELEMENTS
-      excludedElements.forEach(element => {
-        element.style.setProperty('display', 'none', 'important');
-      });
+  staging.style.position = 'fixed';
+  staging.style.left = '-100000px';
+  staging.style.top = '0';
+  staging.style.width = `${widthPx}px`;
+  staging.style.height = `${heightPx}px`;
+  staging.style.pointerEvents = 'none';
+  staging.style.opacity = '1';
+  staging.style.background = '#ffffff';
+  staging.style.overflow = 'hidden';
+  staging.style.zIndex = '-1';
 
-      // CAPTURE CHART AS IMAGE
-      const canvas = await html2canvas(containerNode, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        logging: false,
-        useCORS: true
-      });
+  const clone = targetElement.cloneNode(true);
+  clone.style.margin = '0';
+  clone.style.width = `${widthPx}px`;
+  clone.style.height = `${heightPx}px`;
+  clone.style.maxWidth = 'none';
+  clone.style.maxHeight = 'none';
+  clone.style.overflow = 'hidden';
 
-      restoreExcludedElements();
+  // Remove any filter or control elements marked for exclusion
+  Array.from(clone.querySelectorAll('[data-export-exclude]')).forEach((el) => el.remove());
 
-      const imgData = canvas.toDataURL('image/png');
-      capturedCharts.push({
-        id: chartId,
-        data: imgData,
-        width: canvas.width,
-        height: canvas.height
-      });
+  staging.appendChild(clone);
+  document.body.appendChild(staging);
 
-    } catch (error) {
-      restoreExcludedElements();
-      console.error('Error capturing chart:', error);
-    }
+  if (selectedIds.size) {
+    removeUnselectedSections(clone, selectedIds);
+    cleanupEmptyContainers(clone);
+    adjustGridLayouts(clone);
   }
 
-  if (capturedCharts.length === 0) {
-    alert('No charts were successfully captured');
+  if (selectedIds.size && !clone.querySelector('[data-export-section]')) {
+    if (staging.parentNode) staging.parentNode.removeChild(staging);
+    alert('The selected charts are not ready to export yet. Please ensure they are visible and try again.');
     return;
   }
 
-  // ADD PROFESSIONAL HEADER
-  const addHeader = (pageNum, totalPages) => {
-    pdf.setFontSize(18);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(31, 41, 55); // gray-800
-    pdf.text('Analytics Report', 15, 15);
-    
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(107, 114, 128); // gray-500
-    const dateStr = new Date().toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+  const adjustedHeight = Math.ceil(clone.scrollHeight || heightPx);
+  heightPx = Math.max(adjustedHeight, 200);
+  staging.style.height = `${heightPx}px`;
+  clone.style.height = `${heightPx}px`;
+
+  let canvas;
+  try {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    canvas = await html2canvas(clone, {
+      backgroundColor: '#ffffff',
+      scale,
+      useCORS: true,
+      logging: false,
+      width: widthPx,
+      height: heightPx,
+      windowWidth: widthPx,
+      windowHeight: heightPx,
+      scrollX: 0,
+      scrollY: 0,
+      allowTaint: true,
+      foreignObjectRendering: false,
+      imageTimeout: 20000
     });
-    pdf.text(`Generated: ${dateStr}`, 15, 21);
-    
-    // PAGE NUMBER
-    pdf.setTextColor(156, 163, 175); // gray-400
-    pdf.text(`Page ${pageNum} of ${totalPages}`, pageWidth - 15, 15, { align: 'right' });
-    
-    // SEPARATOR LINE
-    pdf.setDrawColor(229, 231, 235); // gray-200
-    pdf.setLineWidth(0.5);
-    pdf.line(15, 24, pageWidth - 15, 24);
-  };
-
-  addHeader(1, 1);
-
-  // LAYOUT TO MATCH DASHBOARD INTERFACE
-  const margin = 12;
-  const headerSpace = 28;
-  const gap = 6;
-  
-  let yPosition = headerSpace;
-  
-  // FIND KPI CHART
-  const kpiChart = capturedCharts.find(c => c.id === 'kpi-summary');
-  const otherCharts = capturedCharts.filter(c => c.id !== 'kpi-summary');
-  
-  // 1. RENDER KPI SUMMARY AT TOP (FULL WIDTH, SHORT HEIGHT)
-  if (kpiChart) {
-    const availableWidth = pageWidth - (margin * 2);
-    const kpiHeight = 25; // Fixed height for KPI row
-    
-    const imgRatio = kpiChart.width / kpiChart.height;
-    let imgWidth = availableWidth;
-    let imgHeight = imgWidth / imgRatio;
-    
-    // Scale to fit fixed height
-    if (imgHeight > kpiHeight) {
-      imgHeight = kpiHeight;
-      imgWidth = imgHeight * imgRatio;
-    }
-    
-    const xPos = margin + (availableWidth - imgWidth) / 2;
-    pdf.addImage(kpiChart.data, 'PNG', xPos, yPosition, imgWidth, imgHeight);
-    
-    yPosition += kpiHeight + gap;
+  } catch (error) {
+    console.error('Error capturing analytics view:', error);
+    alert('Unable to export the analytics view. Please try again.');
+    if (staging.parentNode) staging.parentNode.removeChild(staging);
+    return;
+  } finally {
+    if (staging.parentNode) staging.parentNode.removeChild(staging);
   }
-  
-  // 2. RENDER CHARTS BELOW IN DASHBOARD LAYOUT
-  if (otherCharts.length > 0) {
-    const availableWidth = pageWidth - (margin * 2);
-    const availableHeight = pageHeight - yPosition - margin;
-    
-    // CHECK IF WE HAVE THE TYPICAL DASHBOARD LAYOUT (TOP PRODUCTS + SALES PERFORMANCE)
-    const topProductsChart = otherCharts.find(c => c.id === 'top-products');
-    const salesChart = otherCharts.find(c => c.id === 'sales-performance');
-    
-    // CHECK FOR BRANCH ANALYTICS LAYOUT (BRANCH PERFORMANCE + REVENUE DISTRIBUTION + BRANCH TIMELINE)
-    const branchPerformanceChart = otherCharts.find(c => c.id === 'branch-performance');
-    const revenueDistributionChart = otherCharts.find(c => c.id === 'revenue-distribution');
-    const branchTimelineChart = otherCharts.find(c => c.id === 'branch-timeline');
-    
-    if (branchPerformanceChart && revenueDistributionChart && branchTimelineChart) {
-      // BRANCH ANALYTICS LAYOUT: TOP ROW (PERFORMANCE + PIE) + BOTTOM ROW (TIMELINE)
-      const topRowHeight = availableHeight * 0.45;
-      const bottomRowHeight = availableHeight * 0.55 - gap;
-      
-      // TOP LEFT: BRANCH PERFORMANCE (67% width)
-      const perfWidth = availableWidth * 0.67;
-      const perfRatio = branchPerformanceChart.width / branchPerformanceChart.height;
-      let perfImgWidth = perfWidth;
-      let perfImgHeight = perfImgWidth / perfRatio;
-      
-      if (perfImgHeight > topRowHeight) {
-        perfImgHeight = topRowHeight;
-        perfImgWidth = perfImgHeight * perfRatio;
-      }
-      
-      pdf.addImage(branchPerformanceChart.data, 'PNG', margin, yPosition, perfImgWidth, perfImgHeight);
-      
-      // TOP RIGHT: REVENUE DISTRIBUTION (33% width)
-      const pieWidth = availableWidth * 0.33 - gap;
-      const pieRatio = revenueDistributionChart.width / revenueDistributionChart.height;
-      let pieImgWidth = pieWidth;
-      let pieImgHeight = pieImgWidth / pieRatio;
-      
-      if (pieImgHeight > topRowHeight) {
-        pieImgHeight = topRowHeight;
-        pieImgWidth = pieImgHeight * pieRatio;
-      }
-      
-      const pieXPos = margin + perfWidth + gap;
-      pdf.addImage(revenueDistributionChart.data, 'PNG', pieXPos, yPosition, pieImgWidth, pieImgHeight);
-      
-      // BOTTOM: BRANCH TIMELINE (FULL WIDTH)
-      const timelineYPos = yPosition + topRowHeight + gap;
-      const timelineRatio = branchTimelineChart.width / branchTimelineChart.height;
-      let timelineImgWidth = availableWidth;
-      let timelineImgHeight = timelineImgWidth / timelineRatio;
-      
-      if (timelineImgHeight > bottomRowHeight) {
-        timelineImgHeight = bottomRowHeight;
-        timelineImgWidth = timelineImgHeight * timelineRatio;
-      }
-      
-      const timelineXPos = margin + (availableWidth - timelineImgWidth) / 2;
-      pdf.addImage(branchTimelineChart.data, 'PNG', timelineXPos, timelineYPos, timelineImgWidth, timelineImgHeight);
-      
-    } else if (topProductsChart && salesChart) {
-      // DASHBOARD LAYOUT: LEFT COLUMN (TOP PRODUCTS) + RIGHT COLUMN (SALES PERFORMANCE)
-      // Top Products takes ~33% width, Sales Performance takes ~67% width
-      const leftWidth = availableWidth * 0.33;
-      const rightWidth = availableWidth * 0.67 - gap;
-      
-      // LEFT: TOP PRODUCTS (TALL)
-      const leftRatio = topProductsChart.width / topProductsChart.height;
-      let leftImgWidth = leftWidth;
-      let leftImgHeight = leftImgWidth / leftRatio;
-      
-      if (leftImgHeight > availableHeight) {
-        leftImgHeight = availableHeight;
-        leftImgWidth = leftImgHeight * leftRatio;
-      }
-      
-      pdf.addImage(topProductsChart.data, 'PNG', margin, yPosition, leftImgWidth, leftImgHeight);
-      
-      // RIGHT: SALES PERFORMANCE (TALL)
-      const rightRatio = salesChart.width / salesChart.height;
-      let rightImgWidth = rightWidth;
-      let rightImgHeight = rightImgWidth / rightRatio;
-      
-      if (rightImgHeight > availableHeight) {
-        rightImgHeight = availableHeight;
-        rightImgWidth = rightImgHeight * rightRatio;
-      }
-      
-      const rightXPos = margin + leftWidth + gap;
-      pdf.addImage(salesChart.data, 'PNG', rightXPos, yPosition, rightImgWidth, rightImgHeight);
-      
-    } else {
-      // FALLBACK: ARRANGE OTHER CHARTS IN GRID
-      const cols = otherCharts.length === 1 ? 1 : 2;
-      const rows = Math.ceil(otherCharts.length / cols);
-      
-      const cellWidth = cols === 1 ? availableWidth : (availableWidth - gap) / 2;
-      const cellHeight = (availableHeight - (gap * (rows - 1))) / rows;
-      
-      otherCharts.forEach((chart, index) => {
-        const col = index % cols;
-        const row = Math.floor(index / cols);
-        
-        const xStart = margin + (col * (cellWidth + gap));
-        const yStart = yPosition + (row * (cellHeight + gap));
-        
-        const imgRatio = chart.width / chart.height;
-        
-        let imgWidth = cellWidth;
-        let imgHeight = imgWidth / imgRatio;
-        
-        if (imgHeight > cellHeight) {
-          imgHeight = cellHeight;
-          imgWidth = imgHeight * imgRatio;
-        }
-        
-        const xPos = xStart + (cellWidth - imgWidth) / 2;
-        const yPos = yStart + (cellHeight - imgHeight) / 2;
-        
-        pdf.addImage(chart.data, 'PNG', xPos, yPos, imgWidth, imgHeight);
-      });
+
+  // Title/header above the screenshot
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(16);
+  pdf.text(meta.title, margin, margin + 4);
+  if (meta.subtitle) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.text(meta.subtitle, margin, margin + 10);
+  }
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.text(`Generated ${meta.generatedAt}`, margin, margin + 16);
+
+  const availableHeight = pageHeight - (margin + 20); // space for header
+  const imgWidth = canvas.width;
+  const imgHeight = canvas.height;
+  const imgRatio = imgWidth && imgHeight ? imgWidth / imgHeight : 1;
+
+  let renderWidth = contentWidth;
+  let renderHeight = renderWidth / imgRatio;
+  if (renderHeight > availableHeight) {
+    renderHeight = availableHeight;
+    renderWidth = renderHeight * imgRatio;
+    if (renderWidth > contentWidth) {
+      renderWidth = contentWidth;
+      renderHeight = renderWidth / imgRatio;
     }
   }
 
+  const x = margin + (contentWidth - renderWidth) / 2;
+  const y = margin + 22; // below header text
+
+  pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', x, y, renderWidth, renderHeight, undefined, 'SLOW');
   pdf.save(filename);
 };
 

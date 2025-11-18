@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { exportChartsAsPDF } from '../../utils/exportUtils';
+import dayjs from 'dayjs';
 import { FaFileExport } from 'react-icons/fa';
 import { IoMdClose } from 'react-icons/io';
+import { exportChartsAsPDF } from '../../utils/exportUtils';
 import useModalLock from '../../hooks/useModalLock';
 
-function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
+function ExportReportDialog({ isOpen, onClose, availableCharts = [], meta = {}, exportContainerRef = null }) {
   const [selectedCharts, setSelectedCharts] = useState([]);
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedCharts([]);
+      return;
+    }
+    setSelectedCharts(availableCharts.map((chart) => chart.id));
+  }, [isOpen, availableCharts]);
 
   const handleToggle = (chartId) => {
     setSelectedCharts((prev) =>
@@ -17,9 +26,9 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
   const handleSelectAll = () => {
     if (selectedCharts.length === availableCharts.length) {
       setSelectedCharts([]);
-    } else {
-      setSelectedCharts(availableCharts.map((c) => c.id));
+      return;
     }
+    setSelectedCharts(availableCharts.map((c) => c.id));
   };
 
   const handleExport = async () => {
@@ -39,8 +48,15 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
         return;
       }
 
-      const chartIds = selectedChartData.map((chart) => chart.id);
-      await exportChartsAsPDF(chartsToExport, 'analytics-report.pdf', chartIds);
+      const chartConfigs = selectedChartData.map(({ id, label }) => ({ id, label }));
+      const now = dayjs();
+      const filename = `analytics-report-${now.format('YYYYMMDD-HHmm')}.pdf`;
+      await exportChartsAsPDF(chartsToExport, filename, chartConfigs, {
+        meta,
+        quality: 'high',
+        containerRef: exportContainerRef,
+        selectedChartIds: chartConfigs.map(({ id }) => id)
+      });
       onClose?.();
       setSelectedCharts([]);
     } catch (error) {
@@ -51,9 +67,8 @@ function ExportReportDialog({ isOpen, onClose, availableCharts = [] }) {
     }
   };
 
-  // unified close handler for overlay, X, Cancel, BACK, ESC
   const handleClose = useCallback(() => {
-    if (exporting) return; // optional: block closing while exporting
+    if (exporting) return;
     onClose?.();
   }, [exporting, onClose]);
 

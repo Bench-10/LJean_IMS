@@ -2,7 +2,7 @@ import React from 'react';
 import { MdInsights } from 'react-icons/md';
 
 // IF THERE IS NO DATA SHOWING IN THE CHART
-function ChartNoData({ message = 'No data to display', hint = 'Try reloading the page' }) {
+function ChartNoData({ message = 'No data to display', hint = 'Try reloading the page', onRetry }) {
   return (
     <div className="w-full h-full flex items-center justify-center">
 
@@ -17,6 +17,15 @@ function ChartNoData({ message = 'No data to display', hint = 'Try reloading the
         <p className="text-sm md:text-base text-gray-600 font-medium">{message}</p>
 
         {hint && <p className="text-[11px] md:text-xs text-gray-400 mt-1">{hint}</p>}
+
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+          >
+            Load Data
+          </button>
+        )}
         
       </div>
 
