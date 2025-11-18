@@ -104,6 +104,9 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
 
   const normalizedRoles = normalizeRoles(roles);
   const roleSet = new Set(normalizedRoles);
+  const hasSalesAssociate = roleSet.has('Sales Associate');
+  const hasNonSalesAssociateRole = Array.from(roleSet).some(role => role !== 'Sales Associate');
+  const isSalesAssociateOnly = hasSalesAssociate && !hasNonSalesAssociateRole;
 
   const disallowedTypes = new Set();
 
@@ -117,8 +120,8 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
   }
 
   // Filter sales and delivery notifications by role
-  if (roleSet.has('Sales Associate')) {
-    // Sales associates should only see sales-related notifications
+  if (isSalesAssociateOnly) {
+    // Sales associates with no extra roles should only see sales-related notifications
     disallowedTypes.add('New Product');
     disallowedTypes.add('Product Update');
     disallowedTypes.add('Inventory Approval Needed');
