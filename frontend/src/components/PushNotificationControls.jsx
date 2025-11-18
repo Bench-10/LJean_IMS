@@ -15,6 +15,7 @@ function PushNotificationControls() {
   // removed: isTesting (test push button removed)
   const [persisted, setPersisted] = useState(false);
   const autoSubscribeAttemptedRef = useRef(false);
+  const autoBootstrapRef = useRef(false);
 
   const readOptOutFlag = useCallback(() => {
     if (typeof window === 'undefined') return false;
@@ -43,6 +44,7 @@ function PushNotificationControls() {
     if (!SUPPORTS_PUSH) return;
     setPermissionState(Notification.permission);
     autoSubscribeAttemptedRef.current = false;
+    autoBootstrapRef.current = false;
 
     const init = async () => {
       if (navigator.storage?.persisted) {
@@ -84,6 +86,56 @@ function PushNotificationControls() {
 
     init();
   }, [user]); // Re-run when user changes
+
+  useEffect(() => {
+    if (!SUPPORTS_PUSH || !user) return;
+    if (autoBootstrapRef.current) return;
+
+    const bootstrapPush = async () => {
+      const userOptedOut = readOptOutFlag();
+      if (userOptedOut) return;
+
+      autoBootstrapRef.current = true;
+
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const existing = await registration.pushManager.getSubscription();
+
+        if (existing) {
+          await autoRepairSubscription(existing);
+          return;
+        }
+
+        let permission = Notification.permission;
+        if (permission === 'denied') {
+          writeOptOutFlag(true);
+          return;
+        }
+
+        if (permission === 'default') {
+          const requested = await Notification.requestPermission();
+          const normalized = requested === 'prompt' ? 'default' : requested;
+          setPermissionState(normalized);
+          permission = requested;
+          if (requested !== 'granted') {
+            return;
+          }
+        }
+
+        if (permission === 'granted') {
+          autoSubscribeAttemptedRef.current = true;
+          const success = await performSilentResubscription();
+          if (!success) {
+            autoSubscribeAttemptedRef.current = false;
+          }
+        }
+      } catch (error) {
+        console.warn('Automatic push bootstrap failed:', error);
+      }
+    };
+
+    bootstrapPush();
+  }, [user, readOptOutFlag, autoRepairSubscription, performSilentResubscription, writeOptOutFlag]);
 
   useEffect(() => {
     if (!SUPPORTS_PUSH || !navigator.permissions?.query) return undefined;
