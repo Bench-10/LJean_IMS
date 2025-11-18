@@ -674,7 +674,7 @@ useModalLock(canOpenSaleModal, closeModal);
       )}
 
       <dialog className='bg-transparent fixed top-0 bottom-0 z-[9999] rounded-lg animate-popup' open={canOpenSaleModal}>
-        <div className="relative flex flex-col border border-gray-300 bg-white h-[90vh] max-h-[700px] w-[95vw] lg:w-[1100px] rounded-lg shadow-2xl animate-popup" >
+        <div className="relative flex flex-col border border-gray-300 bg-white h-[90vh] max-h-[1000px] w-[95vw] lg:w-[1100px] rounded-lg shadow-2xl animate-popup" >
 
 
           {/* FIXED HEADER */}

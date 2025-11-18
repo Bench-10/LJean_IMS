@@ -1589,7 +1589,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 min-h-0 overflow-y-auto min-w-0 pb-10 px-2 sm:px-0 hide-scrollbar">
+      <div className="flex-1 min-h-0 overflow-y-auto min-w-0 pb-20 px-2 sm:px-0 hide-scrollbar">
 
         {/* KPI CARDS */}
         <div
