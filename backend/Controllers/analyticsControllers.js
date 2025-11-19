@@ -82,6 +82,7 @@ export const getTopProducts = async (req, res) => {
     const {
       branch_id,
       category_id,
+      product_id,
       limit = 10,
       range = '3m',
       start_date,
@@ -92,6 +93,7 @@ export const getTopProducts = async (req, res) => {
     const rows = await analyticsServices.fetchTopProducts({
       branch_id,
       category_id,
+      product_id,
       limit,
       range,
       start_date,

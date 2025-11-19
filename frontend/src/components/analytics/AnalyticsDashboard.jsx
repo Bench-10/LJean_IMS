@@ -944,9 +944,14 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const fetchTopProductsData = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
 
+    const hasProductFilter = productIdFilter !== null && productIdFilter !== undefined && productIdFilter !== '';
+    const productFilterParam = hasProductFilter ? Number(productIdFilter) : undefined;
+    const normalizedProductFilter = (hasProductFilter && Number.isFinite(productFilterParam)) ? String(productFilterParam) : 'all';
+
     const paramsTop = {
       branch_id: branchId || undefined,
       category_id: categoryFilter || undefined,
+      product_id: Number.isFinite(productFilterParam) ? productFilterParam : undefined,
       start_date: resolvedRange.start_date,
       end_date: resolvedRange.end_date,
       limit: optimizationsEnabled ? 40 : 50,
@@ -960,6 +965,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     const topKey = {
       branch: branchId ?? 'all',
       category: categoryFilter || 'all',
+      product: normalizedProductFilter,
       start: resolvedRange.start_date,
       end: resolvedRange.end_date,
       limit: paramsTop.limit,
@@ -1025,14 +1031,19 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     } finally {
       if (!silent) setLoadingTopProducts(false);
     }
-  }, [branchId, categoryFilter, resolvedRange, restockInterval, user, optimizationsEnabled]);
+  }, [branchId, categoryFilter, productIdFilter, resolvedRange, restockInterval, user, optimizationsEnabled]);
 
   const fetchRestockSuggestionsData = useCallback(async (signal) => {
     if (!user) return;
 
+    const hasProductFilter = productIdFilter !== null && productIdFilter !== undefined && productIdFilter !== '';
+    const productFilterParam = hasProductFilter ? Number(productIdFilter) : undefined;
+    const normalizedProductFilter = (hasProductFilter && Number.isFinite(productFilterParam)) ? String(productFilterParam) : 'all';
+
     const params = {
       branch_id: branchId || undefined,
       category_id: categoryFilter || undefined,
+      product_id: Number.isFinite(productFilterParam) ? productFilterParam : undefined,
       start_date: resolvedRange.start_date,
       end_date: resolvedRange.end_date,
       limit: 50,
@@ -1043,6 +1054,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     const cacheParams = {
       branch: branchId ?? 'all',
       category: categoryFilter || 'all',
+      product: normalizedProductFilter,
       start: resolvedRange.start_date,
       end: resolvedRange.end_date,
       interval: salesInterval,
@@ -1070,7 +1082,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     } finally {
       setLoadingRestockSuggestions(false);
     }
-  }, [branchId, categoryFilter, resolvedRange, salesInterval, user]);
+  }, [branchId, categoryFilter, productIdFilter, resolvedRange, salesInterval, user]);
 
   const fetchInventoryLevels = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
@@ -1855,7 +1867,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
               setDeliveryStatus={setDeliveryStatus}
               loadingDelivery={loadingDelivery}
               deliveryChartRef={deliveryChartRef}
-              onLoadOlder={handleLoadOlder}
+              onLoadOlder={handleLoadOlder} 
               onResetRange={handleResetDeliveryRange}
               canLoadOlder={canLoadOlder}
               hasExtendedRange={hasExtendedDeliveryRange}

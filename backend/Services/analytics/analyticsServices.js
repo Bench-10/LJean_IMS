@@ -307,21 +307,58 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     return cached;
   }
 
-  const { filters, params, nextIdx } = buildSalesFilters({ start, end, branch_id, category_id });
-  const conditions = [...filters];
-  let idx = nextIdx;
-  if (product_id) { conditions.push(`si.product_id = $${idx++}`); params.push(product_id); }
-  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
-  const { rows } = await SQLquery(`
-    SELECT date_trunc('${dateTrunc}', s.date)::date AS period,
-      SUM(si.amount) AS sales_amount,
-      SUM(si.quantity_display) AS units_sold
-    FROM Sales_Items si
-    JOIN Sales_Information s USING(sales_information_id)
-    JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
-    ${where}
-    GROUP BY 1
-    ORDER BY 1;`, params);
+  const hasCategoryFilter = Boolean(category_id);
+  const hasProductFilter = Boolean(product_id);
+  const shouldUseSalesItems = hasCategoryFilter || hasProductFilter;
+
+  let rows;
+
+  if (shouldUseSalesItems) {
+    const { filters, params, nextIdx } = buildSalesFilters({ start, end, branch_id, category_id });
+    const conditions = [...filters];
+    let idx = nextIdx;
+    if (product_id) { conditions.push(`si.product_id = $${idx++}`); params.push(product_id); }
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+    ({ rows } = await SQLquery(`
+      SELECT date_trunc('${dateTrunc}', s.date)::date AS period,
+        SUM(si.amount) AS sales_amount,
+        SUM(si.quantity_display) AS units_sold
+      FROM Sales_Items si
+      JOIN Sales_Information s USING(sales_information_id)
+      JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
+      ${where}
+      GROUP BY 1
+      ORDER BY 1;`, params));
+  } else {
+    const baseConditions = ['s.date BETWEEN $1 AND $2', RESTORED_SALES_FILTER];
+    const params = [start, end];
+    let idx = 3;
+    if (branch_id) { baseConditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
+    const whereClause = 'WHERE ' + baseConditions.join(' AND ');
+
+    ({ rows } = await SQLquery(`
+      WITH base_sales AS (
+        SELECT s.sales_information_id,
+               date_trunc('${dateTrunc}', s.date)::date AS period,
+               s.total_amount_due
+        FROM Sales_Information s
+        ${whereClause}
+      ),
+      units AS (
+        SELECT si.sales_information_id,
+               SUM(si.quantity_display) AS units_sold
+        FROM Sales_Items si
+        WHERE si.sales_information_id = ANY (SELECT sales_information_id FROM base_sales)
+        GROUP BY si.sales_information_id
+      )
+      SELECT b.period,
+             SUM(b.total_amount_due) AS sales_amount,
+             SUM(COALESCE(u.units_sold, 0)) AS units_sold
+      FROM base_sales b
+      LEFT JOIN units u USING (sales_information_id)
+      GROUP BY b.period
+      ORDER BY b.period;`, params));
+  }
 
   const rawHistory = rows.map(row => ({
     period: dayjs(row.period).format('YYYY-MM-DD'),
@@ -411,7 +448,7 @@ export async function fetchRestockTrends({ branch_id, interval, range }) {
 
 
 
-export async function fetchTopProducts({ branch_id, category_id, limit, range, start_date, end_date, interval = 'monthly', include_forecast = false }) {
+export async function fetchTopProducts({ branch_id, category_id, product_id, limit, range, start_date, end_date, interval = 'monthly', include_forecast = false }) {
   // Use custom dates if provided, otherwise use range
   let start, end;
   if (start_date && end_date) {
@@ -424,6 +461,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
   const cacheKey = makeAnalyticsCacheKey('fetchTopProducts', {
     branch_id,
     category_id,
+    product_id,
     limit,
     interval,
     include_forecast,
@@ -435,7 +473,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     return cached;
   }
 
-  const { filters: summaryFilters, params: summaryParams } = buildSalesFilters({ start, end, branch_id, category_id });
+  const { filters: summaryFilters, params: summaryParams } = buildSalesFilters({ start, end, branch_id, category_id, product_id });
   const where = 'WHERE ' + summaryFilters.join(' AND ');
   const safeLimit = Number.isFinite(Number.parseInt(limit, 10)) ? Number.parseInt(limit, 10) : 10;
   const { rows } = await SQLquery(`
@@ -467,7 +505,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
     return rows;
   }
 
-  const historyFiltersContext = buildSalesFilters({ start: historyStart, end, branch_id, category_id });
+  const historyFiltersContext = buildSalesFilters({ start: historyStart, end, branch_id, category_id, product_id });
   const productArrayParamIndex = historyFiltersContext.nextIdx;
   const historyFilters = [...historyFiltersContext.filters, `si.product_id = ANY($${productArrayParamIndex}::int[])`];
   const historyParams = [...historyFiltersContext.params, topProductIds];
@@ -647,7 +685,11 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     conditions.push(RESTORED_SALES_FILTER);
   };
   
-  if (category_id) {
+  const hasCategoryFilter = Boolean(category_id);
+  const hasProductFilter = Boolean(product_id);
+  const shouldUseSalesItems = hasCategoryFilter || hasProductFilter;
+
+  if (hasCategoryFilter) {
     // CURRENT SALES
     const conditions = ['s.date BETWEEN $1 AND $2', 'ip.category_id = $3'];
     addDeliveryFilter(conditions);
@@ -740,34 +782,62 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   }
 
   // CURRENT SALE (NO CATEGORY FILTER)
-  const salesConditions = ['s.date BETWEEN $1 AND $2'];
-  addDeliveryFilter(salesConditions);
-  const salesParams = [start, end];
-  let salesIdx = 3;
-  if (branch_id) { salesConditions.push(`s.branch_id = $${salesIdx++}`); salesParams.push(branch_id); }
-  if (product_id) { salesConditions.push(`si.product_id = $${salesIdx++}`); salesParams.push(product_id); }
-  const salesWhere = 'WHERE ' + salesConditions.join(' AND ');
-  const { rows: salesRows } = await SQLquery(`
-    SELECT COALESCE(SUM(si.amount),0) AS total_sales
-    FROM Sales_Information s
-    JOIN Sales_Items si USING(sales_information_id)
-    ${salesWhere};`,
-    salesParams);
+  let salesRows;
+  let prevSalesRows;
 
-  // PREVIOUS SALE (NO CATEGORY FILTER)
-  const prevSalesConditions = ['s.date BETWEEN $1 AND $2'];
-  addDeliveryFilter(prevSalesConditions);
-  const prevSalesParams = [prevStart, prevEnd];
-  let prevSalesIdx = 3;
-  if (branch_id) { prevSalesConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevSalesParams.push(branch_id); }
-  if (product_id) { prevSalesConditions.push(`si.product_id = $${prevSalesIdx++}`); prevSalesParams.push(product_id); }
-  const prevSalesWhere = 'WHERE ' + prevSalesConditions.join(' AND ');
-  const { rows: prevSalesRows } = await SQLquery(`
-    SELECT COALESCE(SUM(si.amount),0) AS total_sales
-    FROM Sales_Information s
-    JOIN Sales_Items si USING(sales_information_id)
-    ${prevSalesWhere};`, 
-    prevSalesParams);
+  if (shouldUseSalesItems) {
+    const salesConditions = ['s.date BETWEEN $1 AND $2'];
+    addDeliveryFilter(salesConditions);
+    const salesParams = [start, end];
+    let salesIdx = 3;
+    if (branch_id) { salesConditions.push(`s.branch_id = $${salesIdx++}`); salesParams.push(branch_id); }
+    if (product_id) { salesConditions.push(`si.product_id = $${salesIdx++}`); salesParams.push(product_id); }
+    const salesWhere = 'WHERE ' + salesConditions.join(' AND ');
+    ({ rows: salesRows } = await SQLquery(`
+      SELECT COALESCE(SUM(si.amount),0) AS total_sales
+      FROM Sales_Information s
+      JOIN Sales_Items si USING(sales_information_id)
+      ${salesWhere};`,
+      salesParams));
+
+    const prevSalesConditions = ['s.date BETWEEN $1 AND $2'];
+    addDeliveryFilter(prevSalesConditions);
+    const prevSalesParams = [prevStart, prevEnd];
+    let prevSalesIdx = 3;
+    if (branch_id) { prevSalesConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevSalesParams.push(branch_id); }
+    if (product_id) { prevSalesConditions.push(`si.product_id = $${prevSalesIdx++}`); prevSalesParams.push(product_id); }
+    const prevSalesWhere = 'WHERE ' + prevSalesConditions.join(' AND ');
+    ({ rows: prevSalesRows } = await SQLquery(`
+      SELECT COALESCE(SUM(si.amount),0) AS total_sales
+      FROM Sales_Information s
+      JOIN Sales_Items si USING(sales_information_id)
+      ${prevSalesWhere};`, 
+      prevSalesParams));
+  } else {
+    const salesConditions = ['s.date BETWEEN $1 AND $2'];
+    addDeliveryFilter(salesConditions);
+    const salesParams = [start, end];
+    let salesIdx = 3;
+    if (branch_id) { salesConditions.push(`s.branch_id = $${salesIdx++}`); salesParams.push(branch_id); }
+    const salesWhere = 'WHERE ' + salesConditions.join(' AND ');
+    ({ rows: salesRows } = await SQLquery(`
+      SELECT COALESCE(SUM(s.total_amount_due),0) AS total_sales
+      FROM Sales_Information s
+      ${salesWhere};`,
+      salesParams));
+
+    const prevSalesConditions = ['s.date BETWEEN $1 AND $2'];
+    addDeliveryFilter(prevSalesConditions);
+    const prevSalesParams = [prevStart, prevEnd];
+    let prevSalesIdx = 3;
+    if (branch_id) { prevSalesConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevSalesParams.push(branch_id); }
+    const prevSalesWhere = 'WHERE ' + prevSalesConditions.join(' AND ');
+    ({ rows: prevSalesRows } = await SQLquery(`
+      SELECT COALESCE(SUM(s.total_amount_due),0) AS total_sales
+      FROM Sales_Information s
+      ${prevSalesWhere};`, 
+      prevSalesParams));
+  }
 
   // CURRENT INVESTMENT
   const investConditions = ['a.date_added BETWEEN $1 AND $2'];
@@ -866,11 +936,12 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
   const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : interval === 'yearly' ? 'year' : 'month';
   
   // Build conditions and parameters - optimized for performance
+  const hasCategoryFilter = Boolean(category_id);
   const conditions = ['s.date BETWEEN $1 AND $2', 's.branch_id = $3', RESTORED_SALES_FILTER];
   const params = [start, end, branch_id];
   let idx = 4;
   
-  if (category_id) { 
+  if (hasCategoryFilter) { 
     conditions.push(`ip.category_id = $${idx++}`); 
     params.push(category_id); 
   }
@@ -890,18 +961,49 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
                   TO_CHAR(date_trunc('${dateTrunc}', s.date), 'Mon YYYY') AS formatted_period`;
   }
   
-  // Optimized query - reduced joins when category_id not needed
-  const { rows } = await SQLquery(`
-    SELECT ${dateSelect},
-      SUM(si.amount) AS sales_amount,
-      SUM(si.quantity_display) AS units_sold,
-      COUNT(DISTINCT s.sales_information_id) AS transaction_count
-    FROM Sales_Information s
-    JOIN Sales_Items si USING(sales_information_id)
-    ${category_id ? 'JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id' : ''}
-    ${where}
-    GROUP BY date_trunc('${dateTrunc}', s.date)
-    ORDER BY period;`, params);
+  let rows;
+  
+  if (hasCategoryFilter) {
+    const query = `
+      SELECT ${dateSelect},
+        SUM(si.amount) AS sales_amount,
+        SUM(si.quantity_display) AS units_sold,
+        COUNT(DISTINCT s.sales_information_id) AS transaction_count
+      FROM Sales_Information s
+      JOIN Sales_Items si USING(sales_information_id)
+      JOIN Inventory_Product ip ON si.product_id = ip.product_id AND s.branch_id = ip.branch_id
+      ${where}
+      GROUP BY date_trunc('${dateTrunc}', s.date)
+      ORDER BY period;`;
+    ({ rows } = await SQLquery(query, params));
+  } else {
+    const baseWhere = 'WHERE ' + ['s.date BETWEEN $1 AND $2', 's.branch_id = $3', RESTORED_SALES_FILTER].join(' AND ');
+    const query = `
+      WITH base_sales AS (
+        SELECT s.sales_information_id,
+               date_trunc('${dateTrunc}', s.date)::date AS period,
+               s.total_amount_due
+        FROM Sales_Information s
+        ${baseWhere}
+      ),
+      units AS (
+        SELECT si.sales_information_id,
+               SUM(si.quantity_display) AS units_sold
+        FROM Sales_Items si
+        WHERE si.sales_information_id = ANY (SELECT sales_information_id FROM base_sales)
+        GROUP BY si.sales_information_id
+      )
+      SELECT b.period,
+             ${interval === 'daily' || interval === 'weekly' ? "TO_CHAR(b.period, 'Mon DD')" : "TO_CHAR(b.period, 'Mon YYYY')"} AS formatted_period,
+             SUM(b.total_amount_due) AS sales_amount,
+             SUM(COALESCE(u.units_sold, 0)) AS units_sold,
+             COUNT(DISTINCT b.sales_information_id) AS transaction_count
+      FROM base_sales b
+      LEFT JOIN units u USING (sales_information_id)
+      GROUP BY b.period
+      ORDER BY b.period;`;
+    ({ rows } = await SQLquery(query, params));
+  }
     
   // FORMAT DATES USING DAYJS TO AVOID TIMEZONE ISSUES
   const result = rows.map(row => ({
