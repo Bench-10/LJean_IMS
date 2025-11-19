@@ -107,6 +107,8 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
   const hasSalesAssociate = roleSet.has('Sales Associate');
   const hasNonSalesAssociateRole = Array.from(roleSet).some(role => role !== 'Sales Associate');
   const isSalesAssociateOnly = hasSalesAssociate && !hasNonSalesAssociateRole;
+  const hasBranchManager = roleSet.has('Branch Manager');
+  const hasInventoryStaff = roleSet.has('Inventory Staff');
 
   const disallowedTypes = new Set();
 
@@ -137,7 +139,7 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
 
   }
 
-  if (roleSet.has('Branch Manager') || roleSet.has('Inventory Staff')) {
+  if ((hasBranchManager || hasInventoryStaff) && !hasSalesAssociate) {
     // Branch managers and inventory staff should not see sales and delivery notifications
     disallowedTypes.add('New Sale');
     disallowedTypes.add('Delivery Status Update');
@@ -184,8 +186,8 @@ export const returnNotification = async ({ branchId, userId, hireDate, userType 
       ${disallowedTypes.size > 0 ? 'AND NOT (ia.alert_type = ANY($5::text[]))' : ''}
     ORDER BY ia.alert_date DESC;
     `, disallowedTypes.size > 0
-      ? [userId, branchId, hireDate, userId, Array.from(disallowedTypes), (roleSet.has('Branch Manager') || roleSet.has('Inventory Staff'))]
-      : [userId, branchId, hireDate, userId, (roleSet.has('Branch Manager') || roleSet.has('Inventory Staff'))]
+      ? [userId, branchId, hireDate, userId, Array.from(disallowedTypes), (hasBranchManager || hasInventoryStaff)]
+      : [userId, branchId, hireDate, userId, (hasBranchManager || hasInventoryStaff)]
   );
 
   return rows.map((row) => {
