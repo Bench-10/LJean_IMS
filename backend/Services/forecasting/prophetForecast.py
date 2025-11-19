@@ -268,36 +268,36 @@ def _describe_history_vs_forecast(history_df, forecast_df, freq: str):
 
     if has_extreme_spike:
         code = "spiky_extreme"
-        message = "Irregular sales with rare huge spikes.".format(label=interval_label)
+        message = "This product has occasional huge spikes."
     elif change_ratio is not None and change_ratio >= 1.35:
         code = "uptrend"
-        message = "Sales trend up.".format(label=interval_label)
+        message = "This product is getting popular."
     elif change_ratio is not None and change_ratio <= 0.7:
         code = "downtrend"
-        message = "Sales trend down.".format(label=interval_label)
+        message = "This product is slowing down."
     elif zero_share >= 0.4 and cv is not None and cv >= 1.0:
         code = "spiky_zero"
-        message = "Mostly quiet with sudden jumps.".format(label=interval_label)
+        message = "This product sells in bursts."
     elif zero_share >= 0.4:
         code = "gapped"
-        message = "Many {label}s had no sales.".format(label=interval_label)
+        message = "This product sells inconsistently."
     elif cv is not None and cv >= 1.0:
         code = "volatile"
-        message = "Sales swing a lot.".format(label=interval_label)
+        message = "This product has unpredictable demand."
     elif forecast_ratio is not None and forecast_ratio >= 1.4:
         code = "momentum"
-        message = "Demand is rising.".format(label=interval_label)
+        message = "Demand for this product is growing."
     elif forecast_ratio is not None and forecast_ratio <= 0.6:
         code = "cooldown"
-        message = "Demand is easing.".format(label=interval_label)
+        message = "Demand for this product is dropping."
     elif norm_slope >= 0.1:
         code = "gentle_up"
-        message = "Sales inch upward.".format(label=interval_label)
+        message = "This product is slowly gaining traction."
     elif norm_slope <= -0.1:
         code = "gentle_down"
-        message = "Sales inch downward.".format(label=interval_label)
+        message = "This product is gradually declining."
     else:
-        message = "Sales stay steady.".format(label=interval_label)
+        message = "This product has steady demand."
 
     return {"code": code, "message": message}
 
@@ -378,7 +378,7 @@ def main():
     if insight is None:
         insight = {
             "code": "limited",
-            "message": "Forecast is based on limited history, so treat this restock level as a starting point."
+            "message": "Not enough sales history for accurate forecast."
         }
 
     print(json.dumps({"forecast": result, "insight": insight}))

@@ -200,53 +200,8 @@ const RestockSuggestionsDialog = ({
   const totalAllocation = productInsights.reduce((sum, p) => sum + p.allocationCost, 0);
   const hasData = productInsights.length > 0;
   const lowStockCount = productInsights.filter((p) => p.lowStock).length;
-  const maxHistoricalPeriods = productInsights.reduce((m, p) => Math.max(m, p.periodsHistorical), 0);
   const totalForecastPoints = productInsights.reduce((s, p) => s + p.forecastWindow, 0);
   const productsWithForecast = productInsights.filter((p) => p.forecastWindow > 0).length;
-
-  const defaultCoverageDescriptor =
-    maxHistoricalPeriods > 1
-      ? `previous ${maxHistoricalPeriods} ${intervalLabel}${maxHistoricalPeriods > 1 ? 's' : ''}`
-      : maxHistoricalPeriods === 1
-      ? `previous ${intervalLabel}`
-      : 'limited recent history';
-
-  const coverageLabel = (() => {
-    const validRanges = productInsights
-      .map((p) => ({ start: p.historyRangeStart, end: p.historyRangeEnd }))
-      .filter(({ start, end }) => start && end && dayjs(start).isValid() && dayjs(end).isValid());
-    if (!validRanges.length) {
-      return defaultCoverageDescriptor;
-    }
-
-    let minStart = dayjs(validRanges[0].start);
-    let maxEnd = dayjs(validRanges[0].end);
-
-    for (const { start, end } of validRanges) {
-      const startDate = dayjs(start);
-      const endDate = dayjs(end);
-      if (startDate.isValid() && startDate.isBefore(minStart)) {
-        minStart = startDate;
-      }
-      if (endDate.isValid() && endDate.isAfter(maxEnd)) {
-        maxEnd = endDate;
-      }
-    }
-
-    const formattedRange = formatHistoryRange(minStart.format('YYYY-MM-DD'), maxEnd.format('YYYY-MM-DD'));
-    if (!formattedRange) {
-      return defaultCoverageDescriptor;
-    }
-
-    const yearsSpan = maxEnd.diff(minStart, 'year', true);
-    if (yearsSpan >= 1) {
-      const spanLabel = yearsSpan >= 1.5 ? `${yearsSpan.toFixed(1)} years` : '12 months';
-      return `${formattedRange} (${spanLabel})`;
-    }
-
-    const monthsSpan = Math.max(1, Math.round(maxEnd.diff(minStart, 'month', true)));
-    return `${formattedRange} (~${monthsSpan} months)`;
-  })();
 
   if (!isOpen) return null;
 
@@ -312,17 +267,7 @@ const RestockSuggestionsDialog = ({
             <div className="space-y-6">
               {/* Summary card */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                  <div>
-                    <div className="text-xs text-gray-500">Historical coverage</div>
-                    <div className="font-semibold text-gray-900">{coverageLabel}</div>
-                    {maxHistoricalPeriods > 0 && (
-                      <div className="text-[11px] text-gray-500">
-                        Based on up to {maxHistoricalPeriods} {intervalLabel}
-                        {maxHistoricalPeriods > 1 ? 's' : ''}
-                      </div>
-                    )}
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div>
                     <div className="text-xs text-gray-500">Forecast horizon</div>
                     <div className="font-semibold text-gray-900">
@@ -393,10 +338,10 @@ const RestockSuggestionsDialog = ({
 
                       <div className="text-right shrink-0 mt-1 sm:mt-0">
                         <div className="text-xs sm:text-sm font-semibold text-emerald-700">
-                          {p.totalHistoricalUnits.toLocaleString()} units sold
+                          {`Unit quantity sold (${p.totalHistoricalUnits.toLocaleString()})`}
                         </div>
                         <div className="text-[11px] sm:text-xs text-gray-500">
-                          {currencyFormat(p.salesAmount)}
+                          Qty left: {p.currentQuantity != null ? p.currentQuantity.toLocaleString() : '—'}
                         </div>
                       </div>
                     </div>
