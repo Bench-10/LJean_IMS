@@ -1352,7 +1352,7 @@ function PendingUserApprovalModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9998] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       onClick={onClose} // click outside closes modal

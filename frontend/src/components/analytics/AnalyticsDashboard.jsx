@@ -1704,11 +1704,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
           {/* Mode */}
           <div className="min-w-0">
             <DropdownCustom
-              label="Mode"
+              label="Date"
               value={rangeMode}
               onChange={(e) => setRangeMode(e.target.value)}
               options={[
-                { value: 'preset', label: 'Preset' },
+                { value: 'preset', label: 'Present' },
                 { value: 'custom', label: 'Custom' },
               ]}
               variant="floating"
