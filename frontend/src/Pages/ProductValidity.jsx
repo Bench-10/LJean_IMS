@@ -145,6 +145,34 @@ function ProductValidity({
   const [loading, setLoading] = useState(false);
   const [showNearExpiry, setShowNearExpiry] = useState(false);
   const [showExpired, setShowExpired] = useState(false);
+
+    const handleNearExpiryClick = () => {
+    setCurrentPage(1);
+
+    if (showNearExpiry) {
+      // already on → turn it off
+      setShowNearExpiry(false);
+    } else {
+      // turn Near Expiry on and force Expired off
+      setShowNearExpiry(true);
+      setShowExpired(false);
+    }
+  };
+
+  const handleExpiredClick = () => {
+    setCurrentPage(1);
+
+    if (showExpired) {
+      // already on → turn it off
+      setShowExpired(false);
+    } else {
+      // turn Expired on and force Near Expiry off
+      setShowExpired(true);
+      setShowNearExpiry(false);
+    }
+  };
+
+
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
 
@@ -359,7 +387,7 @@ function ProductValidity({
     setCurrentPage(1);
   };
 
-  // ✅ Centralized, safe filtering logic
+  //Centralized, safe filtering logic
   const searchTerm = (searchValidity || '').trim().toLowerCase();
 
   const filteredValidityData = (Array.isArray(productValidityList) ? productValidityList : []).filter((validity) => {
@@ -470,7 +498,7 @@ function ProductValidity({
           <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 lg:shrink-0">
             <button
               type="button"
-              onClick={() => { setShowNearExpiry(p => !p); setCurrentPage(1); }}
+              onClick={handleNearExpiryClick}
               className={`w-full lg:w-auto flex h-[36px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
           ${showNearExpiry
                   ? 'bg-[#FFF3C1] text-gray-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
@@ -482,7 +510,7 @@ function ProductValidity({
 
             <button
               type="button"
-              onClick={() => { setShowExpired(p => !p); setCurrentPage(1); }}
+              onClick={handleExpiredClick}
               className={`w-full lg:w-auto flex h-[36px] lg:h-[38px] items-center justify-center gap-2 px-3 lg:px-4 text-sm rounded-lg border transition-all
           ${showExpired
                   ? 'bg-[#FF3131] text-white border-red-500 ring-2 ring-red-400 ring-offset-2'

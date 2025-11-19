@@ -3,9 +3,14 @@ import NoInfoFound from "../components/common/NoInfoFound";
 import { useState, useMemo } from "react";
 import DropdownCustom from "../components/DropdownCustom";
 import { useNavigate } from "react-router-dom";
-import { MdOutlineDesktopAccessDisabled, MdOutlineDesktopWindows } from "react-icons/md";
+import {
+  MdOutlineDesktopAccessDisabled,
+  MdOutlineDesktopWindows,
+} from "react-icons/md";
 import EnableDisableAccountDialog from "../components/dialogs/EnableDisableAccountDialog";
 import ChartLoading from "../components/common/ChartLoading";
+import { IoMdClose } from "react-icons/io";
+import useModalLock from "../hooks/useModalLock";
 
 function UserManagement({
   handleUserModalOpen,
@@ -19,10 +24,15 @@ function UserManagement({
 }) {
   const [searchItem, setSearchItem] = useState("");
   const [selectedBranch, setSelectedBranch] = useState("");
-  const [openAccountStatusDialog, setOpenAccountStatusDialog] = useState(false);
+  const [openAccountStatusDialog, setOpenAccountStatusDialog] =
+    useState(false);
   const [userStatus, setUserStatus] = useState(false);
   const [userInfo, setUserInfo] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Pending user info modal (view-only)
+  const [pendingInfoOpen, setPendingInfoOpen] = useState(false);
+  const [selectedPendingUser, setSelectedPendingUser] = useState(null);
 
   const navigate = useNavigate();
 
@@ -34,21 +44,26 @@ function UserManagement({
     user.role.some((role) => ["Owner", "Admin"].includes(role));
 
   const handleSearch = (event) => {
-    setSearchItem(sanitizeInput(event.target.value));
+    const value = event.target.value;
+    setSearchItem(sanitizeInput ? sanitizeInput(value) : value);
   };
 
-  const filteredUserData = users.filter(
-    (user) =>
-      (user.full_name
-        .toLowerCase()
-        .includes(searchItem.toLowerCase()) ||
-        user.branch.toLowerCase().includes(searchItem.toLowerCase()) ||
-        (user.status
-          ? user.status.toLowerCase().includes(searchItem.toLowerCase())
+  const filteredUserData = users
+  //hide all "for approval" users from this page
+  .filter(
+    (u) => String(u.status || "").toLowerCase() !== "pending"
+  )
+  // then apply your existing search + branch filters
+  .filter(
+    (u) =>
+      (u.full_name.toLowerCase().includes(searchItem.toLowerCase()) ||
+        u.branch.toLowerCase().includes(searchItem.toLowerCase()) ||
+        (u.status
+          ? u.status.toLowerCase().includes(searchItem.toLowerCase())
           : false)) &&
       (selectedBranch === "" ||
-        (user.branch &&
-          user.branch.toLowerCase() === selectedBranch.toLowerCase()))
+        (u.branch &&
+          u.branch.toLowerCase() === selectedBranch.toLowerCase()))
   );
 
   const branchOptions = useMemo(() => {
@@ -219,10 +234,13 @@ function UserManagement({
                     key={rowIndex}
                     className={rowBaseClass}
                     onClick={() => {
-                      row.status === "pending"
-                        ? ""
-                        : setOpenUsers(true);
                       setUserDetailes(row);
+                      if (row.status === "pending") {
+                        setSelectedPendingUser(row);
+                        setPendingInfoOpen(true);
+                      } else {
+                        setOpenUsers(true);
+                      }
                     }}
                   >
                     <td className="px-4 py-2">{row.full_name}</td>
@@ -320,8 +338,13 @@ function UserManagement({
                 key={rowIndex}
                 className={`border-2 ${cardBaseClass} rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow`}
                 onClick={() => {
-                  row.status === "pending" ? "" : setOpenUsers(true);
                   setUserDetailes(row);
+                  if (row.status === "pending") {
+                    setSelectedPendingUser(row);
+                    setPendingInfoOpen(true);
+                  } else {
+                    setOpenUsers(true);
+                  }
                 }}
               >
                 <div className="flex justify-between items-start mb-3">
@@ -412,7 +435,173 @@ function UserManagement({
           })
         )}
       </div>
+
       <hr className="mt-3 mb-6 border-t-2 border-green-800 rounded-lg md:hidden" />
+
+      {/* Pending user information modal, styled like UserInformation */}
+      <PendingUserInfoModal
+        open={pendingInfoOpen}
+        user={selectedPendingUser}
+        onClose={() => {
+          setPendingInfoOpen(false);
+          setSelectedPendingUser(null);
+        }}
+        onGoToApprovals={() => {
+          setPendingInfoOpen(false);
+          setSelectedPendingUser(null);
+          navigate("/approvals");
+        }}
+      />
+    </div>
+  );
+}
+
+function PendingUserInfoModal({ open, user, onClose, onGoToApprovals }) {
+  // lock scroll and handle back/escape while modal is open
+  useModalLock(open, onClose);
+
+  if (!open || !user) return null;
+
+  // reconstruct names from object/full_name
+  let firstName =
+    user.first_name || user.firstname || user.given_name || "";
+  let lastName = user.last_name || user.lastname || user.surname || "";
+  const fullName = user.full_name || "";
+
+  if (!firstName && !lastName && fullName) {
+    const parts = fullName.trim().split(" ");
+    if (parts.length === 1) {
+      firstName = parts[0];
+    } else if (parts.length > 1) {
+      firstName = parts.slice(0, parts.length - 1).join(" ");
+      lastName = parts[parts.length - 1];
+    }
+  }
+
+  const branchName = user.branch_name || user.branch || "—";
+  const roleLabel = Array.isArray(user.role)
+    ? user.role.join(", ")
+    : user.role || "—";
+  const cellNumber =
+    user.cell_number ||
+    user.contact_number ||
+    user.phone_number ||
+    user.phone ||
+    "—";
+  const address = user.address || user.city || "—";
+  const permissions =
+    user.permissions_label ||
+    (Array.isArray(user.permissions)
+      ? user.permissions.join(", ")
+      : user.permissions) ||
+    "—";
+  const hireDate =
+    user.hire_date || user.date_hired || user.date_joined || user.created_at;
+
+  const formatHireDate = (value) => {
+    if (!value) return "—";
+    try {
+      const dt = new Date(value);
+      if (Number.isNaN(dt.getTime())) return String(value);
+      return dt.toLocaleString("en-PH", {
+        year: "numeric",
+        month: "long",
+        day: "2-digit",
+      });
+    } catch {
+      return String(value);
+    }
+  };
+
+  const FieldCard = ({ label, children }) => (
+    <div className="bg-white shadow-inner rounded-lg px-3 py-2 border border-gray-200 w-full h-full flex flex-col justify-center">
+      <h2 className="text-green-800 text-sm font-medium mb-1">{label}</h2>
+      <div className="text-gray-800 text-base font-semibold break-words">
+        {children}
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-[9998] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose} // click outside closes modal
+    >
+      <div
+        className="bg-white rounded-lg shadow-2xl border border-green-100 w-full max-w-[900px] max-h-[90vh] flex flex-col overflow-hidden animate-popup"
+        onClick={(e) => e.stopPropagation()} // prevent outside close when clicking inside
+      >
+        {/* Header (same as UserInformation) */}
+        <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-center gap-3 flex-shrink-0 sticky top-0 z-10">
+          <h1 className="text-white font-bold text-2xl">User Information</h1>
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-green-600 p-1.5 rounded-lg"
+            aria-label="Close"
+            title="Close"
+          >
+            <IoMdClose className="text-2xl" />
+          </button>
+        </div>
+
+        {/* Body (same card styling as UserInformation) */}
+        <div className="flex-1 overflow-y-auto p-5 bg-green-50/30 hide-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 auto-rows-fr">
+            {/* Row 1: First / Last */}
+            <FieldCard label="First Name">
+              {firstName || "—"}
+            </FieldCard>
+            <FieldCard label="Last Name">
+              {lastName || "—"}
+            </FieldCard>
+
+            {/* Row 2: Branch / Role */}
+            <FieldCard label="Branch">
+              {branchName}
+            </FieldCard>
+            <FieldCard label="Role">
+              {roleLabel}
+            </FieldCard>
+
+            {/* Row 3: Cell / Address */}
+            <FieldCard label="Cell Number">
+              {cellNumber}
+            </FieldCard>
+            <FieldCard label="Address">
+              {address}
+            </FieldCard>
+
+            {/* Row 4: Hire Date / Permissions */}
+            
+            <FieldCard label="Hire Date">
+              {formatHireDate(hireDate)}
+            </FieldCard>
+
+
+            {/* Row 5: Account Status (left) + placeholder (right for alignment) */}
+            <FieldCard label="Account Status">
+              <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1 border border-amber-200">
+                For Approval
+              </span>
+            </FieldCard>
+            <div className="hidden md:block" />
+          </div>
+        </div>
+
+        {/* Optional footer for "Go to Approval Center" */}
+        {/* <div className="flex justify-end gap-3 p-3 lg:p-4 bg-white border-t border-green-100 flex-shrink-0">
+          <button
+            className="py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium shadow-md transition-all"
+            onClick={() => {
+              onGoToApprovals?.();
+            }}
+          >
+            Go to Approval Center
+          </button>
+        </div> */}
+      </div>
     </div>
   );
 }

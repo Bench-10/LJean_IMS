@@ -289,62 +289,66 @@ export const cancelPendingUserRequest = async (req, res) => {
 
 export const getUserCreationRequests = async (req, res) => {
     try {
+        // Normalize roles from JWT
         const rawRoles = req.user?.role;
         const roles = Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : [];
-        const isOwner = roles.includes('Owner');
-        const isBranchManager = roles.includes('Branch Manager');
-        const isInventoryStaff = roles.includes('Inventory Staff');
+        const isOwner = roles.includes("Owner");
+        const isBranchManager = roles.includes("Branch Manager");
+        const isInventoryStaff = roles.includes("Inventory Staff");
 
         if (!isOwner && !isBranchManager && !isInventoryStaff) {
-            return res.status(403).json({ message: 'Access denied' });
+            return res.status(403).json({ message: "Access denied" });
         }
 
-        let scope = 'user';
-        if (isOwner) {
-            scope = 'admin';
-        } else if (isBranchManager) {
-            scope = 'branch';
-        }
+        // Determine fetch scope
+        let scope = "user";
+        if (isOwner) scope = "admin";
+        else if (isBranchManager) scope = "branch";
 
         const parseNumberOrNull = (value) => {
-            if (value === undefined || value === null || value === '') return null;
+            if (value === undefined || value === null || value === "") return null;
             const num = Number(value);
             return Number.isFinite(num) ? num : null;
         };
 
         const branchId = parseNumberOrNull(req.query.branch_id);
-
         const statusParam = req.query.status;
+
         const statuses = Array.isArray(statusParam)
-            ? statusParam.map(status => status.trim().toLowerCase()).filter(Boolean)
-            : (typeof statusParam === 'string' && statusParam.trim().length > 0
-                ? statusParam
-                    .split(',')
-                    .map(status => status.trim().toLowerCase())
-                    .filter(Boolean)
-                : null);
-
-        const normalizeNameKey = (value) => {
-            if (!value) return null;
-            return value.replace(/\s+/g, ' ').trim().toLowerCase();
-        };
-
-        const requesterNameKey = scope === 'user'
-            ? normalizeNameKey([
-                req.user?.first_name,
-                req.user?.last_name
-            ].filter(Boolean).join(' '))
+            ? statusParam.map((s) => s.trim().toLowerCase()).filter(Boolean)
+            : typeof statusParam === "string" && statusParam.trim()
+            ? statusParam
+                  .split(",")
+                  .map((s) => s.trim().toLowerCase())
+                  .filter(Boolean)
             : null;
 
+        const normalizeNameKey = (value) =>
+            !value ? null : value.replace(/\s+/g, " ").trim().toLowerCase();
+
+        const requesterNameKey =
+            scope === "user"
+                ? normalizeNameKey(
+                      [req.user?.first_name, req.user?.last_name]
+                          .filter(Boolean)
+                          .join(" ")
+                  )
+                : null;
+
         const branchIdFromUser = parseNumberOrNull(req.user?.branch_id);
-        const effectiveBranchId = scope === 'branch'
-            ? (branchIdFromUser ?? branchId)
-            : (scope === 'admin' ? branchId : null);
+
+        const effectiveBranchId =
+            scope === "branch"
+                ? branchIdFromUser ?? branchId
+                : scope === "admin"
+                ? branchId
+                : null;
 
         const safeRequesterId = parseNumberOrNull(req.user?.user_id);
         const safeLimit = parseNumberOrNull(req.query.limit);
         const safeOffset = parseNumberOrNull(req.query.offset);
 
+        // Fetch raw pending requests
         const requests = await userCreation.getUserCreationRequests({
             scope,
             branchId: effectiveBranchId ?? null,
@@ -355,19 +359,55 @@ export const getUserCreationRequests = async (req, res) => {
             offset: safeOffset ?? undefined
         });
 
+        // ===========================
+        // MERGE REAL USER TABLE
+        // ===========================
+        const enrichedRequests = [];
+
+        for (const reqObj of requests) {
+            const pending = { ...reqObj };
+            const userId = Number(pending.user_id);
+
+            if (Number.isFinite(userId)) {
+                const { rows } = await SQLquery(
+                    `SELECT 
+                        address,
+                        cell_number,
+                        permissions,
+                        hire_date
+                     FROM Users
+                     WHERE user_id = $1`,
+                    [userId]
+                );
+
+                if (rows.length > 0) {
+                    const u = rows[0];
+
+                    pending.address = u.address ?? null;
+                    pending.cell_number = u.cell_number ?? null;
+                    pending.permissions = u.permissions ?? null;
+                    pending.hire_date = u.hire_date ?? null;
+                }
+            }
+
+            enrichedRequests.push(pending);
+        }
+
+        // Send final enriched response
         res.status(200).json({
             scope,
             filters: {
                 branch_id: effectiveBranchId ?? null,
                 statuses
             },
-            requests
+            requests: enrichedRequests
         });
     } catch (error) {
-        console.error('Error fetching user creation requests: ', error);
-        res.status(500).json({ message: 'Internal Server Error' });
+        console.error("Error fetching user creation requests: ", error);
+        res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
 
 
 

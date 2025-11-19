@@ -703,27 +703,6 @@ function ProductInventory({
 
         {/* RIGHT: actions */}
         <div className="mt-3 lg:mt-0 ml-0 lg:ml-auto grid grid-cols-2 gap-3 items-center w-full lg:w-auto lg:flex lg:flex-nowrap lg:gap-3 shrink-0">
-          {/* Export */}
-          <div className="relative group col-span-2 lg:col-span-1">
-            <button className="w-full text-sm lg:w-auto bg-blue-800 hover:bg-blue-600 text-white font-medium px-5 h-10 rounded-lg transition-all flex items-center justify-center gap-2">
-              <TbFileExport />
-              <span className="leading-none">EXPORT</span>
-            </button>
-            <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-              <button
-                onClick={() => handleExportInventory('csv')}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-[13px] whitespace-nowrap"
-              >
-                Export as CSV
-              </button>
-              <button
-                onClick={() => handleExportInventory('pdf')}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-[13px] whitespace-nowrap"
-              >
-                Export as PDF
-              </button>
-            </div>
-          </div>
 
           {/* Inventory Staff only */}
           {user && user.role && user.role.some(r => r === 'Inventory Staff') && (
@@ -765,69 +744,78 @@ function ProductInventory({
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
       {/* INVENTORY COUNTERS CARD */}
-      <div className="bg-white border border-gray-200  rounded-lg shadow-sm p-6 mb-4">
-        <div className="flex items-center justify-center gap-8 overflow-x-auto">
-          {/* Total Products */}
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm sm:p-3 p-5 mb-4">
+        <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Total Products (ALL) */}
           <div
-            className={`flex w-full border rounded-lg flex-col items-center cursor-pointer transition-all ${
-              selectedStatus === 'all'
-                ? 'border-blue-500 bg-blue-200 shadow-md'
-                : 'border-blue-300 bg-blue-100'
-            }`}
+            className={`flex h-auto items-center justify-center gap-2 px-3 py-1 text-sm rounded-lg border cursor-pointer transition-all
+              ${
+                selectedStatus === 'all'
+                  ? 'bg-blue-300 text-blue-900 border-blue-400 ring-2 ring-blue-400 ring-offset-2 '
+                  : 'bg-blue-200 text-gray-700 border-blue-200 hover:bg-blue-100 '
+              }`}
             onClick={() => setSelectedStatus('all')}
           >
-            <span className="inline-flex flex-col items-center justify-center h-16 text-blue-800 p-2 rounded-lg">
-              <span className="text-xs font-semibold text-center">Total Unique Products</span>
-              <span className="text-xl font-bold">{totalUnique}</span>
-            </span>
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-semibold text-center">
+                Total Unique Products
+              </span>
+              <span className="text-lg font-bold">{totalUnique}</span>
+            </div>
           </div>
 
-          {/* Low Stock */}
+          {/* Low Stock – uses Near Expiry clicked style */}
           <div
-            className={`flex w-full border rounded-lg flex-col items-center cursor-pointer transition-all ${
-              selectedStatus === 'low'
-                ? 'border-amber-500 bg-amber-200 shadow-md'
-                : 'bg-amber-100 border-amber-300'
-            }`}
+            className={`flex h-auto items-center justify-center gap-2 px-3 py-1 text-sm rounded-lg border cursor-pointer transition-all
+              ${
+                selectedStatus === 'low'
+                  ? 'bg-yellow-300 text-yellow-900 border-yellow-400 ring-2 ring-yellow-400 ring-offset-2'
+                  : 'bg-yellow-200 text-gray-700 border-yellow-200 hover:bg-yellow-100'
+              }`}
             onClick={() => setSelectedStatus('low')}
           >
-            <span className="inline-flex flex-col items-center justify-center w-20 h-16 text-amber-800 p-2 rounded-lg">
+
+            <div className="flex flex-col items-center">
               <span className="text-xs font-semibold text-center">Low Stock</span>
-              <span className="text-xl font-bold">{lowStockCount}</span>
-            </span>
+              <span className="text-lg font-bold">{lowStockCount}</span>
+            </div>
           </div>
 
-          {/* Max Stock */}
+          {/* Max Stock – green theme, similar treatment */}
           <div
-            className={`flex w-full border rounded-lg flex-col items-center cursor-pointer transition-all ${
-              selectedStatus === 'max'
-                ? 'border-green-500 bg-green-200 shadow-md'
-                : 'bg-green-100 border-green-300'
-            }`}
+            className={`flex h-auto items-center justify-center gap-2 px-3 py-1 text-sm rounded-lg border cursor-pointer transition-all
+              ${
+                selectedStatus === 'max'
+                  ? 'bg-green-300 text-green-900 border-green-500 ring-2 ring-green-400 ring-offset-2'
+                  : 'bg-green-200 text-gray-700 border-green-200 hover:bg-green-100'
+              }`}
             onClick={() => setSelectedStatus('max')}
           >
-            <span className="inline-flex flex-col items-center justify-center w-20 h-16 text-green-800 p-2 rounded-lg">
+
+            <div className="flex flex-col items-center">
               <span className="text-xs font-semibold text-center">Max Stock</span>
-              <span className="text-xl font-bold">{maxStockCount}</span>
-            </span>
+              <span className="text-lg font-bold">{maxStockCount}</span>
+            </div>
           </div>
 
-          {/* No Stock */}
+          {/* No Stock – uses Expired clicked style */}
           <div
-            className={`flex w-full border rounded-lg flex-col items-center cursor-pointer transition-all ${
-              selectedStatus === 'none'
-                ? 'border-red-500 bg-red-200 shadow-md'
-                : 'bg-red-100 border-red-300'
-            }`}
+            className={`flex h-auto items-center justify-center gap-2 px-3 py-1 text-sm rounded-lg border cursor-pointer transition-all
+              ${
+                selectedStatus === 'none'
+                  ? 'bg-red-300 text-red-600 border-red-500 ring-2 ring-red-400 ring-offset-2'
+                  : 'bg-red-200 text-gray-700 border-red-200 hover:bg-red-100'
+              }`}
             onClick={() => setSelectedStatus('none')}
           >
-            <span className="inline-flex flex-col items-center justify-center w-20 h-16 text-red-800 p-2 rounded-lg">
+            <div className="flex flex-col items-center">
               <span className="text-xs font-semibold text-center">No Stock</span>
-              <span className="text-xl font-bold">{noStockCount}</span>
-            </span>
+              <span className="text-lg font-bold">{noStockCount}</span>
+            </div>
           </div>
         </div>
       </div>
+
 
       {/* TABLE */}
       <div className="overflow-x-auto overflow-y-auto h-[65vh] sm:h-[65vh] md:h-[70vh] lg:h-[75vh] xl:h-[60vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
@@ -1092,7 +1080,31 @@ function ProductInventory({
         </div>
 
         {/* RIGHT: INVENTORY HISTORY BUTTON (BOTH MOBILE & DESKTOP) */}
-        <div className="flex justify-end sm:flex-1">
+        <div className="flex justify-end sm:flex-1 gap-3">
+          {/* Export dropdown */}
+<div className="relative group w-full sm:w-auto">
+  <button className="bg-blue-800 hover:bg-blue-600 text-white font-medium px-4 lg:px-5 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-[13px] w-full sm:w-auto">
+    <TbFileExport />
+    EXPORT
+  </button>
+  <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 bottom-full mb-2 bg-white border border-gray-300 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+    <button
+      onClick={() => handleExportInventory('csv')}
+      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-[13px] whitespace-nowrap"
+    >
+      Export as CSV
+    </button>
+    <button
+      onClick={() => handleExportInventory('pdf')}
+      className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-[13px] whitespace-nowrap"
+    >
+      Export as PDF
+    </button>
+  </div>
+</div>
+
+
+          {/* Show Inventory History */}
           <button
             className="bg-white hover:bg-gray-200 rounded-lg border transition-all py-2 px-3 lg:px-5 text-[13px] whitespace-nowrap w-full sm:w-auto"
             onClick={() => setIsProductTransactOpen(true)}
@@ -1100,6 +1112,8 @@ function ProductInventory({
             Show Inventory History
           </button>
         </div>
+
+
       </div>
     </div>
   );
