@@ -56,7 +56,7 @@ function pickPythonExecutable() {
 
 export async function runDemandForecast({ history, interval = 'monthly' }) {
   if (!Array.isArray(history) || history.length < 2) {
-    return [];
+    return { forecast: [], insight: null };
   }
 
   const cacheKey = makeCacheKey(interval, history);
@@ -95,7 +95,7 @@ export async function runDemandForecast({ history, interval = 'monthly' }) {
 
     child.on('error', (err) => {
       console.error('[forecast] Failed to start Prophet process:', err.message);
-      resolve([]);
+      resolve({ forecast: [], insight: null });
     });
 
     child.on('close', (code) => {
@@ -104,16 +104,22 @@ export async function runDemandForecast({ history, interval = 'monthly' }) {
           console.error('[forecast] Prophet stderr:', stderr);
         }
         console.error(`[forecast] Prophet process exited with code ${code}`);
-        resolve([]);
+        resolve({ forecast: [], insight: null });
         return;
       }
 
       try {
         const parsed = JSON.parse(stdout || '{}');
-        resolve(Array.isArray(parsed.forecast) ? parsed.forecast : []);
+        const forecast = Array.isArray(parsed.forecast) ? parsed.forecast : [];
+        const insight = parsed.insight && typeof parsed.insight === 'object'
+          ? parsed.insight
+          : parsed.insight
+          ? { message: String(parsed.insight) }
+          : null;
+        resolve({ forecast, insight });
       } catch (parseErr) {
         console.error('[forecast] Unable to parse Prophet output:', parseErr.message);
-        resolve([]);
+        resolve({ forecast: [], insight: null });
       }
     });
 

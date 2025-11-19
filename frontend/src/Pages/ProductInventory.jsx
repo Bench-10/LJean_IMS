@@ -33,14 +33,8 @@ function ProductInventory({
   const [error, setError] = useState();
   const [searchItem, setSearchItem] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState(
-    () =>
-      user &&
-      user.role &&
-      user.role.some(role => ['Branch Manager'].includes(role))
-        ? user.branch_id
-        : ''
-  );
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('all'); // 'all', 'low', 'max', 'none'
   const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [pendingRejectId, setPendingRejectId] = useState(null);
@@ -215,7 +209,14 @@ function ProductInventory({
   // RESET PAGINATION WHEN FILTERS CHANGE
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, selectedBranch]);
+  }, [selectedCategory, selectedBranch, selectedStatus]);
+
+  // SET DEFAULT BRANCH FOR NON-OWNERS
+  useEffect(() => {
+    if (user && user.branch_id && user.role && !user.role.some(r => r === 'Owner')) {
+      setSelectedBranch(user.branch_id);
+    }
+  }, [user]);
 
   // OPEN DETAILS DIALOG ON ROW CLICK
   const openDetails = (item) => {
@@ -240,6 +241,21 @@ function ProductInventory({
   filteredProducts = selectedBranch
     ? filteredProducts.filter(item => item.branch_id === Number(selectedBranch))
     : filteredProducts;
+
+  // COMPUTE COUNTS BEFORE STATUS FILTER
+  const totalUnique = new Set(filteredProducts.map(p => p.product_id)).size;
+  const lowStockCount = filteredProducts.filter(p => Number(p.quantity) <= Number(p.min_threshold) &&  Number(p.quantity) !==  0).length;
+  const maxStockCount = filteredProducts.filter(p => Number(p.quantity) >= Number(p.max_threshold)).length;
+  const noStockCount = filteredProducts.filter(p => Number(p.quantity) === 0).length;
+
+  // FILTER BY STATUS
+  if (selectedStatus === 'low') {
+    filteredProducts = filteredProducts.filter(p => Number(p.quantity) > 0 && Number(p.quantity) <= Number(p.min_threshold));
+  } else if (selectedStatus === 'max') {
+    filteredProducts = filteredProducts.filter(p => Number(p.quantity) >= Number(p.max_threshold));
+  } else if (selectedStatus === 'none') {
+    filteredProducts = filteredProducts.filter(p => Number(p.quantity) === 0);
+  }
 
   // FILTER BY SEARCH
   const filteredData = filteredProducts.filter(product =>
@@ -748,6 +764,71 @@ function ProductInventory({
 
       <hr className="border-t-2 my-4 w-full border-gray-500 rounded-lg" />
 
+      {/* INVENTORY COUNTERS CARD */}
+      <div className="bg-white border border-gray-200  rounded-lg shadow-sm p-6 mb-4">
+        <div className="flex items-center justify-center gap-8 overflow-x-auto">
+          {/* Total Products */}
+          <div
+            className={`flex w-full border rounded-lg flex-col items-center cursor-pointer transition-all ${
+              selectedStatus === 'all'
+                ? 'border-blue-500 bg-blue-200 shadow-md'
+                : 'border-blue-300 bg-blue-100'
+            }`}
+            onClick={() => setSelectedStatus('all')}
+          >
+            <span className="inline-flex flex-col items-center justify-center h-16 text-blue-800 p-2 rounded-lg">
+              <span className="text-xs font-semibold text-center">Total Unique Products</span>
+              <span className="text-xl font-bold">{totalUnique}</span>
+            </span>
+          </div>
+
+          {/* Low Stock */}
+          <div
+            className={`flex w-full border rounded-lg flex-col items-center cursor-pointer transition-all ${
+              selectedStatus === 'low'
+                ? 'border-amber-500 bg-amber-200 shadow-md'
+                : 'bg-amber-100 border-amber-300'
+            }`}
+            onClick={() => setSelectedStatus('low')}
+          >
+            <span className="inline-flex flex-col items-center justify-center w-20 h-16 text-amber-800 p-2 rounded-lg">
+              <span className="text-xs font-semibold text-center">Low Stock</span>
+              <span className="text-xl font-bold">{lowStockCount}</span>
+            </span>
+          </div>
+
+          {/* Max Stock */}
+          <div
+            className={`flex w-full border rounded-lg flex-col items-center cursor-pointer transition-all ${
+              selectedStatus === 'max'
+                ? 'border-green-500 bg-green-200 shadow-md'
+                : 'bg-green-100 border-green-300'
+            }`}
+            onClick={() => setSelectedStatus('max')}
+          >
+            <span className="inline-flex flex-col items-center justify-center w-20 h-16 text-green-800 p-2 rounded-lg">
+              <span className="text-xs font-semibold text-center">Max Stock</span>
+              <span className="text-xl font-bold">{maxStockCount}</span>
+            </span>
+          </div>
+
+          {/* No Stock */}
+          <div
+            className={`flex w-full border rounded-lg flex-col items-center cursor-pointer transition-all ${
+              selectedStatus === 'none'
+                ? 'border-red-500 bg-red-200 shadow-md'
+                : 'bg-red-100 border-red-300'
+            }`}
+            onClick={() => setSelectedStatus('none')}
+          >
+            <span className="inline-flex flex-col items-center justify-center w-20 h-16 text-red-800 p-2 rounded-lg">
+              <span className="text-xs font-semibold text-center">No Stock</span>
+              <span className="text-xl font-bold">{noStockCount}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* TABLE */}
       <div className="overflow-x-auto overflow-y-auto h-[65vh] sm:h-[65vh] md:h-[70vh] lg:h-[75vh] xl:h-[60vh] border-b-2 border-gray-500 rounded-lg hide-scrollbar pb-6">
         <table
@@ -763,12 +844,25 @@ function ProductInventory({
               <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white">
                 ITEM NAME
               </th>
+
+              {user &&
+                user.role &&
+                user.role.some(role => ['Owner'].includes(role)) && (
+                  <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-40">
+                    BRANCH
+                  </th>
+                )}
+
+
               <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-3">
                 UNIT
               </th>
               <th className="bg-green-500 px-4 py-2 text-left text-sm font-medium text-white w-40">
                 CATEGORY
               </th>
+
+              
+
               <th className="bg-green-500 px-4 py-2 text-right text-sm font-medium text-white w-32">
                 UNIT PRICE
               </th>
@@ -803,12 +897,12 @@ function ProductInventory({
           <tbody className="bg-white relative">
             {invetoryLoading ? (
               <tr>
-                <td colSpan="13" className="h-96 text-center">
+                <td colSpan="14" className="h-96 text-center">
                   <ChartLoading message="Loading inventory products..." />
                 </td>
               </tr>
             ) : currentPageData.length === 0 ? (
-              <NoInfoFound col={11} />
+              <NoInfoFound col={12} />
             ) : (
               currentPageData.map((row, rowIndex) => (
                 <tr
@@ -827,12 +921,21 @@ function ProductInventory({
                   <td className="px-4 py-2 font-medium whitespace-nowrap">
                     {row.product_name}
                   </td>
+
+                  {user &&
+                    user.role &&
+                    user.role.some(role => ['Owner'].includes(role)) && (
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {branches.find(b => b.branch_id === row.branch_id)?.branch_name || 'Unknown'}
+                      </td>
+                    )}
                   <td className="px-4 py-2 font-bold">
                     {row.unit.toUpperCase()}
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap">
                     {row.category_name}
                   </td>
+
                   <td className="px-4 py-2 text-right">
                     {currencyFormat(row.unit_price)}
                   </td>

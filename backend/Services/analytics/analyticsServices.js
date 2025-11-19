@@ -337,20 +337,19 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     units_sold: Number(item.units_sold || 0)
   }));
 
-  let forecast = [];
+  let forecastResult = { forecast: [], insight: null };
   try {
     const forecastInput = history.map(item => ({
       period: item.period,
       value: item.units_sold
     }));
-    forecast = await runDemandForecast({ history: forecastInput, interval });
+    forecastResult = await runDemandForecast({ history: forecastInput, interval });
   } catch (err) {
     console.error('Sales forecast error', err);
-    forecast = [];
+    forecastResult = { forecast: [], insight: null };
   }
 
-
-  const forecastSeries = forecast.map(point => ({
+  const forecastSeries = forecastResult.forecast.map(point => ({
     period: point.period,
     units_sold: Number(point.forecast || 0),
     forecast_lower: point.forecast_lower != null ? Number(point.forecast_lower) : null,
@@ -366,7 +365,8 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
   const result = {
     history,
     forecast: forecastSeries,
-    series: combinedSeries
+    series: combinedSeries,
+    forecast_context: forecastResult.insight
   };
   setAnalyticsCache(cacheKey, result);
   return result;
@@ -528,6 +528,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
         ...product,
         history: historySeries,
         forecast: [],
+        forecast_context: null,
         history_range_start: historyRangeStart,
         history_range_end: historyRangeEnd,
         history_coverage_days: historyCoverageDays,
@@ -537,8 +538,8 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
 
     try {
       const forecastInput = historySeries.map(item => ({ period: item.period, value: item.units_sold }));
-      const forecast = await runDemandForecast({ history: forecastInput, interval });
-      const forecastSeries = forecast.map(point => ({
+      const { forecast: forecastPoints, insight: forecastInsight } = await runDemandForecast({ history: forecastInput, interval });
+      const forecastSeries = forecastPoints.map(point => ({
         period: point.period,
         forecast_units: Number(point.forecast || 0),
         forecast_lower: point.forecast_lower != null ? Number(point.forecast_lower) : null,
@@ -549,6 +550,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
         ...product,
         history: historySeries,
         forecast: forecastSeries,
+        forecast_context: forecastInsight,
         history_range_start: historyRangeStart,
         history_range_end: historyRangeEnd,
         history_coverage_days: historyCoverageDays,
@@ -560,6 +562,7 @@ export async function fetchTopProducts({ branch_id, category_id, limit, range, s
         ...product,
         history: historySeries,
         forecast: [],
+        forecast_context: null,
         history_range_start: historyRangeStart,
         history_range_end: historyRangeEnd,
         history_coverage_days: historyCoverageDays,
@@ -744,11 +747,10 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   if (branch_id) { salesConditions.push(`s.branch_id = $${salesIdx++}`); salesParams.push(branch_id); }
   if (product_id) { salesConditions.push(`si.product_id = $${salesIdx++}`); salesParams.push(product_id); }
   const salesWhere = 'WHERE ' + salesConditions.join(' AND ');
-  const salesJoin = product_id ? 'JOIN Sales_Items si USING(sales_information_id)' : '';
   const { rows: salesRows } = await SQLquery(`
-    SELECT COALESCE(SUM(${product_id ? 'si.amount' : 'total_amount_due'}),0) AS total_sales
+    SELECT COALESCE(SUM(si.amount),0) AS total_sales
     FROM Sales_Information s
-    ${salesJoin}
+    JOIN Sales_Items si USING(sales_information_id)
     ${salesWhere};`,
     salesParams);
 
@@ -760,11 +762,10 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   if (branch_id) { prevSalesConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevSalesParams.push(branch_id); }
   if (product_id) { prevSalesConditions.push(`si.product_id = $${prevSalesIdx++}`); prevSalesParams.push(product_id); }
   const prevSalesWhere = 'WHERE ' + prevSalesConditions.join(' AND ');
-  const prevSalesJoin = product_id ? 'JOIN Sales_Items si USING(sales_information_id)' : '';
   const { rows: prevSalesRows } = await SQLquery(`
-    SELECT COALESCE(SUM(${product_id ? 'si.amount' : 'total_amount_due'}),0) AS total_sales
+    SELECT COALESCE(SUM(si.amount),0) AS total_sales
     FROM Sales_Information s
-    ${prevSalesJoin}
+    JOIN Sales_Items si USING(sales_information_id)
     ${prevSalesWhere};`, 
     prevSalesParams);
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from typing import Any, Dict, List
+import math
 
 import sys
 try:
@@ -195,6 +196,112 @@ def _stabilize_predictions(forecast_df, history_df, freq: str):
     return forecast_df
 
 
+def _describe_history_vs_forecast(history_df, forecast_df, freq: str):
+    if history_df.empty or forecast_df.empty:
+        return None
+
+    raw_history = [
+        float(value)
+        for value in history_df["y"].tolist()
+        if value is not None and not (isinstance(value, float) and math.isnan(value))
+    ]
+    if not raw_history:
+        return None
+
+    total_points = len(raw_history)
+    window = max(1, min(total_points, max(3, total_points // 3)))
+    recent = raw_history[-window:]
+    earlier = raw_history[:-window]
+
+    def _safe_mean(values):
+        return float(sum(values) / len(values)) if values else 0.0
+
+    def _population_std(values, avg=None):
+        if not values:
+            return 0.0
+        if avg is None:
+            avg = _safe_mean(values)
+        variance = sum((v - avg) ** 2 for v in values) / len(values)
+        return variance ** 0.5
+
+    recent_mean = _safe_mean(recent)
+    earlier_mean = _safe_mean(earlier) if earlier else recent_mean
+    change_ratio = (recent_mean / earlier_mean) if earlier_mean > 0 else None
+
+    overall_mean = _safe_mean(raw_history)
+    cv = (_population_std(raw_history, overall_mean) / overall_mean) if overall_mean > 0 else None
+    zero_share = sum(1 for value in raw_history if value <= 0) / float(total_points)
+    low_volume_share = sum(1 for value in raw_history if value <= 10) / float(total_points)
+    max_value = max(raw_history) if raw_history else 0.0
+
+    indices = list(range(total_points))
+    mean_x = (total_points - 1) / 2.0
+    denominator = sum((idx - mean_x) ** 2 for idx in indices)
+    numerator = sum((idx - mean_x) * (value - overall_mean) for idx, value in zip(indices, raw_history))
+    slope = numerator / denominator if denominator else 0.0
+    norm_slope = slope / overall_mean if overall_mean else 0.0
+
+    forecast_values = [
+        float(value)
+        for value in forecast_df["yhat"].tolist()
+        if value is not None and not (isinstance(value, float) and math.isnan(value))
+    ]
+    if forecast_values:
+        forecast_total = sum(forecast_values)
+        expected_recent = recent_mean * len(forecast_values)
+        forecast_ratio = (forecast_total / expected_recent) if expected_recent > 0 else None
+    else:
+        forecast_ratio = None
+
+    interval_label = {
+        "D": "day",
+        "W": "week",
+        "M": "month",
+        "Y": "year"
+    }.get(freq, "period")
+
+    message = None
+    code = "steady"
+
+    spike_threshold = max(50.0, overall_mean * 6) if overall_mean else 50.0
+    has_extreme_spike = max_value >= spike_threshold and low_volume_share >= 0.6
+
+    if has_extreme_spike:
+        code = "spiky_extreme"
+        message = "Irregular sales with rare huge spikes.".format(label=interval_label)
+    elif change_ratio is not None and change_ratio >= 1.35:
+        code = "uptrend"
+        message = "Sales trend up.".format(label=interval_label)
+    elif change_ratio is not None and change_ratio <= 0.7:
+        code = "downtrend"
+        message = "Sales trend down.".format(label=interval_label)
+    elif zero_share >= 0.4 and cv is not None and cv >= 1.0:
+        code = "spiky_zero"
+        message = "Mostly quiet with sudden jumps.".format(label=interval_label)
+    elif zero_share >= 0.4:
+        code = "gapped"
+        message = "Many {label}s had no sales.".format(label=interval_label)
+    elif cv is not None and cv >= 1.0:
+        code = "volatile"
+        message = "Sales swing a lot.".format(label=interval_label)
+    elif forecast_ratio is not None and forecast_ratio >= 1.4:
+        code = "momentum"
+        message = "Demand is rising.".format(label=interval_label)
+    elif forecast_ratio is not None and forecast_ratio <= 0.6:
+        code = "cooldown"
+        message = "Demand is easing.".format(label=interval_label)
+    elif norm_slope >= 0.1:
+        code = "gentle_up"
+        message = "Sales inch upward.".format(label=interval_label)
+    elif norm_slope <= -0.1:
+        code = "gentle_down"
+        message = "Sales inch downward.".format(label=interval_label)
+    else:
+        message = "Sales stay steady.".format(label=interval_label)
+
+    return {"code": code, "message": message}
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -253,9 +360,10 @@ def main():
 
     forecast_tail = forecast.iloc[len(history_df):].copy()
     forecast_tail = _stabilize_predictions(forecast_tail, history_df, freq)
+    insight = _describe_history_vs_forecast(history_df, forecast_tail, freq)
 
     if forecast_tail.empty:
-        print(json.dumps({"forecast": []}))
+        print(json.dumps({"forecast": [], "insight": insight}))
         return
 
     result = []
@@ -267,7 +375,13 @@ def main():
             "forecast_upper": float(row["yhat_upper"])
         })
 
-    print(json.dumps({"forecast": result}))
+    if insight is None:
+        insight = {
+            "code": "limited",
+            "message": "Forecast is based on limited history, so treat this restock level as a starting point."
+        }
+
+    print(json.dumps({"forecast": result, "insight": insight}))
 
 
 if __name__ == "__main__":

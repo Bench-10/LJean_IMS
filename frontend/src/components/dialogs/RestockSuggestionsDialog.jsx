@@ -71,6 +71,8 @@ const RestockSuggestionsDialog = ({
             .sort((a, b) => (a.period || '').localeCompare(b.period || ''))
         : [];
 
+      const forecastContext = product.forecast_context ?? null;
+
       const historyRangeStart = product.history_range_start || (historySeries[0]?.period ?? null);
       const historyRangeEnd = product.history_range_end || (historySeries[historySeries.length - 1]?.period ?? null);
       const historyCoverageDays = product.history_coverage_days ?? (
@@ -96,6 +98,7 @@ const RestockSuggestionsDialog = ({
         isLowStock,
         historySeries,
         forecastSeries,
+        forecastContext,
         historyRangeStart,
         historyRangeEnd,
         historyCoverageDays,
@@ -127,6 +130,7 @@ const RestockSuggestionsDialog = ({
     return prioritizedProducts.map((product, index) => {
       const historySeries = product.historySeries;
       const forecastSeries = product.forecastSeries;
+      const forecastContext = product.forecastContext;
       const historyRangeStart = product.historyRangeStart;
       const historyRangeEnd = product.historyRangeEnd;
       const historyCoverageDays = product.historyCoverageDays;
@@ -183,6 +187,7 @@ const RestockSuggestionsDialog = ({
         allocationCost,
         historySeries,
         forecastSeries,
+        forecastContext,
         historyRangeStart,
         historyRangeEnd,
         historyCoverageDays,
@@ -448,6 +453,12 @@ const RestockSuggestionsDialog = ({
                             </p>
                           ) : (
                             <div className="mt-2 text-xs text-gray-600" />
+                          )}
+
+                          {p.forecastContext?.message && (
+                            <div className="mt-3 rounded-md border border-emerald-200 bg-white/70 px-3 py-2 text-left text-xs text-gray-700">
+                              {p.forecastContext.message}
+                            </div>
                           )}
                         </div>
                       </div>
