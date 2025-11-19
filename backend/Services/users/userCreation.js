@@ -742,32 +742,7 @@ export const approvePendingUser = async (userId, approverId, approverName) => {
         }
 
         // Send push notification to the requester (creator of the user account)
-        if (approvedUser.created_by_id) {
-            try {
-                await sendPushNotification({
-                    userId: approvedUser.created_by_id,
-                    userType: 'user',
-                    notificationData: {
-                        title: 'User Request Approved ✅',
-                        body: `Your request to create user "${approvedUser.full_name}" has been approved by the owner (${approverName}).`,
-                            icon: '/LOGO.png',
-                            badge: '/LOGO.png',
-                        tag: `user-approved-${userIdInt}`,
-                        data: {
-                            type: 'user-approval',
-                            user_id: userIdInt,
-                            status: 'approved',
-                            url: '/user-management'
-                        },
-                        requireInteraction: false,
-                        vibrate: [200, 100, 200]
-                    }
-                });
-            } catch (error) {
-                console.error('Failed to send approval push notification:', error);
-                // Don't throw - push notifications are optional
-            }
-        }
+        
     }
 
     return approvedUser;
@@ -909,34 +884,6 @@ export const rejectPendingUser = async (userId, approverId, approverName, option
     }
 
     // Send push notification to the requester (creator of the user account)
-    if (rejectedUser?.created_by_id) {
-        try {
-            const reasonText = resolvedReason ? ` Reason: ${resolvedReason}` : '';
-            await sendPushNotification({
-                userId: rejectedUser.created_by_id,
-                userType: 'user',
-                notificationData: {
-                    title: 'User Request Rejected ❌',
-                    body: `Your request to create user "${rejectedUser.full_name}" has been rejected by the owner (${approverName}).${reasonText}`,
-                        icon: '/LOGO.png',
-                        badge: '/LOGO.png',
-                    tag: `user-rejected-${userIdInt}`,
-                    data: {
-                        type: 'user-rejection',
-                        user_id: userIdInt,
-                        status: 'rejected',
-                        reason: resolvedReason,
-                        url: '/user-management'
-                    },
-                    requireInteraction: true, // Rejection is important, user should acknowledge
-                    vibrate: [200, 100, 200, 100, 200]
-                }
-            });
-        } catch (error) {
-            console.error('Failed to send rejection push notification:', error);
-            // Don't throw - push notifications are optional
-        }
-    }
 
     return rejectedUser;
 };
