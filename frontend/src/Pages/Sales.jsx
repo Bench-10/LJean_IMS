@@ -232,8 +232,8 @@ function Sales({ setOpenSaleModal, saleHeader = [], sanitizeInput, salesLoading 
                 >
                   <td className="px-4 py-2 text-center">{row.sales_information_id}</td>
                   <td className="px-4 py-2 font-medium whitespace-nowrap">{row.charge_to}</td>
-                  <td className="px-4 py-2 whitespace-nowrap">{row.tin}</td>
-                  <td className="px-4 py-2">{row.address}</td>
+                  <td className="px-4 py-2 whitespace-nowrap">{row.tin || 'None'}</td>
+                  <td className="px-4 py-2">{row.address || 'None'}</td>
                   <td className="px-4 py-2 text-right">{row.formated_date}</td>
                   <td className="px-4 py-2 text-right">{currencyFormat(row.amount_net_vat)}</td>
                   <td className="px-4 py-2 text-right">{currencyFormat(row.vat)}</td>

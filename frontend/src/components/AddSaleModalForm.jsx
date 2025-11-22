@@ -5,15 +5,9 @@ import toTwoDecimals from '../utils/fixedDecimalPlaces.js';
 import { currencyFormat } from '../utils/formatCurrency.js';
 import ConfirmationDialog from './dialogs/ConfirmationDialog.jsx';
 import FormLoading from './common/FormLoading'; 
-import DropdownUnitSelect from '../components/DropdownUnitSelect';
 import dayjs from 'dayjs';
 import api from '../utils/api.js';
-import {
-  getQuantityStep,
-  validateQuantity,
-  getQuantityPlaceholder,
-  allowsFractional
-} from '../utils/unitConversion';
+// Unit conversion removed: use product base unit and unit_price directly
 import { IoMdClose } from "react-icons/io";
 import useModalLock from "../hooks/useModalLock";
 import toast from 'react-hot-toast'; 
@@ -64,74 +58,10 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   }, [openSaleModal]);
 
 
-  const getSellingUnitsForProduct = (product) => {
-    if (!product) return [];
-
-    const parsedUnits = Array.isArray(product.selling_units)
-      ? product.selling_units.reduce((acc, entry) => {
-          const unitLabel = typeof entry?.unit === 'string' ? entry.unit.trim() : '';
-          if (!unitLabel) return acc;
-
-          const price = Number(entry.unit_price);
-          const baseQuantity = Number(entry.base_quantity_per_sell_unit);
-
-          if (!Number.isFinite(price) || price <= 0) return acc;
-          if (!Number.isFinite(baseQuantity) || baseQuantity <= 0) return acc;
-
-          acc.push({
-            unit: unitLabel,
-            unit_price: price,
-            base_quantity_per_sell_unit: baseQuantity,
-            units_per_base: Number(entry.units_per_base) || null,
-            is_base: Boolean(entry.is_base)
-          });
-          return acc;
-        }, [])
-      : [];
-
-    if (parsedUnits.length > 0) {
-      return parsedUnits.sort((a, b) => {
-        if (a.is_base === b.is_base) {
-          return a.unit.localeCompare(b.unit);
-        }
-        return a.is_base ? -1 : 1;
-      });
-    }
-
-    const fallbackUnit = typeof product.unit === 'string' ? product.unit.trim() : '';
-    const fallbackPrice = Number(product.unit_price);
-
-    if (!fallbackUnit || !Number.isFinite(fallbackPrice) || fallbackPrice <= 0) {
-      return [];
-    }
-
-    return [{
-      unit: fallbackUnit,
-      unit_price: fallbackPrice,
-      base_quantity_per_sell_unit: 1,
-      units_per_base: 1,
-      is_base: true
-    }];
-  };
+  // Removed selling-units parsing; rely on product.unit and product.unit_price
 
 
-  const getSelectedUnitConfig = (row, product) => {
-    if (!row) return null;
-    const sellingUnits = Array.isArray(row.sellingUnits) && row.sellingUnits.length > 0
-      ? row.sellingUnits
-      : getSellingUnitsForProduct(product);
-
-    if (!sellingUnits || sellingUnits.length === 0) {
-      return null;
-    }
-
-    const matched = sellingUnits.find(entry => entry.unit === row.unit);
-    if (matched) {
-      return matched;
-    }
-
-    return sellingUnits.find(entry => entry.is_base) || sellingUnits[0];
-  };
+  // unit selection and conversion removed
 
   const createEmptySaleRow = () => ({
     product_id: '',
@@ -139,8 +69,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     unit: '',
     unitPrice: 0,
     amount: 0,
-    sellingUnits: [],
-    baseQuantityPerSellUnit: 1
+    // sellingUnits/baseQuantity removed; base quantity assumed 1
   });
 
 
@@ -224,57 +153,15 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
       return;
     }
 
-    const selectedUnitConfig = getSelectedUnitConfig(currentRow, product);
-    if (!currentRow.unit && selectedUnitConfig?.unit) {
-      currentRow.unit = selectedUnitConfig.unit;
-    }
-    const resolvedUnitPrice = Number(selectedUnitConfig?.unit_price ?? currentRow.unitPrice ?? 0);
-    const resolvedBaseQuantity = Number(selectedUnitConfig?.base_quantity_per_sell_unit ?? currentRow.baseQuantityPerSellUnit ?? 1);
-
-    currentRow.sellingUnits = Array.isArray(currentRow.sellingUnits) && currentRow.sellingUnits.length > 0
-      ? currentRow.sellingUnits
-      : getSellingUnitsForProduct(product);
+    // Use product base unit and price directly
+    currentRow.unit = currentRow.unit || (product.unit || '');
+    const resolvedUnitPrice = Number(currentRow.unitPrice || product.unit_price || 0);
     currentRow.unitPrice = Number.isFinite(resolvedUnitPrice) && resolvedUnitPrice > 0 ? resolvedUnitPrice : 0;
-    currentRow.baseQuantityPerSellUnit = Number.isFinite(resolvedBaseQuantity) && resolvedBaseQuantity > 0 ? resolvedBaseQuantity : 1;
 
     const currentQuantity = Number(currentRow.quantity) || 0;
-    const unit = currentRow.unit;
-
-    // Validate quantity for unit
-    if (unit && currentQuantity > 0) {
-      const validation = validateQuantity(currentQuantity, unit);
-      if (!validation.valid) {
-        setQuantityValidationErrors(prev => ({
-          ...prev,
-          [index]: validation.error
-        }));
-
-        currentRow.amount = 0;
-        currentRows[index] = currentRow;
-        preventEmptyQuantity(currentRows);
-        totalAmount(currentRows);
-        setRows(currentRows);
-        return;
-      } else {
-        setQuantityValidationErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors[index];
-          return newErrors;
-        });
-      }
-    } else {
-      setQuantityValidationErrors(prev => {
-        if (!prev[index]) return prev;
-        const newErrors = { ...prev };
-        delete newErrors[index];
-        return newErrors;
-      });
-    }
 
     const availableInventoryDisplay = Number(product.quantity) || 0;
-    const availableSaleQuantity = currentRow.baseQuantityPerSellUnit > 0
-      ? availableInventoryDisplay / currentRow.baseQuantityPerSellUnit
-      : availableInventoryDisplay;
+    const availableSaleQuantity = availableInventoryDisplay; // base quantity assumed 1
     const tolerance = 1e-9;
 
     if (currentKey && currentQuantity > 0 && currentQuantity - availableSaleQuantity > tolerance) {
@@ -346,6 +233,17 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     const n = Number(value);
     if (!Number.isFinite(n)) return '';
     return Number.isInteger(n) ? String(n) : toTwoDecimals(n);
+  };
+
+  // Format numbers with thousand separators and two decimals for visual display
+  const formatNumberWithSeparators = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '';
+    if (Number.isInteger(n)) {
+      return new Intl.NumberFormat('en-PH', { maximumFractionDigits: 0 }).format(n);
+    }
+    // For fractional values show up to 2 decimals (no unnecessary trailing zeros)
+    return new Intl.NumberFormat('en-PH', { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(n);
   };
 
   //HANDLE DISCOUNT CHANGE
@@ -491,11 +389,8 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
   //HANDLES PRODUCT SELECTION FROM DROPDOWN
   const selectProduct = (index, product) => {
-    const sellingUnits = getSellingUnitsForProduct(product);
-    const defaultUnitConfig = sellingUnits.find(entry => entry.is_base) || sellingUnits[0] || null;
-    const defaultUnit = defaultUnitConfig?.unit || '';
-    const defaultPrice = Number(defaultUnitConfig?.unit_price ?? product.unit_price ?? 0);
-    const defaultBaseQty = Number(defaultUnitConfig?.base_quantity_per_sell_unit ?? 1) || 1;
+    const defaultUnit = product.unit || '';
+    const defaultPrice = Number(product.unit_price) || 0;
 
     const newRows = [...rows];
     newRows[index] = {
@@ -504,9 +399,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
       quantity: '',
       unit: defaultUnit,
       unitPrice: Number.isFinite(defaultPrice) ? defaultPrice : 0,
-      amount: 0,
-      sellingUnits,
-      baseQuantityPerSellUnit: defaultBaseQty
+      amount: 0
     };
 
     preventEmptyQuantity(newRows);
@@ -539,30 +432,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   };
 
 
-  const handleUnitChange = (index, unitValue) => {
-    const currentRow = rows[index];
-    if (!currentRow) return;
-
-    const product = productsToSell.find(p => p.product_id === currentRow.product_id);
-    const sellingUnits = Array.isArray(currentRow.sellingUnits) && currentRow.sellingUnits.length > 0
-      ? currentRow.sellingUnits
-      : getSellingUnitsForProduct(product);
-
-    const unitConfig = sellingUnits.find(entry => entry.unit === unitValue) || null;
-    const resolvedPrice = Number(unitConfig?.unit_price ?? currentRow.unitPrice ?? 0);
-    const resolvedBaseQuantity = Number(unitConfig?.base_quantity_per_sell_unit ?? currentRow.baseQuantityPerSellUnit ?? 1);
-
-    const newRows = [...rows];
-    newRows[index] = {
-      ...currentRow,
-      unit: unitValue,
-      unitPrice: Number.isFinite(resolvedPrice) && resolvedPrice > 0 ? resolvedPrice : 0,
-      baseQuantityPerSellUnit: Number.isFinite(resolvedBaseQuantity) && resolvedBaseQuantity > 0 ? resolvedBaseQuantity : 1,
-      sellingUnits
-    };
-
-    createAnAmount(index, newRows);
-  };
+  // unit change removed; units are fixed to product base unit
 
 
   //FILTERS PRODUCTS BASED ON SEARCH TERM
@@ -645,6 +515,9 @@ useModalLock(canOpenSaleModal, closeModal);
 
 
   if (!user) return; // PREVENRTS RENDERING THE REST OF THE COMPONENT IF USER IS STILL EMPTY
+
+  // Form completeness check: TIN is optional; Address required only when delivery is selected
+  const isFormIncomplete = !amountNetVat || !totalAmountDue || !chargeTo || someEmpy || emptyQuantity || exceedQuanity.length > 0 || Object.keys(quantityValidationErrors).length > 0 || (isForDelivery && !address);
 
 
   return (
@@ -731,7 +604,7 @@ useModalLock(canOpenSaleModal, closeModal);
                     <input
                       type="text"
                       className='w-full border border-gray-300 rounded-md px-3 lg:py-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white shadow-sm'
-                      placeholder="Tax Identification Number"
+                      placeholder={tin || 'Optional (enter TIN if available)'}
                       value={tin}
                       onChange={(e) => setTin(e.target.value)}
                     />
@@ -742,10 +615,13 @@ useModalLock(canOpenSaleModal, closeModal);
                     <input
                       type="text"
                       className='w-full border border-gray-300 rounded-md px-3 lg:py-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white shadow-sm'
-                      placeholder="Customer address"
+                      placeholder={address || (isForDelivery ? 'Address required for delivery' : 'Optional')}
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                     />
+                    {isForDelivery && !address && (
+                      <p className='text-xs text-red-600 mt-1'>Address is required for delivery</p>
+                    )}
                   </div>
 
                   <div className='w-full'>
@@ -898,8 +774,8 @@ useModalLock(canOpenSaleModal, closeModal);
                               )}
                               <input
                                 type="number"
-                                step={row.unit ? getQuantityStep(row.unit) : "0.001"}
-                                min={row.unit ? getQuantityStep(row.unit) : "0.001"}
+                                step="0.001"
+                                min="0.001"
                                 className="border w-full rounded-md px-2 py-1.5"
                                 value={row.quantity}
                                 onChange={e => {
@@ -908,7 +784,7 @@ useModalLock(canOpenSaleModal, closeModal);
                                   setRows(newRows);
                                 }}
                                 onKeyUp={() => createAnAmount(idx)}
-                                placeholder={row.unit ? getQuantityPlaceholder(row.unit) : "0"}
+                                placeholder={"0"}
                               />
                               {quantityValidationErrors[idx] && (
                                 <div
@@ -922,14 +798,14 @@ useModalLock(canOpenSaleModal, closeModal);
                           </td>
 
 
-                          <td className="px-2 relative overflow-visible min-w-[140px]">
+                          <td className="px-2 relative cursor-not-allowed overflow-visible min-w-[140px]">
                             <input
                               type="text"
-                              className="border w-full rounded-md px-2 py-1.5"
-                              placeholder={row.product_id ? 'Unit' : 'Choose product first'}
+                              className="border w-full rounded-md px-2 py-1.5 bg-gray-50"
+                              placeholder={row.product_id ? 'Unit' : 'Choose a product'}
                               disabled={!row.product_id}
                               value={row.unit || ''}
-                              onChange={(e) => handleUnitChange(idx, e.target.value)}
+                              readOnly
                             />
                           </td>
 
@@ -937,7 +813,7 @@ useModalLock(canOpenSaleModal, closeModal);
                           <td className="px-2">
                             <input
                               type="text"
-                              className="border w-full rounded-md px-2 py-1.5"
+                              className="border cursor-not-allowed w-full rounded-md px-2 py-1.5 bg-gray-50 text-gray-600"
                               value={toTwoDecimals(row.unitPrice)}
                               readOnly
                             />
@@ -947,8 +823,8 @@ useModalLock(canOpenSaleModal, closeModal);
                           <td className="px-2">
                             <input
                               type="text"
-                              className="border w-full rounded-md px-2 py-1.5"
-                              value={toTwoDecimals(row.amount)}
+                              className="border cursor-not-allowed w-full rounded-md px-2 py-1.5 bg-gray-50 font-semibold text-gray-700"
+                              value={formatNumberWithSeparators(row.amount)}
                               readOnly
                             />
                           </td>
@@ -1060,8 +936,8 @@ useModalLock(canOpenSaleModal, closeModal);
                             )}
                             <input
                               type="number"
-                              step={row.unit ? getQuantityStep(row.unit) : "0.001"}
-                              min={row.unit ? getQuantityStep(row.unit) : "0.001"}
+                              step="0.001"
+                              min="0.001"
                               className="border w-full rounded-md px-3 py-2 text-sm"
                               value={row.quantity}
                               onChange={e => {
@@ -1070,7 +946,7 @@ useModalLock(canOpenSaleModal, closeModal);
                                 setRows(newRows);
                               }}
                               onKeyUp={() => createAnAmount(idx)}
-                              placeholder={row.unit ? getQuantityPlaceholder(row.unit) : "0"}
+                              placeholder={"0"}
                             />
                             {quantityValidationErrors[idx] && (
                               <div className="text-xs text-red-600 mt-1">
@@ -1081,21 +957,16 @@ useModalLock(canOpenSaleModal, closeModal);
                         </div>
 
                         <div className="relative">
-  <label className="block text-xs font-bold mb-1 text-gray-600 uppercase">Unit</label>
-  <DropdownUnitSelect
-    className="relative"  // anchor for absolute dropdown
-    placeholder={row.product_id ? 'Select unit' : 'Choose product first'}
-    disabled={!row.product_id}
-    value={row.unit || ''}
-    onChange={(e) => handleUnitChange(idx, e.target.value)}
-    options={
-      !row.product_id
-        ? [{ value: '', label: 'Choose product first' }]
-        : (Array.isArray(row.sellingUnits) ? row.sellingUnits : [])
-            .map(u => ({ value: u.unit, label: u.unit }))
-    }
-  />
-</div>
+                          <label className="block text-xs font-bold mb-1 text-gray-600 uppercase">Unit</label>
+                          <input
+                            type="text"
+                            className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50"
+                            placeholder={row.product_id ? 'Unit' : 'Choose product first'}
+                            disabled={!row.product_id}
+                            value={row.unit || ''}
+                            readOnly
+                          />
+                        </div>
 
                       </div>
 
@@ -1113,12 +984,12 @@ useModalLock(canOpenSaleModal, closeModal);
 
                         <div>
                           <label className='block text-xs font-bold mb-1 text-gray-600 uppercase'>Amount</label>
-                          <input
-                            type="text"
-                            className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50 font-semibold"
-                            value={toTwoDecimals(row.amount)}
-                            readOnly
-                          />
+                            <input
+                              type="text"
+                              className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50 font-semibold"
+                              value={formatNumberWithSeparators(row.amount)}
+                              readOnly
+                            />
                         </div>
                       </div>
 
@@ -1230,15 +1101,17 @@ useModalLock(canOpenSaleModal, closeModal);
                 {/*SUBMIT BUTTON*/}
                 <div className='text-center'>
                   <button
-                    disabled={!amountNetVat || !totalAmountDue || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0 || Object.keys(quantityValidationErrors).length > 0}
+                    disabled={isFormIncomplete}
                     type='submit'
                     className={`py-2 lg:py-3 px-12 lg:text-base text-sm font-semibold rounded-lg transition-all duration-200 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5`}>
                     Confirm Sale
                   </button>
 
-                  {(!amountNetVat || !totalAmountDue || !chargeTo || !tin || !address || someEmpy || emptyQuantity || exceedQuanity.length > 0 || Object.keys(quantityValidationErrors).length > 0) &&
-                    <p className='font-thin italic text-xs lg:text-sm text-red-500 mt-3'>*Please complete the required fields</p>
-                  }
+                  {isFormIncomplete && (
+                    <p className='font-thin italic text-xs lg:text-sm text-red-500 mt-3'>
+                      *Please complete the required fields{isForDelivery ? ' (Address required for delivery)' : ''}
+                    </p>
+                  )}
                 </div>
               </div>
 

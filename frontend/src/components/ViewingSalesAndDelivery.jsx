@@ -192,11 +192,11 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
     ];
 
     const metaMarkup = metaLines
-      .filter(line => line.value)
+      // include lines even if empty; render 'None' for missing values
       .map(line => `
         <tr>
           <td class="meta-label">${escapeHtml(line.label)}:</td>
-          <td class="meta-value">${escapeHtml(line.value)}</td>
+          <td class="meta-value">${escapeHtml(line.value ?? 'None')}</td>
         </tr>
       `)
       .join('');
@@ -508,13 +508,13 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
                     {type === "sales" ? "TIN" : "COURIER NAME"}
                   </label>
                   <div className="p-2 bg-gray-50 border rounded text-xs sm:text-sm break-all">
-                    {type === "sales" ? headerInformation.tin : headerInformation.courier_name}
+                      {type === "sales" ? (headerInformation.tin || 'None') : (headerInformation.courier_name || 'None')}
                   </div>
                 </div>
                 <div className="sm:col-span-2 lg:col-span-1">
                   <label className="text-xs font-bold text-gray-600">ADDRESS</label>
                   <div className="p-2 bg-gray-50 border rounded text-xs sm:text-sm">
-                    {headerInformation.address}
+                      {headerInformation.address || 'None'}
                   </div>
                 </div>
               </div>
