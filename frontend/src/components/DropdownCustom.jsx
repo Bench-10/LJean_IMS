@@ -151,14 +151,16 @@ const DropdownCustom = ({
                   <div
                     key={option.value || index}
                     onClick={() => {
+                      if (option.disabled) return; // prevent selecting disabled options
                       onChange({ target: { value: option.value } });
                       setIsOpen(false);
                     }}
                     className={`
                       px-4 ${rowSize} cursor-pointer transition-colors border-b border-gray-100 last:border-b-0
+                      ${option.disabled ? 'opacity-50 cursor-not-allowed text-gray-400' : ''}
                       ${value === option.value
                         ? 'bg-green-500 text-white font-semibold hover:bg-green-600'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        : (option.disabled ? 'text-gray-400' : 'text-gray-700 hover:bg-gray-100')
                       }
                     `}
                   >
@@ -218,6 +220,7 @@ const DropdownCustom = ({
                   <div
                     key={option.value || index}
                     onClick={() => {
+                      if (option.disabled) return; // prevent selecting disabled options
                       onChange({ target: { value: option.value } });
                       setIsOpen(false);
                     }}
@@ -225,7 +228,7 @@ const DropdownCustom = ({
                       px-4 ${rowSize} cursor-pointer transition-colors border-b border-gray-100 last:border-b-0
                       ${value === option.value
                         ? 'bg-green-500 text-white font-semibold hover:bg-green-600'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        : (option.disabled ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900')
                       }
                     `}
                   >

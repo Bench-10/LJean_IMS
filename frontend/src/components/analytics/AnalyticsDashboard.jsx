@@ -34,7 +34,7 @@ import DropdownCustom from '../DropdownCustom.jsx';
 import DatePickerCustom from '../DatePickerCustom.jsx';
 
 const FETCH_DEBOUNCE_MS = 150;
-const DELIVERY_WINDOW_SIZES = { daily: 20, monthly: 12, yearly: 5 };
+const DELIVERY_WINDOW_SIZES = { daily: 14, monthly: 12, yearly: 5 };
 const DELIVERY_META_DEFAULT = {
   min_bucket: null,
   max_bucket: null,
@@ -631,10 +631,34 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     if (rangeMode === 'preset') {
       const today = dayjs().startOf('day');
       let start = today;
-      if (preset === 'current_day') start = today;
-      else if (preset === 'current_week') start = today.isoWeekday(1).startOf('day');
-      else if (preset === 'current_month') start = today.startOf('month');
-      else if (preset === 'current_year') start = today.startOf('year');
+      if (preset === 'current_day') {
+        start = today;
+        return { start_date: start.format('YYYY-MM-DD'), end_date: start.format('YYYY-MM-DD'), presetKey: preset };
+      }
+
+      if (preset === 'current_week') {
+        // start of current ISO week (Monday)
+        start = today.isoWeekday(1).startOf('day');
+        // end must be today (do not extend to end of week)
+        const end = today;
+        return { start_date: start.format('YYYY-MM-DD'), end_date: end.format('YYYY-MM-DD'), presetKey: preset };
+      }
+
+      if (preset === 'current_month') {
+        start = today.startOf('month');
+        // end must be today (do not extend to end of month)
+        const end = today;
+        return { start_date: start.format('YYYY-MM-DD'), end_date: end.format('YYYY-MM-DD'), presetKey: preset };
+      }
+
+      if (preset === 'current_year') {
+        start = today.startOf('year');
+        // end must be today (do not extend to end of year)
+        const end = today;
+        return { start_date: start.format('YYYY-MM-DD'), end_date: end.format('YYYY-MM-DD'), presetKey: preset };
+      }
+
+      // fallback returns to today single-day window
       return { start_date: start.format('YYYY-MM-DD'), end_date: today.format('YYYY-MM-DD'), presetKey: preset };
     }
     return { start_date: startDate, end_date: endDate, presetKey: 'custom' };
@@ -809,7 +833,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     setDeliveryData([]);
     setDeliveryOldestCursor(0);
     setDeliveryMeta({ ...DELIVERY_META_DEFAULT });
-  }, [deliveryInterval, deliveryStatus, branchId]);
+  }, [deliveryInterval, deliveryStatus, branchId, resolvedRange.start_date, resolvedRange.end_date]);
 
   const shouldLoadBranches = useMemo(
     () => canSelectBranch || (!branchId && isOwner),
@@ -1236,13 +1260,50 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     const windowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
     if (!windowSize) return null;
 
-    const todayEnd = dayjs().endOf('day');
+    // Determine global clamp window from resolvedRange so delivery data never escapes the global range
+    const globalStart = resolvedRange?.start_date ? dayjs(resolvedRange.start_date, 'YYYY-MM-DD').startOf('day') : null;
+    const globalEnd = resolvedRange?.end_date ? dayjs(resolvedRange.end_date, 'YYYY-MM-DD').endOf('day') : null;
+
+    // If a global (resolved) range exists, page within that global range.
+    // The windowSize determines page size. Cursor 0 is the most recent page (anchored at globalEnd).
+    if (globalStart && globalEnd) {
+      // compute total units (inclusive) depending on interval type
+      let totalUnits = 0;
+      if (deliveryInterval === 'yearly') totalUnits = Math.abs(globalEnd.diff(globalStart, 'year')) + 1;
+      else if (deliveryInterval === 'monthly') totalUnits = Math.abs(globalEnd.diff(globalStart, 'month')) + 1;
+      else totalUnits = Math.abs(globalEnd.diff(globalStart, 'day')) + 1;
+
+      const totalPages = Math.max(1, Math.ceil(totalUnits / windowSize));
+      if (cursor >= totalPages) return null; // pages exhausted
+
+      // compute the end anchor for this page (cursor=0 => end = globalEnd)
+      let end = globalEnd.clone();
+      // shift end left by cursor * windowSize units
+      if (deliveryInterval === 'yearly') end = end.subtract(cursor * windowSize, 'year').endOf('year');
+      else if (deliveryInterval === 'monthly') end = end.subtract(cursor * windowSize, 'month').endOf('month');
+      else end = end.subtract(cursor * windowSize, 'day').endOf('day');
+
+      // compute the start by moving windowSize-1 units left and clamping to globalStart
+      let start = end.clone();
+      if (deliveryInterval === 'yearly') start = start.startOf('year').subtract(windowSize - 1, 'year').startOf('year');
+      else if (deliveryInterval === 'monthly') start = start.startOf('month').subtract(windowSize - 1, 'month').startOf('month');
+      else start = start.startOf('day').subtract(windowSize - 1, 'day').startOf('day');
+
+      if (start.isBefore(globalStart)) start = globalStart.clone().startOf('day');
+      if (end.isAfter(globalEnd)) end = globalEnd.clone().endOf('day');
+
+      return { start_date: start.format('YYYY-MM-DD'), end_date: end.format('YYYY-MM-DD'), windowSize, totalPages };
+    }
+    const todayEnd = globalEnd ?? dayjs().endOf('day');
 
     if (deliveryInterval === 'yearly') {
       const endAnchor = dayjs().endOf('year').subtract(cursor * windowSize, 'year');
       const startAnchor = endAnchor.subtract(windowSize - 1, 'year');
-      const end = cursor === 0 ? todayEnd : endAnchor.endOf('year');
-      const start = startAnchor.startOf('year');
+      let end = cursor === 0 ? todayEnd : endAnchor.endOf('year');
+      let start = startAnchor.startOf('year');
+      // clamp to global range
+      if (globalEnd && end.isAfter(globalEnd)) end = globalEnd;
+      if (globalStart && start.isBefore(globalStart)) start = globalStart;
       return {
         start_date: start.format('YYYY-MM-DD'),
         end_date: end.format('YYYY-MM-DD'),
@@ -1253,8 +1314,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     if (deliveryInterval === 'monthly') {
       const endAnchor = dayjs().endOf('month').subtract(cursor * windowSize, 'month');
       const startAnchor = endAnchor.subtract(windowSize - 1, 'month');
-      const end = cursor === 0 ? todayEnd : endAnchor.endOf('month');
-      const start = startAnchor.startOf('month');
+      let end = cursor === 0 ? todayEnd : endAnchor.endOf('month');
+      let start = startAnchor.startOf('month');
+      if (globalEnd && end.isAfter(globalEnd)) end = globalEnd;
+      if (globalStart && start.isBefore(globalStart)) start = globalStart;
       return {
         start_date: start.format('YYYY-MM-DD'),
         end_date: end.format('YYYY-MM-DD'),
@@ -1262,14 +1325,16 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       };
     }
 
-    const end = dayjs().endOf('day').subtract(cursor * windowSize, 'day');
-    const start = end.subtract(windowSize - 1, 'day');
+    let end = dayjs().endOf('day').subtract(cursor * windowSize, 'day');
+    let start = end.subtract(windowSize - 1, 'day');
+    if (globalEnd && end.isAfter(globalEnd)) end = globalEnd;
+    if (globalStart && start.isBefore(globalStart)) start = globalStart;
     return {
       start_date: start.format('YYYY-MM-DD'),
       end_date: end.format('YYYY-MM-DD'),
       windowSize
     };
-  }, [deliveryInterval]);
+  }, [deliveryInterval, resolvedRange.start_date, resolvedRange.end_date]);
 
   const loadDeliveryChunk = useCallback(async ({ cursor = 0, mode = 'replace', signal, silent = false, forceRefresh = false } = {}) => {
     if (!user) return;
@@ -1393,6 +1458,17 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
   const deliveryWindowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
 
+  const deliveryTotalPages = useMemo(() => {
+    const globalStart = resolvedRange?.start_date ? dayjs(resolvedRange.start_date, 'YYYY-MM-DD').startOf('day') : null;
+    const globalEnd = resolvedRange?.end_date ? dayjs(resolvedRange.end_date, 'YYYY-MM-DD').endOf('day') : null;
+    if (!globalStart || !globalEnd) return null;
+    let totalUnits = 0;
+    if (deliveryInterval === 'yearly') totalUnits = Math.abs(globalEnd.diff(globalStart, 'year')) + 1;
+    else if (deliveryInterval === 'monthly') totalUnits = Math.abs(globalEnd.diff(globalStart, 'month')) + 1;
+    else totalUnits = Math.abs(globalEnd.diff(globalStart, 'day')) + 1;
+    return Math.max(1, Math.ceil(totalUnits / deliveryWindowSize));
+  }, [resolvedRange.start_date, resolvedRange.end_date, deliveryInterval, deliveryWindowSize]);
+
   const deliveryWindowLabel = useMemo(() => {
     if (!deliveryWindowSize) return '';
     if (deliveryInterval === 'yearly') return `Shows ${deliveryWindowSize} years per request`;
@@ -1429,9 +1505,9 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
   const canLoadOlder = useMemo(() => {
     if (loadingDelivery) return false;
-    if (!deliveryMeta?.min_reference) return true;
     const nextRange = computeDeliveryRange(deliveryOldestCursor + 1);
-    if (!nextRange) return false;
+    if (!nextRange) return false; // no further pages
+    if (!deliveryMeta?.min_reference) return true; // fallback: assume there could be older data
     const earliest = dayjs(deliveryMeta.min_reference, 'YYYY-MM-DD');
     if (!earliest.isValid()) return true;
     const nextEnd = dayjs(nextRange.end_date, 'YYYY-MM-DD');
@@ -1504,7 +1580,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       controller.abort();
       clearTimeout(timer);
     };
-  }, [loadDeliveryChunk, user]);
+  }, [loadDeliveryChunk, user, resolvedRange.start_date, resolvedRange.end_date]);
 
   // Real-time updates: listen for socket-driven analytics events and refresh silently
   useEffect(() => {
@@ -1873,6 +1949,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
               hasExtendedRange={hasExtendedDeliveryRange}
               rangeLabel={deliveryRangeLabel}
               windowLabel={deliveryWindowLabel}
+              globalStartDate={resolvedRange.start_date}
+              globalEndDate={resolvedRange.end_date}
+              deliveryPage={deliveryOldestCursor}
+              deliveryTotalPages={deliveryTotalPages}
             />
           )}
 

@@ -1,4 +1,5 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
+import dayjs from 'dayjs';
 import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, BarChart, Bar, LabelList
@@ -21,8 +22,17 @@ function Delivery({
   canLoadOlder = true,
   hasExtendedRange = false,
   rangeLabel = '',
-  windowLabel = ''
+  windowLabel = '',
+  globalStartDate = null,
+  globalEndDate = null,
+  deliveryPage = 0,
+  deliveryTotalPages = null
 }) {
+  // globalStartDate / globalEndDate are provided by the parent analytics dashboard
+  // and define the global date range the dashboard is operating in. These are
+  // expected to be ISO dates (YYYY-MM-DD) or falsy.
+  const globalStart = useMemo(() => (globalStartDate ? dayjs(globalStartDate, 'YYYY-MM-DD') : null), [globalStartDate]);
+  const globalEnd = useMemo(() => (globalEndDate ? dayjs(globalEndDate, 'YYYY-MM-DD') : null), [globalEndDate]);
   // Expect incoming deliveryData to be an array of { date, delivered, undelivered }
   const normalizedData = useMemo(() => (Array.isArray(deliveryData) ? deliveryData : []), [deliveryData]);
   const hasData = normalizedData.length > 0;
@@ -72,6 +82,51 @@ function Delivery({
   const loadOlderDisabled = loadingDelivery || !canLoadOlder;
   const resetDisabled = loadingDelivery || !hasExtendedRange;
 
+  // Decide which interval options should be presented and whether they should be disabled
+  // based on the global date range (parent dashboard). Rules:
+  // - If global range covers a single day => monthly + yearly disabled
+  // - If global range is within the same month => monthly should not appear, yearly disabled
+  // - Otherwise show all intervals enabled
+  const { allowedDeliveryOptions, effectiveDeliveryInterval } = useMemo(() => {
+    const allowed = [];
+    const hasGlobal = globalStart && globalEnd && globalStart.isValid() && globalEnd.isValid();
+    const sameDay = hasGlobal && globalStart.isSame(globalEnd, 'day');
+    const sameMonth = hasGlobal && globalStart.isSame(globalEnd, 'month');
+
+    // Always include daily
+    allowed.push({ value: 'daily', label: 'Daily', disabled: false });
+
+    if (sameDay) {
+      // If single day: include monthly & yearly but disabled so user is aware they exist
+      allowed.push({ value: 'monthly', label: 'Monthly', disabled: true });
+      allowed.push({ value: 'yearly', label: 'Yearly', disabled: true });
+    } else if (sameMonth) {
+      // If the global range spans only one month: do not show monthly (it's redundant)
+      // but include yearly as disabled (too coarse)
+      // (daily already present)
+      allowed.push({ value: 'yearly', label: 'Yearly', disabled: true });
+    } else {
+      // multi-month range: show all enabled
+      allowed.push({ value: 'monthly', label: 'Monthly', disabled: false });
+      allowed.push({ value: 'yearly', label: 'Yearly', disabled: false });
+    }
+
+    // Determine a safe interval to use if current value is missing/disabled
+    let safe = deliveryInterval || 'daily';
+    const current = allowed.find(o => o.value === deliveryInterval);
+    if (!current || current.disabled) safe = 'daily';
+    return { allowedDeliveryOptions: allowed, effectiveDeliveryInterval: safe };
+  }, [globalStart, globalEnd, deliveryInterval]);
+
+  // If the parent's current selection is invalid for the current global range, switch to a safe interval
+  useEffect(() => {
+    if (!deliveryInterval) return;
+    const current = allowedDeliveryOptions.find(o => o.value === deliveryInterval);
+    if (!current || current.disabled) {
+      setDeliveryInterval(effectiveDeliveryInterval);
+    }
+  }, [allowedDeliveryOptions, deliveryInterval, effectiveDeliveryInterval, setDeliveryInterval]);
+
   return (
     <>
       <Card
@@ -96,11 +151,7 @@ function Delivery({
                   label="Interval"
                   variant="default"
                   size="xs"
-                  options={[
-                    { value: 'daily', label: 'Daily' },
-                    { value: 'monthly', label: 'Monthly' },
-                    { value: 'yearly', label: 'Yearly' },
-                  ]}
+                  options={allowedDeliveryOptions}
                 />
               </div>
 
@@ -137,6 +188,11 @@ function Delivery({
                 >
                   Latest
                 </button>
+              )}
+              {Number.isFinite(deliveryTotalPages) && (
+                <span className="text-xs text-gray-500 font-medium whitespace-nowrap mx-3">
+                  Page {Math.max(1, (Number(deliveryPage || 0) + 1))} of {deliveryTotalPages}
+                </span>
               )}
               <button
                 type="button"
