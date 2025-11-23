@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { RiErrorWarningLine } from "react-icons/ri";
 import { TbFileExport } from "react-icons/tb";
 import api from '../utils/api';
@@ -109,6 +109,14 @@ const matchesFocus = (entry, focus) => {
 };
 
 const getEntryKey = (entry, fallbackIndex = 0) => {
+  // Prefer the deterministic unique id generator so keys match dedupe behavior
+  try {
+    const uid = getUniqueEntryId(entry);
+    if (uid && uid !== 'unknown') return `validity-${uid}`;
+  } catch (e) {
+    // fall through to legacy behavior
+  }
+
   if (!entry) return `validity-row-${fallbackIndex}`;
 
   const entryAlertId = entry.alert_id ?? entry.alertId;
@@ -131,6 +139,51 @@ const getEntryKey = (entry, fallbackIndex = 0) => {
   }
 
   return `validity-row-${fallbackIndex}`;
+};
+
+// Create a deterministic identifier for an entry to detect duplicates
+const getUniqueEntryId = (entry = {}) => {
+  if (!entry) return 'unknown';
+
+  const primary = entry.primary_add_id ?? entry.primaryAddId ?? null;
+  if (primary) return `add-${primary}`;
+
+  const addStockId = entry.add_stock_id ?? entry.addStockId ?? entry.add_id ?? null;
+  if (addStockId) return `add-${addStockId}`;
+
+  const productId = entry.product_id ?? entry.productId ?? entry.inventory_product_id ?? null;
+  const dateAdded = entry.date_added ?? entry.dateAdded ?? null;
+  if (productId && dateAdded) return `prod-${productId}-date-${String(dateAdded)}`;
+
+  const productValidity = entry.product_validity ?? entry.productValidity ?? null;
+  if (productId && productValidity) return `prod-${productId}-validity-${String(productValidity)}`;
+
+  if (productId) return `prod-${productId}`;
+
+  // final fallback: combine product name and category if any
+  const name = entry.product_name ?? entry.name ?? 'unknown';
+  const cat = entry.category_name ?? entry.category ?? '';
+  return `free-${String(name).slice(0, 50)}-${String(cat).slice(0, 50)}`;
+};
+
+// Deduplicate an array of entries keeping the first occurrence (which is typically the newest)
+const dedupeEntries = (list = []) => {
+  const map = new Map();
+  for (const item of (list || [])) {
+    const id = getUniqueEntryId(item);
+    if (!map.has(id)) {
+      map.set(id, item);
+    } else {
+      // debug: log duplicate detection for suspicious product
+      if ((String(item.product_name || '').toUpperCase()).includes('GYPSUM BOARD 9 MM')) {
+        console.debug('[ProductValidity] dedupe: found duplicate for GYPSUM BOARD 9 MM', { id, existing: map.get(id), incoming: item });
+      }
+      // merge fields from later entries into existing (prefer existing values but fill empty ones)
+      const existing = map.get(id);
+      map.set(id, { ...item, ...existing });
+    }
+  }
+  return Array.from(map.values());
 };
 
 function ProductValidity({
@@ -205,10 +258,18 @@ function ProductValidity({
         const cached = sessionStorage.getItem(cacheKey);
         if (cached) {
           try {
-            const parsed = JSON.parse(cached);
+                const parsed = JSON.parse(cached);
+                // debug: report if cached contains the suspicious product
+                try {
+                  const suspicious = parsed.filter(p => (p.product_name || '').toUpperCase().includes('GYPSUM BOARD 9 MM'));
+                  if (suspicious && suspicious.length) {
+                    console.debug('[ProductValidity] cached entries matching GYPSUM BOARD 9 MM', suspicious);
+                  }
+                } catch (e) {}
             if (Array.isArray(parsed)) {
-              setValidity(parsed);
-              if (setPropValidityList) setPropValidityList(parsed);
+              const unique = dedupeEntries(parsed);
+              setValidity(unique);
+              if (setPropValidityList) setPropValidityList(unique);
             }
           } catch (e) {
             console.warn('Failed to parse product validity cache', e);
@@ -220,15 +281,24 @@ function ProductValidity({
       if (!hasCache || force) setLoading(true);
 
       const data = await api.get(`/api/product_validity?branch_id=${user.branch_id}`);
-      setValidity(data.data);
+      // ensure we don't show duplicates
+      const unique = dedupeEntries(data.data);
+      // debug: if the fetched data contains the suspicious product print details so we can inspect server payloads
       try {
-        sessionStorage.setItem(cacheKey, JSON.stringify(data.data));
+        const suspicious = (data.data || []).filter(p => (p.product_name || '').toUpperCase().includes('GYPSUM BOARD 9 MM'));
+        if (suspicious && suspicious.length) {
+          console.debug('[ProductValidity] fetched entries matching GYPSUM BOARD 9 MM', suspicious);
+        }
+      } catch (e) {}
+      setValidity(unique);
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify(unique));
       } catch (e) {
         console.warn('Failed to write product validity cache', e);
       }
 
       if (setPropValidityList) {
-        setPropValidityList(data.data);
+        setPropValidityList(unique);
       }
     } catch (error) {
       console.log(error.message);
@@ -259,13 +329,15 @@ function ProductValidity({
     }
 
     const focus = pendingFocusRef.current;
-    const matchIndex = productValidityList.findIndex(entry => matchesFocus(entry, focus));
+    // use the deduplicated list for focus/lookup
+    const uniqueList = dedupeEntries(productValidityList || []);
+    const matchIndex = uniqueList.findIndex(entry => matchesFocus(entry, focus));
 
     if (matchIndex === -1) {
       return;
     }
 
-    const targetEntry = productValidityList[matchIndex];
+    const targetEntry = uniqueList[matchIndex];
     const targetKey = getEntryKey(targetEntry, matchIndex);
     pendingFocusRef.current = null;
 
@@ -324,44 +396,53 @@ function ProductValidity({
       console.log('Validity update received in component:', validityData);
 
       if (validityData.action === 'add') {
-        const updateFunction = (prevValidity) => [validityData.product, ...(prevValidity || [])];
-        setValidity(updateFunction);
-        if (setPropValidityList) setPropValidityList(updateFunction);
+        const item = validityData.product;
+        const updateFunction = (prevValidity = []) => {
+          // Prevent duplicates by comparing unique ids, merge if exists
+          const id = getUniqueEntryId(item);
+          const exists = prevValidity.find(v => getUniqueEntryId(v) === id);
+          if (exists) {
+            return prevValidity.map(v => getUniqueEntryId(v) === id ? { ...v, ...item } : v);
+          }
+          return [item, ...prevValidity];
+        };
+        setValidity(prev => updateFunction(prev));
+        if (setPropValidityList) setPropValidityList(prev => updateFunction(prev));
         try {
+          if ((String(item.product_name || '').toUpperCase()).includes('GYPSUM BOARD 9 MM')) {
+            console.debug('[ProductValidity] event:add for GYPSUM BOARD 9 MM', item);
+          }
           const cur = JSON.parse(sessionStorage.getItem(cacheKey) || '[]');
-          sessionStorage.setItem(cacheKey, JSON.stringify([validityData.product, ...cur]));
+          const merged = dedupeEntries([item, ...cur]);
+          sessionStorage.setItem(cacheKey, JSON.stringify(merged));
         } catch (e) {}
       } else if (validityData.action === 'update') {
+        const item = validityData.product;
+        const id = getUniqueEntryId(item);
         const updateFunction = (prevValidity = []) => {
-          const existingIndex = prevValidity.findIndex(
-            item =>
-              item.product_id === validityData.product.product_id &&
-              item.date_added === validityData.product.date_added
-          );
-
+          const existingIndex = prevValidity.findIndex(v => getUniqueEntryId(v) === id);
           if (existingIndex >= 0) {
             const updated = [...prevValidity];
-            updated[existingIndex] = { ...updated[existingIndex], ...validityData.product };
+            updated[existingIndex] = { ...updated[existingIndex], ...item };
             return updated;
-          } else {
-            return [validityData.product, ...prevValidity];
           }
+          // if not found, insert at the front but avoid duplicates
+          return dedupeEntries([item, ...prevValidity]);
         };
-        setValidity(updateFunction);
-        if (setPropValidityList) setPropValidityList(updateFunction);
+        setValidity(prev => updateFunction(prev));
+        if (setPropValidityList) setPropValidityList(prev => updateFunction(prev));
         try {
+          if ((String(item.product_name || '').toUpperCase()).includes('GYPSUM BOARD 9 MM')) {
+            console.debug('[ProductValidity] event:update for GYPSUM BOARD 9 MM', item);
+          }
           const cur = JSON.parse(sessionStorage.getItem(cacheKey) || '[]');
-          const existingIndex = cur.findIndex(
-            item =>
-              item.product_id === validityData.product.product_id &&
-              item.date_added === validityData.product.date_added
-          );
+          const existingIndex = cur.findIndex(v => getUniqueEntryId(v) === id);
           let updated;
           if (existingIndex >= 0) {
             updated = [...cur];
-            updated[existingIndex] = { ...updated[existingIndex], ...validityData.product };
+            updated[existingIndex] = { ...updated[existingIndex], ...item };
           } else {
-            updated = [validityData.product, ...cur];
+            updated = dedupeEntries([item, ...cur]);
           }
           sessionStorage.setItem(cacheKey, JSON.stringify(updated));
         } catch (e) {}
@@ -387,10 +468,13 @@ function ProductValidity({
     setCurrentPage(1);
   };
 
+  // Use a deduplicated list as the canonical source for filtering and UI
+  const dedupedList = useMemo(() => dedupeEntries(productValidityList || []), [productValidityList]);
+
   //Centralized, safe filtering logic
   const searchTerm = (searchValidity || '').trim().toLowerCase();
 
-  const filteredValidityData = (Array.isArray(productValidityList) ? productValidityList : []).filter((validity) => {
+  const filteredValidityData = (Array.isArray(dedupedList) ? dedupedList : []).filter((validity) => {
     if (!validity) return false;
 
     // Search (skip if no term)
@@ -409,6 +493,14 @@ function ProductValidity({
 
     const isNear = isTruthyFlag(validity.near_expy);
     const isExp = isTruthyFlag(validity.expy);
+
+    // debug why an item might be included: only for the suspicious product log details
+    try {
+      const name = String(validity.product_name || '').toUpperCase();
+      if (name.includes('GYPSUM BOARD 9 MM')) {
+        console.debug('[ProductValidity] filter check for GYPSUM BOARD 9 MM', { item: validity, isNear, isExp, searchTerm, showNearExpiry, showExpired, selectedYear, selectedMonth });
+      }
+    } catch (e) {}
 
     // Near Expiry / Expired chips
     if (showNearExpiry || showExpired) {
@@ -530,7 +622,7 @@ function ProductValidity({
                 variant="simple"
                 options={[
                   { value: '', label: 'All Years' },
-                  ...Array.from(new Set((productValidityList || []).map(v => v.year).filter(Boolean)))
+                  ...Array.from(new Set((dedupedList || []).map(v => v.year).filter(Boolean)))
                     .sort((a, b) => b - a)
                     .map(y => ({ value: y, label: y }))
                 ]}
@@ -547,7 +639,7 @@ function ProductValidity({
                     const names = [null, 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                     const months = Array.from(
                       new Set(
-                        (productValidityList || [])
+                        (dedupedList || [])
                           .map(v => v.month)
                           .filter(m => m != null)
                           .map(Number)
