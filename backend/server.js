@@ -167,6 +167,9 @@ if (process.env.NODE_ENV !== 'production') {
 // STORE CURRNTLY CONNECTED USERS
 const connectedUsers = new Map();
 
+// TRACK LAST ACTIVITY TIMESTAMP PER USER (FOR INACTIVITY TIMEOUT)
+const lastActivity = new Map();
+
 const fetchUserActivityContext = async (userIdInt) => {
   const { rows } = await SQLquery(
     "SELECT user_id, branch_id, first_name || ' ' || last_name AS full_name FROM Users WHERE user_id = $1",
@@ -363,7 +366,6 @@ const dispatchRoleBasedNotification = ({ branchId = null, notification, category
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // User joins with their branch and user information
   socket.on('join-branch', async (userData = {}) => {
     const {
       userId,
@@ -420,6 +422,9 @@ io.on('connection', (socket) => {
       }
     }
 
+    // SET LAST ACTIVITY ON JOIN
+    lastActivity.set(entityId, Date.now());
+
     connectedUsers.set(socket.id, subscriberData);
 
     if (subscriberData.branchIds.length > 0) {
@@ -433,6 +438,14 @@ io.on('connection', (socket) => {
     }
 
     console.log(`User ${entityId} (${entityType}) connected with roles [${normalizedRoles.join(', ')}]${subscriberData.branchIds.length ? ` on branches [${subscriberData.branchIds.join(', ')}]` : ''}`);
+  });
+
+  // TRACK USER ACTIVITY
+  socket.on('activity', () => {
+    const subscriber = connectedUsers.get(socket.id);
+    if (subscriber && subscriber.userType === 'user') {
+      lastActivity.set(subscriber.userId, Date.now());
+    }
   });
 
 
@@ -449,6 +462,9 @@ io.on('connection', (socket) => {
     if (stillConnected) {
       return;
     }
+
+    // REMOVE FROM LAST ACTIVITY SINCE NO MORE SOCKETS
+    lastActivity.delete(subscriber.userId);
 
     const fallbackBranchId = getPrimaryBranchToken(subscriber);
     await updateUserActivityFromSocket({
@@ -643,4 +659,35 @@ app.get("/", (req, res) =>{
 //THIS NOTIFIES THE PRODUCT SHELFLIFE EVERY 12 AM
 cron.schedule('0 0 * * *', async () => { 
   notifyProductShelfLife();
+}, { timezone: "Asia/Manila" });
+
+// CHECK FOR INACTIVE USERS EVERY MINUTE AND SET THEM INACTIVE IF NO ACTIVITY FOR 30 MINUTES
+cron.schedule('*/1 * * * *', async () => {
+  const now = Date.now();
+  const inactiveUsers = [];
+
+  for (const [userId, time] of lastActivity) {
+    if (now - time > 30 * 60 * 1000) { // 30 minutes
+      inactiveUsers.push(userId);
+    }
+  }
+
+  for (const userId of inactiveUsers) {
+    lastActivity.delete(userId);
+    try {
+      await SQLquery("UPDATE Users SET is_active = false WHERE user_id = $1", [userId]);
+      const context = await fetchUserActivityContext(userId);
+      if (context?.branch_id) {
+        broadcastUserStatusUpdate(context.branch_id, {
+          action: 'logout',
+          user_id: userId,
+          full_name: context.full_name,
+          is_active: false,
+          reason: 'inactivity-timeout'
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to set user ${userId} inactive due to inactivity:`, error);
+    }
+  }
 }, { timezone: "Asia/Manila" });
