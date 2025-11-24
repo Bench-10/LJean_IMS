@@ -736,7 +736,7 @@ const handleModalClose = useCallback(() => {
                               className="w-full border rounded-md px-3 py-2"
                               value={entry.base_quantity_per_sell_unit}
                               onChange={(e) =>
-                                handleSellingUnitFieldChange(index, 'base_quantity_per_sell_unit', e.target.value)
+                                handleSellingUnitFieldChange(index, 'base_quantity_per_sell_unit', sanitizeInput(e.target.value))
                               }
                               inputMode="decimal"
                             />
@@ -1032,7 +1032,7 @@ const handleModalClose = useCallback(() => {
             placeholder="Min Threshold"
             className={`${inputClass('min_threshold')} focus:border-2 focus:border-green-500`}
             value={min_threshold}
-            onChange={(e) => setMinThreshold(e.target.value)}
+            onChange={(e) => setMinThreshold(sanitizeInput(e.target.value))}
             inputMode="decimal"
           />
           {errorflag('min_threshold', 'value')}
@@ -1043,7 +1043,7 @@ const handleModalClose = useCallback(() => {
             placeholder="Max Threshold"
             className={`${inputClass('max_threshold')} focus:border-2 focus:border-green-500`}
             value={max_threshold}
-            onChange={(e) => { const v = e.target.value; setMaxThreshold(v); handleThreshold(quantity_added, v); }}
+            onChange={(e) => { const v = sanitizeInput(e.target.value); setMaxThreshold(v); handleThreshold(quantity_added, v); }}
             inputMode="decimal"
           />
           {errorflag('max_threshold', 'value')}
@@ -1063,7 +1063,7 @@ const handleModalClose = useCallback(() => {
         placeholder={unit ? getQuantityPlaceholder(unit) : `${mode === 'add' ? 'Quantity' : 'Add Quantity or Enter 0'}`}
         className={`${inputClass('quantity_added')} focus:border-2 focus:border-green-500`}
         value={quantity_added}
-        onChange={(e) => { const v = e.target.value; setQuantity(v); handleThreshold(v, max_threshold); }}
+        onChange={(e) => { const v = sanitizeInput(e.target.value); setQuantity(v); handleThreshold(v, max_threshold); }}
         inputMode="decimal"
       />
       {errorflag('quantity_added', 'value')}
@@ -1096,7 +1096,7 @@ const handleModalClose = useCallback(() => {
             placeholder="Cost"
             className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
             value={unit_cost}
-            onChange={(e) => setPurchasedPrice(e.target.value)}
+            onChange={(e) => setPurchasedPrice(sanitizeInput(e.target.value))}
             inputMode="decimal"
           />
           {errorflag('unit_cost', 'value')}
@@ -1112,7 +1112,7 @@ const handleModalClose = useCallback(() => {
             placeholder="Cost"
             className={`${inputClass('unit_cost')} focus:border-2 focus:border-green-500`}
             value={unit_cost}
-            onChange={(e) => setPurchasedPrice(e.target.value)}
+            onChange={(e) => setPurchasedPrice(sanitizeInput(e.target.value))}
             inputMode="decimal"
           />
           {errorflag('unit_cost', 'value')}
@@ -1126,7 +1126,7 @@ const handleModalClose = useCallback(() => {
             placeholder="Price"
             className={`${inputClass('unit_price')} focus:border-2 focus:border-green-500`}
             value={unit_price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(e) => setPrice(sanitizeInput(e.target.value))}
             inputMode="decimal"
           />
           {errorflag('unit_price', 'value')}

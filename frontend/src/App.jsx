@@ -469,7 +469,7 @@ function App() {
 
   //PREVENTS SCRIPTS ATTACKS ON INPUT FIELDS
   function sanitizeInput(input) {
-    return input.replace(/[<>="']/g, '');
+    return input.replace(/[<>="'_#;=!%?/*-]/g, '');
   }
 
   const resolveBeaconUrl = useCallback(() => {
