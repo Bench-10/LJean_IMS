@@ -1,12 +1,10 @@
 import { SQLquery } from '../../db.js';
 
-export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_date, status = 'delivered') => {
+export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_date, status = 'delivered', category_id = null) => {
     const statusValue = String(status).toLowerCase();
     const isUndelivered = statusValue === 'undelivered';
 
-    const referenceDateExpr = isUndelivered
-        ? "COALESCE(s.date, CURRENT_DATE)"
-        : 'd.delivered_date';
+    const referenceDateExpr = 's.date';
 
     let bucketExpression;
     let labelFormat;
@@ -47,6 +45,11 @@ export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_da
 
     baseConditions.push(`${referenceDateExpr} IS NOT NULL`);
 
+    if (category_id) {
+        baseConditions.push(`ip.category_id = $${paramIndex++}::int`);
+        baseParams.push(category_id);
+    }
+
     const filters = [...baseConditions];
     const params = [...baseParams];
 
@@ -57,24 +60,34 @@ export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_da
     }
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-    const baseWhereClause = baseConditions.length ? `WHERE ${baseConditions.join(' AND ')}` : '';
+
+    const joinClause = category_id ? `
+        INNER JOIN sales_items si ON si.sales_information_id = s.sales_information_id
+        INNER JOIN Inventory_Product ip ON ip.product_id = si.product_id AND ip.branch_id = si.branch_id
+    ` : '';
 
     const query = `
         WITH buckets AS (
-            SELECT ${bucketExpression} AS bucket
+            SELECT ${bucketExpression} AS bucket, d.sales_information_id
             FROM Delivery d
             INNER JOIN Sales_Information s ON s.sales_information_id = d.sales_information_id
+            ${joinClause}
             ${whereClause}
         )
         SELECT
             TO_CHAR(bucket, '${labelFormat}') AS date,
-            COUNT(*)::int AS number_of_deliveries
+            COUNT(DISTINCT sales_information_id)::int AS number_of_deliveries
         FROM buckets
         GROUP BY bucket
         ORDER BY bucket;
     `;
 
     const { rows } = await SQLquery(query, params);
+
+    const metaJoinClause = category_id ? `
+        INNER JOIN sales_items si ON si.sales_information_id = s.sales_information_id
+        INNER JOIN Inventory_Product ip ON ip.product_id = si.product_id AND ip.branch_id = si.branch_id
+    ` : '';
 
     const metaQuery = `
         SELECT
@@ -84,7 +97,8 @@ export const numberOfDelivery = async (dateFormat, branch_id, start_date, end_da
             COALESCE(TO_CHAR(MAX(${referenceDateExpr})::date, 'YYYY-MM-DD'), NULL) AS max_reference
         FROM Delivery d
         INNER JOIN Sales_Information s ON s.sales_information_id = d.sales_information_id
-        ${baseWhereClause};
+        ${metaJoinClause}
+        ${baseConditions.length ? `WHERE ${baseConditions.join(' AND ')}` : ''};
     `;
 
     const metaResult = await SQLquery(metaQuery, baseParams);

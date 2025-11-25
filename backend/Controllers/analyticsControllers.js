@@ -174,11 +174,11 @@ export const getBranches = async (_req, res) => {
 export const numberOfDeliveriesByDate = async (req, res) => {
   try {
 
-    const { branch_id, format = 'monthly', start_date, end_date, status = 'delivered' } = req.query;
+    const { branch_id, format = 'monthly', start_date, end_date, status = 'delivered', category_id } = req.query;
     
-    console.log('Delivery request params:', { branch_id, format, start_date, end_date, status });
+    console.log('Delivery request params:', { branch_id, format, start_date, end_date, status, category_id });
     
-  const result = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id, start_date, end_date, status);
+  const result = await deliveryAnalyticsServices.numberOfDelivery(format, branch_id, start_date, end_date, status, category_id);
 
     
   res.json(result);

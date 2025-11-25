@@ -1350,6 +1350,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         end_date: range.end_date
       };
       if (branchId) params.branch_id = branchId;
+      if (categoryFilter) params.category_id = categoryFilter;
 
       const cacheParams = {
         branch: branchId ?? 'all',
@@ -1357,7 +1358,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         status,
         cursor,
         start: range.start_date,
-        end: range.end_date
+        end: range.end_date,
+        category: categoryFilter || 'all'
       };
 
       if (!forceRefresh) {
@@ -1454,7 +1456,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         setLoadingDelivery(false);
       }
     }
-  }, [branchId, computeDeliveryRange, deliveryInterval, user]);
+  }, [branchId, computeDeliveryRange, deliveryInterval, user, categoryFilter]);
 
   const deliveryWindowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
 
@@ -1580,7 +1582,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       controller.abort();
       clearTimeout(timer);
     };
-  }, [loadDeliveryChunk, user, resolvedRange.start_date, resolvedRange.end_date]);
+  }, [loadDeliveryChunk, user, resolvedRange.start_date, resolvedRange.end_date, categoryFilter]);
 
   // Real-time updates: listen for socket-driven analytics events and refresh silently
   useEffect(() => {
