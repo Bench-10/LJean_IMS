@@ -54,6 +54,8 @@ console.log('CORS_ORIGIN=', process.env.CORS_ORIGIN);
 const app  = express();
 
 const isProduction = process.env.NODE_ENV === 'production';
+const enableExpressHsts = process.env.ENABLE_EXPRESS_HSTS === 'true';
+
 const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://192.168.254.124:5173'];
 const allowedOrigins = (process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
@@ -153,7 +155,7 @@ app.use(helmet({
   referrerPolicy: { policy: 'no-referrer' }
 }));
 
-if (isProduction) {
+if (isProduction && enableExpressHsts) {
   app.use(helmet.hsts({
     maxAge: 31536000,
     includeSubDomains: true,
