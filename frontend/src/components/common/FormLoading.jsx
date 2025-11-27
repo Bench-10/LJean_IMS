@@ -2,8 +2,8 @@ import React from 'react';
 
 function FormLoading({ message = "Processing..." }) {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[10000] backdrop-blur-sm">
-      <div className="bg-white p-8 rounded-lg shadow-xl flex flex-col items-center min-w-[300px] z-[9999]">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[12000] backdrop-blur-sm">
+      <div className="bg-white p-8 rounded-lg shadow-xl flex flex-col items-center min-w-[300px] z-[11999]">
         
          {/*BOUNCING DOTS */}
         <div className="flex space-x-2 mt-2">

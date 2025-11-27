@@ -2154,6 +2154,8 @@ function App() {
     setItemData(items);
     setIsModalOpen(true);
     setModalMode(mode);
+    // Reset initialEditChoice for regular product editing (not request editing)
+    setInitialEditChoice(null);
   };
 
 

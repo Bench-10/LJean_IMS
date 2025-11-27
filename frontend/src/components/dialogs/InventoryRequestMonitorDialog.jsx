@@ -962,6 +962,7 @@ const InventoryRequestMonitorDialog = ({
                             type="button"
                             className="rounded-md border border-blue-300 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               openHistoryModal(request.pending_id);
                             }}
