@@ -1034,7 +1034,10 @@ function App() {
       max_threshold: productData.max_threshold || '',
       description: productData.description || ''
       ,
-      quantity: productData.quantity ?? productData.quantity_added ?? payload?.currentState?.quantity ?? null,
+      quantity: productData.quantity ?? productData.quantity_added ?? payload?.historyEntry?.quantity_added ?? payload?.currentState?.quantity ?? null,
+      // include date and product validity if available in payload or productData
+      date_added: productData.date_added || payload?.historyEntry?.date_added || payload?.date_added || null,
+      product_validity: productData.product_validity || payload?.historyEntry?.product_validity || payload?.product_validity || null,
       selling_units: productData.selling_units || []
     });
 

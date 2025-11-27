@@ -206,15 +206,17 @@ const handleModalClose = useCallback(() => {
         setItemName(itemData.product_name);
         setCategory(itemData.category_id);
         setBranch(user.branch_id);
-        setQuantity(0);
+        // Preload edit quantity if available; prefer payload quantity/quantity_added or empty
+        setQuantity(itemData.quantity ?? itemData.quantity_added ?? 0);
         setPurchasedPrice(itemData.unit_cost);
         setUnit(itemData.unit);
         setMinThreshold(itemData.min_threshold);
         setMaxThreshold(itemData.max_threshold);
         setPrice(itemData.unit_price ?? '');
         setForExceedQuantity(itemData.quantity);
-        setDatePurchased('');
-        setExpirationDate('');
+        // Preload date fields if available
+        setDatePurchased(itemData.date_added ?? '');
+        setExpirationDate(itemData.product_validity ?? '');
         setDescription(itemData.description);
         setSellingUnits(initializeSellingUnits(itemData.selling_units, itemData.unit, itemData.unit_price));
         setSellingUnitErrors({ general: '', entries: {} });
@@ -223,8 +225,8 @@ const handleModalClose = useCallback(() => {
         if (initialEditChoice) setEditChoice(initialEditChoice);
         console.log('ModalForm opened in edit mode with itemData:', itemData, 'initialEditChoice:', initialEditChoice);
       }
-    }
-  }, [isModalOpen, mode, itemData, user, initializeSellingUnits]);
+      }
+  }, [isModalOpen, mode, itemData, user, initializeSellingUnits, initialEditChoice]);
 
   useEffect(() => {
     setSellingUnits(prev => {
