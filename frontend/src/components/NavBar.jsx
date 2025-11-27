@@ -227,7 +227,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
                 }
                 onClick={() => setShowMobileMenu(false)}
               >
-                <FaClipboardCheck />Approvals
+                <FaClipboardCheck />Requests
               </NavLink>
             )}
           </ul>

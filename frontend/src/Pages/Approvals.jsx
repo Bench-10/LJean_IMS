@@ -664,7 +664,7 @@ function Approvals({
     <div className="pt-20 lg:pt-7 px-3 sm:px-4 lg:px-8 pb-6 min-h-screen bg-[#eef2ee]">
       <div className="mb-4 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl lg:text-[33px] leading-[36px] font-bold text-green-900">
-          APPROVAL CENTER
+           PENDING REQUESTS
         </h1>
         <hr className="mt-2 sm:mt-3 mb-4 sm:mb-6 border-t-4 border-green-800 rounded-lg" />
       </div>
