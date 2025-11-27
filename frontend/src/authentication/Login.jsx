@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUser, FaLock, FaEye, FaExclamationCircle, FaSpinner } from "react-icons/fa";
+import { FaUser, FaLock, FaEye, FaExclamationCircle } from "react-icons/fa";
 
 import AccountDisabledPopUp from "../components/dialogs/AccountDisabledPopUp";
 import TooMuchAttempts from "../components/dialogs/TooMuchAttempts";

@@ -77,7 +77,22 @@ function Authentication ({ children }) {
 
     return (
       <AuthContext.Provider value={{user, loginAuthentication, logout, loading}}>
-        {children}
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-green-800 mb-2">L-JEAN TRADING</h1>
+                <p className="text-lg text-gray-600">Construction and Supply</p>
+              </div>
+              <div className="flex flex-col items-center space-y-4">
+                {/* SOLID SPINNER */}
+                <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          children
+        )}
       </AuthContext.Provider>
     )
 }
