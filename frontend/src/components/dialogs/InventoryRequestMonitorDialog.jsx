@@ -6,7 +6,8 @@ import ChartLoading from '../common/ChartLoading.jsx';
 import DropdownCustom from '../DropdownCustom';
 import { IoMdClose } from "react-icons/io";
 import { MdRefresh } from 'react-icons/md';
-import useModalLock from '../../hooks/useModalLock'; 
+import useModalLock from '../../hooks/useModalLock';
+import CancellationReasonDialog from './CancellationReasonDialog'; 
 
 const toneStyles = {
   slate:   { badge: 'border-slate-200 bg-slate-50 text-slate-700',   dot: 'bg-slate-500' },
@@ -109,6 +110,9 @@ const InventoryRequestMonitorDialog = ({
   const [cancellingId, setCancellingId] = useState(null);
   const lastRefreshTokenRef = useRef(refreshToken);
   const [showRefreshIndicator, setShowRefreshIndicator] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelDialogContext, setCancelDialogContext] = useState({ pendingId: null });
+  const [cancelDialogLoading, setCancelDialogLoading] = useState(false);
 
   const triggerRefresh = useCallback(() => {
     setRefreshIndex((prev) => prev + 1);
@@ -211,6 +215,9 @@ const InventoryRequestMonitorDialog = ({
     if (!open) {
       setRequests([]); setMeta(null); setError(null);
       setStatusFilter(''); setRequestTypeFilter(''); setVisibleCount(PAGE_SIZE);
+      setCancelDialogOpen(false);
+      setCancelDialogContext({ pendingId: null });
+      setCancelDialogLoading(false);
     }
   }, [open]);
 
@@ -492,28 +499,9 @@ const InventoryRequestMonitorDialog = ({
       return;
     }
 
-    let confirmed = true;
-    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      confirmed = window.confirm('Cancel this inventory request? This action cannot be undone.');
-    }
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setCancelError(null);
-      const identifier = `inventory-${pendingId}`;
-      setCancellingId(identifier);
-      await onCancelInventoryRequest(pendingId);
-      triggerRefresh();
-    } catch (error) {
-      const message = error?.response?.data?.message || error?.message || 'Failed to cancel the request. Please try again.';
-      setCancelError(message);
-    } finally {
-      setCancellingId(null);
-    }
-  }, [onCancelInventoryRequest, triggerRefresh]);
+    setCancelDialogContext({ pendingId });
+    setCancelDialogOpen(true);
+  }, [onCancelInventoryRequest]);
 
   const handleCancelUserRequest = useCallback(async (pendingUserId) => {
     if (typeof onCancelUserRequest !== 'function') {
@@ -544,12 +532,43 @@ const InventoryRequestMonitorDialog = ({
     }
   }, [onCancelUserRequest, triggerRefresh]);
 
+  const handleCancelDialogCancel = useCallback(() => {
+    if (cancelDialogLoading) return;
+    setCancelDialogOpen(false);
+    setCancelDialogContext({ pendingId: null });
+  }, [cancelDialogLoading]);
+
+  const handleCancelDialogConfirm = useCallback(async (reason) => {
+    if (cancelDialogContext.pendingId === null) {
+      handleCancelDialogCancel();
+      return;
+    }
+
+    const pendingId = cancelDialogContext.pendingId;
+    setCancelDialogLoading(true);
+
+    try {
+      setCancelError(null);
+      const identifier = `inventory-${pendingId}`;
+      setCancellingId(identifier);
+      await onCancelInventoryRequest(pendingId, reason);
+      triggerRefresh();
+      handleCancelDialogCancel();
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to cancel the request. Please try again.';
+      setCancelError(message);
+    } finally {
+      setCancellingId(null);
+      setCancelDialogLoading(false);
+    }
+  }, [cancelDialogContext.pendingId, onCancelInventoryRequest, triggerRefresh, handleCancelDialogCancel]);
+
   if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={cancelDialogOpen ? undefined : onClose}
     >
       <div
         className="relative flex h-[90vh] w-full max-w-4xl mx-2 lg:mx-4 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
@@ -916,6 +935,14 @@ const InventoryRequestMonitorDialog = ({
           )}
         </div>
       </div>
+
+      {/* Cancellation Reason Dialog */}
+      <CancellationReasonDialog
+        open={cancelDialogOpen}
+        onCancel={handleCancelDialogCancel}
+        onConfirm={handleCancelDialogConfirm}
+        loading={cancelDialogLoading}
+      />
     </div>
   );
 };
