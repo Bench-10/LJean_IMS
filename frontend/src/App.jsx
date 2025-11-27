@@ -75,6 +75,33 @@ const dedupeNotifications = (notifications) => {
   return result;
 };
 
+// ROOT ROUTE COMPONENT - handles authentication-based routing
+function RootRoute() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && user.role) {
+      // User is authenticated, redirect to appropriate dashboard
+      if (user.role.some((r) => ["Owner", "Branch Manager"].includes(r))) {
+        navigate("/dashboard", { replace: true });
+      } else if (user.role.some((r) => ["Inventory Staff"].includes(r))) {
+        navigate("/inventory", { replace: true });
+      } else {
+        navigate("/sales", { replace: true });
+      }
+    }
+  }, [user, navigate]);
+
+  // If user is authenticated, don't render anything (redirect will happen)
+  // If not authenticated, show login
+  if (user) {
+    return null; // Will redirect via useEffect
+  }
+
+  return <Login />;
+}
+
 const createDeleteGuardState = () => ({
   open: false,
   message: '',
@@ -2778,7 +2805,7 @@ function App() {
       <Routes>
 
         <Route path="/" exact element={
-          <Login/>
+          <RootRoute />
         }/>
 
         <Route path="/reset-password" element={
