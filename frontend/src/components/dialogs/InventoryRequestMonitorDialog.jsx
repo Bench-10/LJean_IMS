@@ -967,7 +967,7 @@ const InventoryRequestMonitorDialog = ({
                               openHistoryModal(request.pending_id);
                             }}
                           >
-                            View Changes
+                            Request Timeline
                           </button>
                       </div>
                     </div>

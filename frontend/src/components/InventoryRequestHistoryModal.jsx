@@ -278,19 +278,19 @@ function InventoryRequestHistoryModal({
                     </div>
                   )}
 
-                  {/* Additional data for other actions (skip if we've already shown change-request details) */}
+                  {/* Additional data for other actions (skip if we've already shown structured details) */}
                   {entry.additional_data && (() => {
                     try {
                       const parsed = typeof entry.additional_data === 'string'
                         ? JSON.parse(entry.additional_data)
                         : entry.additional_data;
 
-                      const hasChangeFields = parsed && (
-                        parsed.comment || parsed.change_request_comment || parsed.change_type
+                      const hasStructuredFields = parsed && (
+                        parsed.comment || parsed.change_request_comment || parsed.change_type || parsed.cancellation_reason
                       );
 
-                      // If this payload is a change-request (we already rendered it above), don't render raw JSON again
-                      if (hasChangeFields) return null;
+                      // If this payload has structured fields (we already rendered them above), don't render raw JSON again
+                      if (hasStructuredFields) return null;
 
                       return (
                         <div className="text-xs text-gray-600 mt-2 p-2 bg-gray-50 rounded">
