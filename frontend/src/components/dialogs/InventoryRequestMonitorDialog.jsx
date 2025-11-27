@@ -957,7 +957,7 @@ const InventoryRequestMonitorDialog = ({
                               Make changes
                             </button>
                           )}
-                          {/* View History button for all inventory requests */}
+                          {/* View Changes button for all inventory requests */}
                           <button
                             type="button"
                             className="rounded-md border border-blue-300 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
@@ -967,7 +967,7 @@ const InventoryRequestMonitorDialog = ({
                               openHistoryModal(request.pending_id);
                             }}
                           >
-                            View History
+                            View Changes
                           </button>
                       </div>
                     </div>

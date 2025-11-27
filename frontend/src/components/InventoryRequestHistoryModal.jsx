@@ -199,7 +199,7 @@ function InventoryRequestHistoryModal({
             <NoInfoFound message="No history found for this request." />
           ) : (
             <div className="space-y-4">
-              {history.map((entry, index) => (
+              {[...history].reverse().map((entry, index) => (
                 <div
                   key={entry.id || index}
                   className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
@@ -212,7 +212,9 @@ function InventoryRequestHistoryModal({
                           entry.action_type
                         )}`}
                       >
-                        {entry.action_type || "Action"}
+                        {entry.action_type
+                          ? entry.action_type.charAt(0).toUpperCase() + entry.action_type.slice(1).toLowerCase()
+                          : "Action"}
                       </span>
                       <span className="text-sm text-gray-500">
                         by {entry.user_name || "Unknown"} ({entry.user_role || "Unknown Role"})
@@ -248,14 +250,19 @@ function InventoryRequestHistoryModal({
                                   </span>
                                 </div>
                               )}
-                              {data.comment && (
-                                <div className="text-sm">
-                                  <span className="font-medium text-yellow-700">Comments:</span>{" "}
-                                  <div className="text-yellow-900 mt-1 p-2 bg-yellow-100 rounded border-l-4 border-yellow-400">
-                                    {data.comment}
+                              {data.comment || data.change_request_comment ? (
+                                <div className="mt-2">
+                                  <div className="text-sm text-yellow-800 mb-1">
+                                    <span className="font-medium">Change requested by </span>
+                                    <span className="font-semibold">{entry.user_name || 'Unknown'}</span>
+                                    <span className="text-gray-500"> {entry.user_role ? `(${entry.user_role})` : ''}</span>
+                                  </div>
+
+                                  <div className="text-yellow-900 mt-1 p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-400 text-sm">
+                                    <div className="italic font-bold">{data.comment || data.change_request_comment}</div>
                                   </div>
                                 </div>
-                              )}
+                              ) : null}
                             </div>
                           );
                         } catch (e) {
@@ -271,14 +278,38 @@ function InventoryRequestHistoryModal({
                     </div>
                   )}
 
-                  {/* Additional data for other actions */}
-                  {entry.additional_data && entry.action_type !== "request_changes" && (
-                    <div className="text-xs text-gray-600 mt-2 p-2 bg-gray-50 rounded">
-                      {typeof entry.additional_data === "string"
-                        ? entry.additional_data
-                        : JSON.stringify(entry.additional_data, null, 2)}
-                    </div>
-                  )}
+                  {/* Additional data for other actions (skip if we've already shown change-request details) */}
+                  {entry.additional_data && (() => {
+                    try {
+                      const parsed = typeof entry.additional_data === 'string'
+                        ? JSON.parse(entry.additional_data)
+                        : entry.additional_data;
+
+                      const hasChangeFields = parsed && (
+                        parsed.comment || parsed.change_request_comment || parsed.change_type
+                      );
+
+                      // If this payload is a change-request (we already rendered it above), don't render raw JSON again
+                      if (hasChangeFields) return null;
+
+                      return (
+                        <div className="text-xs text-gray-600 mt-2 p-2 bg-gray-50 rounded">
+                          {typeof entry.additional_data === "string"
+                            ? entry.additional_data
+                            : JSON.stringify(entry.additional_data, null, 2)}
+                        </div>
+                      );
+                    } catch (e) {
+                      // If parsing fails, fall back to printing whatever we have
+                      return (
+                        <div className="text-xs text-gray-600 mt-2 p-2 bg-gray-50 rounded">
+                          {typeof entry.additional_data === "string"
+                            ? entry.additional_data
+                            : JSON.stringify(entry.additional_data, null, 2)}
+                        </div>
+                      );
+                    }
+                  })()}
 
                   {/* Payload changes - only show for created and resubmitted actions */}
                   {(entry.action_type === "created" || entry.action_type === "resubmitted") &&
