@@ -9,7 +9,7 @@ import DropdownCustom from './DropdownCustom';
 import DatePickerCustom from './DatePickerCustom';
 import useModalLock from '../hooks/useModalLock';
 
-function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput }) {
+function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput, initialEditChoice = null }) {
   const { user } = useAuth();
 
   // Feature flag: hide selling-units UI and price fields from users without deleting code.
@@ -219,6 +219,9 @@ const handleModalClose = useCallback(() => {
         setSellingUnits(initializeSellingUnits(itemData.selling_units, itemData.unit, itemData.unit_price));
         setSellingUnitErrors({ general: '', entries: {} });
         setShowSellingUnitsEditor(false);
+        // honor initial edit choice when opening the edit modal
+        if (initialEditChoice) setEditChoice(initialEditChoice);
+        console.log('ModalForm opened in edit mode with itemData:', itemData, 'initialEditChoice:', initialEditChoice);
       }
     }
   }, [isModalOpen, mode, itemData, user, initializeSellingUnits]);
@@ -533,7 +536,7 @@ const handleModalClose = useCallback(() => {
 
       {/* edit action chooser */}
       {isModalOpen && mode === 'edit' && !editChoice && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[11000] flex items-center justify-center px-4">
           <div className="bg-white rounded-xl p-6 shadow-2xl w-full max-w-md sm:max-w-lg">
             <h4 className="font-semibold text-xl sm:text-2xl mb-6 text-center">Choose an action</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -576,7 +579,7 @@ const handleModalClose = useCallback(() => {
 
       {/* dialog */}
       <dialog
-        className="bg-transparent fixed inset-0 z-[200]"
+        className="bg-transparent fixed inset-0 z-[11001]"
         
         
         open={mode === 'edit'
@@ -594,7 +597,7 @@ const handleModalClose = useCallback(() => {
           {/* Selling Units editor (kept as-is) */}
           {!HIDE_SELLING_UNITS && showSellingUnitsEditor && (
   <div
-    className="fixed inset-0 z-[400] bg-black/30 backdrop-blur-[2px]"
+    className="fixed inset-0 z-[11002] bg-black/30 backdrop-blur-[2px]"
     onClick={() => setShowSellingUnitsEditor(false)}
     role="dialog"
     aria-modal="true"

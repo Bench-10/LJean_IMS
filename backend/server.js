@@ -713,6 +713,28 @@ server.listen(PORT, '0.0.0.0', async ()=>{
         console.error('⚠ Failed to initialize unit conversion:', error.message);
         console.log('⚠ Fractional quantity features may not work until database migration is complete');
     }
+    // Ensure DB columns required by runtime features exist
+    try {
+      await SQLquery(`ALTER TABLE Inventory_Pending_Actions
+        ADD COLUMN IF NOT EXISTS change_requested boolean DEFAULT false;
+      `);
+      await SQLquery(`ALTER TABLE Inventory_Pending_Actions
+        ADD COLUMN IF NOT EXISTS change_request_type text;
+      `);
+      await SQLquery(`ALTER TABLE Inventory_Pending_Actions
+        ADD COLUMN IF NOT EXISTS change_request_comment text;
+      `);
+      await SQLquery(`ALTER TABLE Inventory_Pending_Actions
+        ADD COLUMN IF NOT EXISTS change_requested_by integer;
+      `);
+      await SQLquery(`ALTER TABLE Inventory_Pending_Actions
+        ADD COLUMN IF NOT EXISTS change_requested_at timestamp without time zone;
+      `);
+      // Note: constraint creation is handled via migrations; skip adding constraint here to avoid deprecated syntax errors.
+      console.log('✓ Ensured change request schema on Inventory_Pending_Actions');
+    } catch (err) {
+      console.error('Failed to ensure change request schema for Inventory_Pending_Actions', err?.message || err);
+    }
 });
 
 

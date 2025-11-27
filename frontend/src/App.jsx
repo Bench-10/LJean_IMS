@@ -256,6 +256,8 @@ function App() {
   const [validityFocus, setValidityFocus] = useState(null);
   const [modalMode, setModalMode] = useState('add');
   const [itemData, setItemData] = useState(null);
+  const [initialEditChoice, setInitialEditChoice] = useState(null);
+  const [resubmissionSourcePendingId, setResubmissionSourcePendingId] = useState(null);
   const [productsData, setProductsData] = useState([])
   const [listCategories, setListCategories] = useState([]);
   const [users, setUsers] = useState([]);
@@ -969,6 +971,80 @@ function App() {
     }
     setIsRequestMonitorOpen(true);
   }, [canOpenRequestMonitor]);
+
+  
+
+  
+
+  
+
+  const handleRequestPendingChanges = useCallback(async (pendingId, changeType, comment) => {
+    if (!user) return; // guard
+    try {
+      const body = {
+        actor_type: user?.admin_id ? 'admin' : 'manager',
+        change_type: changeType,
+        comment
+      };
+
+      if (user?.admin_id) {
+        body.admin_id = Number(user.admin_id);
+      } else if (user?.user_id) {
+        body.approver_id = Number(user.user_id);
+      }
+
+      await api.patch(`/api/items/pending/${pendingId}/request-changes`, body);
+      // Refresh pending requests and notification badge
+      setRequestStatusRefreshKey((prev) => prev + 1);
+      fetchPendingInventoryRequests();
+    } catch (error) {
+      console.error('Failed to request changes for pending inventory request:', error);
+      throw error;
+    }
+  }, [user]);
+
+  const handleOpenEditForRequest = useCallback(async ({ pendingId, pending, changeType }) => {
+    if (!pending && !pendingId) return;
+    let pendingObj = pending;
+    if (!pendingObj) {
+      try {
+        const res = await api.get(`/api/items/pending/${pendingId}`);
+        pendingObj = res.data;
+      } catch (e) {
+        console.error('Failed to fetch pending for edit modal:', e);
+        addToNotificationQueue('Failed to load the requested request for editing. Please try again.', { isLocal: true });
+        return;
+      }
+    }
+    const payload = pendingObj.payload || {};
+    const productData = payload.productData || payload;
+    const productId = pendingObj.product_id || productData.product_id || null;
+
+    setModalMode('edit');
+    console.log('Opening edit modal for pending:', pendingId || pendingObj?.pending_id, 'changeType:', changeType);
+    setItemData({
+      product_id: productId,
+      branch_id: pendingObj.branch_id,
+      product_name: productData.product_name || '',
+      unit: productData.unit || '',
+      unit_cost: productData.unit_cost || '',
+      unit_price: productData.unit_price || '',
+      category_id: productData.category_id || null,
+      min_threshold: productData.min_threshold || '',
+      max_threshold: productData.max_threshold || '',
+      description: productData.description || ''
+      ,
+      quantity: productData.quantity ?? productData.quantity_added ?? payload?.currentState?.quantity ?? null,
+      selling_units: productData.selling_units || []
+    });
+
+    // Set initial edit choice depending on changeType
+    setInitialEditChoice(changeType === 'quantity' ? 'addStocks' : 'edit');
+    setResubmissionSourcePendingId(pendingObj.pending_id || null);
+    // Open the edit modal without closing the request monitor (allow overlays to stack via z-index)
+    console.log('setIsModalOpen(true) called');
+    setIsModalOpen(true);
+  }, []);
 
   const handleCloseDeleteGuardDialog = useCallback(() => {
     setDeleteGuardDialog(createDeleteGuardState());
@@ -2086,6 +2162,16 @@ function App() {
           addToNotificationQueue('Inventory request submitted for branch manager approval.', true);
           await fetchPendingInventoryRequests();
           setRequestStatusRefreshKey((prev) => prev + 1);
+          // If this was a resubmission after a change request, cancel the previous pending request
+          if (resubmissionSourcePendingId) {
+            try {
+              await api.patch(`/api/items/pending/${resubmissionSourcePendingId}/cancel`, { reason: 'Resubmitted modified request' });
+            } catch (e) {
+              console.error('Failed to cancel previous pending request during resubmission', e);
+            } finally {
+              setResubmissionSourcePendingId(null);
+            }
+          }
         } else {
           const addedProduct = response.data?.product || response.data;
           setProductsData((prevData) => [...prevData, addedProduct]);
@@ -2117,6 +2203,15 @@ function App() {
           addToNotificationQueue('Inventory update sent for branch manager approval.', true);
           await fetchPendingInventoryRequests();
           setRequestStatusRefreshKey((prev) => prev + 1);
+          if (resubmissionSourcePendingId) {
+            try {
+              await api.patch(`/api/items/pending/${resubmissionSourcePendingId}/cancel`, { reason: 'Resubmitted modified request' });
+            } catch (e) {
+              console.error('Failed to cancel previous pending request during resubmission', e);
+            } finally {
+              setResubmissionSourcePendingId(null);
+            }
+          }
         } else {
           const updatedProduct = response.data?.product || response.data;
           setProductsData((prevData) => 
@@ -2753,6 +2848,7 @@ function App() {
         itemData={itemData}  
         listCategories={listCategories}
         sanitizeInput={sanitizeInput}
+        initialEditChoice={initialEditChoice}
          
       />
 
@@ -2797,6 +2893,8 @@ function App() {
         refreshToken={requestStatusRefreshKey}
         onCancelInventoryRequest={canOpenRequestMonitor ? handleCancelInventoryRequest : undefined}
         onCancelUserRequest={canOpenRequestMonitor ? handleCancelUserCreationRequest : undefined}
+        onRequestChanges={canOpenRequestMonitor ? handleRequestPendingChanges : undefined}
+        onOpenEditRequest={handleOpenEditForRequest}
       />
 
   
@@ -2929,6 +3027,7 @@ function App() {
                 refreshInventoryRequests={fetchAdminPendingInventoryRequests}
                 refreshUserRequests={fetchUserCreationRequests}
                 onOpenRequestMonitor={handleRequestMonitorOpen}
+                onRequestChanges={handleRequestPendingChanges}
                 highlightDirective={highlightDirective?.type === 'owner-approvals' ? highlightDirective : null}
                 onHighlightConsumed={handleHighlightConsumed}
               />

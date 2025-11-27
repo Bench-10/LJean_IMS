@@ -31,6 +31,7 @@ function Approvals({
   refreshInventoryRequests,
   refreshUserRequests,
   onOpenRequestMonitor,
+  onRequestChanges,
   highlightDirective = null,
   onHighlightConsumed,
 }) {
@@ -585,6 +586,20 @@ function Approvals({
     setRejectDialogOpen(true);
   };
 
+  const handleInventoryRequestChanges = async (pendingId) => {
+    if (!onRequestChanges) return;
+    // Simple prompt UI temporarily: ask for change type and comment
+    const changeType = window.prompt('Enter change type (quantity, product_info, other):', 'quantity');
+    if (!changeType) return;
+    const comment = window.prompt('Enter comments for the user (what needs to be changed):', 'Please update the quantity to proper value');
+    try {
+      await onRequestChanges(pendingId, changeType, comment);
+      if (typeof refreshInventoryRequests === 'function') await refreshInventoryRequests();
+    } catch (error) {
+      console.error('Failed to request changes for the pending inventory request:', error);
+    }
+  };
+
   const handleUserReject = (event, pendingUser) => {
     if (!rejectPendingAccount) return;
     event?.stopPropagation?.();
@@ -822,6 +837,13 @@ function Approvals({
                             }
                           >
                             {rejectingInProgress ? "Rejecting..." : "Reject"}
+                          </button>
+                          <button
+                            className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100"
+                            onClick={(e) => { e.stopPropagation(); handleInventoryRequestChanges(request.pending_id); }}
+                            disabled={processingInventoryId === request.pending_id}
+                          >
+                            Request changes
                           </button>
                         </div>
                       </td>
@@ -1204,7 +1226,7 @@ function Approvals({
                         ? "Processing..."
                         : "Approve"}
                     </button>
-                    <button
+                      <button
                       className={BTN_REJECT_RED}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1214,6 +1236,13 @@ function Approvals({
                     >
                       Reject
                     </button>
+                      <button
+                        className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
+                        onClick={(e) => { e.stopPropagation(); handleInventoryRequestChanges(request.pending_id); }}
+                        disabled={processingInventoryId === request.pending_id}
+                      >
+                        Request changes
+                      </button>
                   </div>
                 </div>
               </div>

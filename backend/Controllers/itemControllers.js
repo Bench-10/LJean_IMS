@@ -482,3 +482,44 @@ export const markAllRead = async (req, res) => {
     }
 
 };
+
+export const requestPendingInventoryChanges = async (req, res) => {
+    try {
+        const pendingId = Number(req.params.id);
+        const { approver_id, admin_id, change_type, comment, actor_type = 'manager' } = req.body;
+
+        if (actor_type === 'admin') {
+            if (!admin_id) {
+                return res.status(400).json({ message: 'admin_id is required for owner change requests' });
+            }
+
+            const result = await inventoryServices.requestChangesPendingInventoryRequest(pendingId, Number(admin_id), change_type, comment, { actorType: 'admin' });
+            return res.status(200).json(result);
+        }
+
+        if (!approver_id) {
+            return res.status(400).json({ message: 'approver_id is required' });
+        }
+
+        const result = await inventoryServices.requestChangesPendingInventoryRequest(pendingId, Number(approver_id), change_type, comment, { actorType: 'manager' });
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error requesting modifications for inventory request:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
+export const getPendingInventoryRequest = async (req, res) => {
+    try {
+        const pendingId = Number(req.params.id);
+        if (!Number.isFinite(pendingId)) {
+            return res.status(400).json({ message: 'Invalid pending id' });
+        }
+        const request = await inventoryServices.getPendingInventoryRequestById(pendingId);
+        if (!request) return res.status(404).json({ message: 'Pending inventory request not found' });
+        res.status(200).json(request);
+    } catch (error) {
+        console.error('Error fetching pending inventory request:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};

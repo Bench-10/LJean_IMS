@@ -20,6 +20,7 @@ const toneStyles = {
 // Merged: single Pending
 const statusFilters = [
   { id: 'pending',  label: 'Pending' },
+  { id: 'changes_requested', label: 'Requires changes' },
   { id: 'approved', label: 'Approved' },
   { id: 'rejected', label: 'Rejected' },
   { id: 'cancelled', label: 'Cancelled' }
@@ -63,7 +64,9 @@ const InventoryRequestMonitorDialog = ({
   userRequestsLoading = false,
   refreshToken = 0,
   onCancelInventoryRequest,
-  onCancelUserRequest
+  onCancelUserRequest,
+  onRequestChanges,
+  onOpenEditRequest
 }) => {
   // Lock scroll + intercept BACK to close the modal instead of navigating away
   useModalLock(open, onClose);  // important: pass onClose here
@@ -113,6 +116,9 @@ const InventoryRequestMonitorDialog = ({
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelDialogContext, setCancelDialogContext] = useState({ pendingId: null });
   const [cancelDialogLoading, setCancelDialogLoading] = useState(false);
+  const [changeDialogOpen, setChangeDialogOpen] = useState(false);
+  const [changeDialogContext, setChangeDialogContext] = useState({ pendingId: null, changeType: 'quantity', comment: '' });
+  const [changeDialogLoading, setChangeDialogLoading] = useState(false);
 
   const triggerRefresh = useCallback(() => {
     setRefreshIndex((prev) => prev + 1);
@@ -439,7 +445,7 @@ const InventoryRequestMonitorDialog = ({
       return list.filter((req) => {
         if (req.kind === 'user') return req.normalized_status === 'pending';
         const code = req.status_detail?.code || '';
-        return code === 'pending' || code === 'pending_manager' || code === 'pending_admin';
+        return code === 'pending' || code === 'pending_manager' || code === 'pending_admin' || code === 'changes_requested';
       });
     }
 
@@ -562,6 +568,39 @@ const InventoryRequestMonitorDialog = ({
       setCancelDialogLoading(false);
     }
   }, [cancelDialogContext.pendingId, onCancelInventoryRequest, triggerRefresh, handleCancelDialogCancel]);
+
+  const handleRequestChangeOpen = useCallback((pendingId) => {
+    setChangeDialogContext({ pendingId, changeType: 'quantity', comment: '' });
+    setChangeDialogOpen(true);
+  }, []);
+
+  const handleRequestChangeCancel = useCallback(() => {
+    if (changeDialogLoading) return;
+    setChangeDialogOpen(false);
+    setChangeDialogContext({ pendingId: null, changeType: 'quantity', comment: '' });
+  }, [changeDialogLoading]);
+
+  const handleRequestChangeSubmit = useCallback(async () => {
+    if (!changeDialogContext.pendingId) return handleRequestChangeCancel();
+    try {
+      setChangeDialogLoading(true);
+      // Delegate API call to parent via onRequestChanges prop if available
+      if (typeof onRequestChanges === 'function') {
+        const { pendingId, changeType, comment } = changeDialogContext;
+        await onRequestChanges(pendingId, changeType, comment);
+      } else {
+        console.warn('onRequestChanges handler not provided');
+      }
+    } catch (e) {
+      console.error('Failed to request changes:', e);
+    } finally {
+      setChangeDialogLoading(false);
+      // Close dialog and refresh
+      setChangeDialogOpen(false);
+      setChangeDialogContext({ pendingId: null, changeType: 'quantity', comment: '' });
+      triggerRefresh();
+    }
+  }, [changeDialogContext, triggerRefresh, changeDialogLoading, handleRequestChangeCancel]);
 
   if (!open) return null;
 
@@ -827,7 +866,17 @@ const InventoryRequestMonitorDialog = ({
                         : 'In progress';
 
                 return (
-                  <div key={request.pending_id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+                  <div key={request.pending_id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md"
+                      onClick={() => {
+                      // If the current user is the requester and the request has changes requested, open edit modal
+                      if (currentUserId !== null && request.created_by && Number(currentUserId) === Number(request.created_by) && request.status_detail?.code === 'changes_requested') {
+                        if (typeof onOpenEditRequest === 'function') {
+                          const changeType = request.change_request_type || request.payload?.change_request_type || 'quantity';
+                          onOpenEditRequest({ pendingId: request.pending_id, changeType });
+                        }
+                      }
+                    }}
+                  >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-1">
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -845,7 +894,7 @@ const InventoryRequestMonitorDialog = ({
                           <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
                           {statusLabel}
                         </span>
-                        {canCancelInventory && (
+                          {canCancelInventory && (
                           <button
                             type="button"
                             className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -854,7 +903,34 @@ const InventoryRequestMonitorDialog = ({
                           >
                             {isCancelling ? 'Cancelling…' : 'Cancel'}
                           </button>
-                        )}
+                          )}
+                          {/* Manager/Owner: Request Changes button */}
+                          {(isBranchManager || isOwnerUser) && (request.status_detail?.code === 'pending' || request.status_detail?.code === 'pending_manager' || request.status_detail?.code === 'pending_admin') && (
+                            <button
+                              type="button"
+                              className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => { console.log('Request changes clicked for', request.pending_id); handleRequestChangeOpen(request.pending_id); }}
+                            >
+                              Request changes
+                            </button>
+                          )}
+                          {/* Creator: Make changes button for requests with changes_requested */}
+                          {currentUserId !== null && request.created_by && Number(currentUserId) === Number(request.created_by) && request.status_detail?.code === 'changes_requested' && (
+                            <button
+                              type="button"
+                              className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100"
+                              onClick={() => {
+                                // Ask parent to open appropriate edit modal based on change_request_type, passing the pending id
+                                const changeType = (request.payload?.change_request_type || request.change_request_type || request.payload?.change_type || null);
+                                console.log('Make changes clicked: pendingId=', request.pending_id, 'changeType=', changeType);
+                                if (typeof onOpenEditRequest === 'function') {
+                                  onOpenEditRequest({ pendingId: request.pending_id, changeType });
+                                }
+                              }}
+                            >
+                              Make changes
+                            </button>
+                          )}
                       </div>
                     </div>
 
@@ -913,6 +989,16 @@ const InventoryRequestMonitorDialog = ({
                         <p>{request.cancelled_reason}</p>
                       </div>
                     )}
+
+                    {request.status_detail?.code === 'changes_requested' && (request.change_request_comment || request.payload?.change_request_comment) && (
+                      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                        <p className="font-semibold">Changes Requested</p>
+                        <p>{request.change_request_comment || request.payload?.change_request_comment}</p>
+                        {(request.change_request_type || request.payload?.change_request_type) && (
+                          <p className="mt-2 text-xs text-amber-700">Requested change: <span className="font-medium">{(request.change_request_type || request.payload?.change_request_type)}</span></p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -943,6 +1029,44 @@ const InventoryRequestMonitorDialog = ({
         onConfirm={handleCancelDialogConfirm}
         loading={cancelDialogLoading}
       />
+      {/* Change Request Dialog */}
+      {changeDialogOpen && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => changeDialogLoading ? null : handleRequestChangeCancel()}>
+          <div className="relative w-[min(680px,95%)] rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-800">Request Changes</h3>
+            <p className="text-sm text-gray-500 mt-1">Ask the requester to make changes to their pending request.</p>
+            <div className="mt-4">
+              <label className="text-xs text-gray-600">Change type</label>
+              <select
+                value={changeDialogContext.changeType}
+                onChange={(e) => setChangeDialogContext(c => ({ ...c, changeType: e.target.value }))}
+                className="mt-1 w-full rounded border p-2"
+              >
+                <option value="quantity">Quantity</option>
+                <option value="product_info">Product information</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="mt-4">
+              <label className="text-xs text-gray-600">Comment</label>
+              <textarea
+                value={changeDialogContext.comment}
+                onChange={(e) => setChangeDialogContext(c => ({ ...c, comment: e.target.value }))}
+                className="mt-1 w-full rounded border p-2 h-28"
+                placeholder="Tell the user what's required (e.g., update quantity, fix product name)">
+              </textarea>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="rounded-md border px-4 py-2 text-sm" onClick={handleRequestChangeCancel} disabled={changeDialogLoading}>Cancel</button>
+              <button
+                className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white"
+                onClick={handleRequestChangeSubmit}
+                disabled={changeDialogLoading}
+              >{changeDialogLoading ? 'Sending…' : 'Send change request'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

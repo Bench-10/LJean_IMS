@@ -289,6 +289,16 @@ const deriveRequestStatusDetail = (row) => {
         };
     }
 
+    if (row.status === 'changes_requested') {
+        return {
+            code: 'changes_requested',
+            label: 'Changes requested',
+            tone: 'amber',
+            is_final: false,
+            stage: row.current_stage
+        };
+    }
+
     if (row.status === 'pending') {
         return {
             code: 'pending_manager',
@@ -404,7 +414,11 @@ const mapRequestStatusRow = (row, options = {}) => {
                 cancellation_reason: row.status === 'cancelled' ? row.cancelled_reason : null
             }
         },
-        payload: includePayload ? row.payload : undefined
+        payload: includePayload ? row.payload : undefined,
+        change_request_type: row.change_request_type || null,
+        change_request_comment: row.change_request_comment || null,
+        change_requested_by: row.change_requested_by || null,
+        change_requested_at: row.change_requested_at || null
     };
 };
 
@@ -2017,4 +2031,209 @@ export const cancelPendingInventoryRequest = async (pendingId, requesterId, reas
         await SQLquery('ROLLBACK');
         throw error;
     }
+};
+
+export const requestChangesPendingInventoryRequest = async (pendingId, approverId, changeType = null, comment = null, options = {}) => {
+    const { actorType = 'manager' } = options;
+
+    const pendingResult = await SQLquery(
+        `SELECT * FROM Inventory_Pending_Actions WHERE pending_id = $1`,
+        [pendingId]
+    );
+
+    if (pendingResult.rowCount === 0) {
+        throw new Error('Pending inventory request not found');
+    }
+
+    const pending = pendingResult.rows[0];
+
+    if (pending.status !== 'pending') {
+        throw new Error('Pending inventory request has already been processed');
+    }
+
+    const requestedBy = {
+        userID: pending.created_by,
+        fullName: pending.created_by_name
+    };
+
+    if (actorType === 'admin') {
+        if (!pending.requires_admin_review || pending.current_stage !== 'admin_review') {
+            throw new Error('Pending inventory request is not awaiting owner approval');
+        }
+
+        const adminName = await getAdminFullName(approverId);
+        const trimmedComment = typeof comment === 'string' ? comment.trim() : null;
+
+        let rows;
+        try {
+            const updateResult = await SQLquery(
+                `UPDATE Inventory_Pending_Actions
+                 SET status = 'changes_requested',
+                     change_requested = true,
+                     change_request_type = $1,
+                     change_request_comment = $2,
+                     change_requested_by = $3,
+                     change_requested_at = NOW(),
+                     admin_approver_id = $3
+                 WHERE pending_id = $4
+                 RETURNING *`,
+                [changeType, trimmedComment, approverId, pendingId]
+            );
+            rows = updateResult.rows;
+        } catch (updateError) {
+            // If DB column missing, fallback to setting status only
+            if (updateError?.code === '42703') {
+                const updateFallback = await SQLquery(
+                    `UPDATE Inventory_Pending_Actions
+                     SET status = 'changes_requested', admin_approver_id = $1
+                     WHERE pending_id = $2
+                     RETURNING *`,
+                    [approverId, pendingId]
+                );
+                rows = updateFallback.rows;
+            } else {
+                throw updateError;
+            }
+        }
+
+        const updated = rows[0];
+
+        broadcastInventoryApprovalUpdate(pending.branch_id, {
+            pending_id: pendingId,
+            status: 'changes_requested',
+            action: pending.action_type,
+            branch_id: pending.branch_id,
+            change_request_type: changeType,
+            change_request_comment: trimmedComment
+        });
+
+        if (requestedBy.userID) {
+            const privateMessage = trimmedComment
+                ? `Your inventory request requires changes by the owner (${adminName}): ${trimmedComment}`
+                : `Your inventory request requires changes by the owner (${adminName}).`;
+
+            const persisted = await createSystemInventoryNotification({
+                productId: pending.product_id || null,
+                branchId: pending.branch_id,
+                alertType: 'Inventory Request Changes Requested',
+                message: privateMessage,
+                bannerColor: 'amber',
+                targetUserId: requestedBy.userID
+            }).catch((err) => {
+                console.error('Failed to persist change-request notification', err);
+                return null;
+            });
+
+            broadcastToUser(requestedBy.userID, {
+                alert_id: persisted?.alert_id || `inventory-request-changes-${pendingId}-${Date.now()}`,
+                alert_type: 'Inventory Request Changes Requested',
+                message: privateMessage,
+                banner_color: 'amber',
+                created_at: persisted?.alert_date || new Date().toISOString(),
+                alert_date: persisted?.alert_date || new Date().toISOString(),
+                user_full_name: 'System',
+                isDateToday: true,
+                alert_date_formatted: 'Just now'
+            }, { persist: false });
+        }
+
+        return mapPendingRequest(rows[0]);
+    }
+
+    if (pending.current_stage !== 'manager_review') {
+        throw new Error('Pending inventory request is not awaiting branch manager approval');
+    }
+
+    const approverName = await getUserFullName(approverId);
+    const trimmedComment2 = typeof comment === 'string' ? comment.trim() : null;
+
+    let rows;
+    try {
+        const updateResult = await SQLquery(
+            `UPDATE Inventory_Pending_Actions
+             SET status = 'changes_requested',
+                 change_requested = true,
+                 change_request_type = $1,
+                 change_request_comment = $2,
+                 change_requested_by = $3,
+                 change_requested_at = NOW(),
+                 manager_approver_id = $3
+             WHERE pending_id = $4
+             RETURNING *`,
+            [changeType, trimmedComment2, approverId, pendingId]
+        );
+        rows = updateResult.rows;
+    } catch (updateError) {
+        if (updateError?.code === '42703') {
+            const fallback = await SQLquery(
+                `UPDATE Inventory_Pending_Actions
+                 SET status = 'changes_requested', manager_approver_id = $1
+                 WHERE pending_id = $2
+                 RETURNING *`,
+                [approverId, pendingId]
+            );
+            rows = fallback.rows;
+        } else {
+            throw updateError;
+        }
+    }
+
+    const updated = rows[0];
+
+    broadcastInventoryApprovalUpdate(pending.branch_id, {
+        pending_id: pendingId,
+        status: 'changes_requested',
+        action: pending.action_type,
+        branch_id: pending.branch_id,
+        change_request_type: changeType,
+        change_request_comment: trimmedComment2
+    });
+
+    if (requestedBy.userID) {
+        const privateMessage = trimmedComment2
+            ? `Your inventory request requires changes by ${approverName}: ${trimmedComment2}`
+            : `Your inventory request requires changes by ${approverName}.`;
+
+        const persisted = await createSystemInventoryNotification({
+            productId: pending.product_id || null,
+            branchId: pending.branch_id,
+            alertType: 'Inventory Request Changes Requested',
+            message: privateMessage,
+            bannerColor: 'amber',
+            targetUserId: requestedBy.userID
+        }).catch((err) => {
+            console.error('Failed to persist change-request notification', err);
+            return null;
+        });
+
+        broadcastToUser(requestedBy.userID, {
+            alert_id: persisted?.alert_id || `inventory-request-changes-${pendingId}-${Date.now()}`,
+            alert_type: 'Inventory Request Changes Requested',
+            message: privateMessage,
+            banner_color: 'amber',
+            created_at: persisted?.alert_date || new Date().toISOString(),
+            alert_date: persisted?.alert_date || new Date().toISOString(),
+            user_full_name: 'System',
+            isDateToday: true,
+            alert_date_formatted: 'Just now'
+        }, { persist: false });
+    }
+
+    return mapPendingRequest(rows[0]);
+};
+
+export const getPendingInventoryRequestById = async (pendingId) => {
+    const { rows } = await SQLquery(
+        `SELECT ipa.*, b.branch_name,
+                (manager.first_name || ' ' || manager.last_name) AS manager_approver_name
+         FROM Inventory_Pending_Actions ipa
+         LEFT JOIN Branch b ON ipa.branch_id = b.branch_id
+         LEFT JOIN Users manager ON manager.user_id = ipa.manager_approver_id
+         WHERE ipa.pending_id = $1
+         LIMIT 1`,
+        [pendingId]
+    );
+
+    if (rows.length === 0) return null;
+    return mapPendingRequest(rows[0]);
 };

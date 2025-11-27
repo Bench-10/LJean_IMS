@@ -127,6 +127,11 @@ CREATE TABLE IF NOT EXISTS public.inventory_pending_actions
     cancelled_by integer,
     cancelled_at timestamp without time zone,
     cancelled_reason text COLLATE pg_catalog."default",
+    change_requested boolean DEFAULT false,
+    change_request_type text COLLATE pg_catalog."default",
+    change_request_comment text COLLATE pg_catalog."default",
+    change_requested_by integer,
+    change_requested_at timestamp without time zone,
     CONSTRAINT inventory_pending_actions_pkey PRIMARY KEY (pending_id)
 );
 
