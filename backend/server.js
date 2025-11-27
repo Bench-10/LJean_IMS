@@ -54,12 +54,51 @@ console.log('CORS_ORIGIN=', process.env.CORS_ORIGIN);
 const app  = express();
 
 const isProduction = process.env.NODE_ENV === 'production';
+const enableExpressHsts = process.env.ENABLE_EXPRESS_HSTS === 'true';
+
 const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://192.168.254.124:5173'];
 const allowedOrigins = (process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
   : DEFAULT_DEV_ORIGINS)
   .map(origin => origin.trim())
   .filter(Boolean);
+
+const cspConnectSources = new Set(["'self'", 'https:', 'wss:']);
+
+for (const origin of allowedOrigins) {
+  cspConnectSources.add(origin);
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol === 'http:') {
+      cspConnectSources.add(`ws://${parsed.host}`);
+    } else if (parsed.protocol === 'https:') {
+      cspConnectSources.add(`wss://${parsed.host}`);
+    }
+  } catch (error) {
+    console.warn(`⚠️  Skipping invalid origin in CSP connect-src: ${origin}`);
+  }
+}
+
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  baseUri: ["'self'"],
+  connectSrc: Array.from(cspConnectSources),
+  fontSrc: ["'self'", 'https:', 'data:'],
+  frameAncestors: ["'self'"],
+  imgSrc: ["'self'", 'data:', 'https:'],
+  objectSrc: ["'none'"],
+  scriptSrc: ["'self'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+  workerSrc: ["'self'", 'blob:'],
+  formAction: ["'self'"],
+  manifestSrc: ["'self'"],
+};
+
+if (!isProduction) {
+  cspDirectives.scriptSrc.push("'unsafe-eval'");
+} else {
+  cspDirectives.upgradeInsecureRequests = [];
+}
 
 const isOriginAllowed = (origin) => {
   if (!origin) return true;
@@ -95,15 +134,41 @@ const io = new Server(server, {
   }
 });
 
-
 const isTrustedProxy = (ip) => ip === '127.0.0.1' || ip === '::1';
 app.set('trust proxy', isTrustedProxy);
 
 app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.removeHeader('Server');
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
 app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: cspDirectives
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false,
+  frameguard: { action: 'sameorigin' },
+  referrerPolicy: { policy: 'no-referrer' }
 }));
+
+if (isProduction && enableExpressHsts) {
+  app.use(helmet.hsts({
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: false
+  }));
+}
+
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 //DATA COMPRESSION
 app.use(compression({
