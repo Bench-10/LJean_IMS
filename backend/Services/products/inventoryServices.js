@@ -1370,6 +1370,8 @@ export const getInventoryRequestStatusFeed = async (options = {}) => {
         includePayload = false
     } = options;
 
+    console.log('[getInventoryRequestStatusFeed] called with options:', { scope, branchId, requesterId, statuses, limit, offset });
+
     const filters = [];
     const params = [];
     let paramIndex = 1;
@@ -1425,6 +1427,7 @@ export const getInventoryRequestStatusFeed = async (options = {}) => {
     params.push(numericLimit, numericOffset);
 
     const { rows } = await SQLquery(query, params);
+    console.log('[getInventoryRequestStatusFeed] query returned rows:', rows.length);
     return rows.map(row => mapRequestStatusRow(row, { includePayload }));
 };
 

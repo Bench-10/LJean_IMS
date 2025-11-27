@@ -193,6 +193,8 @@ const InventoryRequestMonitorDialog = ({
         const res = await api.get(`/api/items/request-status?${params.toString()}`, { signal: controller.signal });
         if (!isMounted) return;
         const data = res.data || {};
+        // Debug log: show raw response shape for request status fetch
+        console.debug('[InventoryRequestMonitorDialog] fetchRequests response:', data);
         const list = Array.isArray(data.requests) ? data.requests : (Array.isArray(data) ? data : []);
         setRequests(list);
         setMeta(data.meta || null);
@@ -409,7 +411,8 @@ const InventoryRequestMonitorDialog = ({
       if (!code) return false;
 
       // Owner: show only final decisions (approved/rejected/cancelled) to avoid clutter
-      if (isOwnerUser) {
+      // BUT allow pending requests when explicitly viewing "pending" status
+      if (isOwnerUser && statusFilter !== 'pending') {
         if (req.kind === 'user') return ['approved', 'rejected', 'cancelled'].includes(req.normalized_status);
         return ['approved', 'rejected', 'cancelled'].includes(code);
       }

@@ -838,13 +838,6 @@ function Approvals({
                           >
                             {rejectingInProgress ? "Rejecting..." : "Reject"}
                           </button>
-                          <button
-                            className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100"
-                            onClick={(e) => { e.stopPropagation(); handleInventoryRequestChanges(request.pending_id); }}
-                            disabled={processingInventoryId === request.pending_id}
-                          >
-                            Request changes
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -914,22 +907,25 @@ function Approvals({
                     </td>
                     <td className="px-4 py-4 text-gray-700 align-top">
                       <div className="text-sm space-y-1.5">
-                        <p>
+                        <div>
                           <span className="font-medium">Category:</span>{" "}
-                          {categoryLabel}
-                        <p>
+                          <span>{categoryLabel}</span>
+                        </div>
+
+                        <div>
                           <span className="font-medium">Quantity:</span>{' '}
-                          {quantityAdded != null ? Number(quantityAdded).toLocaleString() : '—'}
-                        </p>
-                        </p>
-                        <p>
+                          <span>{quantityAdded != null ? Number(quantityAdded).toLocaleString() : '—'}</span>
+                        </div>
+
+                        <div>
                           <span className="font-medium">Unit Price:</span>{" "}
-                          {unitPrice}
-                        </p>
-                        <p>
+                          <span>{unitPrice}</span>
+                        </div>
+
+                        <div>
                           <span className="font-medium">Unit Cost:</span>{" "}
-                          {unitCost}
-                        </p>
+                          <span>{unitCost}</span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center align-top">
