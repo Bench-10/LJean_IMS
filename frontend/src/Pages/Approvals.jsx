@@ -1267,6 +1267,7 @@ function Approvals({
             : "Reject Inventory Request"
         }
         confirmLabel="Submit Rejection"
+        zIndexClass="z-[10000]"
       />
     </div>
   );
