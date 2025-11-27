@@ -202,6 +202,25 @@ const handleModalClose = useCallback(() => {
         fetchExistingProducts();
       }
 
+      // Preload data if itemData is provided (for resubmissions)
+      if (itemData && Object.keys(itemData).length > 0) {
+        setItemName(itemData.product_name || '');
+        setCategory(itemData.category_id || '');
+        setBranch(itemData.branch_id || user.branch_id);
+        setQuantity(itemData.quantity ?? 0);
+        setPurchasedPrice(itemData.unit_cost || '');
+        setDatePurchased(itemData.date_added || '');
+        setUnit(itemData.unit || '');
+        setMinThreshold(itemData.min_threshold || '');
+        setMaxThreshold(itemData.max_threshold || '');
+        setPrice(itemData.unit_price || '');
+        setExpirationDate(itemData.product_validity || '');
+        setDescription(itemData.description || '');
+        setSellingUnits(initializeSellingUnits(itemData.selling_units, itemData.unit, itemData.unit_price));
+        setSellingUnitErrors({ general: '', entries: {} });
+        setShowSellingUnitsEditor(false);
+      }
+
       if (isModalOpen && mode === 'edit' && itemData) {
         setItemName(itemData.product_name);
         setCategory(itemData.category_id);

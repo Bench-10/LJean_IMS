@@ -1022,7 +1022,7 @@ function App() {
     const shouldPrefillDates = shouldPrefillQuantity;
     const productId = pendingObj.product_id || productData.product_id || null;
 
-    setModalMode('edit');
+    setModalMode(pendingObj.action_type === 'create' ? 'add' : 'edit');
     console.log('Opening edit modal for pending:', pendingId || pendingObj?.pending_id, 'changeType:', changeType);
     setItemData({
       product_id: productId,
