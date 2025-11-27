@@ -803,7 +803,9 @@ const InventoryRequestMonitorDialog = ({
                     ? `Completed on ${formatDateTime(final.acted_at)}`
                     : final.status === 'rejected'
                       ? `Rejected on ${formatDateTime(final.acted_at)}`
-                      : 'In progress';
+                      : final.status === 'cancelled'
+                        ? `Cancelled on ${formatDateTime(final.acted_at)}`
+                        : 'In progress';
 
                 return (
                   <div key={request.pending_id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
@@ -883,6 +885,13 @@ const InventoryRequestMonitorDialog = ({
                       <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700">
                         <p className="font-semibold">Rejection Reason</p>
                         <p>{request.rejection_reason}</p>
+                      </div>
+                    )}
+
+                    {final.status === 'cancelled' && request.cancelled_reason && (
+                      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                        <p className="font-semibold">Cancellation Reason</p>
+                        <p>{request.cancelled_reason}</p>
                       </div>
                     )}
                   </div>

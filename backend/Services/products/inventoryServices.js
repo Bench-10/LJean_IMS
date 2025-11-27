@@ -400,7 +400,8 @@ const mapRequestStatusRow = (row, options = {}) => {
                 acted_at: finalDecisionAt,
                 rejection_reason: row.status === 'deleted'
                     ? (row.cancelled_reason || row.rejection_reason || null)
-                    : (row.rejection_reason || null)
+                    : (row.rejection_reason || null),
+                cancellation_reason: row.status === 'cancelled' ? row.cancelled_reason : null
             }
         },
         payload: includePayload ? row.payload : undefined
