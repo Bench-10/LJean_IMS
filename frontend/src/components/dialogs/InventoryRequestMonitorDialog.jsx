@@ -20,7 +20,8 @@ const toneStyles = {
 const statusFilters = [
   { id: 'pending',  label: 'Pending' },
   { id: 'approved', label: 'Approved' },
-  { id: 'rejected', label: 'Rejected' }
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'cancelled', label: 'Cancelled' }
 ];
 
 const requestTypeFilters = [
@@ -113,14 +114,13 @@ const InventoryRequestMonitorDialog = ({
     setRefreshIndex((prev) => prev + 1);
   }, []);
 
-  // On open: default to 'rejected' + 'user' to show rejected user creation requests
+  // On open: default to 'pending' + 'inventory' to show pending inventory requests
   useEffect(() => {
     if (!open) return;
-    setBranchFilter(''); // Clear branch filter to show ALL rejected users across all branches
-    // Default to showing pending requests when the dialog opens so owners/managers
-    // can immediately review rejected items (both inventory and user accounts).
+    setBranchFilter(''); // Clear branch filter to show ALL
+    // Default to showing pending inventory requests when the dialog opens
     setStatusFilter('pending');
-    setRequestTypeFilter('');
+    setRequestTypeFilter('inventory');
   }, [open]);
 
   useEffect(() => {
@@ -227,10 +227,10 @@ const InventoryRequestMonitorDialog = ({
     setVisibleCount(PAGE_SIZE);
   }, [open, scope, branchFilter, statusFilter, requestTypeFilter, refreshIndex]);
 
-  // Status chips: remove "Pending" for Owner
+  // Status chips: show all statuses for everyone (owners can now see cancelled requests too)
   const statusFilterOptions = useMemo(() => {
-    return isOwnerUser ? statusFilters.filter((f) => f.id !== 'pending') : statusFilters;
-  }, [isOwnerUser]);
+    return statusFilters;
+  }, []);
 
   // Keep status valid (allow '' or a valid id)
   useEffect(() => {
@@ -382,11 +382,11 @@ const InventoryRequestMonitorDialog = ({
   // ✅ ROLE-BASED & chip filtering
   const filteredRequests = useMemo(() => {
     // Simplified, explicit filtering pipeline for clarity and correctness.
-    // 1) Start by removing cancelled/deleted items.
+    // 1) Start by removing only deleted items (keep cancelled requests)
     let list = combinedRequests.filter((req) => {
       const code = req?.status_detail?.code;
       if (!code) return false;
-      if (code === 'cancelled' || code === 'deleted') return false;
+      if (code === 'deleted') return false; // Only filter out deleted, keep cancelled
       return true;
     });
 
@@ -395,10 +395,10 @@ const InventoryRequestMonitorDialog = ({
       const code = req.status_detail?.code;
       if (!code) return false;
 
-      // Owner: show only final decisions (approved/rejected) to avoid clutter
+      // Owner: show only final decisions (approved/rejected/cancelled) to avoid clutter
       if (isOwnerUser) {
-        if (req.kind === 'user') return ['approved', 'rejected'].includes(req.normalized_status);
-        return code === 'approved' || code === 'rejected';
+        if (req.kind === 'user') return ['approved', 'rejected', 'cancelled'].includes(req.normalized_status);
+        return ['approved', 'rejected', 'cancelled'].includes(code);
       }
 
       // Branch Manager: if not explicitly viewing pending, hide items that are "pending_manager"
@@ -414,17 +414,17 @@ const InventoryRequestMonitorDialog = ({
       list = list.filter((req) => req.kind === requestTypeFilter);
     }
 
-    // 4) Status filter: explicit, small set of rules to avoid leakage of rejected user accounts
+    // 4) Status filter: explicit, small set of rules to avoid leakage of rejected/cancelled user accounts
     if (!statusFilter) {
       // Default behavior:
       // - If the user explicitly selected the "User" type chip, show all user requests
-      //   (include rejected) so branch managers/owners can review as many accounts as possible.
-      // - Otherwise, hide rejected user accounts unless 'rejected' is explicitly selected.
+      //   (include rejected/cancelled) so branch managers/owners can review as many accounts as possible.
+      // - Otherwise, hide rejected/cancelled user accounts unless 'rejected'/'cancelled' is explicitly selected.
       if (requestTypeFilter === 'user') {
         return list;
       }
 
-      list = list.filter((req) => !(req.kind === 'user' && req.normalized_status === 'rejected'));
+      list = list.filter((req) => !(req.kind === 'user' && (req.normalized_status === 'rejected' || req.normalized_status === 'cancelled')));
       return list;
     }
 
@@ -442,6 +442,15 @@ const InventoryRequestMonitorDialog = ({
         if (requestTypeFilter === 'inventory') return req.kind === 'inventory' && req.status_detail?.code === 'rejected';
         // No type specified: include both rejected inventory and user requests
         return (req.kind === 'inventory' && req.status_detail?.code === 'rejected') || (req.kind === 'user' && req.normalized_status === 'rejected');
+      });
+    }
+
+    if (statusFilter === 'cancelled') {
+      return list.filter((req) => {
+        if (requestTypeFilter === 'user') return req.kind === 'user' && req.normalized_status === 'cancelled';
+        if (requestTypeFilter === 'inventory') return req.kind === 'inventory' && req.status_detail?.code === 'cancelled';
+        // No type specified: include both cancelled inventory and user requests
+        return (req.kind === 'inventory' && req.status_detail?.code === 'cancelled') || (req.kind === 'user' && req.normalized_status === 'cancelled');
       });
     }
 

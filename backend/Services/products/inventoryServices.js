@@ -269,6 +269,16 @@ const deriveRequestStatusDetail = (row) => {
         };
     }
 
+    if (row.status === 'cancelled') {
+        return {
+            code: 'cancelled',
+            label: 'Cancelled',
+            tone: 'slate',
+            is_final: true,
+            stage: row.current_stage
+        };
+    }
+
     if (row.status === 'pending' && row.current_stage === 'admin_review') {
         return {
             code: 'pending_admin',
@@ -1973,7 +1983,7 @@ export const cancelPendingInventoryRequest = async (pendingId, requesterId, reas
     try {
         const { rows: updatedRows } = await SQLquery(
             `UPDATE Inventory_Pending_Actions
-             SET status = 'deleted',
+             SET status = 'cancelled',
                  current_stage = 'cancelled',
                  cancelled_by = $2,
                  cancelled_at = NOW(),
@@ -1994,7 +2004,7 @@ export const cancelPendingInventoryRequest = async (pendingId, requesterId, reas
 
         broadcastInventoryApprovalUpdate(pending.branch_id, {
             pending_id: resolvedPendingId,
-            status: 'deleted',
+            status: 'cancelled',
             action: pending.action_type,
             branch_id: pending.branch_id,
             cancelled_by: resolvedRequesterId,
