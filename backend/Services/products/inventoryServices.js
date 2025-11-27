@@ -2307,6 +2307,33 @@ export const resubmitPendingInventoryRequest = async (pendingId, requesterId, pr
     const isCreateAction = pending.action_type === 'create';
     const requiresAdminReview = isCreateAction && !(sanitized?.existing_product_id);
 
+    // Check requester's roles to determine appropriate approval stage
+    const requesterRoles = normalizeRoles(pending.created_by_roles || []);
+    const hasBranchManagerRole = requesterRoles.includes('Branch Manager');
+    const hasOwnerRole = requesterRoles.includes('Owner');
+
+    // Determine the initial stage based on requester's roles (similar to addProductItem logic)
+    let initialStage = 'manager_review';
+    let managerApproverId = null;
+    let managerApproverName = null;
+
+    if (requiresAdminReview && hasBranchManagerRole && !hasOwnerRole) {
+        // Branch Manager (but not Owner) creating new product goes to admin review
+        initialStage = 'admin_review';
+        managerApproverId = resolvedRequesterId;
+        managerApproverName = pending.created_by_name;
+    } else if (!hasBranchManagerRole && !hasOwnerRole) {
+        // Non-branch-manager goes to manager review
+        initialStage = 'manager_review';
+    } else if (requiresAdminReview && (hasBranchManagerRole || hasOwnerRole)) {
+        // Users with Branch Manager or Owner role bypass manager review for new products
+        initialStage = 'admin_review';
+        if (hasBranchManagerRole) {
+            managerApproverId = resolvedRequesterId;
+            managerApproverName = pending.created_by_name;
+        }
+    }
+
     const newPayload = {
         productData: sanitized,
         currentState: pending.payload?.currentState || null,
@@ -2319,9 +2346,9 @@ export const resubmitPendingInventoryRequest = async (pendingId, requesterId, pr
             `UPDATE Inventory_Pending_Actions
              SET payload = $2::jsonb,
                  status = 'pending',
-                 current_stage = 'manager_review',
-                 manager_approver_id = NULL,
-                 manager_approved_at = NULL,
+                 current_stage = $4,
+                 manager_approver_id = $5::integer,
+                 manager_approved_at = CASE WHEN $5 IS NOT NULL THEN NOW() ELSE NULL END,
                  admin_approver_id = NULL,
                  admin_approved_at = NULL,
                  approved_by = NULL,
@@ -2334,7 +2361,7 @@ export const resubmitPendingInventoryRequest = async (pendingId, requesterId, pr
                  requires_admin_review = $3
              WHERE pending_id = $1
              RETURNING *`,
-            [resolvedPendingId, JSON.stringify(newPayload), requiresAdminReview]
+            [resolvedPendingId, JSON.stringify(newPayload), requiresAdminReview, initialStage, managerApproverId]
         );
 
         await SQLquery('COMMIT');
