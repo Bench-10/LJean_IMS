@@ -620,9 +620,9 @@ const InventoryRequestMonitorDialog = ({
             )}
 
             {/* Status chips (Pending removed for Owner via statusFilterOptions) */}
-            <div className="order-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <div className="order-2 rounded-xl border border-gray-200 bg-gray-50 p-3 xl:col-span-2">
               <span className="text-xs font-semibold uppercase text-gray-500">Status</span>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-2 flex items-center gap-2 flex-nowrap overflow-x-auto">
                 {statusFilterOptions.map((filter) => {
                   const isActive = statusFilter === filter.id;
                   return (
