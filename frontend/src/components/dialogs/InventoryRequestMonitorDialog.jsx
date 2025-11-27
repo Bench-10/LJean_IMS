@@ -7,7 +7,8 @@ import DropdownCustom from '../DropdownCustom';
 import { IoMdClose } from "react-icons/io";
 import { MdRefresh } from 'react-icons/md';
 import useModalLock from '../../hooks/useModalLock';
-import CancellationReasonDialog from './CancellationReasonDialog'; 
+import CancellationReasonDialog from './CancellationReasonDialog';
+import InventoryRequestHistoryModal from '../InventoryRequestHistoryModal'; 
 
 const toneStyles = {
   slate:   { badge: 'border-slate-200 bg-slate-50 text-slate-700',   dot: 'bg-slate-500' },
@@ -119,6 +120,10 @@ const InventoryRequestMonitorDialog = ({
   const [changeDialogOpen, setChangeDialogOpen] = useState(false);
   const [changeDialogContext, setChangeDialogContext] = useState({ pendingId: null, changeType: 'quantity', comment: '' });
   const [changeDialogLoading, setChangeDialogLoading] = useState(false);
+
+  // History modal state
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedHistoryPendingId, setSelectedHistoryPendingId] = useState(null);
 
   const triggerRefresh = useCallback(() => {
     setRefreshIndex((prev) => prev + 1);
@@ -613,6 +618,16 @@ const InventoryRequestMonitorDialog = ({
     }
   }, [changeDialogContext, triggerRefresh, changeDialogLoading, handleRequestChangeCancel]);
 
+  const openHistoryModal = useCallback((pendingId) => {
+    setSelectedHistoryPendingId(pendingId);
+    setHistoryModalOpen(true);
+  }, []);
+
+  const closeHistoryModal = useCallback(() => {
+    setSelectedHistoryPendingId(null);
+    setHistoryModalOpen(false);
+  }, []);
+
   if (!open) return null;
 
   return (
@@ -942,6 +957,17 @@ const InventoryRequestMonitorDialog = ({
                               Make changes
                             </button>
                           )}
+                          {/* View History button for all inventory requests */}
+                          <button
+                            type="button"
+                            className="rounded-md border border-blue-300 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openHistoryModal(request.pending_id);
+                            }}
+                          >
+                            View History
+                          </button>
                       </div>
                     </div>
 
@@ -1078,6 +1104,13 @@ const InventoryRequestMonitorDialog = ({
           </div>
         </div>
       )}
+      {/* Inventory Request History Modal */}
+      <InventoryRequestHistoryModal
+        open={historyModalOpen}
+        onClose={closeHistoryModal}
+        pendingId={selectedHistoryPendingId}
+        formatDateTime={formatDateTime}
+      />
     </div>
   );
 };

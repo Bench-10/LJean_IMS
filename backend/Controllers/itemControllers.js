@@ -524,6 +524,20 @@ export const getPendingInventoryRequest = async (req, res) => {
     }
 };
 
+export const getInventoryRequestHistory = async (req, res) => {
+    try {
+        const pendingId = Number(req.params.id);
+        if (!Number.isFinite(pendingId)) {
+            return res.status(400).json({ message: 'Invalid pending id' });
+        }
+        const history = await inventoryServices.getInventoryRequestHistory(pendingId);
+        res.status(200).json(history);
+    } catch (error) {
+        console.error('Error fetching inventory request history:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
 export const resubmitPendingInventoryRequest = async (req, res) => {
     try {
         const pendingId = Number(req.params.id);

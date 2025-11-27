@@ -20,6 +20,7 @@ router.patch("/items/pending/:id/request-changes", authenticate, requireRole('Br
 router.patch("/items/pending/:id/cancel", authenticate, requireRole('Inventory Staff', 'Branch Manager', 'Owner'), writeOperationLimiter, itemControllers.cancelPendingInventoryRequest);
 router.patch("/items/pending/:id/resubmit", authenticate, requireRole('Inventory Staff', 'Branch Manager', 'Owner'), writeOperationLimiter, itemControllers.resubmitPendingInventoryRequest);
 router.get('/items/pending/:id', authenticate, requireRole('Branch Manager', 'Owner', 'Inventory Staff'), itemControllers.getPendingInventoryRequest);
+router.get('/items/pending/:id/history', authenticate, requireRole('Branch Manager', 'Owner', 'Inventory Staff'), itemControllers.getInventoryRequestHistory);
 
 
 

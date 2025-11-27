@@ -26,6 +26,39 @@ const needsBranchManagerApproval = (roles) => {
 const normalizeWhitespace = (value) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
 const normalizeProductNameKey = (value) => normalizeWhitespace(value).toLowerCase();
 
+// Helper function to log inventory request history
+const logInventoryRequestHistory = async ({
+    pendingId,
+    actionType,
+    actionDescription,
+    userName = null,
+    userRole = null,
+    oldPayload = null,
+    newPayload = null,
+    additionalData = null
+}) => {
+    try {
+        await SQLquery(
+            `INSERT INTO inventory_request_history
+             (pending_id, action_type, action_description, user_name, user_role, old_payload, new_payload, additional_data)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+                pendingId,
+                actionType,
+                actionDescription,
+                userName,
+                userRole,
+                oldPayload ? JSON.stringify(oldPayload) : null,
+                newPayload ? JSON.stringify(newPayload) : null,
+                additionalData ? JSON.stringify(additionalData) : null
+            ]
+        );
+    } catch (error) {
+        console.error('Failed to log inventory request history:', error);
+        // Don't throw - history logging failure shouldn't break the main flow
+    }
+};
+
 
 export const createSystemInventoryNotification = async ({
     productId = null,
@@ -519,6 +552,16 @@ const createPendingInventoryAction = async ({
     const mapped = mapPendingRequest(rows[0]);
 
     if (mapped) {
+        // Log history for request creation
+        await logInventoryRequestHistory({
+            pendingId: mapped.pending_id,
+            actionType: 'created',
+            actionDescription: `${sanitizedPayload?.fullName || 'User'} submitted a request to ${actionType} ${sanitizedPayload?.product_name || 'an inventory item'}`,
+            userName: sanitizedPayload?.fullName || null,
+            userRole: sanitizedPayload?.requestor_roles?.join(', ') || null,
+            newPayload: payload
+        });
+
         const requesterName = sanitizedPayload?.fullName || 'Inventory staff member';
         const productName = sanitizedPayload?.product_name || 'an inventory item';
         const categoryLabel = categoryName ? ` (${categoryName})` : '';
@@ -1524,6 +1567,17 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
             manager_approver_name: pending.manager_approver_name
         };
 
+        // Log history for admin approval
+        await logInventoryRequestHistory({
+            pendingId: pendingId,
+            actionType: 'approved',
+            actionDescription: `Request approved by owner (${adminName})`,
+            userName: adminName,
+            userRole: 'Owner',
+            oldPayload: pending.payload,
+            newPayload: updatedPending.payload
+        });
+
         broadcastInventoryApprovalUpdate(pending.branch_id, {
             pending_id: pending.pending_id,
             status: 'approved',
@@ -1719,6 +1773,16 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
         [approverId, pendingId]
     );
 
+    // Log history for manager approval
+    await logInventoryRequestHistory({
+        pendingId: pendingId,
+        actionType: 'approved',
+        actionDescription: `Request approved by branch manager (${approverName})`,
+        userName: approverName,
+        userRole: 'Branch Manager',
+        oldPayload: pending.payload
+    });
+
     broadcastInventoryApprovalUpdate(pending.branch_id, {
         pending_id: pending.pending_id,
         status: 'approved',
@@ -1805,6 +1869,17 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
         );
 
         const updated = rows[0];
+
+        // Log history for admin rejection
+        await logInventoryRequestHistory({
+            pendingId: pendingId,
+            actionType: 'rejected',
+            actionDescription: `Request rejected by owner (${adminName})${reason ? `: ${reason}` : ''}`,
+            userName: adminName,
+            userRole: 'Owner',
+            oldPayload: pending.payload,
+            additionalData: { rejection_reason: reason }
+        });
 
         broadcastInventoryApprovalUpdate(pending.branch_id, {
             pending_id: pendingId,
@@ -1911,6 +1986,18 @@ export const rejectPendingInventoryRequest = async (pendingId, approverId, reaso
     );
 
     const updated = rows[0];
+
+    // Log history for manager rejection
+    const approverName = await getUserFullName(approverId);
+    await logInventoryRequestHistory({
+        pendingId: pendingId,
+        actionType: 'rejected',
+        actionDescription: `Request rejected by branch manager (${approverName})${reason ? `: ${reason}` : ''}`,
+        userName: approverName,
+        userRole: 'Branch Manager',
+        oldPayload: pending.payload,
+        additionalData: { rejection_reason: reason }
+    });
 
     broadcastInventoryApprovalUpdate(pending.branch_id, {
         pending_id: pendingId,
@@ -2036,6 +2123,18 @@ export const cancelPendingInventoryRequest = async (pendingId, requesterId, reas
             manager_approver_name: pending.manager_approver_name
         } : pending;
 
+        // Log history for cancellation
+        const cancellerName = await getUserFullName(resolvedRequesterId);
+        await logInventoryRequestHistory({
+            pendingId: resolvedPendingId,
+            actionType: 'cancelled',
+            actionDescription: `Request cancelled by ${cancellerName}${normalizedReason ? `: ${normalizedReason}` : ''}`,
+            userName: cancellerName,
+            userRole: pending.created_by_roles?.join(', ') || null,
+            oldPayload: pending.payload,
+            additionalData: { cancellation_reason: normalizedReason }
+        });
+
         broadcastInventoryApprovalUpdate(pending.branch_id, {
             pending_id: resolvedPendingId,
             status: 'cancelled',
@@ -2116,6 +2215,17 @@ export const requestChangesPendingInventoryRequest = async (pendingId, approverI
         }
 
         const updated = rows[0];
+
+        // Log history for admin requesting changes
+        await logInventoryRequestHistory({
+            pendingId: pendingId,
+            actionType: 'changes_requested',
+            actionDescription: `Changes requested by owner (${adminName})${trimmedComment ? `: ${trimmedComment}` : ''}`,
+            userName: adminName,
+            userRole: 'Owner',
+            oldPayload: pending.payload,
+            additionalData: { change_request_comment: trimmedComment }
+        });
 
         broadcastInventoryApprovalUpdate(pending.branch_id, {
             pending_id: pendingId,
@@ -2199,6 +2309,18 @@ export const requestChangesPendingInventoryRequest = async (pendingId, approverI
 
     const updated = rows[0];
 
+    // Log history for manager requesting changes
+    const managerApproverName = await getUserFullName(approverId);
+    await logInventoryRequestHistory({
+        pendingId: pendingId,
+        actionType: 'changes_requested',
+        actionDescription: `Changes requested by branch manager (${managerApproverName})${trimmedComment2 ? `: ${trimmedComment2}` : ''}`,
+        userName: managerApproverName,
+        userRole: 'Branch Manager',
+        oldPayload: pending.payload,
+        additionalData: { change_request_comment: trimmedComment2 }
+    });
+
     broadcastInventoryApprovalUpdate(pending.branch_id, {
         pending_id: pendingId,
         status: 'changes_requested',
@@ -2255,6 +2377,39 @@ export const getPendingInventoryRequestById = async (pendingId) => {
 
     if (rows.length === 0) return null;
     return mapPendingRequest(rows[0]);
+};
+
+export const getInventoryRequestHistory = async (pendingId) => {
+    const { rows } = await SQLquery(
+        `SELECT 
+            history_id,
+            pending_id,
+            action_type,
+            action_description,
+            user_name,
+            user_role,
+            action_date,
+            old_payload,
+            new_payload,
+            additional_data
+         FROM inventory_request_history
+         WHERE pending_id = $1
+         ORDER BY action_date ASC`,
+        [pendingId]
+    );
+
+    return rows.map(row => ({
+        history_id: row.history_id,
+        pending_id: row.pending_id,
+        action_type: row.action_type,
+        action_description: row.action_description,
+        user_name: row.user_name,
+        user_role: row.user_role,
+        action_date: row.action_date,
+        old_payload: row.old_payload,
+        new_payload: row.new_payload,
+        additional_data: row.additional_data
+    }));
 };
 
 export const resubmitPendingInventoryRequest = async (pendingId, requesterId, productData, options = {}) => {
@@ -2367,6 +2522,17 @@ export const resubmitPendingInventoryRequest = async (pendingId, requesterId, pr
         await SQLquery('COMMIT');
 
         const updated = updatedRows[0] ? { ...pending, ...updatedRows[0], branch_name: pending.branch_name } : pending;
+
+        // Log history for resubmission
+        await logInventoryRequestHistory({
+            pendingId: resolvedPendingId,
+            actionType: 'resubmitted',
+            actionDescription: `${pending.created_by_name || 'User'} resubmitted the request with changes`,
+            userName: pending.created_by_name,
+            userRole: pending.created_by_roles?.join(', ') || null,
+            oldPayload: pending.payload,
+            newPayload: newPayload
+        });
 
         // Broadcast that the pending request has transitioned back to 'pending'
         const mapped = mapPendingRequest(updated);
