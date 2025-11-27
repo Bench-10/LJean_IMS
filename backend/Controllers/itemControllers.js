@@ -523,3 +523,23 @@ export const getPendingInventoryRequest = async (req, res) => {
         res.status(500).json({ message: 'Internal Server Error' });
     }
 };
+
+export const resubmitPendingInventoryRequest = async (req, res) => {
+    try {
+        const pendingId = Number(req.params.id);
+        const requesterContext = req.user;
+        const productData = req.body;
+
+        if (!requesterContext || (requesterContext.user_type !== 'user' && !requesterContext.user_id && !requesterContext.admin_id)) {
+            return res.status(403).json({ message: 'Only inventory users may resubmit pending requests' });
+        }
+
+        const requesterId = requesterContext.user_id ?? requesterContext.admin_id ?? null;
+        const result = await inventoryServices.resubmitPendingInventoryRequest(pendingId, requesterId, productData, { actingUser: requesterContext });
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error resubmitting pending inventory request:', error);
+        const status = error?.statusCode ?? 500;
+        res.status(status).json({ message: error?.message || 'Internal Server Error' });
+    }
+};

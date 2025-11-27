@@ -445,7 +445,15 @@ const InventoryRequestMonitorDialog = ({
       return list.filter((req) => {
         if (req.kind === 'user') return req.normalized_status === 'pending';
         const code = req.status_detail?.code || '';
-        return code === 'pending' || code === 'pending_manager' || code === 'pending_admin' || code === 'changes_requested';
+        return code === 'pending' || code === 'pending_manager' || code === 'pending_admin';
+      });
+    }
+
+    if (statusFilter === 'changes_requested') {
+      return list.filter((req) => {
+        // only inventory requests can be changes_requested
+        if (req.kind !== 'inventory') return false;
+        return req.status_detail?.code === 'changes_requested';
       });
     }
 

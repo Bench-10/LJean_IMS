@@ -108,15 +108,13 @@ const sanitizeProductPayload = (productData) => {
         sanitizedUnitPrice = Number(productData.unit_price);
     }
 
-    let dateAdded = productData.date_added;
-    if (!dateAdded || (typeof dateAdded === 'string' && dateAdded.trim() === '')) {
-        dateAdded = new Date().toISOString();
-    }
+    // Only use date_added if explicitly provided - avoid defaulting to NOW because it makes update requests look like add-stocks
+    let dateAdded = productData?.date_added ?? null;
+    if (typeof dateAdded === 'string' && dateAdded.trim() === '') dateAdded = null;
 
-    let productValidity = productData.product_validity;
-    if (!productValidity || productValidity === '' || (typeof productValidity === 'string' && productValidity.trim() === '')) {
-        productValidity = '9999-12-31';
-    }
+    // Only use a product_validity value if explicitly provided by the requestor. Defaulting to 9999-12-31 causes update requests to appear as if validity was changed.
+    let productValidity = productData.product_validity ?? null;
+    if (typeof productValidity === 'string' && productValidity.trim() === '') productValidity = null;
 
     return {
         product_id: productData.product_id ?? null,
@@ -126,7 +124,7 @@ const sanitizeProductPayload = (productData) => {
         unit: baseUnit,
         unit_price: Number(sanitizedUnitPrice),
         unit_cost: Number(productData.unit_cost),
-        quantity_added: Number(productData.quantity_added),
+        quantity_added: safeNumber(productData.quantity_added),
         min_threshold: Number(productData.min_threshold),
         max_threshold: Number(productData.max_threshold),
         date_added: dateAdded,
@@ -330,11 +328,27 @@ const buildRequestSummary = (row) => {
         ?? currentState?.category_name
         ?? null;
 
+    const quantityRequested = (() => {
+        // Show requested quantity only for creation or when explicitly specified in update/create payload
+        if (!row || !row.action_type) return null;
+        const isCreate = row.action_type === 'create';
+        const isUpdate = row.action_type === 'update';
+        if (isCreate) return safeNumber(productData?.quantity_added ?? productData?.quantity);
+        if (isUpdate) {
+            // Only show if the productData explicitly contains quantity_added or quantity property
+            if (productData && (Object.prototype.hasOwnProperty.call(productData, 'quantity_added') || Object.prototype.hasOwnProperty.call(productData, 'quantity'))) {
+                return safeNumber(productData?.quantity_added ?? productData?.quantity);
+            }
+            return null;
+        }
+        return safeNumber(productData?.quantity_added ?? productData?.quantity);
+    })();
+
     return {
         product_name: productData?.product_name || currentState?.product_name || 'Inventory item',
         category_name: categoryName,
         action_label: row?.action_type === 'update' ? 'Update existing item' : 'Add new item',
-        quantity_requested: safeNumber(productData?.quantity_added ?? productData?.quantity),
+        quantity_requested: quantityRequested,
         current_quantity: safeNumber(currentState?.quantity),
         unit: productData?.unit || currentState?.unit || null,
         unit_price: safeNumber(productData?.unit_price),
@@ -756,7 +770,9 @@ export const addProductItem = async (productData, options = {}) => {
         fullName: actingUserName
     });
 
-    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName, existing_product_id, description } = cleanedData;
+    const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added: raw_date_added, product_validity: raw_product_validity, userID, fullName, existing_product_id, description } = cleanedData;
+    const date_added = raw_date_added ?? new Date().toISOString();
+    const product_validity = raw_product_validity ?? '9999-12-31';
 
     const isNewProductSubmission = !existing_product_id;
     const ignorePendingId = bypassApproval ? pendingActionId : null;
@@ -1104,7 +1120,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
 
     let addedStockRow = null;
 
-    if (quantity_added !== 0) {
+    if (quantity_added !== null && Number(quantity_added) !== 0) {
         addedStockRow = await addStocksQuery();
         hasQuantityChange = true;
     }
@@ -2236,4 +2252,113 @@ export const getPendingInventoryRequestById = async (pendingId) => {
 
     if (rows.length === 0) return null;
     return mapPendingRequest(rows[0]);
+};
+
+export const resubmitPendingInventoryRequest = async (pendingId, requesterId, productData, options = {}) => {
+    const { actingUser = null } = options;
+    const resolvedPendingId = Number(pendingId);
+    const resolvedRequesterId = Number(requesterId);
+
+    if (!Number.isFinite(resolvedPendingId)) {
+        const error = new Error('Invalid pending inventory request id');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (!Number.isFinite(resolvedRequesterId)) {
+        const error = new Error('Invalid requester id');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const { rows: existingRows } = await SQLquery(
+        `SELECT ipa.*, b.branch_name
+         FROM Inventory_Pending_Actions ipa
+         LEFT JOIN Branch b ON b.branch_id = ipa.branch_id
+         WHERE ipa.pending_id = $1`,
+         [resolvedPendingId]
+    );
+
+    if (existingRows.length === 0) {
+        const error = new Error('Pending inventory request not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const pending = existingRows[0];
+
+    if (Number(pending.created_by) !== resolvedRequesterId) {
+        const error = new Error('You can only resubmit requests that you submitted');
+        error.statusCode = 403;
+        throw error;
+    }
+
+    // Only allow resubmission when current status is changes_requested or pending (defensive)
+    if (pending.status !== 'changes_requested' && pending.status !== 'pending') {
+        const error = new Error('Only requests with changes requested can be resubmitted');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    const sanitized = sanitizeProductPayload(productData);
+    const isCreateAction = pending.action_type === 'create';
+    const requiresAdminReview = isCreateAction && !(sanitized?.existing_product_id);
+
+    const newPayload = {
+        productData: sanitized,
+        currentState: pending.payload?.currentState || null,
+        category_name: pending.payload?.category_name || null
+    };
+
+    await SQLquery('BEGIN');
+    try {
+        const { rows: updatedRows } = await SQLquery(
+            `UPDATE Inventory_Pending_Actions
+             SET payload = $2::jsonb,
+                 status = 'pending',
+                 current_stage = 'manager_review',
+                 manager_approver_id = NULL,
+                 manager_approved_at = NULL,
+                 admin_approver_id = NULL,
+                 admin_approved_at = NULL,
+                 approved_by = NULL,
+                 approved_at = NULL,
+                 change_request_type = NULL,
+                 change_request_comment = NULL,
+                 change_requested_by = NULL,
+                 change_requested_at = NULL,
+                 change_requested = false,
+                 requires_admin_review = $3
+             WHERE pending_id = $1
+             RETURNING *`,
+            [resolvedPendingId, JSON.stringify(newPayload), requiresAdminReview]
+        );
+
+        await SQLquery('COMMIT');
+
+        const updated = updatedRows[0] ? { ...pending, ...updatedRows[0], branch_name: pending.branch_name } : pending;
+
+        // Broadcast that the pending request has transitioned back to 'pending'
+        const mapped = mapPendingRequest(updated);
+        if (mapped) {
+            broadcastInventoryApprovalUpdate(mapped.branch_id, {
+                pending_id: mapped.pending_id,
+                status: 'pending',
+                action: mapped.action_type,
+                branch_id: mapped.branch_id
+            });
+
+            // If this requires owner review, also post the request to owners for awareness
+            if (mapped.current_stage === 'admin_review') {
+                broadcastInventoryApprovalRequestToOwners({ request: mapped });
+            } else {
+                broadcastInventoryApprovalRequest(mapped.branch_id, { request: mapped });
+            }
+        }
+
+        return mapPendingRequest(updated);
+    } catch (error) {
+        await SQLquery('ROLLBACK');
+        throw error;
+    }
 };

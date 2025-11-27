@@ -559,7 +559,7 @@ function ProductInventory({
                               Requested Update
                             </p>
                             <ul className="space-y-1 text-amber-900">
-                              {requestedProduct?.quantity_added !== undefined && (
+                              {requestedProduct?.quantity_added != null && (
                                 <li>
                                   <span className="font-medium">Quantity:</span>{' '}
                                   {currentState
@@ -571,27 +571,27 @@ function ProductInventory({
                                   {requestedProduct.unit ?? ''}
                                 </li>
                               )}
-                              {requestedProduct?.unit_price !== undefined && (
+                              {requestedProduct?.unit_price != null && (request.action_type === 'create' || !currentState || Number(requestedProduct.unit_price) !== Number(currentState.unit_price)) && (
                                 <li>
                                   <span className="font-medium">Unit Price:</span> ₱{' '}
                                   {Number(requestedProduct.unit_price).toLocaleString()}
                                 </li>
                               )}
-                              {requestedProduct?.unit_cost !== undefined && (
+                              {requestedProduct?.unit_cost != null && (request.action_type === 'create' || !currentState || Number(requestedProduct.unit_cost) !== Number(currentState.unit_cost)) && (
                                 <li>
                                   <span className="font-medium">Unit Cost:</span> ₱{' '}
                                   {Number(requestedProduct.unit_cost).toLocaleString()}
                                 </li>
                               )}
-                              {requestedProduct?.min_threshold !== undefined &&
-                                requestedProduct?.max_threshold !== undefined && (
+                              {(requestedProduct?.min_threshold != null || requestedProduct?.max_threshold != null) &&
+                                (request.action_type === 'create' || (!currentState || Number(requestedProduct.min_threshold) !== Number(currentState.min_threshold) || Number(requestedProduct.max_threshold) !== Number(currentState.max_threshold))) && (
                                   <li>
                                     <span className="font-medium">Threshold:</span>{' '}
                                     {requestedProduct.min_threshold} -{' '}
                                     {requestedProduct.max_threshold}
                                   </li>
                                 )}
-                              {requestedProduct?.product_validity && (
+                              {requestedProduct?.product_validity != null && (request.action_type === 'create' || !currentState || requestedProduct.product_validity !== currentState.product_validity) && (
                                 <li>
                                   <span className="font-medium">Validity:</span>{' '}
                                   {requestedProduct.product_validity}

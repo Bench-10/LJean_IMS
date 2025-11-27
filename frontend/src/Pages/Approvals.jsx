@@ -861,7 +861,7 @@ function Approvals({
                 const unitCost = productData?.unit_cost
                   ? `₱ ${Number(productData.unit_cost).toLocaleString()}`
                   : "—";
-                const quantityAdded = productData?.quantity_added ?? 0;
+                const quantityAdded = productData?.quantity_added != null ? productData.quantity_added : null;
 
                 const isHighlighted = highlightedInventoryIds.includes(
                   request.pending_id
@@ -917,10 +917,10 @@ function Approvals({
                         <p>
                           <span className="font-medium">Category:</span>{" "}
                           {categoryLabel}
-                        </p>
                         <p>
-                          <span className="font-medium">Quantity:</span>{" "}
-                          {quantityAdded}
+                          <span className="font-medium">Quantity:</span>{' '}
+                          {quantityAdded != null ? Number(quantityAdded).toLocaleString() : '—'}
+                        </p>
                         </p>
                         <p>
                           <span className="font-medium">Unit Price:</span>{" "}
@@ -1512,7 +1512,7 @@ function PendingInventoryApprovalModal({
     productData.max_threshold ?? productData.max_stock ?? "—";
 
   const quantity =
-    productData.quantity ?? productData.quantity_added ?? 0;
+    productData.quantity ?? productData.quantity_added ?? null;
 
   const unitCost =
     productData.unit_cost != null

@@ -206,23 +206,33 @@ const handleModalClose = useCallback(() => {
         setItemName(itemData.product_name);
         setCategory(itemData.category_id);
         setBranch(user.branch_id);
-        // Preload edit quantity if available; prefer payload quantity/quantity_added or empty
-        setQuantity(itemData.quantity ?? itemData.quantity_added ?? 0);
+        // Preload edit quantity only if this is an 'addStocks' edit; otherwise clear it
+        const shouldPrefillQuantity = initialEditChoice === 'addStocks' || editChoice === 'addStocks' || mode === 'add';
+        if (shouldPrefillQuantity) {
+          setQuantity(itemData.quantity ?? itemData.quantity_added ?? 0);
+        } else {
+          setQuantity(0);
+        }
         setPurchasedPrice(itemData.unit_cost);
         setUnit(itemData.unit);
         setMinThreshold(itemData.min_threshold);
         setMaxThreshold(itemData.max_threshold);
         setPrice(itemData.unit_price ?? '');
         setForExceedQuantity(itemData.quantity);
-        // Preload date fields if available
-        setDatePurchased(itemData.date_added ?? '');
-        setExpirationDate(itemData.product_validity ?? '');
+        // Preload date fields only for addStocks scenario
+        if (shouldPrefillQuantity) {
+          setDatePurchased(itemData.date_added ?? '');
+          setExpirationDate(itemData.product_validity ?? '');
+        } else {
+          setDatePurchased('');
+          setExpirationDate('');
+        }
         setDescription(itemData.description);
         setSellingUnits(initializeSellingUnits(itemData.selling_units, itemData.unit, itemData.unit_price));
         setSellingUnitErrors({ general: '', entries: {} });
         setShowSellingUnitsEditor(false);
         // honor initial edit choice when opening the edit modal
-        if (initialEditChoice) setEditChoice(initialEditChoice);
+          if (initialEditChoice) setEditChoice(initialEditChoice);
         console.log('ModalForm opened in edit mode with itemData:', itemData, 'initialEditChoice:', initialEditChoice);
       }
       }
@@ -483,11 +493,11 @@ const handleModalClose = useCallback(() => {
         unit,
         unit_price: Number(unit_price),
         unit_cost: Number(unit_cost),
-        quantity_added: Number(quantity_added),
+        // Only include quantity and date fields when adding stocks or explicitly chosen
+        ...(mode === 'add' || (mode === 'edit' && editChoice === 'addStocks') ? { quantity_added: Number(quantity_added) } : {}),
         min_threshold: Number(min_threshold),
         max_threshold: Number(max_threshold),
-        date_added,
-        product_validity,
+        ...(mode === 'add' || (mode === 'edit' && editChoice === 'addStocks') ? { date_added, product_validity } : {}),
         userID: user.user_id,
         fullName: user.full_name,
         requestor_roles: user.role,

@@ -1017,7 +1017,9 @@ function App() {
       }
     }
     const payload = pendingObj.payload || {};
-    const productData = payload.productData || payload;
+    const productData = payload.productData || payload || {};
+    const shouldPrefillQuantity = (changeType === 'quantity') || (pendingObj.action_type === 'create');
+    const shouldPrefillDates = shouldPrefillQuantity;
     const productId = pendingObj.product_id || productData.product_id || null;
 
     setModalMode('edit');
@@ -1034,10 +1036,10 @@ function App() {
       max_threshold: productData.max_threshold || '',
       description: productData.description || ''
       ,
-      quantity: productData.quantity ?? productData.quantity_added ?? payload?.historyEntry?.quantity_added ?? payload?.currentState?.quantity ?? null,
-      // include date and product validity if available in payload or productData
-      date_added: productData.date_added || payload?.historyEntry?.date_added || payload?.date_added || null,
-      product_validity: productData.product_validity || payload?.historyEntry?.product_validity || payload?.product_validity || null,
+      quantity: shouldPrefillQuantity ? (productData.quantity ?? productData.quantity_added ?? payload?.historyEntry?.quantity_added ?? payload?.currentState?.quantity ?? null) : null,
+      // include date and product validity if available in payload or productData (only for addStocks)
+      date_added: shouldPrefillDates ? (productData.date_added || payload?.historyEntry?.date_added || payload?.date_added || null) : null,
+      product_validity: shouldPrefillDates ? (productData.product_validity || payload?.historyEntry?.product_validity || payload?.product_validity || null) : null,
       selling_units: productData.selling_units || []
     });
 
@@ -2160,20 +2162,19 @@ function App() {
   const handleSubmit = async (newItem) =>{
     if (modalMode === 'add'){
       try {
-        const response = await api.post(`/api/items/`, newItem);
+        let response;
+        if (resubmissionSourcePendingId) {
+          response = await api.patch(`/api/items/pending/${resubmissionSourcePendingId}/resubmit`, newItem);
+        } else {
+          response = await api.post(`/api/items/`, newItem);
+        }
         if (response.status === 202 || response.data?.status === 'pending') {
           addToNotificationQueue('Inventory request submitted for branch manager approval.', true);
           await fetchPendingInventoryRequests();
           setRequestStatusRefreshKey((prev) => prev + 1);
-          // If this was a resubmission after a change request, cancel the previous pending request
+          // If this was a resubmission (add), the backend updated the pending entry in place; clear our tracking id
           if (resubmissionSourcePendingId) {
-            try {
-              await api.patch(`/api/items/pending/${resubmissionSourcePendingId}/cancel`, { reason: 'Resubmitted modified request' });
-            } catch (e) {
-              console.error('Failed to cancel previous pending request during resubmission', e);
-            } finally {
-              setResubmissionSourcePendingId(null);
-            }
+            setResubmissionSourcePendingId(null);
           }
         } else {
           const addedProduct = response.data?.product || response.data;
@@ -2198,22 +2199,23 @@ function App() {
          } 
       }
 
-    } else{
+      } else{
       try {
         console.log(itemData)
-        const response = await api.put(`/api/items/${itemData.product_id}`, newItem);
+        let response;
+        // If this is a resubmission of an existing pending request, update the pending entry instead of creating a new one
+        if (resubmissionSourcePendingId) {
+          response = await api.patch(`/api/items/pending/${resubmissionSourcePendingId}/resubmit`, newItem);
+        } else {
+          response = await api.put(`/api/items/${itemData.product_id}`, newItem);
+        }
         if (response.status === 202 || response.data?.status === 'pending') {
           addToNotificationQueue('Inventory update sent for branch manager approval.', true);
           await fetchPendingInventoryRequests();
           setRequestStatusRefreshKey((prev) => prev + 1);
+          // If resubmitted, clear the resubmission source id since the backend updated the pending in place
           if (resubmissionSourcePendingId) {
-            try {
-              await api.patch(`/api/items/pending/${resubmissionSourcePendingId}/cancel`, { reason: 'Resubmitted modified request' });
-            } catch (e) {
-              console.error('Failed to cancel previous pending request during resubmission', e);
-            } finally {
-              setResubmissionSourcePendingId(null);
-            }
+            setResubmissionSourcePendingId(null);
           }
         } else {
           const updatedProduct = response.data?.product || response.data;
