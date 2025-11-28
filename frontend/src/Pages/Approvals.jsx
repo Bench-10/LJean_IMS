@@ -8,6 +8,8 @@ import RejectionReasonDialog from "../components/dialogs/RejectionReasonDialog";
 import useModalLock from "../hooks/useModalLock";
 import { useLocation, useNavigate } from "react-router-dom";
 import { computeApprovalLabel } from '../utils/approvalLabels';
+import InventoryRequestHistoryModal from "../components/InventoryRequestHistoryModal";
+import RequestChangeDialog from "../components/dialogs/RequestChangeDialog";
 
 /* Unified button styles: identical sizes everywhere */
 const BTN_BASE =
@@ -56,6 +58,13 @@ function Approvals({
     useState(null);
   const [inventoryApprovalModalOpen, setInventoryApprovalModalOpen] =
     useState(false);
+
+  // Request changes / timeline modals for inventory approval (owner-facing)
+  const [changeDialogOpen, setChangeDialogOpen] = useState(false);
+  const [changeDialogContext, setChangeDialogContext] = useState({ pendingId: null, changeType: 'quantity', comment: '' });
+  const [changeDialogLoading, setChangeDialogLoading] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedHistoryPendingId, setSelectedHistoryPendingId] = useState(null);
 
   const { user } = useAuth();
   const location = useLocation();
@@ -604,15 +613,28 @@ function Approvals({
 
   const handleInventoryRequestChanges = async (pendingId) => {
     if (!onRequestChanges) return;
-    // Simple prompt UI temporarily: ask for change type and comment
-    const changeType = window.prompt('Enter change type (quantity, product_info, other):', 'quantity');
-    if (!changeType) return;
-    const comment = window.prompt('Enter comments for the user (what needs to be changed):', 'Please update the quantity to proper value');
+    // open the reusable RequestChangeDialog (same UX as Request History)
+    setChangeDialogContext({ pendingId, changeType: 'quantity', comment: '' });
+    setChangeDialogOpen(true);
+  };
+
+  const handleChangeDialogCancel = () => {
+    if (changeDialogLoading) return;
+    setChangeDialogOpen(false);
+    setChangeDialogContext({ pendingId: null, changeType: 'quantity', comment: '' });
+  };
+
+  const handleChangeDialogConfirm = async (pendingId, changeType, comment) => {
+    if (!pendingId) return handleChangeDialogCancel();
+    setChangeDialogLoading(true);
     try {
       await onRequestChanges(pendingId, changeType, comment);
       if (typeof refreshInventoryRequests === 'function') await refreshInventoryRequests();
     } catch (error) {
       console.error('Failed to request changes for the pending inventory request:', error);
+    } finally {
+      setChangeDialogLoading(false);
+      handleChangeDialogCancel();
     }
   };
 
@@ -628,8 +650,10 @@ function Approvals({
   const handleModalInventoryApprove = async () => {
     if (!selectedInventoryRequest) return;
     const pendingId = selectedInventoryRequest.pending_id;
-    closeInventoryApprovalModal();
+    // Wait for the approval to finish before closing the modal so the user
+    // sees the "Processing…" state while the request is handled.
     await handleInventoryApprove(pendingId);
+    closeInventoryApprovalModal();
   };
 
   const handleModalInventoryReject = () => {
@@ -1311,6 +1335,8 @@ function Approvals({
           processingInventoryId === selectedInventoryRequest.pending_id
         }
         formatDateTime={formatDateTime}
+        onOpenRequestChanges={(pendingId) => { setChangeDialogContext({ pendingId, changeType: 'quantity', comment: '' }); setChangeDialogOpen(true); }}
+        onOpenRequestTimeline={(pendingId) => { setSelectedHistoryPendingId(pendingId); setHistoryModalOpen(true); }}
       />
 
       <RejectionReasonDialog
@@ -1325,6 +1351,22 @@ function Approvals({
         }
         confirmLabel="Submit Rejection"
         zIndexClass="z-[400]"
+      />
+      <RequestChangeDialog
+        open={changeDialogOpen}
+        onCancel={handleChangeDialogCancel}
+        onConfirm={handleChangeDialogConfirm}
+        loading={changeDialogLoading}
+        initialChangeType={changeDialogContext.changeType}
+        initialComment={changeDialogContext.comment}
+        pendingId={changeDialogContext.pendingId}
+      />
+
+      <InventoryRequestHistoryModal
+        open={historyModalOpen}
+        onClose={() => { setSelectedHistoryPendingId(null); setHistoryModalOpen(false); }}
+        pendingId={selectedHistoryPendingId}
+        formatDateTime={formatDateTime}
       />
     </div>
   );
@@ -1427,11 +1469,6 @@ function PendingUserApprovalModal({
             <h1 className="text-white font-bold text-base lg:text-2xl">
               {headerTitle}
             </h1>
-            {isPending && (
-              <span className="inline-flex items-center rounded-full bg-amber-100/90 text-amber-800 text-xs font-semibold px-3 py-1">
-                This account is awaiting owner approval
-              </span>
-            )}
           </div>
 
           <button
@@ -1501,6 +1538,8 @@ function PendingInventoryApprovalModal({
   onReject,
   processing,
   formatDateTime, // not used directly but kept for signature consistency
+  onOpenRequestChanges,
+  onOpenRequestTimeline,
 }) {
   // lock scroll + Esc/back when modal is open
   useModalLock(open, onClose);
@@ -1622,9 +1661,6 @@ function PendingInventoryApprovalModal({
             <h1 className="text-white font-bold text-base lg:text-2xl">
               Inventory Information – For Approval
             </h1>
-            <span className="inline-flex items-center rounded-full bg-emerald-100/90 text-emerald-900 text-xs font-semibold px-3 py-1">
-              This inventory request is awaiting owner approval
-            </span>
           </div>
 
           <button
@@ -1726,23 +1762,50 @@ function PendingInventoryApprovalModal({
           </div>
         </div>
 
-        {/* Footer – Approve / Reject buttons */}
-        <div className="bg-white border-t border-gray-200 px-6 py-4 flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={onApprove}
-            disabled={processing}
-            className="px-8 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-60"
-          >
-            {processing ? "Processing…" : "Approve"}
-          </button>
+        {/* Footer – Approve / Reject buttons (plus Owner actions when applicable) */}
+        <div className="bg-white border-t border-gray-200 px-6 py-4 flex flex-col sm:flex-row gap-4 justify-center items-center">
+          {/* Owner-facing actions: Request changes & Request timeline when owner approval required */}
+          {(() => {
+            const modalRequestStatus = String(request?.status ?? request?.request_status ?? request?.resolution_status ?? '').toLowerCase();
+            const isForOwnerApproval = modalRequestStatus === 'pending_admin' || request?.requires_admin_review === true;
+            if (!isForOwnerApproval) return null;
+            return (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
+                  onClick={(e) => { e.stopPropagation(); if (typeof onOpenRequestChanges === 'function') onOpenRequestChanges(request.pending_id); }}
+                >
+                  Request changes
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
+                  onClick={(e) => { e.stopPropagation(); if (typeof onOpenRequestTimeline === 'function') onOpenRequestTimeline(request.pending_id); }}
+                >
+                  Request Timeline
+                </button>
+              </div>
+            );
+          })()}
 
-          <button
-            onClick={onReject}
-            disabled={processing}
-            className="px-8 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-60"
-          >
-            Reject
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onApprove}
+              disabled={processing}
+              className="px-8 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-60"
+            >
+              {processing ? "Processing…" : "Approve"}
+            </button>
+
+            <button
+              onClick={onReject}
+              disabled={processing}
+              className="px-8 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-60"
+            >
+              Reject
+            </button>
+          </div>
         </div>
       </div>
     </div>
