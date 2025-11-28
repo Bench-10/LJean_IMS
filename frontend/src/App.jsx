@@ -1388,7 +1388,7 @@ function App() {
 
       if (isOwner) {
         setAdminInventoryRequests(prev => {
-          if (['approved', 'rejected', 'deleted'].includes(payload.status)) {
+          if (['approved', 'rejected', 'deleted', 'changes_requested'].includes(payload.status)) {
             return prev.filter(req => normalizePendingId(req.pending_id) !== normalizePendingId(payload.pending_id));
           }
 
@@ -1415,6 +1415,7 @@ function App() {
           isBranchManager
         });
         setRequestStatusRefreshKey((prev) => prev + 1);
+        window.dispatchEvent(new CustomEvent('inventory-approval-update'));
       }
     });
 

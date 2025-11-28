@@ -70,6 +70,8 @@ function Approvals({
   const mobileScrollContainerRef = useRef(null);
   const lastHandledHighlightRef = useRef(null);
 
+  const [refreshToken, setRefreshToken] = useState(0);
+
   const ownerCanOpenRequestMonitor = useMemo(() => {
     if (!user) return false;
     const roles = Array.isArray(user.role)
@@ -203,7 +205,7 @@ function Approvals({
             request?.resolution_status ??
             ""
         ).toLowerCase();
-        return request.current_stage === "admin_review" && status === "pending";
+        return ['pending', 'pending_manager', 'pending_admin'].includes(status);
       })
       .filter((request) => {
         if (!normalizedSearch) return true;
@@ -564,6 +566,19 @@ function Approvals({
     inventoryRequestsLoading,
     onHighlightConsumed,
   ]);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (typeof refreshInventoryRequests === 'function') {
+        refreshInventoryRequests();
+      }
+      setRefreshToken(prev => prev + 1);
+    };
+
+    window.addEventListener('inventory-approval-update', handleUpdate);
+
+    return () => window.removeEventListener('inventory-approval-update', handleUpdate);
+  }, [refreshInventoryRequests]);
 
   const handleInventoryApprove = async (pendingId) => {
     if (!approveInventoryRequest) return;
