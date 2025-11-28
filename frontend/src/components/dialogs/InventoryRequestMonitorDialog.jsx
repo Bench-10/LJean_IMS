@@ -129,14 +129,18 @@ const InventoryRequestMonitorDialog = ({
     setRefreshIndex((prev) => prev + 1);
   }, []);
 
-  // On open: default to 'pending' + 'inventory' to show pending inventory requests
+  // On open: default to 'pending' for users, '' for owner/branch manager to show all statuses including changes_requested for tracking
   useEffect(() => {
     if (!open) return;
     setBranchFilter(''); // Clear branch filter to show ALL
-    // Default to showing pending inventory requests when the dialog opens
-    setStatusFilter('pending');
+    // Default to showing pending inventory requests for users, all for managers/owners
+    if (isOwnerUser || isBranchManager) {
+      setStatusFilter('');
+    } else {
+      setStatusFilter('pending');
+    }
     setRequestTypeFilter('inventory');
-  }, [open]);
+  }, [open, isOwnerUser, isBranchManager]);
 
   useEffect(() => {
     if (!open) { setVisibleCount(PAGE_SIZE); return; }
@@ -415,11 +419,11 @@ const InventoryRequestMonitorDialog = ({
       const code = req.status_detail?.code;
       if (!code) return false;
 
-      // Owner: show only final decisions (approved/rejected/cancelled) to avoid clutter
+      // Owner: show only final decisions (approved/rejected/cancelled) and changes_requested to avoid clutter but allow tracking
       // BUT allow pending requests when explicitly viewing "pending" status
       if (isOwnerUser && statusFilter !== 'pending') {
         if (req.kind === 'user') return ['approved', 'rejected', 'cancelled'].includes(req.normalized_status);
-        return ['approved', 'rejected', 'cancelled'].includes(code);
+        return ['approved', 'rejected', 'cancelled', 'changes_requested'].includes(code);
       }
 
       // Branch Manager: if not explicitly viewing pending, hide items that are "pending_manager"
