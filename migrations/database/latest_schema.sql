@@ -127,6 +127,10 @@ CREATE TABLE IF NOT EXISTS public.inventory_pending_actions
     cancelled_by integer,
     cancelled_at timestamp without time zone,
     cancelled_reason text COLLATE pg_catalog."default",
+    revision_requested_by integer,
+    revision_requested_at timestamp without time zone,
+    revision_comments text COLLATE pg_catalog."default",
+    revision_type text COLLATE pg_catalog."default",
     change_requested boolean DEFAULT false,
     change_request_type text COLLATE pg_catalog."default",
     change_request_comment text COLLATE pg_catalog."default",
@@ -152,6 +156,31 @@ CREATE TABLE IF NOT EXISTS public.inventory_product
     conversion_factor integer NOT NULL DEFAULT 1,
     CONSTRAINT inventory_product_pkey PRIMARY KEY (product_id, branch_id)
 );
+
+CREATE TABLE IF NOT EXISTS public.inventory_request_history
+(
+    history_id serial NOT NULL,
+    pending_id integer NOT NULL,
+    action_type character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    action_description text COLLATE pg_catalog."default" NOT NULL,
+    user_name character varying(255) COLLATE pg_catalog."default",
+    user_role character varying(100) COLLATE pg_catalog."default",
+    action_date timestamp with time zone DEFAULT now(),
+    old_payload jsonb,
+    new_payload jsonb,
+    additional_data jsonb,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT inventory_request_history_pkey PRIMARY KEY (history_id)
+);
+
+COMMENT ON TABLE public.inventory_request_history
+    IS 'Tracks all changes and actions performed on inventory pending requests';
+
+COMMENT ON COLUMN public.inventory_request_history.user_name
+    IS 'User name stored as text to avoid foreign key constraints';
+
+COMMENT ON COLUMN public.inventory_request_history.user_role
+    IS 'User role stored as text for historical reference';
 
 CREATE TABLE IF NOT EXISTS public.login_credentials
 (
@@ -295,6 +324,9 @@ CREATE TABLE IF NOT EXISTS public.user_creation_requests
     CONSTRAINT user_creation_requests_pkey PRIMARY KEY (request_id)
 );
 
+COMMENT ON COLUMN public.user_creation_requests.resolution_status
+    IS 'Request status: pending (awaiting admin approval), approved (admin approved), rejected (admin rejected, user deleted), deleted (approved user later deleted)';
+
 CREATE TABLE IF NOT EXISTS public.user_notification
 (
     user_id integer NOT NULL,
@@ -396,6 +428,13 @@ ALTER TABLE IF EXISTS public.inventory_alerts
 
 
 ALTER TABLE IF EXISTS public.inventory_pending_actions
+    ADD CONSTRAINT fk_inventory_pending_actions_revision_requested_by FOREIGN KEY (revision_requested_by)
+    REFERENCES public.users (user_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION;
+
+
+ALTER TABLE IF EXISTS public.inventory_pending_actions
     ADD CONSTRAINT inventory_pending_actions_admin_approver_id_fkey FOREIGN KEY (admin_approver_id)
     REFERENCES public.administrator (admin_id) MATCH SIMPLE
     ON UPDATE NO ACTION
@@ -456,6 +495,15 @@ ALTER TABLE IF EXISTS public.inventory_product
     REFERENCES public.products (product_id) MATCH SIMPLE
     ON UPDATE NO ACTION
     ON DELETE NO ACTION;
+
+
+ALTER TABLE IF EXISTS public.inventory_request_history
+    ADD CONSTRAINT inventory_request_history_pending_id_fkey FOREIGN KEY (pending_id)
+    REFERENCES public.inventory_pending_actions (pending_id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_inventory_request_history_pending_id
+    ON public.inventory_request_history(pending_id);
 
 
 ALTER TABLE IF EXISTS public.login_credentials

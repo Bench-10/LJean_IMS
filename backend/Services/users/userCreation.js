@@ -960,9 +960,31 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
             creator_request_reason: resolvedReason ?? pendingRecord.creator_request_reason
         };
 
-        // DELETE the request record (not preserve it)
-        await SQLquery('DELETE FROM User_Creation_Requests WHERE pending_user_id = $1', [userIdInt]);
-        
+        // UPDATE the request record to 'cancelled' status instead of deleting it
+        await SQLquery(
+            `UPDATE User_Creation_Requests
+             SET resolution_status = 'cancelled',
+                 resolved_at = NOW(),
+                 resolution_reason = COALESCE($2, resolution_reason),
+                 target_branch_id = COALESCE(target_branch_id, $3),
+                 target_branch_name = COALESCE(target_branch_name, $4),
+                 target_roles = COALESCE(target_roles, $5),
+                 target_full_name = COALESCE(target_full_name, $6),
+                 target_username = COALESCE(target_username, $7),
+                 target_cell_number = COALESCE(target_cell_number, $8)
+             WHERE pending_user_id = $1`,
+            [
+                userIdInt,
+                resolvedReason,
+                pendingRecord.branch_id,
+                pendingRecord.branch,
+                pendingRecord.role,
+                pendingRecord.full_name,
+                pendingRecord.username,
+                pendingRecord.cell_number
+            ]
+        );
+
         // DELETE the user from Users and Login_Credentials
         await SQLquery('DELETE FROM Login_Credentials WHERE user_id = $1', [userIdInt]);
         await SQLquery('DELETE FROM Users WHERE user_id = $1', [userIdInt]);
@@ -980,13 +1002,14 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
         reason: resolvedReason || 'cancelled'
     });
 
-    // Broadcast request removal (status: 'cancelled' signals complete removal)
+    // Broadcast request cancellation (status: 'cancelled' signals cancellation)
+    const requestSnapshot = await fetchUserCreationRequestById(userIdInt);
     broadcastUserApprovalUpdate(branchId, {
         pending_user_id: userIdInt,
         status: 'cancelled',
         branch_id: branchId,
         reason: resolvedReason || null,
-        request: null // No request snapshot because it's deleted
+        request: requestSnapshot
     });
 
     // Send targeted notification to the creator if they didn't cancel their own request

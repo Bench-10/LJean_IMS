@@ -793,7 +793,7 @@ function Approvals({
 
                   return (
                     <tr
-                      key={`user-${pendingUser.user_id}`}
+                      key={pendingUser.pending_id ?? `user-${pendingUser.user_id}`}
                       ref={(node) => {
                         if (hasNumericId)
                           setPendingUserRowRef(numericUserId, node);
@@ -1025,7 +1025,7 @@ function Approvals({
 
               return (
                 <div
-                  key={`user-${pendingUser.user_id}`}
+                  key={pendingUser.pending_id ?? `user-${pendingUser.user_id}`}
                   ref={(node) => {
                     if (hasNumericId)
                       setPendingUserMobileRef(numericUserId, node);

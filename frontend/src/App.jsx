@@ -193,6 +193,7 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
     // username or email. If none exist, generate a synthetic key so the record is preserved.
     let rawId = rec?.pending_user_id ?? rec?.user_id ?? rec?.id ?? rec?.username ?? rec?.email ?? null;
     let idKey = (rawId !== null && rawId !== undefined && String(rawId).trim() !== '') ? String(rawId) : null;
+    const recStatus = normalizeStatus(rec);
 
     const candidateTime = toTime(
       rec?.request_resolved_at ?? 
@@ -203,12 +204,17 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
       rec?.createdAt
     ) || 0;
 
+    if (recStatus === 'rejected') {
+      idKey = `${idKey ?? 'anon'}__rejected__${candidateTime || index || Date.now()}`;
+    }
+
     if (!idKey) {
       idKey = `anon-${index}-${candidateTime}`;
     }
 
     const existing = byId.get(idKey);
     if (!existing) {
+      try { rec.pending_id = idKey; } catch (e) { /* ignore */ }
       byId.set(idKey, rec);
       return;
     }
@@ -224,6 +230,7 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
 
     // Strategy: Always prefer the most recent timestamp
     if (candidateTime > existingTime) {
+      try { rec.pending_id = idKey; } catch (e) { /* ignore */ }
       byId.set(idKey, rec);
       return;
     }
@@ -234,6 +241,7 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
 
     // If timestamps are equal, use priority
     if (getPriority(rec) > getPriority(existing)) {
+      try { rec.pending_id = idKey; } catch (e) { /* ignore */ }
       byId.set(idKey, rec);
     }
   });

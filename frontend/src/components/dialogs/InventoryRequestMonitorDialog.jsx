@@ -330,11 +330,18 @@ const InventoryRequestMonitorDialog = ({
 
       const safeTimestamp = toTime(createdAtIso) || toTime(decisionAtIso) || Date.now();
 
+      const basePendingKey = `user-${record.user_id ?? record.pending_user_id ?? record.username ?? record.email ?? safeTimestamp}`;
+      let uniquePendingKey = basePendingKey;
+      if (normalizedStatus === 'rejected' || normalizedStatus === 'cancelled') {
+        const suffix = decisionAtIso || record?.request_resolved_at || record?.resolved_at || createdAtIso || safeTimestamp;
+        uniquePendingKey = `${basePendingKey}__${normalizedStatus}__${suffix}`;
+      }
+
       return {
         kind: 'user',
         // Ensure we always produce a stable pending_id even when user_id is missing.
         // Fallback order: user_id -> pending_user_id -> username/email -> createdAt timestamp
-        pending_id: `user-${record.user_id ?? record.pending_user_id ?? record.username ?? record.email ?? safeTimestamp}`,
+        pending_id: uniquePendingKey,
         user_id: record.user_id ?? null,
         branch_id: record.branch_id,
         branch_name: branchName,
