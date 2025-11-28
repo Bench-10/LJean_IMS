@@ -1043,8 +1043,13 @@ function App() {
       selling_units: productData.selling_units || []
     });
 
-    // Set initial edit choice depending on changeType
-    setInitialEditChoice(changeType === 'quantity' ? 'addStocks' : 'edit');
+    // Determine initial edit choice based on changeType and quantity
+    const quantity = productData.quantity ?? productData.quantity_added ?? payload?.historyEntry?.quantity_added ?? payload?.currentState?.quantity ?? 0;
+    setInitialEditChoice(
+      changeType === 'quantity' ? (quantity > 0 ? 'addStocks' : 'edit') :
+      changeType === 'price' ? 'edit' :
+      'edit'
+    );
     setResubmissionSourcePendingId(pendingObj.pending_id || null);
     // Open the edit modal without closing the request monitor (allow overlays to stack via z-index)
     console.log('setIsModalOpen(true) called');
@@ -2857,6 +2862,7 @@ function App() {
         listCategories={listCategories}
         sanitizeInput={sanitizeInput}
         initialEditChoice={initialEditChoice}
+        isRequestEdit={!!resubmissionSourcePendingId}
          
       />
 

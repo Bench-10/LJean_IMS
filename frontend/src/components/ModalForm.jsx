@@ -9,7 +9,7 @@ import DropdownCustom from './DropdownCustom';
 import DatePickerCustom from './DatePickerCustom';
 import useModalLock from '../hooks/useModalLock';
 
-function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput, initialEditChoice = null }) {
+function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategories, sanitizeInput, initialEditChoice = null, isRequestEdit = false }) {
   const { user } = useAuth();
 
   // Feature flag: hide selling-units UI and price fields from users without deleting code.
@@ -835,7 +835,7 @@ const handleModalClose = useCallback(() => {
   <div className="relative">
     {/* Title + back */}
     <div className="flex items-center gap-3">
-      {mode === 'edit' && editChoice && (
+      {mode === 'edit' && editChoice && !isRequestEdit && (
         <button
           type="button"
           onClick={() => { setEditChoice(null); setShowExistingProducts(false); }}

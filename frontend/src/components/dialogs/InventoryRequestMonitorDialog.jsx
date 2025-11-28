@@ -649,7 +649,7 @@ const InventoryRequestMonitorDialog = ({
         <div className="sticky top-0 z-10 flex flex-col gap-3 border-b bg-white px-4 sm:px-6 py-4 overflow-visible">
           <div className="flex items-start justify-between gap-3 sm:gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-800">Request Status</h2>
+              <h2 className="text-xl font-semibold text-gray-800">Request History</h2>
               <p className="text-sm text-gray-500">Review user accounts and inventory requests that need action.</p>
             </div>
             <div className="flex items-center gap-2">
