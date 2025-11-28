@@ -2759,7 +2759,8 @@ function App() {
             lineHeight: 1.4,
             minWidth: '340px',
             border: '1px solid rgba(187, 247, 208, 0.9)',
-            boxShadow: '0 20px 45px rgba(22, 101, 52, 0.16)'
+            boxShadow: '0 20px 45px rgba(22, 101, 52, 0.16)',
+            zIndex: 9999
           },
           success: {
             iconTheme: {
@@ -2769,7 +2770,8 @@ function App() {
             style: {
               background: '#ffffff',
               color: '#14532d',
-              border: '1px solid #86efac'
+              border: '1px solid #86efac',
+              zIndex: 9999
             }
           },
           error: {
@@ -2780,7 +2782,8 @@ function App() {
             style: {
               background: '#ffffff',
               color: '#7f1d1d',
-              border: '1px solid #fecaca'
+              border: '1px solid #fecaca',
+              zIndex: 9999
             }
           }
         }}

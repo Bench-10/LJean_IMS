@@ -1307,7 +1307,7 @@ function Approvals({
             : "Reject Inventory Request"
         }
         confirmLabel="Submit Rejection"
-        zIndexClass="z-[10000]"
+        zIndexClass="z-[400]"
       />
     </div>
   );
@@ -1393,7 +1393,7 @@ function PendingUserApprovalModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[300] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       onClick={onClose} // click outside closes modal
@@ -1590,7 +1590,7 @@ function PendingInventoryApprovalModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9998] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[350] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       onClick={onClose}

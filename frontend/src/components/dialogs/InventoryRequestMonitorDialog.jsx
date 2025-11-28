@@ -636,7 +636,7 @@ const InventoryRequestMonitorDialog = ({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={cancelDialogOpen ? undefined : onClose}
     >
       <div
@@ -1074,7 +1074,7 @@ const InventoryRequestMonitorDialog = ({
       />
       {/* Change Request Dialog */}
       {changeDialogOpen && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => changeDialogLoading ? null : handleRequestChangeCancel()}>
+        <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/40" onClick={() => changeDialogLoading ? null : handleRequestChangeCancel()}>
           <div className="relative w-[min(680px,95%)] rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-800">Request Changes</h3>
             <p className="text-sm text-gray-500 mt-1">Ask the requester to make changes to their pending request.</p>

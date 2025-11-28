@@ -40,7 +40,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
       {/* Overlay */}
       {open && (
         <div
-          className="fixed inset-0 bg-black/50 z-[9998] backdrop-blur-sm"
+          className="fixed inset-0 bg-black/50 z-[150] backdrop-blur-sm"
           style={{ pointerEvents: 'auto' }}
           onClick={handleOverlayClick}
         />
@@ -49,7 +49,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
       {/* Dialog */}
       {open && (
         <dialog
-          className="bg-transparent fixed top-0 bottom-0 z-[9999]"
+          className="bg-transparent fixed top-0 bottom-0 z-[200]"
           open={open}
           onClick={handleOverlayClick}
         >

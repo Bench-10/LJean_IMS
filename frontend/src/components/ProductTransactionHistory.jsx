@@ -345,13 +345,13 @@ function ProductTransactionHistory({
     <div>
       {isProductTransactOpen && (
         <div
-          className="fixed inset-0 bg-black/35 bg-opacity-50 z-[9998] backdrop-blur-sm"
+          className="fixed inset-0 bg-black/35 bg-opacity-50 z-[200] backdrop-blur-sm"
           onClick={handleClose}
         />
       )}
 
       <dialog
-        className="bg-transparent fixed inset-0 z-[9999]"
+        className="bg-transparent fixed inset-0 z-[250]"
         open={isProductTransactOpen}
       >
         {/* MODAL SHELL */}
@@ -409,7 +409,7 @@ function ProductTransactionHistory({
                 <div className="relative mt-2 sm:mt-0 w-full lg:w-auto overflow-visible">
                   {openFilter && (
                     <div
-                      className="absolute z-[10000]
+                      className="absolute z-[300]
                                  top-[110%] left-1/2 -translate-x-1/2
                                  sm:top-[100%] sm:left-auto sm:right-0 sm:translate-x-0"
                     >

@@ -299,7 +299,7 @@ function UserModalForm({
         {openUserModal && (
           // Backdrop container catches outside clicks
           <div
-            className="fixed inset-0 z-[9999] p-2 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[250] p-2 flex items-center justify-center bg-black/40 backdrop-blur-sm"
             onClick={handleClose}
             role="dialog"
             aria-modal="true"

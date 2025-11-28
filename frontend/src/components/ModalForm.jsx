@@ -567,7 +567,7 @@ const handleModalClose = useCallback(() => {
 
       {/* edit action chooser */}
       {isModalOpen && mode === 'edit' && !editChoice && (
-        <div className="fixed inset-0 z-[11000] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[500] flex items-center justify-center px-4">
           <div className="bg-white rounded-xl p-6 shadow-2xl w-full max-w-md sm:max-w-lg">
             <h4 className="font-semibold text-xl sm:text-2xl mb-6 text-center">Choose an action</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -602,7 +602,7 @@ const handleModalClose = useCallback(() => {
       {/* overlay */}
       {isModalOpen && user?.role?.some(r => ['Inventory Staff'].includes(r)) && (
         <div
-          className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm"
+          className="fixed inset-0 bg-black/50 z-[400] backdrop-blur-sm"
           style={{ pointerEvents: 'auto' }}
           onClick={handleModalClose}
         />
@@ -610,7 +610,7 @@ const handleModalClose = useCallback(() => {
 
       {/* dialog */}
       <dialog
-        className="bg-transparent fixed inset-0 z-[11001]"
+        className="bg-transparent fixed inset-0 z-[450]"
         
         
         open={mode === 'edit'
@@ -628,7 +628,7 @@ const handleModalClose = useCallback(() => {
           {/* Selling Units editor (kept as-is) */}
           {!HIDE_SELLING_UNITS && showSellingUnitsEditor && (
   <div
-    className="fixed inset-0 z-[11002] bg-black/30 backdrop-blur-[2px]"
+    className="fixed inset-0 z-[550] bg-black/30 backdrop-blur-[2px]"
     onClick={() => setShowSellingUnitsEditor(false)}
     role="dialog"
     aria-modal="true"
