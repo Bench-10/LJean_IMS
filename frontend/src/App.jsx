@@ -191,7 +191,7 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
   prefiltered.forEach((rec, index) => {
     // Accept any stable identifier (numeric or string). Prefer pending_user_id, then user_id, id,
     // username or email. If none exist, generate a synthetic key so the record is preserved.
-    let rawId = rec?.pending_user_id ?? rec?.user_id ?? rec?.id ?? rec?.username ?? rec?.email ?? null;
+    let rawId = rec?.request_id ?? rec?.pending_user_id ?? rec?.user_id ?? rec?.id ?? rec?.username ?? rec?.email ?? null;
     let idKey = (rawId !== null && rawId !== undefined && String(rawId).trim() !== '') ? String(rawId) : null;
     const recStatus = normalizeStatus(rec);
 
@@ -204,8 +204,8 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
       rec?.createdAt
     ) || 0;
 
-    if (recStatus === 'rejected') {
-      idKey = `${idKey ?? 'anon'}__rejected__${candidateTime || index || Date.now()}`;
+    if (recStatus === 'rejected' || recStatus === 'cancelled') {
+      idKey = `${idKey ?? 'anon'}__${recStatus}__${candidateTime || index || Date.now()}`;
     }
 
     if (!idKey) {
@@ -358,7 +358,7 @@ function App() {
           return null;
         }
 
-        const basePendingKey = `user-${record.user_id ?? record.pending_user_id ?? record.username ?? record.email ?? (Date.parse(createdAtIso) || 0)}`;
+        const basePendingKey = `user-${record.request_id ?? record.user_id ?? record.pending_user_id ?? record.username ?? record.email ?? (Date.parse(createdAtIso) || 0)}`;
         let uniquePendingKey = basePendingKey;
         if (normalizedStatus === 'rejected' || normalizedStatus === 'cancelled') {
           const suffix = resolvedAtIso || createdAtIso || Date.now();
@@ -1600,7 +1600,21 @@ function App() {
               return request;
             });
 
-            if (matched) return dedupeUserRequestList(mapped);
+            if (matched) {
+              // Also append a history snapshot for the cancellation event so
+              // previous cancellations are preserved in the list as distinct entries.
+              const append = {
+                ...incoming,
+                status: 'cancelled',
+                request_status: 'cancelled',
+                resolution_status: incoming?.resolution_status ?? 'cancelled',
+                request_resolved_at: resolvedAt,
+                request_decision_at: decisionAt,
+                request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
+                resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
+              };
+              return dedupeUserRequestList([append, ...mapped]);
+            }
 
             // Not matched, append a fresh snapshot for the cancelled request
             const append = {
@@ -2198,6 +2212,7 @@ function App() {
         const myBranchId = Number(user?.branch_id);
 
         let changed = false;
+        const appends = [];
 
         const mapped = prev.map((request) => {
           const candidateId = Number(request?.pending_user_id ?? request?.user_id);
@@ -2210,6 +2225,19 @@ function App() {
               // For non-branch managers, remove the request by returning null (we'll filter it out below)
               return null;
             }
+            // For branch managers, create an append snapshot representing this
+            // cancellation event so the history keeps multiple entries.
+            const cancelAppend = {
+              ...request,
+              status: 'cancelled',
+              request_status: 'cancelled',
+              resolution_status: 'cancelled',
+              request_resolved_at: decisionTimestamp,
+              request_decision_at: decisionTimestamp,
+              request_rejection_reason: trimmedReason || request?.request_rejection_reason || null,
+              resolution_reason: trimmedReason || request?.resolution_reason || null
+            };
+            appends.push(cancelAppend);
 
             return {
               ...request,
@@ -2226,7 +2254,7 @@ function App() {
           return request;
         }).filter(Boolean);
 
-        return changed ? dedupeUserRequestList(mapped) : prev;
+        return changed ? dedupeUserRequestList([...appends, ...mapped]) : prev;
       });
 
       setRequestStatusRefreshKey((prev) => prev + 1);

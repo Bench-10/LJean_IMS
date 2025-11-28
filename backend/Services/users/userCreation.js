@@ -28,7 +28,7 @@ const mapUserCreationRequestRow = (row) => {
     const effectiveRoles = normalizeRoleArray(row.effective_roles);
 
     return {
-        request_id: row.pending_user_id,
+        request_id: row.request_id,
         user_id: row.pending_user_id,
         pending_user_id: row.pending_user_id,
         status: row.effective_status,
@@ -80,6 +80,7 @@ const fetchUserCreationRequestById = async (pendingUserId) => {
 
     const { rows } = await SQLquery(`
         SELECT 
+            ucr.request_id,
             ucr.pending_user_id,
             ucr.creator_user_id,
             ucr.creator_name,
@@ -911,6 +912,7 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
 
     let branchId = null;
     let cancelledUser = null;
+    let newHistoryRow = null;
 
     try {
         const { rows } = await SQLquery(`
@@ -962,10 +964,100 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
             creator_request_reason: resolvedReason ?? pendingRecord.creator_request_reason
         };
 
-        // Try to UPDATE the request record to 'cancelled' status. If the DB
-        // schema enforces a constraint that excludes 'cancelled' (some
-        // deployments use 'deleted' instead), fall back to 'deleted' while
-        // recording who performed the deletion.
+        // Create a separate history row for this cancellation so multiple
+        // cancellations are preserved as discrete events (audit/history).
+        // We'll attempt to insert with resolution_status 'cancelled' and
+        // fall back to 'deleted' if constrained.
+        try {
+            const { rows: insertRows } = await SQLquery(
+                `INSERT INTO User_Creation_Requests (
+                    pending_user_id,
+                    creator_user_id,
+                    creator_name,
+                    creator_roles,
+                    resolution_status,
+                    created_at,
+                    resolved_at,
+                    owner_resolved_by,
+                    resolution_reason,
+                    deleted_by_user_id,
+                    deleted_by_admin_id,
+                    target_branch_id,
+                    target_branch_name,
+                    target_roles,
+                    target_full_name,
+                    target_username,
+                    target_cell_number
+                ) VALUES ($1,$2,$3,$4,$5,NOW(),NOW(),$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                   RETURNING *`,
+                [
+                    null, // pending_user_id - NULL, it's a historical snapshot
+                    pendingRecord.creator_user_id ?? null,
+                    pendingRecord.creator_name ?? null,
+                    pendingRecord.creator_roles ?? null,
+                    'cancelled',
+                    null,
+                    resolvedReason,
+                    actorType === 'user' ? cancellerIdInt : null,
+                    actorType === 'admin' ? cancellerIdInt : null,
+                    pendingRecord.branch_id,
+                    pendingRecord.branch,
+                    pendingRecord.role,
+                    pendingRecord.full_name,
+                    pendingRecord.username,
+                    pendingRecord.cell_number
+                ]
+            );
+
+            newHistoryRow = insertRows[0] ?? null;
+        } catch (ie) {
+            // Fall back to 'deleted' status where 'cancelled' is not allowed
+            const isConstraintViolation = ie && (ie.code === '23514' || (ie.constraint && String(ie.constraint).includes('user_creation_requests_resolution_status_check')));
+            if (!isConstraintViolation) throw ie;
+
+            const { rows: insertRows } = await SQLquery(
+                `INSERT INTO User_Creation_Requests (
+                    pending_user_id,
+                    creator_user_id,
+                    creator_name,
+                    creator_roles,
+                    resolution_status,
+                    created_at,
+                    resolved_at,
+                    owner_resolved_by,
+                    resolution_reason,
+                    deleted_by_user_id,
+                    deleted_by_admin_id,
+                    target_branch_id,
+                    target_branch_name,
+                    target_roles,
+                    target_full_name,
+                    target_username,
+                    target_cell_number
+                ) VALUES ($1,$2,$3,$4,$5,NOW(),NOW(),$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                   RETURNING *`,
+                [
+                    null,
+                    pendingRecord.creator_user_id ?? null,
+                    pendingRecord.creator_name ?? null,
+                    pendingRecord.creator_roles ?? null,
+                    'deleted',
+                    null,
+                    resolvedReason,
+                    actorType === 'user' ? cancellerIdInt : null,
+                    actorType === 'admin' ? cancellerIdInt : null,
+                    pendingRecord.branch_id,
+                    pendingRecord.branch,
+                    pendingRecord.role,
+                    pendingRecord.full_name,
+                    pendingRecord.username,
+                    pendingRecord.cell_number
+                ]
+            );
+            newHistoryRow = insertRows[0] ?? null;
+        }
+
+        // UPDATE the main request record to indicate cancelled/deleted status
         try {
             await SQLquery(
                 `UPDATE User_Creation_Requests
@@ -1046,14 +1138,41 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
         reason: resolvedReason || 'cancelled'
     });
 
-    // Broadcast request cancellation (status: 'cancelled' signals cancellation)
-    const requestSnapshot = await fetchUserCreationRequestById(userIdInt);
+    // Broadcast request cancellation. Prefer the newly inserted history
+    // row for accurate event details; otherwise fall back to the main
+    // request snapshot.
+    let broadcastRequest = null;
+    if (newHistoryRow) {
+        // Normalize the history row into the expected shape
+        broadcastRequest = {
+            pending_user_id: userIdInt,
+            creator_user_id: newHistoryRow.creator_user_id ?? null,
+            creator_name: newHistoryRow.creator_name ?? null,
+            creator_roles: newHistoryRow.creator_roles ?? null,
+            resolution_status: newHistoryRow.resolution_status ?? null,
+            created_at: newHistoryRow.created_at ?? null,
+            resolved_at: newHistoryRow.resolved_at ?? null,
+            resolution_reason: newHistoryRow.resolution_reason ?? null,
+            deleted_by_user_id: newHistoryRow.deleted_by_user_id ?? null,
+            deleted_by_admin_id: newHistoryRow.deleted_by_admin_id ?? null,
+            target_branch_id: newHistoryRow.target_branch_id ?? null,
+            target_branch_name: newHistoryRow.target_branch_name ?? null,
+            target_roles: newHistoryRow.target_roles ?? null,
+            target_full_name: newHistoryRow.target_full_name ?? null,
+            target_username: newHistoryRow.target_username ?? null,
+            target_cell_number: newHistoryRow.target_cell_number ?? null
+        };
+    } else {
+        const requestSnapshot = await fetchUserCreationRequestById(userIdInt);
+        broadcastRequest = requestSnapshot;
+    }
+
     broadcastUserApprovalUpdate(branchId, {
         pending_user_id: userIdInt,
-        status: 'cancelled',
+        status: (broadcastRequest?.resolution_status ?? 'cancelled'),
         branch_id: branchId,
         reason: resolvedReason || null,
-        request: requestSnapshot
+        request: broadcastRequest
     });
 
     // Send targeted notification to the creator if they didn't cancel their own request
@@ -1147,7 +1266,20 @@ export const getUserCreationRequests = async (options = {}) => {
         // that store cancellations as 'deleted' to be queried when asking for
         // 'cancelled'. If the caller isn't allowed to see cancelled records,
         // then filter them out.
-        const filtered = normalized.filter(s => canSeeCancelled || s !== 'cancelled');
+        // Expand 'cancelled' to include 'deleted' where the DB uses 'deleted'
+        // for cancellation events so callers asking for 'cancelled' still get
+        // results in those deployments.
+        const expanded = [];
+        normalized.forEach((s) => {
+            if (s === 'cancelled') {
+                // include both values for broad compatibility with DBs
+                expanded.push('cancelled', 'deleted');
+            } else {
+                expanded.push(s);
+            }
+        });
+
+        const filtered = expanded.filter(s => canSeeCancelled || s !== 'cancelled');
 
         if (filtered.length === 0) {
             return [];
@@ -1188,6 +1320,7 @@ export const getUserCreationRequests = async (options = {}) => {
 
     const query = `
         SELECT 
+            ucr.request_id,
             ucr.pending_user_id,
             ucr.creator_user_id,
             ucr.creator_name,
