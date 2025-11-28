@@ -3277,6 +3277,7 @@ function App() {
                     refreshPendingRequests={fetchPendingInventoryRequests}
                     highlightPendingDirective={highlightDirective?.type === 'branch-pending' ? highlightDirective : null}
                     onHighlightConsumed={handleHighlightConsumed}
+                    onRequestChanges={handleRequestPendingChanges}
 
                   />
 

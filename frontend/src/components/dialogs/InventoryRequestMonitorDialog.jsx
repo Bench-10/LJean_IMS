@@ -10,6 +10,7 @@ import { MdRefresh } from 'react-icons/md';
 import useModalLock from '../../hooks/useModalLock';
 import CancellationReasonDialog from './CancellationReasonDialog';
 import InventoryRequestHistoryModal from '../InventoryRequestHistoryModal'; 
+import RequestChangeDialog from './RequestChangeDialog';
 
 const toneStyles = {
   slate:   { badge: 'border-slate-200 bg-slate-50 text-slate-700',   dot: 'bg-slate-500' },
@@ -1091,43 +1092,19 @@ const InventoryRequestMonitorDialog = ({
         loading={cancelDialogLoading}
       />
       {/* Change Request Dialog */}
-      {changeDialogOpen && (
-        <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/40" onClick={() => changeDialogLoading ? null : handleRequestChangeCancel()}>
-          <div className="relative w-[min(680px,95%)] rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-gray-800">Request Changes</h3>
-            <p className="text-sm text-gray-500 mt-1">Ask the requester to make changes to their pending request.</p>
-            <div className="mt-4">
-              <label className="text-xs text-gray-600">Change type</label>
-              <select
-                value={changeDialogContext.changeType}
-                onChange={(e) => setChangeDialogContext(c => ({ ...c, changeType: e.target.value }))}
-                className="mt-1 w-full rounded border p-2"
-              >
-                <option value="quantity">Quantity</option>
-                <option value="product_info">Product information</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div className="mt-4">
-              <label className="text-xs text-gray-600">Comment</label>
-              <textarea
-                value={changeDialogContext.comment}
-                onChange={(e) => setChangeDialogContext(c => ({ ...c, comment: e.target.value }))}
-                className="mt-1 w-full rounded border p-2 h-28"
-                placeholder="Tell the user what's required (e.g., update quantity, fix product name)">
-              </textarea>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button className="rounded-md border px-4 py-2 text-sm" onClick={handleRequestChangeCancel} disabled={changeDialogLoading}>Cancel</button>
-              <button
-                className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white"
-                onClick={handleRequestChangeSubmit}
-                disabled={changeDialogLoading}
-              >{changeDialogLoading ? 'Sending…' : 'Send change request'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RequestChangeDialog
+        open={changeDialogOpen}
+        onCancel={handleRequestChangeCancel}
+        onConfirm={(pendingId, changeType, comment) => {
+          // set the context then submit through existing handler
+          setChangeDialogContext({ pendingId, changeType, comment });
+          handleRequestChangeSubmit();
+        }}
+        loading={changeDialogLoading}
+        initialChangeType={changeDialogContext.changeType}
+        initialComment={changeDialogContext.comment}
+        pendingId={changeDialogContext.pendingId}
+      />
       {/* Inventory Request History Modal */}
       <InventoryRequestHistoryModal
         open={historyModalOpen}

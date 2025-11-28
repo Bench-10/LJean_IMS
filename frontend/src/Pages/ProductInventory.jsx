@@ -11,6 +11,8 @@ import ChartLoading from '../components/common/ChartLoading.jsx';
 import { FaBoxOpen } from "react-icons/fa6";
 import RejectionReasonDialog from '../components/dialogs/RejectionReasonDialog.jsx';
 import DropdownCustom from '../components/DropdownCustom';
+import InventoryRequestHistoryModal from '../components/InventoryRequestHistoryModal';
+import RequestChangeDialog from '../components/dialogs/RequestChangeDialog';
 
 function ProductInventory({
   branches,
@@ -28,6 +30,8 @@ function ProductInventory({
   refreshPendingRequests,
   highlightPendingDirective = null,
   onHighlightConsumed
+  ,
+  onRequestChanges
 }) {
   const { user } = useAuth();
   const [error, setError] = useState();
@@ -38,6 +42,11 @@ function ProductInventory({
   const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [pendingRejectId, setPendingRejectId] = useState(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedHistoryPendingId, setSelectedHistoryPendingId] = useState(null);
+  const [changeDialogOpen, setChangeDialogOpen] = useState(false);
+  const [changeDialogContext, setChangeDialogContext] = useState({ pendingId: null, changeType: 'quantity', comment: '' });
+  const [changeDialogLoading, setChangeDialogLoading] = useState(false);
 
   // Track if we already pushed a history state for the pending modal
   const hasPushedPendingModalRef = useRef(false);
@@ -102,6 +111,46 @@ function ProductInventory({
 
     setPendingRejectId(pendingId);
     setIsRejectDialogOpen(true);
+  };
+
+  const handleRequestChangesClick = async (pendingId) => {
+    // open dialog and set context
+    setChangeDialogContext({ pendingId, changeType: 'quantity', comment: '' });
+    setChangeDialogOpen(true);
+  };
+
+  const openHistoryModal = (pendingId) => {
+    setSelectedHistoryPendingId(pendingId);
+    setHistoryModalOpen(true);
+  };
+
+  const closeHistoryModal = () => {
+    setSelectedHistoryPendingId(null);
+    setHistoryModalOpen(false);
+  };
+
+  const handleChangeDialogCancel = () => {
+    if (changeDialogLoading) return;
+    setChangeDialogOpen(false);
+    setChangeDialogContext({ pendingId: null, changeType: 'quantity', comment: '' });
+  };
+
+  const handleChangeDialogConfirm = async (pendingId, changeType, comment) => {
+    if (!pendingId) return handleChangeDialogCancel();
+    setChangeDialogLoading(true);
+    try {
+      if (typeof onRequestChanges === 'function') {
+        await onRequestChanges(pendingId, changeType, comment);
+      } else {
+        console.warn('onRequestChanges handler not provided');
+      }
+      if (typeof refreshPendingRequests === 'function') await refreshPendingRequests();
+    } catch (error) {
+      console.error('Failed to request changes for pending inventory request:', error);
+    } finally {
+      setChangeDialogLoading(false);
+      handleChangeDialogCancel();
+    }
   };
 
   const handleRejectDialogCancel = () => {
@@ -503,7 +552,7 @@ function ProductInventory({
                           </div>
 
                           {/* Buttons */}
-                          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                          <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
                             <button
                               className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${
                                 isBusy(request.pending_id)
@@ -540,6 +589,25 @@ function ProductInventory({
                               ) : (
                                 'Reject'
                               )}
+                            </button>
+
+                            {/* Request Changes - visible to Branch Manager or Owner */}
+                            {(user && user.role && (user.role.includes('Branch Manager') || user.role.includes('Owner'))) && (
+                              <button
+                                className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium bg-amber-600 hover:bg-amber-500`}
+                                onClick={() => handleRequestChangesClick(request.pending_id)}
+                                disabled={isBusy(request.pending_id)}
+                              >
+                                Request changes
+                              </button>
+                            )}
+
+                            {/* Request Timeline */}
+                            <button
+                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium bg-green-600 hover:bg-green-700`}
+                              onClick={() => openHistoryModal(request.pending_id)}
+                            >
+                              Request Timeline
                             </button>
                           </div>
                         </div>
@@ -638,6 +706,22 @@ function ProductInventory({
           </div>
         </div>
       )}
+      {/* Inventory Request History Modal (Request Timeline) */}
+      <InventoryRequestHistoryModal
+        open={historyModalOpen}
+        onClose={closeHistoryModal}
+        pendingId={selectedHistoryPendingId}
+        formatDateTime={formatDateTime}
+      />
+      <RequestChangeDialog
+        open={changeDialogOpen}
+        onCancel={handleChangeDialogCancel}
+        onConfirm={handleChangeDialogConfirm}
+        loading={changeDialogLoading}
+        initialChangeType={changeDialogContext.changeType}
+        initialComment={changeDialogContext.comment}
+        pendingId={changeDialogContext.pendingId}
+      />
       {/* ===================== /PENDING REQUESTS MODAL END ===================== */}
 
       {/* SEARCH + FILTERS + ACTIONS */}
