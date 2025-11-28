@@ -283,7 +283,11 @@ const InventoryRequestMonitorDialog = ({
     if (!Array.isArray(userRequests)) return [];
     return userRequests.map((record) => {
       const rawStatus = String(record?.request_status || record?.status || '').toLowerCase();
-      const normalizedStatus = rawStatus === 'active' ? 'approved' : rawStatus;
+      const normalizedStatus = (() => {
+        if (rawStatus === 'active') return 'approved';
+        if (rawStatus === 'deleted') return 'cancelled';
+        return rawStatus;
+      })();
       if (!['pending', 'approved', 'rejected', 'cancelled'].includes(normalizedStatus)) return null;
 
       const branchName    = record?.branch || findBranchName(branches, record?.branch_id) || null;
@@ -363,7 +367,8 @@ const InventoryRequestMonitorDialog = ({
         normalized_status: normalizedStatus,
         decision_at: decisionAtIso,
         rejection_reason: normalizedStatus === 'rejected' ? resolutionReason : null,
-        cancellation_reason: normalizedStatus === 'cancelled' ? resolutionReason : null
+        cancellation_reason: normalizedStatus === 'cancelled' ? resolutionReason : null,
+        cancelled_by_id: record?.deleted_by_user_id ?? record?.deleted_by_admin_id ?? null
       };
     }).filter(Boolean);
   }, [userRequests, branches]);
@@ -430,10 +435,11 @@ const InventoryRequestMonitorDialog = ({
       const code = req.status_detail?.code;
       if (!code) return false;
 
-      // Owner: show only final decisions (approved/rejected/cancelled) and changes_requested to avoid clutter but allow tracking
+      // Owner: show only final decisions (approved/rejected) and changes_requested to avoid clutter but allow tracking.
+      // NOTE: Owners should NOT see cancellations created by branch managers.
       // BUT allow pending requests when explicitly viewing "pending" status
       if (isOwnerUser && statusFilter !== 'pending') {
-        if (req.kind === 'user') return ['approved', 'rejected', 'cancelled'].includes(req.normalized_status);
+        if (req.kind === 'user') return ['approved', 'rejected'].includes(req.normalized_status);
         return ['approved', 'rejected', 'cancelled', 'changes_requested'].includes(code);
       }
 

@@ -383,6 +383,8 @@ function App() {
           branch_name: record?.branch_name ?? record?.branch ?? null,
           full_name: record?.full_name ?? record?.target_full_name ?? record?.username ?? 'User account',
           role: normalizedRoles
+          ,
+          cancelled_by_id: record?.deleted_by_user_id ?? record?.deleted_by_admin_id ?? null
         };
       })
       .filter((record) => {
@@ -1540,10 +1542,87 @@ function App() {
           });
         }
       }
+      // Derive the resolved/decision timestamps and reason payload for
+      // use by status handlers. We compute these early so 'cancelled' branch
+      // (and others) can reference them safely.
+      const resolvedAt = incoming?.request_resolved_at
+        ?? incoming?.resolved_at
+        ?? payload.resolved_at
+        ?? (nextStatus && nextStatus !== 'pending' ? new Date().toISOString() : null);
+      const decisionAt = incoming?.request_decision_at ?? resolvedAt;
+      const reasonPayload = payload.reason ?? payload.resolution_reason;
+
       // If a request was cancelled, remove it from local state immediately so
       // Owners' approval list doesn't show a cancelled request (prevents
       // approving a request that was cancelled by a manager).
       if (nextStatus === 'cancelled') {
+        // Decide whether we should keep the cancelled request visible for the
+        // current client. Only branch managers for the matching branch may see
+        // the cancelled user creation requests.
+        const isBranchManager = Array.isArray(userRoles) && userRoles.includes('Branch Manager');
+        const myBranchId = Number(user?.branch_id);
+        const eventBranchId = Number(payload.branch_id ?? incoming?.target_branch_id ?? incoming?.branch_id ?? incoming?.effective_branch_id ?? null);
+
+        if (isBranchManager && Number.isFinite(myBranchId) && Number.isFinite(eventBranchId) && myBranchId === eventBranchId) {
+          // Branch managers should see the cancelled request — update or append it
+          setUserCreationRequests((prev) => {
+            if (!Array.isArray(prev) || prev.length === 0) {
+              if (!incoming) return prev;
+              const normalizedStatus = nextStatus ?? 'pending';
+              return dedupeUserRequestList([{
+                ...incoming,
+                status: normalizedStatus,
+                request_status: normalizedStatus,
+                resolution_status: incoming?.resolution_status ?? normalizedStatus,
+                request_resolved_at: resolvedAt,
+                request_decision_at: decisionAt,
+                request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
+                resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
+              }]);
+            }
+
+            let matched = false;
+            const mapped = prev.map((request) => {
+              const candidateId = Number(request?.pending_user_id ?? request?.user_id);
+              if (Number.isFinite(candidateId) && candidateId === targetId) {
+                matched = true;
+                const merged = { ...request };
+                if (incoming) Object.assign(merged, incoming);
+                merged.status = 'cancelled';
+                merged.request_status = 'cancelled';
+                merged.resolution_status = incoming?.resolution_status ?? 'cancelled';
+                merged.request_resolved_at = resolvedAt;
+                merged.request_decision_at = decisionAt;
+                merged.request_rejection_reason = reasonPayload || null;
+                merged.resolution_reason = reasonPayload || null;
+                return merged;
+              }
+              return request;
+            });
+
+            if (matched) return dedupeUserRequestList(mapped);
+
+            // Not matched, append a fresh snapshot for the cancelled request
+            const append = {
+              ...incoming,
+              status: 'cancelled',
+              request_status: 'cancelled',
+              resolution_status: incoming?.resolution_status ?? 'cancelled',
+              request_resolved_at: resolvedAt,
+              request_decision_at: decisionAt,
+              request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
+              resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
+            };
+            return dedupeUserRequestList([append, ...prev]);
+          });
+
+          setRequestStatusRefreshKey((prev) => prev + 1);
+          return;
+        }
+
+        // Default behavior for other roles (Owner/Admin, Inventory staff): remove
+        // cancelled entries locally so they don't show up in lists such as Owners'
+        // approval list where cancellation is irrelevant.
         setUserCreationRequests((prev) => {
           if (!Array.isArray(prev)) return prev;
           return prev.filter((request) => {
@@ -1554,16 +1633,8 @@ function App() {
 
         // bump the refresh key so any dialogs depending on it refresh
         setRequestStatusRefreshKey((prev) => prev + 1);
-        // No need to continue with the regular merge logic for cancelled
-        // events since we've removed the request locally.
         return;
       }
-      const resolvedAt = incoming?.request_resolved_at
-        ?? incoming?.resolved_at
-        ?? payload.resolved_at
-        ?? (nextStatus && nextStatus !== 'pending' ? new Date().toISOString() : null);
-      const decisionAt = incoming?.request_decision_at ?? resolvedAt;
-      const reasonPayload = payload.reason ?? payload.resolution_reason;
 
       setUserCreationRequests((prev) => {
         if (!Array.isArray(prev) || prev.length === 0) {
@@ -2122,12 +2193,24 @@ function App() {
       setUserCreationRequests((prev) => {
         if (!Array.isArray(prev)) return prev;
 
+        // Determine if the current client is a branch manager of the request's branch
+        const isBranchManager = Array.isArray(userRoles) && userRoles.includes('Branch Manager');
+        const myBranchId = Number(user?.branch_id);
+
         let changed = false;
 
         const mapped = prev.map((request) => {
           const candidateId = Number(request?.pending_user_id ?? request?.user_id);
           if (Number.isFinite(targetId) && Number.isFinite(candidateId) && candidateId === targetId) {
             changed = true;
+            const requestBranch = Number(request?.branch_id ?? request?.current_branch_id ?? null);
+            const shouldKeep = isBranchManager && Number.isFinite(myBranchId) && Number.isFinite(requestBranch) && myBranchId === requestBranch;
+
+            if (!shouldKeep) {
+              // For non-branch managers, remove the request by returning null (we'll filter it out below)
+              return null;
+            }
+
             return {
               ...request,
               status: 'cancelled',
@@ -2141,7 +2224,7 @@ function App() {
             };
           }
           return request;
-        });
+        }).filter(Boolean);
 
         return changed ? dedupeUserRequestList(mapped) : prev;
       });

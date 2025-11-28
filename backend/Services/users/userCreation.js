@@ -43,6 +43,8 @@ const mapUserCreationRequestRow = (row) => {
         request_rejection_reason: row.resolution_reason,
         resolution_reason: row.resolution_reason,
         deleted_at: row.deleted_at,
+        deleted_by_user_id: row.deleted_by_user_id,
+        deleted_by_admin_id: row.deleted_by_admin_id,
         created_by_id: row.creator_user_id,
         created_by: row.creator_user_id ?? row.creator_name,
         created_by_name: row.creator_name,
@@ -960,30 +962,72 @@ export const cancelPendingUserRequest = async (userId, cancellerId, options = {}
             creator_request_reason: resolvedReason ?? pendingRecord.creator_request_reason
         };
 
-        // UPDATE the request record to 'cancelled' status instead of deleting it
-        await SQLquery(
-            `UPDATE User_Creation_Requests
-             SET resolution_status = 'cancelled',
-                 resolved_at = NOW(),
-                 resolution_reason = COALESCE($2, resolution_reason),
-                 target_branch_id = COALESCE(target_branch_id, $3),
-                 target_branch_name = COALESCE(target_branch_name, $4),
-                 target_roles = COALESCE(target_roles, $5),
-                 target_full_name = COALESCE(target_full_name, $6),
-                 target_username = COALESCE(target_username, $7),
-                 target_cell_number = COALESCE(target_cell_number, $8)
-             WHERE pending_user_id = $1`,
-            [
-                userIdInt,
-                resolvedReason,
-                pendingRecord.branch_id,
-                pendingRecord.branch,
-                pendingRecord.role,
-                pendingRecord.full_name,
-                pendingRecord.username,
-                pendingRecord.cell_number
-            ]
-        );
+        // Try to UPDATE the request record to 'cancelled' status. If the DB
+        // schema enforces a constraint that excludes 'cancelled' (some
+        // deployments use 'deleted' instead), fall back to 'deleted' while
+        // recording who performed the deletion.
+        try {
+            await SQLquery(
+                `UPDATE User_Creation_Requests
+                 SET resolution_status = 'cancelled',
+                     resolved_at = NOW(),
+                     resolution_reason = COALESCE($2, resolution_reason),
+                     target_branch_id = COALESCE(target_branch_id, $3),
+                     target_branch_name = COALESCE(target_branch_name, $4),
+                     target_roles = COALESCE(target_roles, $5),
+                     target_full_name = COALESCE(target_full_name, $6),
+                     target_username = COALESCE(target_username, $7),
+                     target_cell_number = COALESCE(target_cell_number, $8),
+                     deleted_by_user_id = COALESCE(deleted_by_user_id, $9),
+                     deleted_by_admin_id = COALESCE(deleted_by_admin_id, $10)
+                 WHERE pending_user_id = $1`,
+                [
+                    userIdInt,
+                    resolvedReason,
+                    pendingRecord.branch_id,
+                    pendingRecord.branch,
+                    pendingRecord.role,
+                    pendingRecord.full_name,
+                    pendingRecord.username,
+                    pendingRecord.cell_number,
+                    actorType === 'user' ? cancellerIdInt : null,
+                    actorType === 'admin' ? cancellerIdInt : null
+                ]
+            );
+        } catch (e) {
+            // If the DB rejects 'cancelled' via a constraint (e.g., 23514),
+            // use 'deleted' instead and ensure deleted_by_* fields are set.
+            const isConstraintViolation = e && (e.code === '23514' || (e.constraint && String(e.constraint).includes('user_creation_requests_resolution_status_check')));
+            if (!isConstraintViolation) throw e;
+
+            await SQLquery(
+                `UPDATE User_Creation_Requests
+                 SET resolution_status = 'deleted',
+                     resolved_at = NOW(),
+                     resolution_reason = COALESCE($2, resolution_reason),
+                     target_branch_id = COALESCE(target_branch_id, $3),
+                     target_branch_name = COALESCE(target_branch_name, $4),
+                     target_roles = COALESCE(target_roles, $5),
+                     target_full_name = COALESCE(target_full_name, $6),
+                     target_username = COALESCE(target_username, $7),
+                     target_cell_number = COALESCE(target_cell_number, $8),
+                     deleted_by_user_id = COALESCE(deleted_by_user_id, $9),
+                     deleted_by_admin_id = COALESCE(deleted_by_admin_id, $10)
+                 WHERE pending_user_id = $1`,
+                [
+                    userIdInt,
+                    resolvedReason,
+                    pendingRecord.branch_id,
+                    pendingRecord.branch,
+                    pendingRecord.role,
+                    pendingRecord.full_name,
+                    pendingRecord.username,
+                    pendingRecord.cell_number,
+                    actorType === 'user' ? cancellerIdInt : null,
+                    actorType === 'admin' ? cancellerIdInt : null
+                ]
+            );
+        }
 
         // DELETE the user from Users and Login_Credentials
         await SQLquery('DELETE FROM Login_Credentials WHERE user_id = $1', [userIdInt]);
@@ -1093,10 +1137,45 @@ export const getUserCreationRequests = async (options = {}) => {
         const normalized = statuses
             .map(status => String(status || '').toLowerCase())
             .filter(Boolean);
+        // If the caller provided explicit statuses, respect the list but
+        // * Do NOT include cancelled entries unless the scope is 'branch'.
+        // * If the resulting set of statuses is empty, return an empty result
+        //   rather than falling back to returning everything.
+        const canSeeCancelled = resolvedScope === 'branch';
+        // Expand the 'cancelled' status into both 'cancelled' and 'deleted' in
+        // DB when the scope can see cancelled requests. This allows older DBs
+        // that store cancellations as 'deleted' to be queried when asking for
+        // 'cancelled'. If the caller isn't allowed to see cancelled records,
+        // then filter them out.
+        const filtered = normalized.filter(s => canSeeCancelled || s !== 'cancelled');
 
-        if (normalized.length > 0) {
-            filters.push(`LOWER(ucr.resolution_status) = ANY($${paramIndex++})`);
-            params.push(normalized);
+        if (filtered.length === 0) {
+            return [];
+        }
+
+        // Translate statuses for DB: map 'cancelled' -> ['cancelled','deleted'] when allowed.
+        const dbStatuses = [];
+        for (const s of filtered) {
+            if (s === 'cancelled') {
+                dbStatuses.push('cancelled');
+                dbStatuses.push('deleted');
+            } else {
+                dbStatuses.push(s);
+            }
+        }
+
+        filters.push(`LOWER(ucr.resolution_status) = ANY($${paramIndex++})`);
+        params.push(dbStatuses);
+    }
+    else {
+        // No explicit status filter provided: exclude cancelled requests unless
+        // the consumer is fetching as a branch manager (scope === 'branch').
+        if (resolvedScope !== 'branch') {
+            // Exclude 'cancelled' if present as explicit status, but also hide
+            // records where resolution_status = 'deleted' and deleted_by_user_id is set
+            // since these are cancellations by branch managers (not admin deletions).
+            filters.push(`LOWER(ucr.resolution_status) != 'cancelled'`);
+            filters.push(`NOT (LOWER(ucr.resolution_status) = 'deleted' AND ucr.deleted_by_user_id IS NOT NULL)`);
         }
     }
 
