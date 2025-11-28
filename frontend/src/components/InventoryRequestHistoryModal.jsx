@@ -278,6 +278,27 @@ function InventoryRequestHistoryModal({
                     </div>
                   )}
 
+                  {/* Additional data for rejected actions */}
+                  {entry.additional_data && entry.action_type === "rejected" && (() => {
+                    try {
+                      const parsed = typeof entry.additional_data === 'string'
+                        ? JSON.parse(entry.additional_data)
+                        : entry.additional_data;
+
+                      if (parsed.rejection_reason && parsed.rejection_reason.trim() !== "") {
+                        return (
+                          <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                            <h4 className="text-sm font-medium text-red-800 mb-2">Rejection Reason:</h4>
+                            <div className="text-red-900 text-sm">{parsed.rejection_reason}</div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    } catch (e) {
+                      return null;
+                    }
+                  })()}
+
                   {/* Additional data for other actions (skip if we've already shown structured details) */}
                   {entry.additional_data && (() => {
                     try {
@@ -286,7 +307,11 @@ function InventoryRequestHistoryModal({
                         : entry.additional_data;
 
                       const hasStructuredFields = parsed && (
-                        parsed.comment || parsed.change_request_comment || parsed.change_type || parsed.cancellation_reason
+                        parsed.comment || 
+                        parsed.change_request_comment || 
+                        parsed.change_type || 
+                        parsed.cancellation_reason !== undefined ||
+                        parsed.rejection_reason !== undefined
                       );
 
                       // If this payload has structured fields (we already rendered them above), don't render raw JSON again

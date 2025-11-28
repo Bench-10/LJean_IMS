@@ -723,7 +723,7 @@ function Approvals({
                 className="w-full px-4 py-2 text-sm rounded-md bg-emerald-700 text-white font-medium transition hover:bg-emerald-600"
                 onClick={onOpenRequestMonitor}
               >
-                View request status
+                Request History
               </button>
             </div>
           )}

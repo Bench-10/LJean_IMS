@@ -924,21 +924,11 @@ const InventoryRequestMonitorDialog = ({
                           <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
                           {statusLabel}
                         </span>
-                          {canCancelInventory && (
-                          <button
-                            type="button"
-                            className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            onClick={() => handleCancelInventory(request.pending_id)}
-                            disabled={isCancelling}
-                          >
-                            {isCancelling ? 'Cancelling…' : 'Cancel'}
-                          </button>
-                          )}
                           {/* Manager/Owner: Request Changes button */}
                           {(isBranchManager || isOwnerUser) && (request.status_detail?.code === 'pending' || request.status_detail?.code === 'pending_manager' || request.status_detail?.code === 'pending_admin') && (
                             <button
                               type="button"
-                              className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
                               onClick={() => { console.log('Request changes clicked for', request.pending_id); handleRequestChangeOpen(request.pending_id); }}
                             >
                               Request changes
@@ -948,7 +938,7 @@ const InventoryRequestMonitorDialog = ({
                           {currentUserId !== null && request.created_by && Number(currentUserId) === Number(request.created_by) && request.status_detail?.code === 'changes_requested' && (
                             <button
                               type="button"
-                              className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100"
+                              className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-700"
                               onClick={() => {
                                 // Ask parent to open appropriate edit modal based on change_request_type, passing the pending id
                                 const changeType = (request.payload?.change_request_type || request.change_request_type || request.payload?.change_type || null);
@@ -964,7 +954,7 @@ const InventoryRequestMonitorDialog = ({
                           {/* View Changes button for all inventory requests */}
                           <button
                             type="button"
-                            className="rounded-md border border-blue-300 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
+                            className="rounded-lg bg-green-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-green-700"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -973,6 +963,17 @@ const InventoryRequestMonitorDialog = ({
                           >
                             Request Timeline
                           </button>
+                          {/* Cancel button - moved to far right */}
+                          {canCancelInventory && (
+                          <button
+                            type="button"
+                            className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={() => handleCancelInventory(request.pending_id)}
+                            disabled={isCancelling}
+                          >
+                            {isCancelling ? 'Cancelling…' : 'Cancel'}
+                          </button>
+                          )}
                       </div>
                     </div>
 
