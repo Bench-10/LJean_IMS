@@ -247,7 +247,75 @@ const dedupeUserRequestList = (records, statusFilter = null) => {
   });
 
   // 4) Return deduplicated list, preserving insertion order
-  return Array.from(byId.values());
+  // Now run an additional cleanup pass: if we have both 'server' entries
+  // (rows with numeric request_id) and 'local' placeholders (no request_id)
+  // for the same pending_user_id and very-close timestamps, prefer the
+  // server entry and remove the local one to avoid immediate duplicate
+  // visual entries caused by optimistic updates + server broadcasts.
+  const deduped = Array.from(byId.values());
+
+  const groupByPendingId = new Map();
+  const getIdentityKey = (rec) => String(rec?.request_id ?? rec?.pending_user_id ?? rec?.user_id ?? rec?.username ?? rec?.target_username ?? rec?.email ?? 'anon');
+  deduped.forEach((rec) => {
+    const pid = getIdentityKey(rec);
+    if (!groupByPendingId.has(pid)) groupByPendingId.set(pid, []);
+    groupByPendingId.get(pid).push(rec);
+  });
+
+  const isNumericRequestId = (r) => Number.isFinite(Number(r?.request_id));
+  const timeOf = (r) => {
+    const t = r?.request_resolved_at ?? r?.request_decision_at ?? r?.request_created_at ?? r?.created_at ?? null;
+    return t ? Date.parse(t) : NaN;
+  };
+  const TIMESTAMP_THRESHOLD_MS = 5000; // 5s
+
+  const cleaned = [];
+  for (const [pid, records] of groupByPendingId.entries()) {
+    // If we have any server-sourced records, use those and eliminate local
+    // placeholder records that appear to be the same event (time proximity)
+    const serverRecords = records.filter(isNumericRequestId);
+    if (serverRecords.length > 0) {
+      // Keep all serverRecords; remove local ones that match by time and status
+      // But remove the 'current' main request row when a newly inserted
+      // history row exists so we don't show a duplicate Cancelled entry.
+      // Identify any historyRows (server-provided rows with no pending_user_id)
+      const historyRows = serverRecords.filter((s) => (s?.pending_user_id === null || s?.pending_user_id === undefined) && (String((s?.request_status ?? s?.status ?? '')).toLowerCase() === 'cancelled'));
+      let keepRecords = serverRecords;
+      if (historyRows.length > 0) {
+        // If any history rows exist for cancellations, prefer them over main
+        // records and remove main request rows that are cancelled to avoid
+        // duplicate representation in the 'Cancelled' list.
+        keepRecords = serverRecords.filter((s) => {
+          if (!s?.pending_user_id) return true; // keep history rows
+          const sStatus = String((s?.request_status ?? s?.status ?? '')).toLowerCase();
+          // Remove main rows that are cancelled (they are replaced by history rows)
+          if (sStatus === 'cancelled') return false;
+          return true;
+        });
+      }
+      cleaned.push(...keepRecords);
+      for (const r of records) {
+        if (isNumericRequestId(r)) continue;
+        const sameStatusAsAnyServer = serverRecords.some((s) => {
+          const sameStatus = String((s?.request_status ?? s?.status ?? '') || '').toLowerCase() === String((r?.request_status ?? r?.status ?? '') || '').toLowerCase();
+          return sameStatus;
+        });
+        // If any server record exists for this pending id with same status,
+        // we consider the local placeholder redundant and skip it. Otherwise
+        // keep the placeholder.
+        if (!sameStatusAsAnyServer) cleaned.push(r);
+      }
+    } else {
+      // No server records for this subject; keep all local ones
+      cleaned.push(...records);
+    }
+  }
+
+  // Preserve original insertion order of cleaned records by filtering deduped
+  const orderSet = new Set(cleaned.map((r) => String(r?.request_id ?? r?.pending_id ?? r?.pending_user_id ?? r?.user_id ?? JSON.stringify(r))));
+  const final = deduped.filter((r) => orderSet.has(String(r?.request_id ?? r?.pending_id ?? r?.pending_user_id ?? r?.user_id ?? JSON.stringify(r))));
+
+  return final;
 };
 
 
@@ -475,6 +543,69 @@ function App() {
 
   // Socket connection
   const [socket, setSocket] = useState(null);
+  // In-memory recent event signature map to prevent duplicate processing
+  // caused by optimistic updates + server broadcast races or duplicate emits.
+  const recentEventSignaturesRef = useRef(new Map());
+  const EVENT_DEDUPE_WINDOW_MS = 7000; // 7 seconds window to ignore exact duplicates
+  // Relaxed signature map to collapse semantically-identical events that differ
+  // only by actor/time fields (e.g., two cancellation snapshots with different
+  // 'creator_name' values). This helps avoid duplicate Cancelled cards where
+  // the server emits slightly different snapshots for the same logical event.
+  const recentSimpleEventSignaturesRef = useRef(new Map());
+
+  const makeEventSignature = (eventName, payload) => {
+    try {
+      const request = payload?.request ?? payload;
+      const id = request?.request_id ?? payload?.request_id ?? request?.pending_user_id ?? request?.user_id ?? payload?.pending_user_id ?? payload?.user_id ?? '';
+      const status = (payload?.status ?? request?.request_status ?? request?.status ?? '').toString().toLowerCase();
+      const who = request?.deleted_by_user_id ?? request?.deleted_by_admin_id ?? payload?.deleted_by_user_id ?? payload?.deleted_by_admin_id ?? '';
+      const time = request?.request_resolved_at ?? request?.request_decision_at ?? payload?.resolved_at ?? payload?.timestamp ?? request?.created_at ?? '';
+      return `${eventName}::${String(id)}::${status}::${String(who)}::${String(time)}`;
+    } catch (e) {
+      try { return `${eventName}::${JSON.stringify(payload)}`; } catch (err) { return `${eventName}::unknown`; }
+    }
+  };
+
+  const isDuplicateEvent = (signature) => {
+    // Backwards-compatible single-arg call: if a string is provided,
+    // treat it as the exact signature and also compute a relaxed key.
+    let simpleSig = null;
+    if (typeof signature === 'string' && signature.includes('::')) {
+      // derive a simple signature by taking the first three components
+      const parts = String(signature).split('::');
+      if (parts.length >= 3) simpleSig = `${parts[0]}::${parts[1]}::${parts[2]}`;
+    }
+    if (!signature) return false;
+    const now = Date.now();
+    const map = recentEventSignaturesRef.current || new Map();
+    const prev = map.get(signature);
+    if (prev && (now - prev) < EVENT_DEDUPE_WINDOW_MS) {
+      return true;
+    }
+    map.set(signature, now);
+    // light pruning to keep map small
+    for (const [k, v] of map.entries()) {
+      if (now - v > EVENT_DEDUPE_WINDOW_MS * 4) map.delete(k);
+    }
+    recentEventSignaturesRef.current = map;
+    // Also check/set the relaxed signature map
+    try {
+      const simpleMap = recentSimpleEventSignaturesRef.current || new Map();
+      if (simpleSig) {
+        const prevSimple = simpleMap.get(simpleSig);
+        if (prevSimple && (now - prevSimple) < EVENT_DEDUPE_WINDOW_MS) {
+          // If a relaxed match exists within the window we consider this a duplicate
+          return true;
+        }
+        simpleMap.set(simpleSig, now);
+        for (const [k, v] of simpleMap.entries()) {
+          if (now - v > EVENT_DEDUPE_WINDOW_MS * 4) simpleMap.delete(k);
+        }
+        recentSimpleEventSignaturesRef.current = simpleMap;
+      }
+    } catch (e) { /* ignore relaxed dedupe errors */ }
+    return false;
+  };
 
   const {user, logout} = useAuth();
   const navigate = useNavigate();
@@ -1441,6 +1572,14 @@ function App() {
       if (!payload || !payload.request) return;
       if (!canAccessUserRequestFeed) return;
 
+      try {
+        const sig = makeEventSignature('user-approval-request', payload);
+        if (isDuplicateEvent(sig)) {
+          console.log('[App.jsx] Ignored duplicate socket event', sig);
+          return;
+        }
+      } catch (e) { /* ignore signature failures */ }
+
       const incoming = payload.request;
       const targetId = Number(incoming?.pending_user_id ?? incoming?.user_id);
 
@@ -1505,6 +1644,14 @@ function App() {
     newSocket.on('user-approval-updated', (payload) => {
       if (!payload) return;
       if (!canAccessUserRequestFeed) return;
+
+      try {
+        const sig = makeEventSignature('user-approval-updated', payload);
+        if (isDuplicateEvent(sig)) {
+          console.log('[App.jsx] Ignored duplicate socket event', sig);
+          return;
+        }
+      } catch (e) { /* ignore signature failures */ }
 
       const incoming = payload.request ?? null;
       const targetId = Number(
@@ -1613,6 +1760,18 @@ function App() {
                 request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
                 resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
               };
+              // If incoming came with a server-assigned request_id, it is a
+              // canonical history row: remove the matched main request (the
+              // current pending entry) and append the server row instead.
+              if (incoming && Number.isFinite(Number(incoming?.request_id ?? null))) {
+                // Remove the main request from mapped
+                const filteredMapped = mapped.filter((r) => {
+                  const candidateId2 = Number(r?.pending_user_id ?? r?.user_id);
+                  return !(Number.isFinite(candidateId2) && candidateId2 === targetId);
+                });
+                return dedupeUserRequestList([incoming, ...filteredMapped]);
+              }
+
               return dedupeUserRequestList([append, ...mapped]);
             }
 
@@ -1627,6 +1786,9 @@ function App() {
               request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
               resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
             };
+            if (incoming && Number.isFinite(Number(incoming?.request_id ?? null))) {
+              return dedupeUserRequestList([incoming, ...prev]);
+            }
             return dedupeUserRequestList([append, ...prev]);
           });
 
@@ -2212,7 +2374,6 @@ function App() {
         const myBranchId = Number(user?.branch_id);
 
         let changed = false;
-        const appends = [];
 
         const mapped = prev.map((request) => {
           const candidateId = Number(request?.pending_user_id ?? request?.user_id);
@@ -2225,19 +2386,10 @@ function App() {
               // For non-branch managers, remove the request by returning null (we'll filter it out below)
               return null;
             }
-            // For branch managers, create an append snapshot representing this
-            // cancellation event so the history keeps multiple entries.
-            const cancelAppend = {
-              ...request,
-              status: 'cancelled',
-              request_status: 'cancelled',
-              resolution_status: 'cancelled',
-              request_resolved_at: decisionTimestamp,
-              request_decision_at: decisionTimestamp,
-              request_rejection_reason: trimmedReason || request?.request_rejection_reason || null,
-              resolution_reason: trimmedReason || request?.resolution_reason || null
-            };
-            appends.push(cancelAppend);
+            // For branch managers, keep the main request updated to 'cancelled'.
+            // Do not append a local history snapshot here; the server will
+            // broadcast the canonical history row which will be added to the
+            // list by the websocket handler. This prevents duplicate entries.
 
             return {
               ...request,
@@ -2254,7 +2406,7 @@ function App() {
           return request;
         }).filter(Boolean);
 
-        return changed ? dedupeUserRequestList([...appends, ...mapped]) : prev;
+        return changed ? dedupeUserRequestList(mapped) : prev;
       });
 
       setRequestStatusRefreshKey((prev) => prev + 1);

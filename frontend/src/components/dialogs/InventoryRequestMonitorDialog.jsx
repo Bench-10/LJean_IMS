@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { computeApprovalLabel } from '../../utils/approvalLabels';
 import api from '../../utils/api';
 import { currencyFormat } from '../../utils/formatCurrency.js';
 import ChartLoading from '../common/ChartLoading.jsx';
@@ -833,7 +834,7 @@ const InventoryRequestMonitorDialog = ({
                         <div className="flex items-center gap-2">
                           <span className={`inline-flex items-center gap-2 rounded-full  border px-3 py-1 text-sm font-semibold whitespace-nowrap ${toneClass.badge}`}>
                             <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
-                            {request.status_detail?.label || 'Pending'}
+                            {computeApprovalLabel(request, { isOwner: isOwnerUser, isBranchManager })}
                           </span>
                           {canCancelUser && (
                             <button
@@ -939,7 +940,7 @@ const InventoryRequestMonitorDialog = ({
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold whitespace-nowrap ${toneClass.badge}`}>
                           <span className={`h-2.5 w-2.5 rounded-full ${toneClass.dot}`} />
-                          {statusLabel}
+                          {computeApprovalLabel(request, { isOwner: isOwnerUser, isBranchManager })}
                         </span>
                           {/* Manager/Owner: Request Changes button */}
                           {(isBranchManager || isOwnerUser) && (request.status_detail?.code === 'pending' || request.status_detail?.code === 'pending_manager' || request.status_detail?.code === 'pending_admin') && (

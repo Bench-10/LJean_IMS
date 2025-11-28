@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../authentication/Authentication';
+import { computeApprovalLabel } from '../utils/approvalLabels';
 import { FiEdit } from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
 import { RxCross2 } from "react-icons/rx";
@@ -13,13 +14,35 @@ function UserInformation({ openUsers, userDetailes, onClose, handleUserModalOpen
   const message = `Are you sure you want to delete the account for ${userDetailes.full_name}?`;
 
   const getStatusBadge = () => {
-    if (userDetailes.status === 'pending')
-      return { label: 'For Approval', className: 'bg-amber-100 text-amber-700 border border-amber-300' };
+    // Build a lightweight request object for label computation
+    const req = {
+      kind: 'user',
+      user_status: userDetailes.status ?? userDetailes.request_status ?? null,
+      normalized_status: userDetailes.status ?? userDetailes.request_status ?? null,
+      status_detail: { code: userDetailes.status ?? userDetailes.request_status ?? null },
+      timeline: userDetailes.timeline ?? null
+    };
+
+    const roles = user && user.role ? (Array.isArray(user.role) ? user.role : [user.role]) : [];
+    const isOwner = roles.includes('Owner');
+    const isBM = roles.includes('Branch Manager');
+
+    const label = computeApprovalLabel(req, { isOwner, isBranchManager: isBM });
+
     if (userDetailes.is_disabled)
       return { label: 'Disabled', className: 'bg-red-100 text-red-700 border border-red-300' };
     if (userDetailes.is_active)
       return { label: 'Active', className: 'bg-green-100 text-green-700 border border-green-300' };
-    return { label: 'Inactive', className: 'bg-gray-100 text-gray-600 border border-gray-300' };
+
+    // Map approval labels to badge styles
+    if (label === 'For Approval') {
+      return { label, className: 'bg-amber-100 text-amber-700 border border-amber-300' };
+    }
+    if (label.startsWith('Awaiting')) {
+      return { label, className: 'bg-gray-100 text-gray-700 border border-gray-200' };
+    }
+
+    return { label: label || 'Inactive', className: 'bg-gray-100 text-gray-600 border border-gray-300' };
   };
 
   // close ONLY the confirmation dialog

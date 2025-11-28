@@ -7,6 +7,7 @@ import { useAuth } from "../authentication/Authentication";
 import RejectionReasonDialog from "../components/dialogs/RejectionReasonDialog";
 import useModalLock from "../hooks/useModalLock";
 import { useLocation, useNavigate } from "react-router-dom";
+import { computeApprovalLabel } from '../utils/approvalLabels';
 
 /* Unified button styles: identical sizes everywhere */
 const BTN_BASE =
@@ -828,7 +829,7 @@ function Approvals({
                       </td>
                       <td className="px-4 py-4 text-center align-top">
                         <span className="inline-flex items-center justify-center rounded-lg bg-amber-100 px-3 h-7 text-[13px] leading-none font-semibold text-amber-700 border border-amber-300 whitespace-nowrap">
-                          For Approval
+                          {computeApprovalLabel(pendingUser, { isOwner: ownerCanOpenRequestMonitor, isBranchManager: false })}
                         </span>
                       </td>
                       <td className="px-4 py-4 text-center align-top">
@@ -874,6 +875,14 @@ function Approvals({
                 const isHighlighted = highlightedInventoryIds.includes(
                   request.pending_id
                 );
+
+                const requestStatus = String(
+                  request?.status ?? request?.request_status ?? request?.resolution_status ?? ''
+                ).toLowerCase();
+
+                const inventoryLabel = ['pending', 'pending_manager', 'pending_admin'].includes(requestStatus)
+                  ? 'For Approval'
+                  : computeApprovalLabel(request, { isOwner: ownerCanOpenRequestMonitor, isBranchManager: false });
 
                 return (
                   <tr
@@ -944,9 +953,9 @@ function Approvals({
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center align-top">
-                      <span className="inline-flex items-center justify-center rounded-lg bg-blue-100 px-3 h-7 text-[13px] leading-none font-semibold text-blue-700 border border-blue-200 whitespace-nowrap">
-                        For Approval
-                      </span>
+                        <span className="inline-flex items-center justify-center rounded-lg bg-blue-100 px-3 h-7 text-[13px] leading-none font-semibold text-blue-700 border border-blue-200 whitespace-nowrap">
+                          {inventoryLabel}
+                        </span>
                     </td>
                     <td className="px-4 py-4 text-center align-top">
                       <div className="flex items-center justify-center gap-2">
@@ -1051,7 +1060,7 @@ function Approvals({
 
                       {/* status chip below */}
                       <span className="inline-flex items-center justify-center rounded-lg bg-amber-100 px-3 h-7 text-[13px] leading-none font-semibold text-amber-700 border-amber-300 border whitespace-nowrap">
-                        For Approval
+                        {computeApprovalLabel(pendingUser, { isOwner: ownerCanOpenRequestMonitor, isBranchManager: false })}
                       </span>
                     </div>
 
@@ -1111,6 +1120,14 @@ function Approvals({
             const request = entry.record;
             const payload = request.payload || {};
             const productData = payload.productData || payload;
+            const requestStatus = String(
+              request?.status ?? request?.request_status ?? request?.resolution_status ?? ''
+            ).toLowerCase();
+
+            const inventoryLabel = ['pending', 'pending_manager', 'pending_admin'].includes(requestStatus)
+              ? 'For Approval'
+              : computeApprovalLabel(request, { isOwner: ownerCanOpenRequestMonitor, isBranchManager: false });
+            
             const categoryLabel = payload.category_name || "—";
             const unitPrice = productData?.unit_price
               ? `₱ ${Number(productData.unit_price).toLocaleString()}`
@@ -1155,9 +1172,9 @@ function Approvals({
                     </span>
 
                     {/* status as a full-width bar */}
-                    <span className="inline-flex w-full items-center justify-center rounded-lg bg-blue-100 px-3 py-2 text-[13px] leading-none font-semibold text-blue-700 border border-blue-200 text-center">
-                      For Approval
-                    </span>
+                      <span className="inline-flex w-full items-center justify-center rounded-lg bg-blue-100 px-3 py-2 text-[13px] leading-none font-semibold text-blue-700 border border-blue-200 text-center">
+                        {inventoryLabel}
+                      </span>
                   </div>
 
                   <div className="space-y-2 text-sm border-t border-gray-200 pt-3">
