@@ -64,6 +64,7 @@ const InventoryRequestMonitorDialog = ({
   userRequests = [],
   userRequestsLoading = false,
   refreshToken = 0,
+  onRefresh = null,
   onCancelInventoryRequest,
   onCancelUserRequest,
   onRequestChanges,
@@ -167,6 +168,9 @@ const InventoryRequestMonitorDialog = ({
       setTimeout(() => setShowRefreshIndicator(false), 2000);
       
       triggerRefresh();
+      // Also notify parent to refresh user creation requests so the dialog
+      // can display user request updates immediately (rejections, cancellations)
+      if (typeof onRefresh === 'function') onRefresh();
     }
   }, [refreshToken, open, triggerRefresh]);
 
@@ -665,7 +669,7 @@ const InventoryRequestMonitorDialog = ({
                 className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Refresh"
                 title="Refresh"
-                onClick={triggerRefresh}
+                onClick={() => { triggerRefresh(); if (typeof onRefresh === 'function') onRefresh(); }}
                 disabled={loading}
               >
                 <MdRefresh className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />

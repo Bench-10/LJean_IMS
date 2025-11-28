@@ -320,17 +320,12 @@ function App() {
 
     return userCreationRequests
       .map((record) => {
-        if (!record) {
-          return null;
-        }
-
         const normalizedStatusRaw = String(record?.request_status ?? record?.status ?? 'pending').toLowerCase();
         const normalizedStatus = (() => {
           if (normalizedStatusRaw === 'active') return 'approved';
           if (normalizedStatusRaw === 'deleted') return 'cancelled';
           return normalizedStatusRaw;
         })();
-
         const createdAtIso = toIsoString(
           record?.request_created_at
             ?? record?.created_at
@@ -363,7 +358,15 @@ function App() {
           return null;
         }
 
+        const basePendingKey = `user-${record.user_id ?? record.pending_user_id ?? record.username ?? record.email ?? (Date.parse(createdAtIso) || 0)}`;
+        let uniquePendingKey = basePendingKey;
+        if (normalizedStatus === 'rejected' || normalizedStatus === 'cancelled') {
+          const suffix = resolvedAtIso || createdAtIso || Date.now();
+          uniquePendingKey = `${basePendingKey}__${normalizedStatus}__${suffix}`;
+        }
+
         return {
+          pending_id: uniquePendingKey,
           ...record,
           status: normalizedStatus,
           request_status: normalizedStatus,
@@ -1626,9 +1629,24 @@ function App() {
           return dedupeUserRequestList(mapped);
         }
 
-        // For status updates (approved/rejected), don't add new entries if no match found
-        // Only add new entries for new pending requests
+        // For status updates (approved/rejected/cancelled), if no match found
+        // append the snapshot so the change is immediately visible in filters
+        // (e.g., rejected or cancelled) rather than waiting for a full refresh.
         if (nextStatus && nextStatus !== 'pending') {
+          if (incoming) {
+            const normalizedStatus = nextStatus ?? 'pending';
+            const enriched = {
+              ...incoming,
+              status: normalizedStatus,
+              request_status: normalizedStatus,
+              resolution_status: incoming?.resolution_status ?? normalizedStatus,
+              request_resolved_at: resolvedAt,
+              request_decision_at: decisionAt,
+              request_rejection_reason: reasonPayload ?? incoming?.request_rejection_reason ?? incoming?.resolution_reason ?? null,
+              resolution_reason: reasonPayload ?? incoming?.resolution_reason ?? null
+            };
+            return dedupeUserRequestList([...mapped, enriched]);
+          }
           return dedupeUserRequestList(mapped);
         }
 
@@ -2724,6 +2742,36 @@ function App() {
       }
 
       setRequestStatusRefreshKey((prev) => prev + 1);
+
+      // Ensure the local state contains the rejected snapshot even when the
+      // request wasn't in local state previously (e.g., filtered out). This
+      // appends a minimal rejected snapshot so the Rejected filter can show
+      // the new entry immediately; we'll refresh from the server next.
+      setUserCreationRequests((prev) => {
+        if (!Array.isArray(prev)) return prev;
+        const candidateIdNum = Number(userId);
+        const exists = prev.some(r => Number(r?.pending_user_id ?? r?.user_id) === candidateIdNum || String(r?.pending_user_id ?? r?.user_id) === String(userId));
+        if (exists) return prev;
+        const snapshot = {
+          pending_user_id: candidateIdNum || null,
+          user_id: candidateIdNum || null,
+          status: 'rejected',
+          request_status: 'rejected',
+          resolution_status: 'rejected',
+          request_resolved_at: decisionTimestamp,
+          request_decision_at: decisionTimestamp,
+          request_rejection_reason: reason || null,
+          resolution_reason: reason || null,
+          created_by_id: user?.user_id ?? null,
+          created_by_name: user?.full_name ?? (user?.created_by || null),
+          branch: null,
+          branch_name: null,
+          full_name: null,
+          target_full_name: null,
+          target_username: null
+        };
+        return dedupeUserRequestList([snapshot, ...prev]);
+      });
     } catch (error) {
       console.error('Error rejecting user:', error);
       throw error;
@@ -2916,6 +2964,14 @@ function App() {
         userRequests={userRequestHistory}
         userRequestsLoading={userCreationLoading}
         refreshToken={requestStatusRefreshKey}
+        onRefresh={() => {
+          // When the request history modal triggers refresh via its own button,
+          // ask the parent to re-fetch both user and inventory request feeds so
+          // a user's rejection/cancellation is reflected immediately.
+          fetchUserCreationRequests();
+          fetchPendingInventoryRequests();
+          fetchAdminPendingInventoryRequests();
+        }}
         onCancelInventoryRequest={canOpenRequestMonitor ? handleCancelInventoryRequest : undefined}
         onCancelUserRequest={canOpenRequestMonitor ? handleCancelUserCreationRequest : undefined}
         onRequestChanges={canOpenRequestMonitor ? handleRequestPendingChanges : undefined}
