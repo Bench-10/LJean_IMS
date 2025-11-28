@@ -133,11 +133,11 @@ function InventoryRequestHistoryModal({
     if (changes.length === 0) return null;
 
     return (
-      <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
+      <div className="mt-3 p-2 sm:p-3 bg-gray-50 rounded-lg border">
         <h4 className="text-sm font-medium text-gray-700 mb-2">Changes Made:</h4>
-        <div className="space-y-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           {changes.map((change, index) => (
-            <div key={index} className="text-xs">
+            <div key={index} className="text-xs bg-white p-2 rounded border">
               <span className="font-medium">{change.field}:</span>{" "}
               <span className="text-red-600 line-through">{change.oldValue}</span>{" "}
               <span className="text-gray-400">→</span>{" "}
@@ -153,7 +153,7 @@ function InventoryRequestHistoryModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] p-2 sm:p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
@@ -163,9 +163,9 @@ function InventoryRequestHistoryModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-green-700 p-4 rounded-t-lg flex justify-between items-center gap-3 flex-shrink-0 sticky top-0 z-10">
+        <div className="bg-green-700 p-3 sm:p-4 rounded-t-lg flex justify-between items-center gap-3 flex-shrink-0 sticky top-0 z-10">
           <div className="flex flex-col gap-1">
-            <h1 className="text-white font-bold text-base lg:text-2xl flex items-center gap-2">
+            <h1 className="text-white font-bold text-lg lg:text-2xl flex items-center gap-2">
               <MdHistory className="text-xl" />
               Request History
             </h1>
@@ -185,7 +185,7 @@ function InventoryRequestHistoryModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 bg-green-50/30 hide-scrollbar">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-green-50/30 hide-scrollbar">
           {loading ? (
             <div className="py-10">
               <ChartLoading message="Loading request history..." />
@@ -202,7 +202,7 @@ function InventoryRequestHistoryModal({
               {[...history].reverse().map((entry, index) => (
                 <div
                   key={entry.id || index}
-                  className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
+                  className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm"
                 >
                   {/* Header with action and timestamp */}
                   <div className="flex items-start justify-between gap-3 mb-3">
@@ -321,10 +321,10 @@ function InventoryRequestHistoryModal({
         </div>
 
         {/* Footer */}
-        <div className="bg-white border-t border-gray-200 px-6 py-4 flex justify-end">
+        <div className="bg-white border-t border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md"
+            className="px-4 sm:px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md text-sm sm:text-base"
           >
             Close
           </button>
