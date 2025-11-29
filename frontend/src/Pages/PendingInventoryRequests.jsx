@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { MdRefresh } from 'react-icons/md';
 import { FaBoxOpen } from 'react-icons/fa6';
 import { useAuth } from '../authentication/Authentication';
@@ -36,7 +35,6 @@ function PendingInventoryRequests({
   highlightDirective = null,
   onHighlightConsumed,
 }) {
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [approvingIds, setApprovingIds] = useState(() => new Set());
@@ -304,14 +302,6 @@ function PendingInventoryRequests({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/inventory')}
-            className="flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
-          >
-            Back to Inventory
-          </button>
-
           <button
             type="button"
             onClick={() => refreshPendingRequests?.()}

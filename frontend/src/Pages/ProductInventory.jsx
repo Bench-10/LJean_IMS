@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import { TbFileExport } from "react-icons/tb";
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
@@ -17,20 +16,13 @@ function ProductInventory({
   setIsProductTransactOpen,
   sanitizeInput,
   listCategories,
-  invetoryLoading,
-  pendingRequests = []
+  invetoryLoading
 }) {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [searchItem, setSearchItem] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all'); // 'all', 'low', 'max', 'none'
-
-  const displayPendingApprovals =
-    user &&
-    user.role &&
-    user.role.some(role => ['Branch Manager'].includes(role));
 
   // NEW: DIALOG STATE
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -235,21 +227,6 @@ function ProductInventory({
             </>
           )}
 
-          {/* (Optional) Pendings */}
-          {displayPendingApprovals && (
-            <div className="col-span-2 lg:col-span-1">
-              <button
-                className="w-full lg:w-auto inline-flex items-center justify-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
-                onClick={() => navigate('/pending-inventory')}
-                aria-label="Open pending inventory requests"
-              >
-                <span className="whitespace-nowrap">Pendings</span>
-                <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-white text-amber-700 rounded-full">
-                  {pendingRequests?.length ?? 0}
-                </span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
