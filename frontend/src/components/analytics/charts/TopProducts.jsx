@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import dayjs from 'dayjs';
 import { currencyFormat } from '../../../utils/formatCurrency';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -88,10 +89,23 @@ function TopProducts({
   salesInterval, setSalesInterval, restockInterval, setRestockInterval,
   setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts,
   loadingRestockSuggestions, restockSuggestions, dateRangeDisplay, topProductsRef, salesChartRef,
+  globalStartDate, globalEndDate, salesIntervalOptions,
   onRetryTopProducts, onRetrySalesPerformance
 }) {
   const [showRestockDialog, setShowRestockDialog] = useState(false);
   const [visibleCount, setVisibleCount] = useState(INITIAL_TOP_PRODUCTS_PAGE);
+
+  const intervalOptions = useMemo(() => {
+    if (Array.isArray(salesIntervalOptions) && salesIntervalOptions.length) {
+      return salesIntervalOptions;
+    }
+    return [
+      { value: 'daily', label: 'Daily' },
+      { value: 'weekly', label: 'Weekly' },
+      { value: 'monthly', label: 'Monthly' },
+      { value: 'yearly', label: 'Yearly' }
+    ];
+  }, [salesIntervalOptions]);
 
   // NEW (debug heights)
   useEffect(() => {
@@ -164,27 +178,111 @@ function TopProducts({
     }
     : (salesPerformance ?? { history: [], forecast: [], series: [] });
 
-  const combinedSeries = Array.isArray(normalizedPerformance.series) && normalizedPerformance.series.length
-    ? normalizedPerformance.series
-    : (Array.isArray(normalizedPerformance.history)
-      ? normalizedPerformance.history.map(item => ({ ...item, is_forecast: false }))
-      : []);
+  const rawCombinedSeries = useMemo(() => {
+    if (Array.isArray(normalizedPerformance.series) && normalizedPerformance.series.length) {
+      return normalizedPerformance.series;
+    }
+    if (Array.isArray(normalizedPerformance.history)) {
+      return normalizedPerformance.history.map(item => ({ ...item, is_forecast: false }));
+    }
+    return [];
+  }, [normalizedPerformance.history, normalizedPerformance.series]);
 
-  const actualSeries = combinedSeries
-    .filter(item => item && item.is_forecast !== true)
-    .map(item => ({
-      ...item,
-      sales_amount: Number(item.sales_amount ?? item.amount ?? 0),
-      units_sold: Number(item.units_sold ?? item.value ?? 0)
-    }));
+  const rangeStart = useMemo(() => {
+    if (!globalStartDate) return null;
+    const parsed = dayjs(globalStartDate, 'YYYY-MM-DD');
+    return parsed.isValid() ? parsed.startOf('day') : null;
+  }, [globalStartDate]);
 
-  const forecastSeries = combinedSeries
-    .filter(item => item && item.is_forecast === true)
-    .map(item => ({
-      ...item,
-      sales_amount: Number(item.sales_amount ?? item.amount ?? 0),
-      units_sold: Number(item.units_sold ?? item.value ?? item.forecast ?? 0)
-    }));
+  const rangeEnd = useMemo(() => {
+    if (!globalEndDate) return null;
+    const parsed = dayjs(globalEndDate, 'YYYY-MM-DD');
+    return parsed.isValid() ? parsed.endOf('day') : null;
+  }, [globalEndDate]);
+
+  const getPeriodBounds = useCallback((period) => {
+    if (period == null) return null;
+    const value = String(period);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const date = dayjs(value, 'YYYY-MM-DD');
+      if (!date.isValid()) return null;
+      return { start: date.startOf('day'), end: date.endOf('day') };
+    }
+
+    if (/^\d{4}-\d{2}$/.test(value)) {
+      const month = dayjs(`${value}-01`, 'YYYY-MM-DD');
+      if (!month.isValid()) return null;
+      return { start: month.startOf('month'), end: month.endOf('month') };
+    }
+
+    if (/^\d{4}$/.test(value)) {
+      const year = dayjs(value, 'YYYY');
+      if (!year.isValid()) return null;
+      return { start: year.startOf('year'), end: year.endOf('year') };
+    }
+
+    const isoMatch = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) {
+      const date = dayjs(isoMatch[1], 'YYYY-MM-DD');
+      if (date.isValid()) {
+        return { start: date.startOf('day'), end: date.endOf('day') };
+      }
+    }
+
+    return null;
+  }, []);
+
+  const isWithinGlobalRange = useCallback((period) => {
+    if (!rangeStart && !rangeEnd) return true;
+    const bounds = getPeriodBounds(period);
+    if (!bounds) return true;
+    if (rangeStart && bounds.end.isBefore(rangeStart, 'day')) return false;
+    if (rangeEnd && bounds.start.isAfter(rangeEnd, 'day')) return false;
+    return true;
+  }, [getPeriodBounds, rangeEnd, rangeStart]);
+
+  // Only surface forecast data when the selected range ends today.
+  const shouldShowForecast = useMemo(() => {
+    if (!globalEndDate) return false;
+    const end = dayjs(globalEndDate, 'YYYY-MM-DD');
+    if (!end.isValid()) return false;
+    if (!Array.isArray(rawCombinedSeries) || !rawCombinedSeries.length) return false;
+    const hasForecastEntries = rawCombinedSeries.some((item) => item && item.is_forecast === true);
+    if (!hasForecastEntries) return false;
+    return end.endOf('day').isSame(dayjs().endOf('day'));
+  }, [globalEndDate, rawCombinedSeries]);
+
+  const combinedSeries = useMemo(() => {
+    if (!Array.isArray(rawCombinedSeries) || !rawCombinedSeries.length) return [];
+    return rawCombinedSeries.filter((item) => {
+      if (!item) return false;
+      if (item.is_forecast === true) {
+        return shouldShowForecast;
+      }
+      return isWithinGlobalRange(item.period);
+    });
+  }, [isWithinGlobalRange, rawCombinedSeries, shouldShowForecast]);
+
+  const actualSeries = useMemo(() => (
+    combinedSeries
+      .filter(item => item && item.is_forecast !== true)
+      .map(item => ({
+        ...item,
+        sales_amount: Number(item.sales_amount ?? item.amount ?? 0),
+        units_sold: Number(item.units_sold ?? item.value ?? 0)
+      }))
+  ), [combinedSeries]);
+
+  const forecastSeries = useMemo(() => (
+    combinedSeries
+      .filter(item => item && item.is_forecast === true)
+      .map(item => ({
+        ...item,
+        sales_amount: Number(item.sales_amount ?? item.amount ?? 0),
+        units_sold: Number(item.units_sold ?? item.value ?? item.forecast ?? 0)
+      }))
+  ), [combinedSeries]);
 
   const hasActualData = actualSeries.length > 0;
   const hasForecastData = forecastSeries.length > 0;
@@ -434,12 +532,8 @@ function TopProducts({
                 label="Interval"
                 variant="default"
                 size="xs"
-                options={[
-                  { value: 'daily', label: 'Daily' },
-                  { value: 'weekly', label: 'Weekly' },
-                  { value: 'monthly', label: 'Monthly' },
-                  { value: 'yearly', label: 'Yearly' },
-                ]}
+                options={intervalOptions}
+                disabled={intervalOptions.length <= 1}
               />
             </div>
 
@@ -591,7 +685,7 @@ function TopProducts({
 
                     <Legend wrapperStyle={{ fontSize: '10px' }} />
 
-                    {lastActualPeriod && (
+                    {hasForecastData && lastActualPeriod && (
                       <ReferenceLine
                         x={lastActualPeriod}
                         stroke="#94a3b8"
@@ -626,7 +720,9 @@ function TopProducts({
                     )}
 
                     <Area type="monotone" dataKey="actual_units" name="Actual Units" stroke="#0891b2" fillOpacity={1} fill="url(#colorUnits)" connectNulls={false} />
-                    <Line type="monotone" dataKey="forecast_units" name="Forecast Units" stroke="#f97316" strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls={false} />
+                    {hasForecastData && (
+                      <Line type="monotone" dataKey="forecast_units" name="Forecast Units" stroke="#f97316" strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls={false} />
+                    )}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>

@@ -522,6 +522,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const [deliveryData, setDeliveryData] = useState([]);
   const [deliveryOldestCursor, setDeliveryOldestCursor] = useState(0);
   const [deliveryMeta, setDeliveryMeta] = useState(() => ({ ...DELIVERY_META_DEFAULT }));
+  const [dataBounds, setDataBounds] = useState({ min: null, max: null });
 
   const dateRangeDisplay = useMemo(() => {
     if (rangeMode !== 'preset') return null;
@@ -627,6 +628,70 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     }
   }, [categoryFilter, currentCharts, deliveryInterval, deliveryStatus, endDate, preset, rangeMode, restockInterval, salesInterval, startDate, storageKey, productIdFilter]);
 
+  const normalizeCandidateDate = useCallback((candidate) => {
+    if (candidate === null || candidate === undefined) return null;
+    if (candidate instanceof Date) {
+      const parsed = dayjs(candidate);
+      return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null;
+    }
+    const raw = String(candidate).trim();
+    if (!raw) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const parsed = dayjs(raw, 'YYYY-MM-DD', true);
+      return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null;
+    }
+    if (/^\d{4}-\d{2}$/.test(raw)) {
+      const parsed = dayjs(`${raw}-01`, 'YYYY-MM-DD', true);
+      return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null;
+    }
+    if (/^\d{4}$/.test(raw)) {
+      const parsed = dayjs(raw, 'YYYY', true);
+      return parsed.isValid() ? parsed.startOf('year').format('YYYY-MM-DD') : null;
+    }
+    const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) {
+      const parsed = dayjs(isoMatch[1], 'YYYY-MM-DD', true);
+      return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null;
+    }
+    return null;
+  }, []);
+
+  const registerDataBounds = useCallback((candidates) => {
+    const values = Array.isArray(candidates) ? candidates : [candidates];
+    if (!values.length) return;
+    setDataBounds((prev) => {
+      let nextMin = prev.min;
+      let nextMax = prev.max;
+      let changed = false;
+      values.forEach((value) => {
+        const iso = normalizeCandidateDate(value);
+        if (!iso) return;
+        if (!nextMin || iso < nextMin) {
+          nextMin = iso;
+          changed = true;
+        }
+        if (!nextMax || iso > nextMax) {
+          nextMax = iso;
+          changed = true;
+        }
+      });
+      if (!changed) return prev;
+      return { min: nextMin, max: nextMax };
+    });
+  }, [normalizeCandidateDate]);
+
+  const registerSalesBounds = useCallback((payload) => {
+    if (!payload) return;
+    const periods = [];
+    if (Array.isArray(payload.history)) {
+      payload.history.forEach((item) => periods.push(item?.period));
+    }
+    if (Array.isArray(payload.series)) {
+      payload.series.forEach((item) => periods.push(item?.period));
+    }
+    registerDataBounds(periods);
+  }, [registerDataBounds]);
+
   const resolvedRange = useMemo(() => {
     if (rangeMode === 'preset') {
       const today = dayjs().startOf('day');
@@ -661,8 +726,67 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       // fallback returns to today single-day window
       return { start_date: start.format('YYYY-MM-DD'), end_date: today.format('YYYY-MM-DD'), presetKey: preset };
     }
-    return { start_date: startDate, end_date: endDate, presetKey: 'custom' };
-  }, [rangeMode, preset, startDate, endDate]);
+    const fallbackStart = startDate && String(startDate).trim()
+      ? startDate
+      : (dataBounds.min || monthStartISO);
+    const fallbackEnd = endDate && String(endDate).trim()
+      ? endDate
+      : todayISO;
+
+    let normalizedStart = normalizeCandidateDate(fallbackStart) || monthStartISO;
+    let normalizedEnd = normalizeCandidateDate(fallbackEnd) || todayISO;
+
+    const startMoment = dayjs(normalizedStart, 'YYYY-MM-DD', true);
+    const endMoment = dayjs(normalizedEnd, 'YYYY-MM-DD', true);
+    if (startMoment.isValid() && endMoment.isValid() && startMoment.isAfter(endMoment)) {
+      normalizedStart = normalizedEnd;
+    }
+
+    return { start_date: normalizedStart, end_date: normalizedEnd, presetKey: 'custom' };
+  }, [dataBounds.min, endDate, monthStartISO, normalizeCandidateDate, preset, rangeMode, startDate, todayISO]);
+
+  const salesIntervalOptions = useMemo(() => {
+    const defaults = [
+      { value: 'daily', label: 'Daily' },
+      { value: 'weekly', label: 'Weekly' }
+    ];
+
+    const start = resolvedRange.start_date ? dayjs(resolvedRange.start_date, 'YYYY-MM-DD').startOf('day') : null;
+    const end = resolvedRange.end_date ? dayjs(resolvedRange.end_date, 'YYYY-MM-DD').endOf('day') : null;
+
+    if (!start || !end || end.isBefore(start)) {
+      return [
+        ...defaults,
+        { value: 'monthly', label: 'Monthly' },
+        { value: 'yearly', label: 'Yearly' }
+      ];
+    }
+
+    const today = dayjs();
+    const withinCurrentMonth = start.isSame(today, 'month') && end.isSame(today, 'month');
+    const spanDays = end.diff(start, 'day') + 1;
+    const crossesMonth = !start.isSame(end, 'month');
+    const crossesYear = !start.isSame(end, 'year');
+
+    const options = [...defaults];
+
+    if (!withinCurrentMonth && (crossesMonth || spanDays >= 28)) {
+      options.push({ value: 'monthly', label: 'Monthly' });
+    }
+
+    if (!withinCurrentMonth && (crossesYear || spanDays >= 365)) {
+      options.push({ value: 'yearly', label: 'Yearly' });
+    }
+
+    return options;
+  }, [resolvedRange.end_date, resolvedRange.start_date]);
+
+  useEffect(() => {
+    if (!salesIntervalOptions.length) return;
+    if (!salesIntervalOptions.some((option) => option.value === salesInterval)) {
+      setSalesInterval(salesIntervalOptions[0].value);
+    }
+  }, [salesIntervalOptions, salesInterval, setSalesInterval]);
 
   const [allBranches, setAllBranches] = useState([]);
 
@@ -878,6 +1002,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     setDeliveryData([]);
     setDeliveryOldestCursor(0);
     setDeliveryMeta({ ...DELIVERY_META_DEFAULT });
+    setDataBounds({ min: null, max: null });
     deliveryRequestIdRef.current = 0;
     setLoadingSalesPerformance(false);
     setLoadingTopProducts(false);
@@ -895,7 +1020,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
 
   const fetchSalesPerformance = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
-    const params = { interval: salesInterval };
+    const params = {
+      interval: salesInterval,
+      start_date: resolvedRange.start_date,
+      end_date: resolvedRange.end_date
+    };
     if (branchId) params.branch_id = branchId;
     if (categoryFilter) params.category_id = categoryFilter;
     if (productIdFilter) params.product_id = productIdFilter;
@@ -903,11 +1032,15 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       branch: branchId ?? 'all',
       category: categoryFilter || 'all',
       product: productIdFilter || 'all',
-      interval: salesInterval
+      interval: salesInterval,
+      start: resolvedRange.start_date,
+      end: resolvedRange.end_date
     };
     const cached = getCachedValue('salesPerformance', cacheParams);
     if (cached) {
-      setSalesPerformance(maybeDecompress(cached));
+      const decompressed = maybeDecompress(cached);
+      setSalesPerformance(decompressed);
+      registerSalesBounds(decompressed);
       if (silent) {
         // Background refresh to update cache and state silently
         fetchAndCache('salesPerformance', cacheParams, async () => {
@@ -927,7 +1060,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
           return maybeCompress(payload);
         }, { forceRefresh: true, background: true })
           .then((normalized) => {
-            if (normalized) setSalesPerformance(maybeDecompress(normalized));
+            if (normalized) {
+              const next = maybeDecompress(normalized);
+              setSalesPerformance(next);
+              registerSalesBounds(next);
+            }
           })
           .catch(() => {});
       } else {
@@ -957,13 +1094,15 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         }
         return maybeCompress(payload);
       }, silent ? { forceRefresh: true, background: true } : undefined);
-      setSalesPerformance(maybeDecompress(normalized));
+      const decompressed = maybeDecompress(normalized);
+      setSalesPerformance(decompressed);
+      registerSalesBounds(decompressed);
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Sales performance fetch error', e);
     } finally {
       if (!silent) setLoadingSalesPerformance(false);
     }
-  }, [branchId, categoryFilter, productIdFilter, salesInterval, user, optimizationsEnabled]);
+  }, [branchId, categoryFilter, productIdFilter, registerSalesBounds, resolvedRange.end_date, resolvedRange.start_date, salesInterval, user, optimizationsEnabled]);
 
   const fetchTopProductsData = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
@@ -1447,7 +1586,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       }
 
       // prefer delivered meta if available
-      setDeliveryMeta(deliveredRes?.meta ?? undeliveredRes?.meta ?? { ...DELIVERY_META_DEFAULT });
+      const selectedMeta = deliveredRes?.meta ?? undeliveredRes?.meta ?? { ...DELIVERY_META_DEFAULT };
+      setDeliveryMeta(selectedMeta);
+      const metaCandidates = [];
+      if (selectedMeta?.min_reference) metaCandidates.push(selectedMeta.min_reference);
+      if (selectedMeta?.max_reference) metaCandidates.push(selectedMeta.max_reference);
+      const mergedDates = mergedSeries.map((item) => item?.date);
+      registerDataBounds([...metaCandidates, ...mergedDates]);
     } catch (e) {
       if (e?.code !== 'ERR_CANCELED') console.error('Delivery analytics fetch error', e);
       if (mode === 'replace') setDeliveryData([]);
@@ -1456,7 +1601,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         setLoadingDelivery(false);
       }
     }
-  }, [branchId, computeDeliveryRange, deliveryInterval, user, categoryFilter]);
+  }, [branchId, categoryFilter, computeDeliveryRange, deliveryInterval, registerDataBounds, user]);
 
   const deliveryWindowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
 
@@ -1926,10 +2071,13 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
               loadingSalesPerformance={loadingSalesPerformance}
               loadingTopProducts={loadingTopProducts}
               dateRangeDisplay={dateRangeDisplay}
+              globalStartDate={resolvedRange.start_date}
+              globalEndDate={resolvedRange.end_date}
               salesChartRef={salesChartRef}
               topProductsRef={topProductsRef}
               restockSuggestions={restockSuggestions}
               loadingRestockSuggestions={loadingRestockSuggestions}
+              salesIntervalOptions={salesIntervalOptions}
               onRetryTopProducts={() => fetchTopProductsData()}
               onRetrySalesPerformance={() => fetchSalesPerformance()}
             />

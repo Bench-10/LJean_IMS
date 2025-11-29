@@ -185,7 +185,7 @@ function InventoryRequestHistoryModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-green-50/30 hide-scrollbar">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-green-50/30 hide-scrollbar relative">
           {loading ? (
             <div className="py-10">
               <ChartLoading message="Loading request history..." />
