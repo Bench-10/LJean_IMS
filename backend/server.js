@@ -56,7 +56,7 @@ const app  = express();
 const isProduction = process.env.NODE_ENV === 'production';
 const enableExpressHsts = process.env.ENABLE_EXPRESS_HSTS === 'true';
 
-const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://192.168.254.124:5173'];
+const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://192.168.254.114:5173'];
 const allowedOrigins = (process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
   : DEFAULT_DEV_ORIGINS)

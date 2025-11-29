@@ -73,8 +73,8 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
               type="button"
               className="relative p-2 border-2 rounded-lg transition-all cursor-pointer border-white text-white hover:text-green-400 hover:border-green-400 hover:bg-green-400 hover:bg-opacity-10"
               onClick={handleRequestClick}
-              title="Request Status"
-              aria-label="Open Request Status"
+              title="Request History"
+              aria-label="Open Request History"
             >
               <MdPendingActions size={18} />
             </button>

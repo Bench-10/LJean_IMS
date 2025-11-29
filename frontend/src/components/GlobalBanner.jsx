@@ -71,7 +71,7 @@ function GlobalBanner({setOpenNotif, unreadCount, onOpenRequestMonitor}) {
                                                 className='h-10 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white transition hover:bg-emerald-600'
                                                 onClick={handleRequestMonitorClick}
                                             >
-                                                Request Status
+                                                Request History
                                             </button>
                                         )}
 								

@@ -554,7 +554,7 @@ function ProductInventory({
                           {/* Buttons */}
                           <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
                             <button
-                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${
+                              className={`flex-1 md:flex-none px-4 py-1 lg:py-1.5 rounded-md text-white text-sm font-medium ${
                                 isBusy(request.pending_id)
                                   ? 'bg-green-400 cursor-not-allowed'
                                   : 'bg-green-600 hover:bg-green-700'
@@ -573,7 +573,7 @@ function ProductInventory({
                             </button>
 
                             <button
-                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium ${
+                              className={`flex-1 md:flex-none px-4 py-1 lg:py-1.5 rounded-md text-white text-sm font-medium ${
                                 isBusy(request.pending_id)
                                   ? 'bg-red-300 cursor-not-allowed'
                                   : 'bg-red-500 hover:bg-red-600'
@@ -594,7 +594,7 @@ function ProductInventory({
                             {/* Request Changes - visible to Branch Manager or Owner */}
                             {(user && user.role && (user.role.includes('Branch Manager') || user.role.includes('Owner'))) && (
                               <button
-                                className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium bg-amber-600 hover:bg-amber-500`}
+                                className={`flex-1 md:flex-none px-4 py-1 lg:py-1.5 rounded-md text-white text-sm font-medium bg-amber-600 hover:bg-amber-500`}
                                 onClick={() => handleRequestChangesClick(request.pending_id)}
                                 disabled={isBusy(request.pending_id)}
                               >
@@ -604,7 +604,7 @@ function ProductInventory({
 
                             {/* Request Timeline */}
                             <button
-                              className={`flex-1 md:flex-none px-4 py-2 rounded-md text-white text-sm font-medium bg-green-600 hover:bg-green-700`}
+                              className={`flex-1 md:flex-none px-4 py-1 lg:py-1.5 rounded-md text-white text-sm font-medium bg-green-600 hover:bg-green-700`}
                               onClick={() => openHistoryModal(request.pending_id)}
                             >
                               Request Timeline
