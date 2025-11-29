@@ -1,18 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import NoInfoFound from '../components/common/NoInfoFound.jsx';
 import { TbFileExport } from "react-icons/tb";
-import { MdRefresh } from "react-icons/md";
-import { IoMdClose } from "react-icons/io";
 import { exportToCSV, exportToPDF, formatForExport } from "../utils/exportUtils";
 import { useAuth } from '../authentication/Authentication';
 import { currencyFormat } from '../utils/formatCurrency.js';
 import InventoryItemDetailsDialog from '../components/InventoryItemDetailsDialog.jsx';
 import ChartLoading from '../components/common/ChartLoading.jsx';
-import { FaBoxOpen } from "react-icons/fa6";
-import RejectionReasonDialog from '../components/dialogs/RejectionReasonDialog.jsx';
 import DropdownCustom from '../components/DropdownCustom';
-import InventoryRequestHistoryModal from '../components/InventoryRequestHistoryModal';
-import RequestChangeDialog from '../components/dialogs/RequestChangeDialog';
 
 function ProductInventory({
   branches,
@@ -23,224 +18,19 @@ function ProductInventory({
   sanitizeInput,
   listCategories,
   invetoryLoading,
-  pendingRequests = [],
-  pendingRequestsLoading = false,
-  approvePendingRequest,
-  rejectPendingRequest,
-  refreshPendingRequests,
-  highlightPendingDirective = null,
-  onHighlightConsumed
-  ,
-  onRequestChanges
+  pendingRequests = []
 }) {
   const { user } = useAuth();
-  const [error, setError] = useState();
+  const navigate = useNavigate();
   const [searchItem, setSearchItem] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all'); // 'all', 'low', 'max', 'none'
-  const [isPendingDialogOpen, setIsPendingDialogOpen] = useState(false);
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
-  const [pendingRejectId, setPendingRejectId] = useState(null);
-  const [historyModalOpen, setHistoryModalOpen] = useState(false);
-  const [selectedHistoryPendingId, setSelectedHistoryPendingId] = useState(null);
-  const [changeDialogOpen, setChangeDialogOpen] = useState(false);
-  const [changeDialogContext, setChangeDialogContext] = useState({ pendingId: null, changeType: 'quantity', comment: '' });
-  const [changeDialogLoading, setChangeDialogLoading] = useState(false);
-
-  // Track if we already pushed a history state for the pending modal
-  const hasPushedPendingModalRef = useRef(false);
-
-  // Loading states for approve/reject actions (store pending_id while processing)
-  const [approvingIds, setApprovingIds] = useState(() => new Set());
-  const [rejectingIds, setRejectingIds] = useState(() => new Set());
-
-  const isApproving = (id) => approvingIds.has(id);
-  const isRejecting = (id) => rejectingIds.has(id);
-  const isBusy = (id) => isApproving(id) || isRejecting(id);
-
-  const [highlightedPendingIds, setHighlightedPendingIds] = useState([]);
-  const pendingRequestRefs = useRef(new Map());
-  const pendingDialogScrollRef = useRef(null);
-  const lastHandledPendingHighlightRef = useRef(null);
 
   const displayPendingApprovals =
     user &&
     user.role &&
     user.role.some(role => ['Branch Manager'].includes(role));
-
-  const formatDateTime = (value) => {
-    if (!value) return '';
-    try {
-      return new Date(value).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return value;
-    }
-  };
-
-  const handleApproveClick = (pendingId) => {
-    if (typeof approvePendingRequest !== 'function') return;
-
-    (async () => {
-      setApprovingIds(prev => {
-        const next = new Set(prev);
-        next.add(pendingId);
-        return next;
-      });
-
-      try {
-        await approvePendingRequest(pendingId);
-      } finally {
-        setApprovingIds(prev => {
-          const next = new Set(prev);
-          next.delete(pendingId);
-          return next;
-        });
-      }
-    })();
-  };
-
-  const handleRejectClick = (pendingId) => {
-    if (typeof rejectPendingRequest !== 'function') return;
-
-    setPendingRejectId(pendingId);
-    setIsRejectDialogOpen(true);
-  };
-
-  const handleRequestChangesClick = async (pendingId) => {
-    // open dialog and set context
-    setChangeDialogContext({ pendingId, changeType: 'quantity', comment: '' });
-    setChangeDialogOpen(true);
-  };
-
-  const openHistoryModal = (pendingId) => {
-    setSelectedHistoryPendingId(pendingId);
-    setHistoryModalOpen(true);
-  };
-
-  const closeHistoryModal = () => {
-    setSelectedHistoryPendingId(null);
-    setHistoryModalOpen(false);
-  };
-
-  const handleChangeDialogCancel = () => {
-    if (changeDialogLoading) return;
-    setChangeDialogOpen(false);
-    setChangeDialogContext({ pendingId: null, changeType: 'quantity', comment: '' });
-  };
-
-  const handleChangeDialogConfirm = async (pendingId, changeType, comment) => {
-    if (!pendingId) return handleChangeDialogCancel();
-    setChangeDialogLoading(true);
-    try {
-      if (typeof onRequestChanges === 'function') {
-        await onRequestChanges(pendingId, changeType, comment);
-      } else {
-        console.warn('onRequestChanges handler not provided');
-      }
-      if (typeof refreshPendingRequests === 'function') await refreshPendingRequests();
-    } catch (error) {
-      console.error('Failed to request changes for pending inventory request:', error);
-    } finally {
-      setChangeDialogLoading(false);
-      handleChangeDialogCancel();
-    }
-  };
-
-  const handleRejectDialogCancel = () => {
-    setIsRejectDialogOpen(false);
-    setPendingRejectId(null);
-  };
-
-  const handleRejectDialogConfirm = (reason) => {
-    if (typeof rejectPendingRequest !== 'function' || pendingRejectId == null) {
-      setIsRejectDialogOpen(false);
-      setPendingRejectId(null);
-      return;
-    }
-
-    (async () => {
-      setRejectingIds(prev => {
-        const next = new Set(prev);
-        next.add(pendingRejectId);
-        return next;
-      });
-
-      try {
-        await rejectPendingRequest(pendingRejectId, reason);
-      } finally {
-        setRejectingIds(prev => {
-          const next = new Set(prev);
-          next.delete(pendingRejectId);
-          return next;
-        });
-      }
-      setIsRejectDialogOpen(false);
-      setPendingRejectId(null);
-    })();
-  };
-
-  // Close handler for Pending dialog that cooperates with browser history
-  const handleClosePendingDialog = useCallback(() => {
-    if (typeof window !== 'undefined' && hasPushedPendingModalRef.current) {
-      // Let the first "Back" just close the modal by popping the pushed state
-      window.history.back();
-    } else {
-      // Fallback if no history state was pushed
-      setIsPendingDialogOpen(false);
-      setHighlightedPendingIds([]);
-    }
-  }, []);
-
-  // Lock background scroll + handle browser/device Back when Pending dialog is open
-  useEffect(() => {
-    if (!isPendingDialogOpen) return;
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
-    const { documentElement, body } = document;
-    const prevHtmlOverflow = documentElement.style.overflow;
-    const prevBodyOverflow = body.style.overflow;
-
-    // Lock scroll on both <html> and <body>
-    documentElement.style.overflow = 'hidden';
-    body.style.overflow = 'hidden';
-
-    // Push a history state so that the next "Back" only closes the modal
-    if (!hasPushedPendingModalRef.current) {
-      window.history.pushState(
-        { ...(window.history.state || {}), pendingInventoryModal: true },
-        ''
-      );
-      hasPushedPendingModalRef.current = true;
-    }
-
-    const handlePopState = (event) => {
-      // If the modal was open and history moves back, close the modal
-      if (hasPushedPendingModalRef.current) {
-        hasPushedPendingModalRef.current = false;
-        setIsPendingDialogOpen(false);
-        setHighlightedPendingIds([]);
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      documentElement.style.overflow = prevHtmlOverflow;
-      body.style.overflow = prevBodyOverflow;
-      window.removeEventListener('popstate', handlePopState);
-      // If we are cleaning up while still marked as pushed, clear the flag
-      if (hasPushedPendingModalRef.current && !isPendingDialogOpen) {
-        hasPushedPendingModalRef.current = false;
-      }
-    };
-  }, [isPendingDialogOpen]);
 
   // NEW: DIALOG STATE
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -318,87 +108,6 @@ function ProductInventory({
   const endIndex = startIndex + itemsPerPage;
   const currentPageData = filteredData.slice(startIndex, endIndex);
 
-  const setPendingRequestRef = useCallback((pendingId, node) => {
-    const map = pendingRequestRefs.current;
-    if (!map) return;
-    if (node) {
-      map.set(pendingId, node);
-    } else {
-      map.delete(pendingId);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!highlightPendingDirective || highlightPendingDirective.type !== 'branch-pending') {
-      return;
-    }
-
-    if (pendingRequestsLoading) {
-      return;
-    }
-
-    if (lastHandledPendingHighlightRef.current === highlightPendingDirective.triggeredAt) {
-      return;
-    }
-
-    const targetUserId = Number(highlightPendingDirective.userId);
-    const normalizedName = (highlightPendingDirective.userName || '').toLowerCase();
-
-    const matchesDirective = (request) => {
-      const createdBy = Number(request.created_by ?? request.created_by_id ?? null);
-      if (Number.isFinite(targetUserId) && createdBy === targetUserId) {
-        return true;
-      }
-      if (!normalizedName) {
-        return false;
-      }
-      return (request.created_by_name || '').toLowerCase() === normalizedName;
-    };
-
-    const targetIds = (pendingRequests || [])
-      .filter(matchesDirective)
-      .map(req => req.pending_id);
-
-    lastHandledPendingHighlightRef.current = highlightPendingDirective.triggeredAt;
-
-    if (targetIds.length === 0) {
-      onHighlightConsumed?.('branch-pending');
-      return;
-    }
-
-    setIsPendingDialogOpen(true);
-    setHighlightedPendingIds(targetIds);
-
-    const firstId = targetIds[0];
-    const targetElement = pendingRequestRefs.current.get(firstId);
-
-    const scrollAction = () => {
-      const container = pendingDialogScrollRef.current;
-      if (container && targetElement && container.contains(targetElement)) {
-        const offset = targetElement.offsetTop - container.offsetTop;
-        container.scrollTo({
-          top: Math.max(offset - container.clientHeight / 3, 0),
-          behavior: 'smooth'
-        });
-        return;
-      }
-
-      if (targetElement && typeof targetElement.scrollIntoView === 'function') {
-        targetElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }
-    };
-
-    const scrollTimer = setTimeout(scrollAction, 160);
-    const clearTimer = setTimeout(() => setHighlightedPendingIds([]), 6000);
-
-    onHighlightConsumed?.('branch-pending');
-
-    return () => {
-      clearTimeout(scrollTimer);
-      clearTimeout(clearTimer);
-    };
-  }, [highlightPendingDirective, pendingRequests, pendingRequestsLoading, onHighlightConsumed]);
-
   // EXPORT FUNCTIONALITY
   const handleExportInventory = (format) => {
     const exportData = formatForExport(filteredData, ['product_id']);
@@ -424,16 +133,6 @@ function ProductInventory({
 
   return (
     <div className="pt-20 lg:pt-7 px-4 lg:px-8 pb-6">
-      {/* REJECTION REASON */}
-      <RejectionReasonDialog
-        open={isRejectDialogOpen}
-        onCancel={handleRejectDialogCancel}
-        onConfirm={handleRejectDialogConfirm}
-        sanitizeInput={sanitizeInput}
-        title="Reject Inventory Request"
-        confirmLabel="Submit Rejection"
-      />
-
       {/* DETAILS DIALOG */}
       <InventoryItemDetailsDialog
         open={isDetailsOpen}
@@ -451,278 +150,7 @@ function ProductInventory({
 
       <hr className="mt-3 mb-6 border-t-4 border-green-800 rounded-lg" />
 
-      {/* ===================== PENDING REQUESTS MODAL ===================== */}
-      {displayPendingApprovals && isPendingDialogOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Backdrop: click to close */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={handleClosePendingDialog}
-          />
-
-          {/* Panel: stop clicks from bubbling to the backdrop */}
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="relative z-10 w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-popup"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="text-lg md:text-xl font-semibold text-gray-800">
-                  Pending Inventory Requests
-                </h2>
-                <p className="text-xs md:text-sm text-gray-500">
-                  Review inventory additions or updates awaiting your approval.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {typeof refreshPendingRequests === 'function' && (
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={refreshPendingRequests}
-                    disabled={pendingRequestsLoading}
-                    aria-label="Refresh pending inventory requests"
-                    title="Refresh pending inventory requests"
-                  >
-                    <MdRefresh className={`text-xl ${pendingRequestsLoading ? 'animate-spin' : ''}`} />
-                    <span className="sr-only">Refresh</span>
-                  </button>
-                )}
-                <button
-                  className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-lg transition"
-                  onClick={handleClosePendingDialog}
-                  aria-label="Close"
-                >
-                  <IoMdClose className="w-5 h-5 sm:w-6 sm:h-6" />
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div
-              className="flex-1 overflow-y-auto px-4 sm:px-6 py-4"
-              ref={pendingDialogScrollRef}
-            >
-              {pendingRequestsLoading ? (
-                <div className="py-10">
-                  <ChartLoading message="Loading pending inventory approvals..." />
-                </div>
-              ) : (pendingRequests?.length ?? 0) === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <FaBoxOpen className="text-5xl opacity-50 mb-2" />
-                  <p className="text-sm italic text-gray-600">
-                    No pending requests at the moment.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {pendingRequests.map((request) => {
-                    const { payload } = request;
-                    const requestedProduct = payload?.productData || payload;
-                    const currentState = payload?.currentState;
-                    const isHighlighted = highlightedPendingIds.includes(request.pending_id);
-
-                    return (
-                      <div
-                        key={request.pending_id}
-                        ref={(node) => setPendingRequestRef(request.pending_id, node)}
-                        className={`border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition ${
-                          isHighlighted
-                            ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse'
-                            : ''
-                        }`}
-                      >
-                        {/* Header Info */}
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="uppercase text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                              {request.action_type === 'update' ? 'Update' : 'Add'}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              Requested {formatDateTime(request.created_at)}
-                            </span>
-                            {request.requires_admin_review && (
-                              <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                                Owner approval required
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Buttons */}
-                          <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
-                            <button
-                              className={`flex-1 md:flex-none px-4 py-1 lg:py-1.5 rounded-md text-white text-sm font-medium ${
-                                isBusy(request.pending_id)
-                                  ? 'bg-green-400 cursor-not-allowed'
-                                  : 'bg-green-600 hover:bg-green-700'
-                              }`}
-                              onClick={() => handleApproveClick(request.pending_id)}
-                              disabled={isBusy(request.pending_id)}
-                            >
-                              {isApproving(request.pending_id) ? (
-                                <span className="inline-flex items-center">
-                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                  Processing
-                                </span>
-                              ) : (
-                                'Approve'
-                              )}
-                            </button>
-
-                            <button
-                              className={`flex-1 md:flex-none px-4 py-1 lg:py-1.5 rounded-md text-white text-sm font-medium ${
-                                isBusy(request.pending_id)
-                                  ? 'bg-red-300 cursor-not-allowed'
-                                  : 'bg-red-500 hover:bg-red-600'
-                              }`}
-                              onClick={() => handleRejectClick(request.pending_id)}
-                              disabled={isBusy(request.pending_id)}
-                            >
-                              {isRejecting(request.pending_id) ? (
-                                <span className="inline-flex items-center">
-                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                  Processing
-                                </span>
-                              ) : (
-                                'Reject'
-                              )}
-                            </button>
-
-                            {/* Request Changes - visible to Branch Manager or Owner */}
-                            {(user && user.role && (user.role.includes('Branch Manager') || user.role.includes('Owner'))) && (
-                              <button
-                                className={`flex-1 md:flex-none px-4 py-1 lg:py-1.5 rounded-md text-white text-sm font-medium bg-amber-600 hover:bg-amber-500`}
-                                onClick={() => handleRequestChangesClick(request.pending_id)}
-                                disabled={isBusy(request.pending_id)}
-                              >
-                                Request changes
-                              </button>
-                            )}
-
-                            {/* Request Timeline */}
-                            <button
-                              className={`flex-1 md:flex-none px-4 py-1 lg:py-1.5 rounded-md text-white text-sm font-medium bg-green-600 hover:bg-green-700`}
-                              onClick={() => openHistoryModal(request.pending_id)}
-                            >
-                              Request Timeline
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Product Info */}
-                        <h3 className="text-base md:text-lg font-semibold text-gray-800">
-                          {requestedProduct?.product_name || 'Unnamed Product'}
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-3">
-                          Submitted by {request.created_by_name || 'Inventory Staff'}
-                        </p>
-
-                        <div className="flex flex-col md:flex-row gap-3 text-sm">
-                          {/* Requested Update */}
-                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 w-full md:w-1/2">
-                            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">
-                              Requested Update
-                            </p>
-                            <ul className="space-y-1 text-amber-900">
-                              {requestedProduct?.quantity_added != null && (
-                                <li>
-                                  <span className="font-medium">Quantity:</span>{' '}
-                                  {currentState
-                                    ? `${Number(currentState.quantity).toLocaleString()} + `
-                                    : ''}
-                                  <span className="font-bold">
-                                    {requestedProduct.quantity_added}
-                                  </span>{' '}
-                                  {requestedProduct.unit ?? ''}
-                                </li>
-                              )}
-                              {requestedProduct?.unit_price != null && (request.action_type === 'create' || !currentState || Number(requestedProduct.unit_price) !== Number(currentState.unit_price)) && (
-                                <li>
-                                  <span className="font-medium">Unit Price:</span> ₱{' '}
-                                  {Number(requestedProduct.unit_price).toLocaleString()}
-                                </li>
-                              )}
-                              {requestedProduct?.unit_cost != null && (request.action_type === 'create' || !currentState || Number(requestedProduct.unit_cost) !== Number(currentState.unit_cost)) && (
-                                <li>
-                                  <span className="font-medium">Unit Cost:</span> ₱{' '}
-                                  {Number(requestedProduct.unit_cost).toLocaleString()}
-                                </li>
-                              )}
-                              {(requestedProduct?.min_threshold != null || requestedProduct?.max_threshold != null) &&
-                                (request.action_type === 'create' || (!currentState || Number(requestedProduct.min_threshold) !== Number(currentState.min_threshold) || Number(requestedProduct.max_threshold) !== Number(currentState.max_threshold))) && (
-                                  <li>
-                                    <span className="font-medium">Threshold:</span>{' '}
-                                    {requestedProduct.min_threshold} -{' '}
-                                    {requestedProduct.max_threshold}
-                                  </li>
-                                )}
-                              {requestedProduct?.product_validity != null && (request.action_type === 'create' || !currentState || requestedProduct.product_validity !== currentState.product_validity) && (
-                                <li>
-                                  <span className="font-medium">Validity:</span>{' '}
-                                  {requestedProduct.product_validity}
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-
-                          {/* Current Values */}
-                          {currentState && (
-                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 w-full md:w-1/2">
-                              <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
-                                Current Values
-                              </p>
-                              <ul className="space-y-1 text-gray-700">
-                                <li>
-                                  <span className="font-medium">Quantity:</span>{' '}
-                                  {Number(currentState.quantity).toLocaleString()}{' '}
-                                  {currentState.unit}
-                                </li>
-                                <li>
-                                  <span className="font-medium">Unit Price:</span> ₱{' '}
-                                  {Number(currentState.unit_price).toLocaleString()}
-                                </li>
-                                <li>
-                                  <span className="font-medium">Unit Cost:</span> ₱{' '}
-                                  {Number(currentState.unit_cost).toLocaleString()}
-                                </li>
-                                <li>
-                                  <span className="font-medium">Threshold:</span>{' '}
-                                  {currentState.min_threshold} -{' '}
-                                  {currentState.max_threshold}
-                                </li>
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Inventory Request History Modal (Request Timeline) */}
-      <InventoryRequestHistoryModal
-        open={historyModalOpen}
-        onClose={closeHistoryModal}
-        pendingId={selectedHistoryPendingId}
-        formatDateTime={formatDateTime}
-      />
-      <RequestChangeDialog
-        open={changeDialogOpen}
-        onCancel={handleChangeDialogCancel}
-        onConfirm={handleChangeDialogConfirm}
-        loading={changeDialogLoading}
-        initialChangeType={changeDialogContext.changeType}
-        initialComment={changeDialogContext.comment}
-        pendingId={changeDialogContext.pendingId}
-      />
-      {/* ===================== /PENDING REQUESTS MODAL END ===================== */}
+      {/* Pending inventory actions moved to dedicated page */}
 
       {/* SEARCH + FILTERS + ACTIONS */}
       <div className="w-full lg:flex lg:items-center lg:gap-6">
@@ -812,7 +240,7 @@ function ProductInventory({
             <div className="col-span-2 lg:col-span-1">
               <button
                 className="w-full lg:w-auto inline-flex items-center justify-center gap-2 px-4 h-10 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-500"
-                onClick={() => setIsPendingDialogOpen(true)}
+                onClick={() => navigate('/pending-inventory')}
                 aria-label="Open pending inventory requests"
               >
                 <span className="whitespace-nowrap">Pendings</span>
@@ -1069,9 +497,6 @@ function ProductInventory({
             )}
           </tbody>
         </table>
-        {error && (
-          <div className="flex font-bold justify-center px-4 py-4">{error}</div>
-        )}
       </div>
 
       {/* PAGINATION AND CONTROLS */}

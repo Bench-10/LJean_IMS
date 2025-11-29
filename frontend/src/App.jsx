@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { io } from "socket.io-client";
 import ModalForm from "./components/ModalForm";
 import ProductInventory from "./Pages/ProductInventory";
+import PendingInventoryRequests from "./Pages/PendingInventoryRequests";
 import Notification from "./Pages/Notification";
 import ProductValidity from "./Pages/ProductValidity";
 import Category from "./components/Category";
@@ -1249,7 +1250,7 @@ function App() {
     }
 
     if (highlightType === 'branch-pending') {
-      navigate('/inventory');
+      navigate('/pending-inventory');
     }
   }, [deleteGuardDialog, navigate]);
 
@@ -3270,14 +3271,7 @@ function App() {
                     listCategories={listCategories}
                     branches={branches}
                     invetoryLoading={invetoryLoading}
-                    pendingRequests={pendingInventoryRequests}
-                    pendingRequestsLoading={pendingInventoryLoading}
-                    approvePendingRequest={handleApprovePendingInventory}
-                    rejectPendingRequest={handleRejectPendingInventory}
-                    refreshPendingRequests={fetchPendingInventoryRequests}
-                    highlightPendingDirective={highlightDirective?.type === 'branch-pending' ? highlightDirective : null}
-                    onHighlightConsumed={handleHighlightConsumed}
-                    onRequestChanges={handleRequestPendingChanges}
+                      pendingRequests={pendingInventoryRequests}
 
                   />
 
@@ -3285,6 +3279,23 @@ function App() {
         
           }/>
          
+
+          <Route path="/pending-inventory" exact element={
+            <RouteProtection allowedRoles={['Owner', 'Branch Manager']}>
+              <PendingInventoryRequests
+                pendingRequests={pendingInventoryRequests}
+                pendingRequestsLoading={pendingInventoryLoading}
+                approvePendingRequest={handleApprovePendingInventory}
+                rejectPendingRequest={handleRejectPendingInventory}
+                refreshPendingRequests={fetchPendingInventoryRequests}
+                sanitizeInput={sanitizeInput}
+                onRequestChanges={handleRequestPendingChanges}
+                highlightDirective={highlightDirective?.type === 'branch-pending' ? highlightDirective : null}
+                onHighlightConsumed={handleHighlightConsumed}
+              />
+            </RouteProtection>
+          }/>
+
 
           {/*PRODUCT VALIDITY/SHELF LIFE PAGE*/}
           <Route path="/product_validity" exact element={

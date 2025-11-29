@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { MdOutlineInventory, MdOutlineLogout,MdOutlineDashboard, MdMenu, MdClose, MdPendingActions} from "react-icons/md";
 import { IoMdNotifications } from "react-icons/io";
 import { PiSealWarningBold } from "react-icons/pi";
-import {FaUsersCog, FaMoneyBillWave, FaShippingFast, FaClipboardCheck } from "react-icons/fa";
+import {FaUsersCog, FaMoneyBillWave, FaShippingFast, FaClipboardCheck, FaClipboardList } from "react-icons/fa";
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../authentication/Authentication';
 import LogoutDialog from './dialogs/LogoutDialog';
@@ -168,6 +168,18 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
                 onClick={() => setShowMobileMenu(false)}
               >
                 <MdOutlineInventory />Inventory
+              </NavLink>
+            )}
+
+            {roles.some(r => ['Branch Manager', 'Owner'].includes(r)) && (
+              <NavLink
+                to="/pending-inventory"
+                className={({ isActive }) =>
+                  isActive ? "text-[15px] border-l-8 bg-[#254717] border-l-green-400" : ""
+                }
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <FaClipboardList />Pending Inventory
               </NavLink>
             )}
 
