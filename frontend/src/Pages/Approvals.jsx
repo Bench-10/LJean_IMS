@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import ChartLoading from "../components/common/ChartLoading";
 import NoInfoFound from "../components/common/NoInfoFound";
-import { MdInfoOutline } from "react-icons/md";
+import { MdInfoOutline, MdHistory } from "react-icons/md";
 import { IoMdClose } from "react-icons/io";
 import { useAuth } from "../authentication/Authentication";
 import RejectionReasonDialog from "../components/dialogs/RejectionReasonDialog";
@@ -1506,25 +1506,6 @@ function PendingUserApprovalModal({
             <div className="hidden md:block" />
           </div>
         </div>
-
-        {/* Footer – Approve / Reject buttons (kept from your original Approvals modal) */}
-        <div className="bg-white border-t border-gray-200 px-6 py-4 flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={onApprove}
-            disabled={approving || rejecting}
-            className="px-8 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-60"
-          >
-            {approving ? "Approving…" : "Approve"}
-          </button>
-
-          <button
-            onClick={onReject}
-            disabled={rejecting || approving}
-            className="px-8 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-60"
-          >
-            {rejecting ? "Rejecting…" : "Reject"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1628,6 +1609,17 @@ function PendingInventoryApprovalModal({
   const dateAdded = formatDateOnly(dateAddedRaw);
   const validityDate = formatDateOnly(validityRaw);
 
+  // Determine if this is currently in "Owner approval" stage
+  const modalRequestStatus = String(
+    request?.status ??
+      request?.request_status ??
+      request?.resolution_status ??
+      ""
+  ).toLowerCase();
+  const isForOwnerApproval =
+    modalRequestStatus === "pending_admin" ||
+    request?.requires_admin_review === true;
+
   const FieldCard = ({ label, children, className = "" }) => (
     <div
       className={
@@ -1663,14 +1655,33 @@ function PendingInventoryApprovalModal({
             </h1>
           </div>
 
-          <button
-            onClick={onClose}
-            className="text-white hover:bg-black/10 p-1.5 rounded-lg"
-            aria-label="Close"
-            title="Close"
-          >
-            <IoMdClose className="text-2xl" />
-          </button>
+          {/* Right side: timeline icon (if owner approval) + close button */}
+          <div className="flex items-center gap-1">
+            {isForOwnerApproval &&
+              typeof onOpenRequestTimeline === "function" && (
+                <button
+                  type="button"
+                  className="text-white hover:bg-black/10 p-2 rounded-lg"
+                  aria-label="View request timeline"
+                  title="Request timeline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenRequestTimeline(request.pending_id);
+                  }}
+                >
+                  <MdHistory className="text-xl" />
+                </button>
+              )}
+
+            <button
+              onClick={onClose}
+              className="text-white hover:bg-black/10 p-1.5 rounded-lg"
+              aria-label="Close"
+              title="Close"
+            >
+              <IoMdClose className="text-2xl" />
+            </button>
+          </div>
         </div>
 
         {/* Body – layout mirrors the product form */}
@@ -1700,7 +1711,7 @@ function PendingInventoryApprovalModal({
               {unitLabel}
             </FieldCard>
 
-            {/* Min / Max threshold / Quantity – 25 / 25 / 50 (like your form) */}
+            {/* Min / Max threshold / Quantity – 25 / 25 / 50 */}
             <FieldCard
               label="Min Threshold"
               className="md:col-span-3"
@@ -1762,54 +1773,31 @@ function PendingInventoryApprovalModal({
           </div>
         </div>
 
-        {/* Footer – Approve / Reject buttons (plus Owner actions when applicable) */}
+        {/* Footer – Approve / Reject buttons + Request changes */}
         <div className="bg-white border-t border-gray-200 px-6 py-4 flex flex-col sm:flex-row gap-4 justify-center items-center">
-          {/* Owner-facing actions: Request changes & Request timeline when owner approval required */}
-          {(() => {
-            const modalRequestStatus = String(request?.status ?? request?.request_status ?? request?.resolution_status ?? '').toLowerCase();
-            const isForOwnerApproval = modalRequestStatus === 'pending_admin' || request?.requires_admin_review === true;
-            if (!isForOwnerApproval) return null;
-            return (
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  type="button"
-                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
-                  onClick={(e) => { e.stopPropagation(); if (typeof onOpenRequestChanges === 'function') onOpenRequestChanges(request.pending_id); }}
-                >
-                  Request changes
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
-                  onClick={(e) => { e.stopPropagation(); if (typeof onOpenRequestTimeline === 'function') onOpenRequestTimeline(request.pending_id); }}
-                >
-                  Request Timeline
-                </button>
-              </div>
-            );
-          })()}
+          {/* Owner-facing action: Request changes (Request timeline moved to header icon) */}
+          {isForOwnerApproval && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                className="rounded-md border bg-blue-600 px-5 py-2 text-xs lg:text-sm font-semibold text-white hover:bg-blue-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (typeof onOpenRequestChanges === "function") {
+                    onOpenRequestChanges(request.pending_id);
+                  }
+                }}
+              >
+                Request changes
+              </button>
+            </div>
+          )}
 
-          <div className="flex gap-2">
-            <button
-              onClick={onApprove}
-              disabled={processing}
-              className="px-8 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-60"
-            >
-              {processing ? "Processing…" : "Approve"}
-            </button>
-
-            <button
-              onClick={onReject}
-              disabled={processing}
-              className="px-8 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-60"
-            >
-              Reject
-            </button>
-          </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 export default Approvals;

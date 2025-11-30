@@ -148,7 +148,7 @@ function Delivery({
                 <DropdownCustom
                   value={deliveryInterval}
                   onChange={(e) => setDeliveryInterval(e.target.value)}
-                  label="Interval"
+                  label="Graph Interval"
                   variant="default"
                   size="xs"
                   options={allowedDeliveryOptions}
@@ -156,12 +156,12 @@ function Delivery({
               </div>
 
               {/* Legend: delivered vs undelivered for clarity */}
-              <div className="flex items-center gap-3 ml-2">
-                <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-3 m-1">
+                <div className="flex items-center gap-2 text-sm">
                   <span className="w-3 h-3 rounded-sm" style={{ background: deliveredColor }} />
                   <span className="text-gray-600">Delivered</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-2 text-sm">
                   <span className="w-3 h-3 rounded-sm" style={{ background: undeliveredColor }} />
                   <span className="text-gray-600">Undelivered</span>
                 </div>

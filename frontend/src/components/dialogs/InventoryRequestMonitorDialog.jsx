@@ -195,6 +195,9 @@ const InventoryRequestMonitorDialog = ({
   const [selectedHistoryPendingId, setSelectedHistoryPendingId] =
     useState(null);
 
+  // NEW: track which "Make changes" button is in loading state
+  const [editingPendingId, setEditingPendingId] = useState(null); // NEW
+
   const triggerRefresh = useCallback(() => {
     setRefreshIndex((prev) => prev + 1);
   }, []);
@@ -327,6 +330,7 @@ const InventoryRequestMonitorDialog = ({
     if (!open) {
       setCancelError(null);
       setCancellingId(null);
+      setEditingPendingId(null); // NEW: reset loading state when dialog closes
     }
   }, [open]);
 
@@ -908,7 +912,7 @@ const InventoryRequestMonitorDialog = ({
       onClick={cancelDialogOpen ? undefined : onClose}
     >
       <div
-        className="relative flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="relative flex h-[90vh] w-full max-w-[1000px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -955,6 +959,7 @@ const InventoryRequestMonitorDialog = ({
           </div>
 
           {/* Filters: Branch -> Status -> Type */}
+          {/* Filters: Branch -> Status + Type (desktop side-by-side) */}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {canViewAdmin && (
               <div className="order-1 col-span-full sm:col-span-1 rounded-xl border border-gray-200 bg-gray-50 p-3 z-30">
@@ -969,59 +974,66 @@ const InventoryRequestMonitorDialog = ({
               </div>
             )}
 
-            <div className="order-2 rounded-xl border border-gray-200 bg-gray-50 p-3 xl:col-span-2">
-              <span className="text-xs font-semibold uppercase text-gray-500">
-                Status
-              </span>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {statusFilterOptions.map((filter) => {
-                  const isActive = statusFilter === filter.id;
-                  return (
-                    <button
-                      key={filter.id}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition ${
-                        isActive
-                          ? 'bg-green-100 text-green-700 ring-1 ring-green-600/40'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                      onClick={() =>
-                        setStatusFilter(isActive ? '' : filter.id)
-                      }
-                    >
-                      {filter.label}
-                    </button>
-                  );
-                })}
+            {/* Status + Type grouped */}
+            <div className="order-2 col-span-full xl:col-span-2">
+              <div className="flex flex-col gap-3 lg:flex-row">
+                {/* STATUS CARD */}
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex-1">
+                  <span className="text-xs font-semibold uppercase text-gray-500">
+                    Status
+                  </span>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {statusFilterOptions.map((filter) => {
+                      const isActive = statusFilter === filter.id;
+                      return (
+                        <button
+                          key={filter.id}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition ${
+                            isActive
+                              ? 'bg-green-100 text-green-700 ring-1 ring-green-600/40'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                          onClick={() =>
+                            setStatusFilter(isActive ? '' : filter.id)
+                          }
+                        >
+                          {filter.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* TYPE CARD */}
+                {canSeeTypeFilter && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 lg:w-auto lg:self-stretch">
+                    <span className="text-xs font-semibold uppercase text-gray-500">
+                      Type
+                    </span>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {requestTypeFilters.map((filter) => {
+                        const isActive = requestTypeFilter === filter.id;
+                        return (
+                          <button
+                            key={filter.id}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition ${
+                              isActive
+                                ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-500/50'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                            onClick={() =>
+                              setRequestTypeFilter(isActive ? '' : filter.id)
+                            }
+                          >
+                            {filter.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-
-            {canSeeTypeFilter && (
-              <div className="order-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                <span className="text-xs font-semibold uppercase text-gray-500">
-                  Type
-                </span>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {requestTypeFilters.map((filter) => {
-                    const isActive = requestTypeFilter === filter.id;
-                    return (
-                      <button
-                        key={filter.id}
-                        className={`rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition ${
-                          isActive
-                            ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-500/50'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                        onClick={() =>
-                          setRequestTypeFilter(isActive ? '' : filter.id)
-                        }
-                      >
-                        {filter.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
 
           {cancelError && (
@@ -1336,6 +1348,10 @@ const InventoryRequestMonitorDialog = ({
                   request.status_detail?.code ===
                     'changes_requested';
 
+                // NEW: per-request loading state for "Make changes"
+                const isMakingChanges =
+                  editingPendingId === request.pending_id; // NEW
+
                 const statusLabel = resolveStatusPillLabel(request, {
                   isOwnerUser,
                   isBranchManager,
@@ -1552,60 +1568,71 @@ const InventoryRequestMonitorDialog = ({
                       )}
 
                     {request.status_detail?.code === 'changes_requested' &&
-  (request.change_request_comment ||
-    request.payload?.change_request_comment) && (
-    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800 break-words flex flex-col gap-2">
-      {/* Title + comment */}
-      <div>
-        <p className="font-semibold">Changes Requested</p>
-        <p>
-          {request.change_request_comment ||
-            request.payload?.change_request_comment}
-        </p>
-      </div>
+                      (request.change_request_comment ||
+                        request.payload?.change_request_comment) && (
+                        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800 break-words flex flex-col gap-2">
+                          {/* Title + comment */}
+                          <div>
+                            <p className="font-semibold">Changes Requested</p>
+                            <p>
+                              {request.change_request_comment ||
+                                request.payload?.change_request_comment}
+                            </p>
+                          </div>
 
-      {/* Requested change + Make changes (same row, button right) */}
-      {(request.change_request_type ||
-        request.payload?.change_request_type) && (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-amber-700">
-            Requested change:{' '}
-            <span className="font-medium">
-              {request.change_request_type ||
-                request.payload?.change_request_type}
-            </span>
-          </p>
+                          {/* Requested change + Make changes (same row, button right) */}
+                          {(request.change_request_type ||
+                            request.payload?.change_request_type) && (
+                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs text-amber-700">
+                                Requested change:{' '}
+                                <span className="font-medium">
+                                  {request.change_request_type ||
+                                    request.payload?.change_request_type}
+                                </span>
+                              </p>
 
-          {canMakeChanges && (
-            <button
-              type="button"
-              className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs lg:text-[13px] font-semibold text-white transition hover:bg-blue-700 whitespace-nowrap"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const changeType =
-                  request.payload?.change_request_type ||
-                  request.change_request_type ||
-                  request.payload?.change_type ||
-                  null;
+                              {canMakeChanges && (
+                                <button
+                                  type="button"
+                                  className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs lg:text-[13px] font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 whitespace-nowrap"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const changeType =
+                                      request.payload?.change_request_type ||
+                                      request.change_request_type ||
+                                      request.payload?.change_type ||
+                                      null;
 
-                if (typeof onOpenEditRequest === 'function') {
-                  onOpenEditRequest({
-                    pendingId: request.pending_id,
-                    changeType,
-                  });
-                }
-              }}
-            >
-              Make changes
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )}
-
-
+                                    if (typeof onOpenEditRequest === 'function') {
+                                      // set loading so the user knows it was clicked
+                                      setEditingPendingId(request.pending_id); // NEW
+                                      const maybePromise = onOpenEditRequest({
+                                        pendingId: request.pending_id,
+                                        changeType,
+                                      });
+                                      // If parent returns a promise, clear loading when it settles
+                                      if (
+                                        maybePromise &&
+                                        typeof maybePromise.finally === 'function'
+                                      ) {
+                                        maybePromise.finally(() => {
+                                          setEditingPendingId(null);
+                                        });
+                                      }
+                                      // If it's not a promise, we'll keep it "Opening…" until dialog closes
+                                    }
+                                  }}
+                                  disabled={isMakingChanges}
+                                >
+                                  {isMakingChanges ? 'Loading…' : 'Make changes'}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                   </div>
                 );
               })}

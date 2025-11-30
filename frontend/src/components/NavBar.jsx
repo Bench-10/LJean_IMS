@@ -171,7 +171,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
               </NavLink>
             )}
 
-            {roles.some(r => ['Branch Manager', 'Owner'].includes(r)) && (
+            {roles.some(r => ['Branch Manager'].includes(r)) && (
               <NavLink
                 to="/pending-inventory"
                 className={({ isActive }) =>
@@ -179,7 +179,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
                 }
                 onClick={() => setShowMobileMenu(false)}
               >
-                <FaClipboardList />Pending Inventory
+                <FaClipboardList />Requests
               </NavLink>
             )}
 

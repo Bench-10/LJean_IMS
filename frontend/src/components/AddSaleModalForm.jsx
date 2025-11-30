@@ -12,8 +12,6 @@ import { IoMdClose } from "react-icons/io";
 import useModalLock from "../hooks/useModalLock";
 import toast from 'react-hot-toast'; 
 
-
-
 function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSaleHeader, fetchProductsData }) {
 
   const { user } = useAuth();
@@ -22,15 +20,11 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
   //THIS PREVENTS USER WITH COMBINE ROLES OF MANAGER AND SALES ASSOCIATE TO SELL PRODUCTS FROM ALL BRANCHES
   if (user && user.role && user.role.some(role => ['Branch Manager'].includes(role))) {
-
     productsToSell = productsData.filter(product => product.branch_id === user.branch_id);
-
   }
-
 
   const dateToday = dayjs().format("YYYY-MM-DD");
   const dateTodayReadable = dayjs().format("MMMM D, YYYY");
-
 
   //HEADER INFORMATION
   const [chargeTo, setChargeTo] = useState('');
@@ -41,10 +35,6 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   // NEW: Delivery indicator
   const [isForDelivery, setIsForDelivery] = useState(false);
 
-
-
-
-
   //FOR DIALOG
   const [openDialog, setDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState('');
@@ -52,16 +42,9 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   // LOADING STATE
   const [loading, setLoading] = useState(false);
 
-
   useEffect(() => {
     setDate(dateToday)
   }, [openSaleModal]);
-
-
-  // Removed selling-units parsing; rely on product.unit and product.unit_price
-
-
-  // unit selection and conversion removed
 
   const createEmptySaleRow = () => ({
     product_id: '',
@@ -72,15 +55,11 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     // sellingUnits/baseQuantity removed; base quantity assumed 1
   });
 
-
   //PRODUCT INPUT INFORMATION
   const [productSelected, setProductSelected] = useState([]);
   const [rows, setRows] = React.useState([
     createEmptySaleRow()
   ]);
-
-
-
 
   //CALCULATING AMOUNT AND VAT
   const [additionalDiscount, setAdditionalDiscount] = useState(0);
@@ -89,29 +68,24 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   const [amountNetVat, setAmount] = useState(0);
   const [totalAmountDue, setTotalAmountDue] = useState(0);
 
-
   //FOR SEARCHABLE DROPDOWN
   const [searchTerms, setSearchTerms] = useState({});
   const [showDropdowns, setShowDropdowns] = useState({});
-
 
   //SEARCH TERM ERROR HANDLING
   const [someEmpy, setSomeEmpty] = useState(false);
   const [emptyQuantity, setEmptyQuantiy] = useState(false);
   const [quantityValidationErrors, setQuantityValidationErrors] = useState({});
 
-
   //QUANTITY VALIDATION
   const [exceedQuanity, setExceedQuanity] = useState([]);
-
-
 
   //TO RESET THE FORM ONCE CLOSED
   const closeModal = () => {
     setOpenSaleModal(false);
 
     setDialog(false);
-  setDialogMode('');
+    setDialogMode('');
 
     setRows([createEmptySaleRow()]);
     setProductSelected([]);
@@ -131,14 +105,10 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     setAdditionalDiscount(0);
     setDeliveryFee(0);
     setIsForDelivery(false);
-
-
   };
-
 
   //MULTIPLY THE AMOUNT BY THE PRODUCT'S UNIT PRICE
   const createAnAmount = (index, sourceRows = rows) =>{
-
     const currentRows = Array.isArray(sourceRows) ? [...sourceRows] : [...rows];
     const currentRow = { ...currentRows[index] };
     const currentId = currentRow.product_id;
@@ -178,46 +148,34 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     preventEmptyQuantity(currentRows);
     totalAmount(currentRows);
     setRows(currentRows);
-
   };
-
 
   //DISABLE BUTTON IF THERE ARE QUANTITY FEILDS THAT ARE CURRENTLY EMPTY
   const preventEmptyQuantity = (updatedRows) => {
-
     if (!updatedRows) {
       setEmptyQuantiy(false);
-
       return
     };
 
     const emptyQuantity = updatedRows.some(row => !row.product_id || row.product_id === '' || !row.quantity || Number(row.quantity) === 0)
-
     setEmptyQuantiy(emptyQuantity);
-
   };
-
 
   //ADDS ALL THE AMOUNT OF ALL THE PRODUCTS PRESENT IN THE SALE
   const totalAmount = (newData) => {
-
     const final = newData.reduce((sum, product) => {
       const value = Number(product.amount);
       return sum + (isNaN(value) ? 0 : value);
-
     }, 0);
 
     setAmount(final);
     vatAmount(final)
-
   };
-
 
   //CALCULATES THE VAT AND TOTAL AMOUNT
   const vatAmount = (amount) => {
     const vatCalculated = amount * 0.12;
     setVat(vatCalculated);
-
 
     calculateTotalAmount(amount, vatCalculated, additionalDiscount, deliveryFee);
   };
@@ -258,43 +216,32 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     calculateTotalAmount(amountNetVat, vat, additionalDiscount, feeAmount);
   };
 
-
   //REMOVES THE SPECIFIC ROW
   const removeSaleRow = (index) => {
-
     const removedRow = rows[index];
-  const removedProductId = removedRow?.product_id;
-  const removedProductKey = removedProductId !== undefined && removedProductId !== null ? String(removedProductId) : null;
+    const removedProductId = removedRow?.product_id;
+    const removedProductKey = removedProductId !== undefined && removedProductId !== null ? String(removedProductId) : null;
     const newRows = rows.filter((_, i) => i !== index);
-
 
     const newProductSelected = {};
     Object.keys(productSelected).forEach(key => {
       const keyIndex = parseInt(key);
       if (keyIndex < index) {
-
         newProductSelected[keyIndex] = productSelected[keyIndex];
       } else if (keyIndex > index) {
-
         newProductSelected[keyIndex - 1] = productSelected[keyIndex];
       }
-
     });
-
 
     const newSearchTerms = {};
     Object.keys(searchTerms).forEach(key => {
       const keyIndex = parseInt(key);
       if (keyIndex < index) {
-
         newSearchTerms[keyIndex] = searchTerms[keyIndex];
       } else if (keyIndex > index) {
-
         newSearchTerms[keyIndex - 1] = searchTerms[keyIndex];
       }
-
     });
-
 
     const newValidationErrors = {};
     Object.keys(quantityValidationErrors).forEach(key => {
@@ -306,7 +253,6 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
       }
     });
 
-
     setProductSelected(newProductSelected);
     setSearchTerms(newSearchTerms);
     setQuantityValidationErrors(newValidationErrors);
@@ -317,9 +263,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     if (removedProductKey) {
       setExceedQuanity(prev => prev.filter(id => id !== removedProductKey));
     }
-
   };
-
 
   //HANDLES SEARCH INPUT FOR DROPDOWN
   const handleSearchChange = (index, value) => {
@@ -331,12 +275,10 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
       ...prev,
       [index]: true
     }));
-
-
   };
+
   // Stores references to each input field (for focusing or validation)
   const inputRefs = useRef([]);
-
   const rowRefs = useRef([]); // store references to each row
   const desktopScrollRef = useRef(null); // Reference to the desktop scrollable container
   const mobileScrollRef = useRef(null); // Reference to the mobile scrollable container
@@ -351,8 +293,6 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
       preventEmptyQuantity(updatedRows);
 
-      // Wait for React to actually render the new row first
-      // Wait for render
       setTimeout(() => {
         const container =
           window.innerWidth >= 1024
@@ -360,32 +300,25 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
             : mobileScrollRef.current;
 
         if (container) {
-          // Always scroll to the very bottom smoothly
           container.scrollTo({
             top: container.scrollHeight,
             behavior: 'smooth',
           });
         }
-      }, 150); // small delay ensures layout is updated
-
-      return updatedRows; // ⏱ Slightly longer delay ensures DOM updated
+      }, 150);
 
       return updatedRows;
     });
   };
 
   const handleEmptysearchterm = () => {
-
     const anyEmpty = Object.values(searchTerms).some(val => !val || val.trim() === "");
     setSomeEmpty(anyEmpty);
-
   };
 
   useEffect(() => {
     handleEmptysearchterm();
-
   }, [searchTerms]);
-
 
   //HANDLES PRODUCT SELECTION FROM DROPDOWN
   const selectProduct = (index, product) => {
@@ -421,8 +354,8 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
       [index]: false
     }));
 
-  const productKey = String(product.product_id);
-  setExceedQuanity(prev => prev.filter(id => id !== productKey));
+    const productKey = String(product.product_id);
+    setExceedQuanity(prev => prev.filter(id => id !== productKey));
     setQuantityValidationErrors(prev => {
       if (!prev[index]) return prev;
       const newErrors = { ...prev };
@@ -430,10 +363,6 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
       return newErrors;
     });
   };
-
-
-  // unit change removed; units are fixed to product base unit
-
 
   //FILTERS PRODUCTS BASED ON SEARCH TERM
   const getFilteredProducts = (index) => {
@@ -445,7 +374,6 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
       return isNotSelected && matchesSearch;
     });
   };
-
 
   //SUBMIT THE DATA
   const submitSale = async () => {
@@ -466,8 +394,6 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
         additionalDiscount,
         deliveryFee,
         isForDelivery
-
-
       };
 
       const saleData = {
@@ -503,22 +429,26 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   };
 
   const canOpenSaleModal =
-  openSaleModal &&
-  user &&
-  user.role &&
-  user.role.some((role) => ["Sales Associate"].includes(role));
+    openSaleModal &&
+    user &&
+    user.role &&
+    user.role.some((role) => ["Sales Associate"].includes(role));
 
-// Lock scroll + intercept Back when this modal is really open
-useModalLock(canOpenSaleModal, closeModal);
+  // Lock scroll + intercept Back when this modal is really open
+  useModalLock(canOpenSaleModal, closeModal);
 
-
-
-
-  if (!user) return; // PREVENRTS RENDERING THE REST OF THE COMPONENT IF USER IS STILL EMPTY
+  if (!user) return null; // PREVENTS RENDERING THE REST OF THE COMPONENT IF USER IS STILL EMPTY
 
   // Form completeness check: TIN is optional; Address required only when delivery is selected
-  const isFormIncomplete = !amountNetVat || !totalAmountDue || !chargeTo || someEmpy || emptyQuantity || exceedQuanity.length > 0 || Object.keys(quantityValidationErrors).length > 0 || (isForDelivery && !address);
-
+  const isFormIncomplete =
+    !amountNetVat ||
+    !totalAmountDue ||
+    !chargeTo ||
+    someEmpy ||
+    emptyQuantity ||
+    exceedQuanity.length > 0 ||
+    Object.keys(quantityValidationErrors).length > 0 ||
+    (isForDelivery && !address);
 
   return (
     <div>
@@ -527,29 +457,25 @@ useModalLock(canOpenSaleModal, closeModal);
         <FormLoading message="Processing sale..." />
       )}
 
-      {openDialog &&
-
+      {openDialog && (
         <ConfirmationDialog
           mode={dialogMode}
           message={"Are you sure you want to add the informaion to the sale?"}
           submitFunction={() => submitSale()}
           onClose={() => { setDialog(false); setDialogMode('') }}
-
         />
-
-      }
+      )}
 
       {canOpenSaleModal && (
         <div
           className="fixed inset-0 bg-black/35 bg-opacity-50 z-[9998] backdrop-blur-sm transition-opacity"
-          style={{ pointerEvents: 'auto' }} onClick={closeModal}
+          style={{ pointerEvents: 'auto' }}
+          onClick={closeModal}
         />
       )}
 
       <dialog className='bg-transparent fixed top-0 bottom-0 z-[9999] rounded-lg animate-popup' open={canOpenSaleModal}>
         <div className="relative flex flex-col border border-gray-300 bg-white h-[90vh] max-h-[1000px] w-[95vw] lg:w-[1100px] rounded-lg shadow-2xl animate-popup" >
-
-
           {/* FIXED HEADER */}
           <div className='bg-gradient-to-r from-green-700 to-green-800 text-white lg:px-8 px-5 py-6 rounded-t-lg'>
             <div className='flex justify-between items-start'>
@@ -579,15 +505,13 @@ useModalLock(canOpenSaleModal, closeModal);
 
           <div className="flex-1 overflow-y-auto lg:px-8 px-4 py-6 hide-scrollbar">
             {/*FORMS */}
-            <form onSubmit={(e) => { e.preventDefault(); setDialog(true); setDialogMode('add') }} className='w-full flex-1 flex flex-col'>
-
-
+            <form
+              onSubmit={(e) => { e.preventDefault(); setDialog(true); setDialogMode('add') }}
+              className='w-full flex-1 flex flex-col'
+            >
               {/*CUSTOMER INFORMATION*/}
-
               <div className='mb-6'>
-
                 <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm'>
-
                   <div className='w-full'>
                     <label className='block text-xs font-bold mb-2 text-gray-600 uppercase tracking-wide'>Charge To</label>
                     <input
@@ -633,11 +557,8 @@ useModalLock(canOpenSaleModal, closeModal);
                       readOnly
                     />
                   </div>
-
                 </div>
               </div>
-
-
 
               {/*PRODUCT INFORMATION*/}
               <div className='mb-6'>
@@ -658,9 +579,9 @@ useModalLock(canOpenSaleModal, closeModal);
                   </button>
                 </div>
 
-
                 {/* Desktop Table View */}
-                <div ref={desktopScrollRef}
+                <div
+                  ref={desktopScrollRef}
                   className="hidden lg:block h-[180px] max-h-[300px] overflow-y-auto border border-gray-200 rounded-lg mb-8 bg-white shadow-sm hide-scrollbar"
                 >
                   <table className="w-full divide-y divide-gray-200 text-sm ">
@@ -690,22 +611,16 @@ useModalLock(canOpenSaleModal, closeModal);
                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                           ACTION
                         </th>
-
                       </tr>
-
                     </thead>
 
-                    <tbody
-
-                      className="bg-white divide-y divide-gray-200"
-                    >
+                    <tbody className="bg-white divide-y divide-gray-200">
                       {rows.map((row, idx) => (
                         <tr
                           key={idx}
                           ref={el => (rowRefs.current[idx] = el)}
                           className="hover:bg-gray-50 transition-colors"
                         >
-
                           {/* 🔹 Item number column (no header title) */}
                           <td className="text-center text-sm text-gray-600 font-medium w-12">
                             {idx + 1}
@@ -759,8 +674,6 @@ useModalLock(canOpenSaleModal, closeModal);
                             </div>
                           </td>
 
-
-
                           <td className="px-2 relative">
                             <div className="relative">
                               {/* Hovering "Not enough stocks" message above quantity field */}
@@ -797,18 +710,17 @@ useModalLock(canOpenSaleModal, closeModal);
                             </div>
                           </td>
 
-
+                          {/* 🔹 UNIT FIELD (LIGHTER / FADED) */}
                           <td className="px-2 relative cursor-not-allowed overflow-visible min-w-[140px]">
                             <input
                               type="text"
-                              className="border w-full rounded-md px-2 py-1.5 bg-gray-50"
+                              className="border w-full rounded-md px-2 py-1.5 bg-gray-50 text-gray-400"
                               placeholder={row.product_id ? 'Unit' : 'Choose a product'}
                               disabled={!row.product_id}
                               value={row.unit || ''}
                               readOnly
                             />
                           </td>
-
 
                           <td className="px-2">
                             <input
@@ -819,7 +731,6 @@ useModalLock(canOpenSaleModal, closeModal);
                             />
                           </td>
 
-
                           <td className="px-2">
                             <input
                               type="text"
@@ -829,30 +740,26 @@ useModalLock(canOpenSaleModal, closeModal);
                             />
                           </td>
 
-
                           <td className="px-2 text-center">
                             <button
                               type="button"
                               className="bg-green-600 hover:bg-green-500  text-white font-medium text-sm px-3 py-1 rounded"
-                               onClick={() => {removeSaleRow(idx); preventEmptyQuantity()}}
-
+                              onClick={() => {removeSaleRow(idx); preventEmptyQuantity()}}
                             >
                               Remove
                             </button>
-
                           </td>
                         </tr>
                       ))}
-
                     </tbody>
-
                   </table>
                 </div>
 
                 {/* Mobile Card View */}
                 <div
                   ref={mobileScrollRef}
-                  className="lg:hidden max-h-[300px] overflow-y-auto space-y-4 mb-8 hide-scrollbar">
+                  className="lg:hidden max-h-[300px] overflow-y-auto space-y-4 mb-8 hide-scrollbar"
+                >
                   {rows.map((row, idx) => (
                     <div
                       key={idx}
@@ -960,14 +867,13 @@ useModalLock(canOpenSaleModal, closeModal);
                           <label className="block text-xs font-bold mb-1 text-gray-600 uppercase">Unit</label>
                           <input
                             type="text"
-                            className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50"
+                            className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-400 opacity-70"
                             placeholder={row.product_id ? 'Unit' : 'Choose product first'}
                             disabled={!row.product_id}
                             value={row.unit || ''}
                             readOnly
                           />
                         </div>
-
                       </div>
 
                       {/* Unit Price and Amount */}
@@ -984,12 +890,12 @@ useModalLock(canOpenSaleModal, closeModal);
 
                         <div>
                           <label className='block text-xs font-bold mb-1 text-gray-600 uppercase'>Amount</label>
-                            <input
-                              type="text"
-                              className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50 font-semibold"
-                              value={formatNumberWithSeparators(row.amount)}
-                              readOnly
-                            />
+                          <input
+                            type="text"
+                            className="border w-full rounded-md px-3 py-2 text-sm bg-gray-50 font-semibold"
+                            value={formatNumberWithSeparators(row.amount)}
+                            readOnly
+                          />
                         </div>
                       </div>
 
@@ -1005,10 +911,8 @@ useModalLock(canOpenSaleModal, closeModal);
                   ))}
                 </div>
 
-
                 {/* NEW: Additional Discount and Delivery Fee Fields */}
                 <div className='grid grid-cols-1 md:grid-cols-3 gap-3 my-2 p-3 rounded-lg border'>
-
                   {/* Delivery Checkbox */}
                   <div className='w-full flex items-center'>
                     <input
@@ -1018,7 +922,10 @@ useModalLock(canOpenSaleModal, closeModal);
                       checked={isForDelivery}
                       onChange={(e) => setIsForDelivery(e.target.checked)}
                     />
-                    <label htmlFor="isForDelivery" className='text-xs font-medium text-gray-700 uppercase tracking-wide cursor-pointer'>
+                    <label
+                      htmlFor="isForDelivery"
+                      className='text-xs font-medium text-gray-700 uppercase tracking-wide cursor-pointer'
+                    >
                       For Delivery
                     </label>
                   </div>
@@ -1055,7 +962,6 @@ useModalLock(canOpenSaleModal, closeModal);
                       placeholder="Enter additional discount"
                     />
                   </div>
-
                 </div>
               </div>
 
@@ -1087,7 +993,6 @@ useModalLock(canOpenSaleModal, closeModal);
                           <span className='ml-2 font-medium text-red-600'>-{currencyFormat(toTwoDecimals(additionalDiscount))}</span>
                         </div>
                       )}
-
                     </div>
                   </div>
                   <div className='border-t border-gray-300 pt-3'>
@@ -1103,7 +1008,8 @@ useModalLock(canOpenSaleModal, closeModal);
                   <button
                     disabled={isFormIncomplete}
                     type='submit'
-                    className={`py-2 lg:py-3 px-12 lg:text-base text-sm font-semibold rounded-lg transition-all duration-200 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5`}>
+                    className={`py-2 lg:py-3 px-12 lg:text-base text-sm font-semibold rounded-lg transition-all duration-200 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5`}
+                  >
                     Confirm Sale
                   </button>
 
@@ -1114,18 +1020,12 @@ useModalLock(canOpenSaleModal, closeModal);
                   )}
                 </div>
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       </dialog>
-
     </div>
   )
-
 }
 
 export default AddSaleModalForm

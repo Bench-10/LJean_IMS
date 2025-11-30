@@ -166,12 +166,10 @@ function InventoryRequestHistoryModal({
         <div className="bg-green-700 p-3 sm:p-4 rounded-t-lg flex justify-between items-center gap-3 flex-shrink-0 sticky top-0 z-10">
           <div className="flex flex-col gap-1">
             <h1 className="text-white font-bold text-lg lg:text-2xl flex items-center gap-2">
-              <MdHistory className="text-xl" />
+              <MdHistory className="text-2xl" />
               Request History
             </h1>
-            <span className="inline-flex items-center rounded-full bg-emerald-100/90 text-emerald-900 text-xs font-semibold px-3 py-1">
-              Complete audit trail of this inventory request
-            </span>
+
           </div>
 
           <button
@@ -196,7 +194,9 @@ function InventoryRequestHistoryModal({
               <div className="text-sm text-gray-600">{error}</div>
             </div>
           ) : history.length === 0 ? (
-            <NoInfoFound message="No history found for this request." />
+              <div className="flex h-full min-h-[180px] items-center justify-center text-center">
+    <NoInfoFound message="No history found for this request." />
+  </div>
           ) : (
             <div className="space-y-4">
               {[...history].reverse().map((entry, index) => (
@@ -346,10 +346,10 @@ function InventoryRequestHistoryModal({
         </div>
 
         {/* Footer */}
-        <div className="bg-white border-t border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex justify-end">
+        <div className="bg-white border-t border-gray-200 px-4 sm:px-4 py-3 sm:py-3 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 sm:px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md text-sm sm:text-base"
+            className="px-4 sm:px-5 py-1.5 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md text-sm sm:text-base"
           >
             Close
           </button>
