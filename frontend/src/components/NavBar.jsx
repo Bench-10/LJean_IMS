@@ -3,6 +3,7 @@ import { MdOutlineInventory, MdOutlineLogout,MdOutlineDashboard, MdMenu, MdClose
 import { IoMdNotifications } from "react-icons/io";
 import { PiSealWarningBold } from "react-icons/pi";
 import {FaUsersCog, FaMoneyBillWave, FaShippingFast, FaClipboardCheck, FaClipboardList } from "react-icons/fa";
+import { FiSettings } from "react-icons/fi";
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../authentication/Authentication';
 import LogoutDialog from './dialogs/LogoutDialog';
@@ -171,7 +172,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
               </NavLink>
             )}
 
-            {roles.some(r => ['Branch Manager'].includes(r)) && (
+            {roles.some(r => ['Branch Manager', 'Owner'].includes(r)) && (
               <NavLink
                 to="/pending-inventory"
                 className={({ isActive }) =>
@@ -179,7 +180,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
                 }
                 onClick={() => setShowMobileMenu(false)}
               >
-                <FaClipboardList />Requests
+                <FaClipboardList />Pending Inventory
               </NavLink>
             )}
 
@@ -240,6 +241,18 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
                 onClick={() => setShowMobileMenu(false)}
               >
                 <FaClipboardCheck />Requests
+              </NavLink>
+            )}
+
+            {roles.some(r => ['Owner'].includes(r)) && (
+              <NavLink
+                to="/owner-settings"
+                className={({ isActive }) =>
+                  isActive ? "text-[15px] border-l-8 bg-[#254717] border-l-green-400" : ""
+                }
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <FiSettings />Account Settings
               </NavLink>
             )}
           </ul>

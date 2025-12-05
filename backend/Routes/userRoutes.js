@@ -35,6 +35,10 @@ router.post("/create_account", accountCreationLimiter, userControllers.userCreat
 router.put("/update_account/:id", authenticate, requireRole('Owner', 'Branch Manager'), userControllers.userUpdateAccount);
 
 
+//OWNER ACCOUNT SETTINGS
+router.put("/admin/credentials", authenticate, requireRole('Owner'), userControllers.updateOwnerCredentials);
+
+
 //APPROVE PENDING USER ACCOUNT
 router.patch("/users/:id/approval", authenticate, requireRole('Owner'), userControllers.approvePendingUser);
 

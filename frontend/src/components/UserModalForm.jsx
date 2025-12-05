@@ -54,9 +54,17 @@ function UserModalForm({
   ];
 
   const passwordStrength = (value) => {
-    if (!value || value.length < 8) return setPasswordCheck('Password must be at least 8 characters!');
-    if (!(/\d/.test(value))) return setPasswordCheck('Password must have at least one number!');
-    if (!(/[^a-zA-Z0-9]/.test(value))) return setPasswordCheck('Password must contain one special character!');
+    if (!value || value.length < 8){
+      return setPasswordCheck('Password must be at least 8 characters!');
+    } 
+    if (!(/\d/.test(value))){
+      return setPasswordCheck('Password must have at least one number!');
+    } 
+    if (!(/[^a-zA-Z0-9]/.test(value))){
+      return setPasswordCheck('Password must contain one special character!');
+
+    } 
+    
     setPasswordCheck('');
   };
 

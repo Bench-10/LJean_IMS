@@ -343,6 +343,41 @@ function BranchPerformance({
                     fill="#8884d8"
                     stroke="#fff"
                     strokeWidth={responsiveSizes.isMobile ? 1 : 2}
+                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percentage, index }) => {
+                      const RADIAN = Math.PI / 180;
+                      // For small slices (< 8%), place label outside with a line
+                      if (percentage < 8) {
+                        const outerLabelRadius = outerRadius + 18;
+                        const x = cx + outerLabelRadius * Math.cos(-midAngle * RADIAN);
+                        const y = cy + outerLabelRadius * Math.sin(-midAngle * RADIAN);
+                        const textAnchor = x > cx ? 'start' : 'end';
+                        return (
+                          <text x={x} y={y} fill={PIE_COLORS[index % PIE_COLORS.length]} textAnchor={textAnchor} dominantBaseline="central" style={{ fontSize: 8, fontWeight: 600 }}>
+                            {`${percentage}%`}
+                          </text>
+                        );
+                      }
+                      // For larger slices, place label inside
+                      const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                      return (
+                        <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" style={{ fontSize: 8, fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                          {`${percentage}%`}
+                        </text>
+                      );
+                    }}
+                    labelLine={({ cx, cy, midAngle, outerRadius, percentage }) => {
+                      if (percentage >= 8) return null;
+                      const RADIAN = Math.PI / 180;
+                      const startX = cx + outerRadius * Math.cos(-midAngle * RADIAN);
+                      const startY = cy + outerRadius * Math.sin(-midAngle * RADIAN);
+                      const endX = cx + (outerRadius + 12) * Math.cos(-midAngle * RADIAN);
+                      const endY = cy + (outerRadius + 12) * Math.sin(-midAngle * RADIAN);
+                      return (
+                        <path d={`M${startX},${startY}L${endX},${endY}`} stroke="#94a3b8" strokeWidth={1} fill="none" />
+                      );
+                    }}
                   >
                     {processedPieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />

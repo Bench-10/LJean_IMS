@@ -2,9 +2,11 @@ import * as userDetails from '../Services/users/userDetails.js';
 import * as userAuthentication from '../Services/users/userAuthentication.js';
 import * as userCreation from '../Services/users/userCreation.js';
 import * as disableEnableAccount from '../Services/users/disableEnableAccount.js';
+import * as adminAccount from '../Services/users/adminAccount.js';
 import { SQLquery } from '../db.js';
 import { generateToken } from '../utils/jwt.js';
 import { getTokenCookieName, getTokenCookieOptions } from '../utils/authCookies.js';
+import { decodeHashedPassword } from '../Services/Services_Utils/passwordHashing.js';
 
 
 // GET CURRENT USER FROM JWT (CANNOT BE FAKED - READS FROM DATABASE)
@@ -21,6 +23,8 @@ export const getCurrentUser = async (req, res) => {
                 first_name: req.user.first_name,
                 last_name: req.user.last_name,
                 full_name: `${req.user.first_name} ${req.user.last_name}`,
+                username: req.user.username,
+                email: req.user.username,
                 user_type: 'admin'
             });
         }
@@ -169,6 +173,112 @@ export const userUpdateAccount = async (req, res) =>{
         res.status(500).json({message: 'Internal Server Error'})
     }
 }
+
+
+
+export const updateOwnerCredentials = async (req, res) => {
+    try {
+        if (!req.user || req.user.user_type !== 'admin') {
+            return res.status(403).json({ message: 'Only owners can update these settings.' });
+        }
+
+        const adminId = Number(req.user.admin_id ?? req.user.id ?? req.user.user_id ?? null);
+        if (!Number.isFinite(adminId)) {
+            return res.status(400).json({ message: 'Invalid administrator account.' });
+        }
+
+        const payload = req.body ?? {};
+        const rawEmail = typeof payload.email === 'string' ? payload.email.trim() : '';
+        const currentPassword = typeof payload.currentPassword === 'string' ? payload.currentPassword : '';
+        const newPassword = typeof payload.newPassword === 'string' ? payload.newPassword : '';
+
+        if (!currentPassword) {
+            return res.status(400).json({ message: 'Current password is required.' });
+        }
+
+        const adminLookup = await SQLquery(
+            'SELECT username, password FROM Administrator WHERE admin_id = $1 LIMIT 1',
+            [adminId]
+        );
+
+        if (!adminLookup.rows.length) {
+            return res.status(404).json({ message: 'Administrator account not found.' });
+        }
+
+        const { username: storedUsername = '', password: existingPasswordHash } = adminLookup.rows[0];
+
+        const effectiveCurrentUsername = req.user.username || storedUsername || '';
+        const wantsEmailChange = Boolean(rawEmail) && rawEmail !== effectiveCurrentUsername;
+        const wantsPasswordChange = Boolean(newPassword);
+
+        if (!wantsEmailChange && !wantsPasswordChange) {
+            return res.status(400).json({ message: 'No changes submitted.' });
+        }
+
+        const passwordValid = await decodeHashedPassword(currentPassword, existingPasswordHash);
+        if (!passwordValid) {
+            return res.status(400).json({ message: 'Current password is incorrect.' });
+        }
+
+        if (wantsEmailChange) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(rawEmail)) {
+                return res.status(400).json({ message: 'Please enter a valid email address.' });
+            }
+
+            const duplicateCheck = await SQLquery(
+                'SELECT 1 FROM Administrator WHERE LOWER(username) = LOWER($1) AND admin_id <> $2',
+                [rawEmail, adminId]
+            );
+
+            if (duplicateCheck.rowCount > 0) {
+                return res.status(409).json({ message: 'Email is already in use.' });
+            }
+        }
+
+        if (wantsPasswordChange) {
+            if (newPassword.trim().length < 8) {
+                return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
+            }
+
+            const passwordRequirements = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+            if (!passwordRequirements.test(newPassword)) {
+                return res.status(400).json({ message: 'New password must include letters, numbers, and a special character.' });
+            }
+
+            const sameAsOld = await decodeHashedPassword(newPassword, existingPasswordHash);
+            if (sameAsOld) {
+                return res.status(400).json({ message: 'New password must be different from the current password.' });
+            }
+        }
+
+        const updated = await adminAccount.updateAdminCredentials({
+            adminId,
+            email: wantsEmailChange ? rawEmail : null,
+            newPassword: wantsPasswordChange ? newPassword : null
+        });
+
+        if (!updated) {
+            return res.status(500).json({ message: 'Failed to update account settings.' });
+        }
+
+        const fullName = `${updated.first_name ?? ''} ${updated.last_name ?? ''}`.replace(/\s+/g, ' ').trim();
+
+        return res.status(200).json({
+            admin_id: updated.admin_id,
+            username: updated.username,
+            email: updated.username,
+            role: updated.role,
+            first_name: updated.first_name,
+            last_name: updated.last_name,
+            full_name: fullName,
+            message: 'Account settings updated successfully.'
+        });
+    } catch (error) {
+        console.error('Error updating owner credentials:', error);
+        return res.status(500).json({ message: 'Unable to update account settings right now.' });
+    }
+};
 
 
 

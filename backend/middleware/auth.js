@@ -57,7 +57,7 @@ export async function authenticate(req, res, next) {
     let userData;
     if (decoded.user_type === 'admin') {
       const result = await SQLquery(
-        'SELECT admin_id as id, role, first_name, last_name FROM Administrator WHERE admin_id = $1',
+        'SELECT admin_id as id, username, role, first_name, last_name FROM Administrator WHERE admin_id = $1',
         [decoded.user_id]
       );
       if (!result.rows.length) {

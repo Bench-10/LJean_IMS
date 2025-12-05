@@ -112,7 +112,7 @@ export const userAuth = async(loginInformation) =>{
     };
 
     const adminData = await SQLquery(
-        `SELECT admin_id, first_name, last_name, first_name || ' ' || last_name AS full_name, role FROM Administrator WHERE username = $1`,
+        `SELECT admin_id, username, first_name, last_name, first_name || ' ' || last_name AS full_name, role FROM Administrator WHERE username = $1`,
         [username]
 
     );

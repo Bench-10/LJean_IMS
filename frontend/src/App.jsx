@@ -31,6 +31,7 @@ import Approvals from "./Pages/Approvals";
 import { Toaster, toast } from "react-hot-toast";
 import InventoryRequestMonitorDialog from "./components/dialogs/InventoryRequestMonitorDialog.jsx";
 import PendingRequestsGuardDialog from "./components/dialogs/PendingRequestsGuardDialog.jsx";
+import Settings from "./Pages/Settings";
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 const TAB_HIDDEN_GRACE_MS = 20 * 1000;
@@ -3390,6 +3391,13 @@ function App() {
 
             </RouteProtection>
 
+          }/>
+
+
+          <Route path="/owner-settings" exact element={
+            <RouteProtection allowedRoles={['Owner']}>
+              <Settings />
+            </RouteProtection>
           }/>
 
 

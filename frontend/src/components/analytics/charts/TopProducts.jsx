@@ -615,7 +615,20 @@ function TopProducts({
                   />
 
                   <Area type="monotone" dataKey="sales_amount" stroke="none" fillOpacity={1} fill="url(#colorSales)" />
-                  <Line type="monotone" dataKey="sales_amount" name="Sales" stroke="#0f766e" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="sales_amount" name="Sales" stroke="#0f766e" strokeWidth={2} dot={{ r: 3, fill: '#0f766e', strokeWidth: 0 }}>
+                    <LabelList
+                      dataKey="sales_amount"
+                      position="top"
+                      offset={8}
+                      formatter={(value) => {
+                        if (value == null || value === 0) return '';
+                        if (value >= 1000000) return `₱${(value / 1000000).toFixed(1)}M`;
+                        if (value >= 1000) return `₱${(value / 1000).toFixed(1)}K`;
+                        return `₱${value.toLocaleString()}`;
+                      }}
+                      style={{ fontSize: 9, fill: '#0f766e', fontWeight: 600 }}
+                    />
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -719,9 +732,35 @@ function TopProducts({
                       </>
                     )}
 
-                    <Area type="monotone" dataKey="actual_units" name="Actual Units" stroke="#0891b2" fillOpacity={1} fill="url(#colorUnits)" connectNulls={false} />
+                    <Area type="monotone" dataKey="actual_units" name="Actual Units" stroke="#0891b2" fillOpacity={1} fill="url(#colorUnits)" connectNulls={false}>
+                      <LabelList
+                        dataKey="actual_units"
+                        position="top"
+                        offset={8}
+                        formatter={(value) => {
+                          if (value == null || value === 0) return '';
+                          if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                          if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                          return value.toLocaleString();
+                        }}
+                        style={{ fontSize: 9, fill: '#0891b2', fontWeight: 600 }}
+                      />
+                    </Area>
                     {hasForecastData && (
-                      <Line type="monotone" dataKey="forecast_units" name="Forecast Units" stroke="#f97316" strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls={false} />
+                      <Line type="monotone" dataKey="forecast_units" name="Forecast Units" stroke="#f97316" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 3, fill: '#f97316', strokeWidth: 0 }} connectNulls={false}>
+                        <LabelList
+                          dataKey="forecast_units"
+                          position="top"
+                          offset={8}
+                          formatter={(value) => {
+                            if (value == null || value === 0) return '';
+                            if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                            if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                            return value.toLocaleString();
+                          }}
+                          style={{ fontSize: 9, fill: '#f97316', fontWeight: 600 }}
+                        />
+                      </Line>
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>

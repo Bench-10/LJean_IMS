@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import api, { cancelAllPendingRequests } from '../utils/api';
 
 
@@ -59,6 +59,19 @@ function Authentication ({ children }) {
 
 
 
+    const refreshUser = useCallback(async () => {
+      try {
+        const response = await api.get('/api/me');
+        setUser(response.data);
+        return response.data;
+      } catch (error) {
+        setUser(null);
+        throw error;
+      }
+    }, []);
+
+
+
     const logout = async (skipApiCall = false) => {
       cancelAllPendingRequests();
       // SEND LOGOUT API CALL FOR ALL USER TYPES TO UPDATE STATUS (UNLESS SKIPPED FOR DELETED USERS)
@@ -76,7 +89,7 @@ function Authentication ({ children }) {
 
 
     return (
-      <AuthContext.Provider value={{user, loginAuthentication, logout, loading}}>
+      <AuthContext.Provider value={{user, loginAuthentication, logout, loading, refreshUser}}>
         {loading ? (
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
