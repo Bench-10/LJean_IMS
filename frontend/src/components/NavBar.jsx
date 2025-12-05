@@ -172,7 +172,7 @@ function NavBar({ setOpenNotif = () => {}, unreadCount = 0, onOpenRequestMonitor
               </NavLink>
             )}
 
-            {roles.some(r => ['Branch Manager', 'Owner'].includes(r)) && (
+            {roles.some(r => ['Branch Manager'].includes(r)) && (
               <NavLink
                 to="/pending-inventory"
                 className={({ isActive }) =>

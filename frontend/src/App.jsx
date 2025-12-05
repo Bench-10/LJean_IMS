@@ -3282,7 +3282,7 @@ function App() {
          
 
           <Route path="/pending-inventory" exact element={
-            <RouteProtection allowedRoles={['Owner', 'Branch Manager']}>
+            <RouteProtection allowedRoles={['Branch Manager']}>
               <PendingInventoryRequests
                 pendingRequests={pendingInventoryRequests}
                 pendingRequestsLoading={pendingInventoryLoading}

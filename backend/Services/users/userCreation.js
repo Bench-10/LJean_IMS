@@ -596,6 +596,22 @@ export const deleteUser = async (userID, branchId, options = {}) =>{
         throw error;
     }
 
+    // IMPORTANT: Auto-reject BEFORE nullifying created_by, otherwise we lose the reference
+    // If the original requester (Inventory Staff) is deleted and their request is in "changes_requested" status,
+    // automatically reject the request since no one can fulfill the revision request.
+    await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET status = 'rejected',
+             rejection_reason = CONCAT(
+                 COALESCE(rejection_reason, ''),
+                 CASE WHEN rejection_reason IS NOT NULL AND rejection_reason <> '' THEN ' | ' ELSE '' END,
+                 'Auto-rejected: Requester account (', $1::text, ') was deleted.'
+             )
+         WHERE created_by = $2
+           AND status = 'changes_requested'`,
+        [fullName, userIdInt]
+    );
+
     await SQLquery(
         `UPDATE Inventory_Pending_Actions
          SET created_by_name = COALESCE(created_by_name, $1),
@@ -619,6 +635,23 @@ export const deleteUser = async (userID, branchId, options = {}) =>{
         `UPDATE Inventory_Pending_Actions
          SET approved_by = NULL
          WHERE approved_by = $1`,
+        [userIdInt]
+    );
+
+    // Nullify revision_requested_by references (Branch Manager who requested changes was deleted)
+    // Don't reject the request - just clear the reference so someone else can handle it
+    await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET revision_requested_by = NULL
+         WHERE revision_requested_by = $1`,
+        [userIdInt]
+    );
+
+    // Nullify change_requested_by for any remaining references
+    await SQLquery(
+        `UPDATE Inventory_Pending_Actions
+         SET change_requested_by = NULL
+         WHERE change_requested_by = $1`,
         [userIdInt]
     );
 
