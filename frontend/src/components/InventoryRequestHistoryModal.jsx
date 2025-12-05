@@ -311,7 +311,8 @@ function InventoryRequestHistoryModal({
                         parsed.change_request_comment || 
                         parsed.change_type || 
                         parsed.cancellation_reason !== undefined ||
-                        parsed.rejection_reason !== undefined
+                        parsed.rejection_reason !== undefined ||
+                        parsed.auto_rejected !== undefined
                       );
 
                       // If this payload has structured fields (we already rendered them above), don't render raw JSON again

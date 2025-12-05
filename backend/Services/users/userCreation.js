@@ -599,6 +599,35 @@ export const deleteUser = async (userID, branchId, options = {}) =>{
     // IMPORTANT: Auto-reject BEFORE nullifying created_by, otherwise we lose the reference
     // If the original requester (Inventory Staff) is deleted and their request is in "changes_requested" status,
     // automatically reject the request since no one can fulfill the revision request.
+    
+    // First, get the pending_ids that will be auto-rejected so we can log history
+    const { rows: requestsToAutoReject } = await SQLquery(
+        `SELECT pending_id, payload
+         FROM Inventory_Pending_Actions
+         WHERE created_by = $1
+           AND status = 'changes_requested'`,
+        [userIdInt]
+    );
+
+    // Log history for each auto-rejected request
+    for (const request of requestsToAutoReject) {
+        await SQLquery(
+            `INSERT INTO inventory_request_history
+             (pending_id, action_type, action_description, user_name, user_role, old_payload, additional_data)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+                request.pending_id,
+                'rejected',
+                `Request auto-rejected: Requester account (${fullName}) was deleted`,
+                'System',
+                'System',
+                request.payload ? JSON.stringify(request.payload) : null,
+                JSON.stringify({ auto_rejected: true, deleted_user: fullName, deleted_user_id: userIdInt })
+            ]
+        );
+    }
+
+    // Now update the requests to rejected status
     await SQLquery(
         `UPDATE Inventory_Pending_Actions
          SET status = 'rejected',
