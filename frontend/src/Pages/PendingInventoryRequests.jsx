@@ -410,7 +410,7 @@ function PendingInventoryRequests({
         ref={listContainerRef}
       >
         {pendingRequestsLoading ? (
-          <div className="py-12 px-6">
+          <div className="relative flex min-h-[320px] items-center justify-center px-6 py-12">
             <ChartLoading message="Loading pending inventory approvals..." />
           </div>
         ) : pendingCount === 0 ? (
