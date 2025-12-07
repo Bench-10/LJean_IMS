@@ -1,11 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { HiOutlineMail } from 'react-icons/hi';
-import { FiLock, FiSettings } from 'react-icons/fi';
+import { FiLock, FiSettings, FiEye, FiEyeOff } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import api from '../utils/api';
 import { useAuth } from '../authentication/Authentication';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const passwordFormatMessage = (value = '') => {
+	const trimmed = value.trim();
+	if (!trimmed) return '';
+	if (trimmed.length < 8) return 'Password must be at least 8 characters long.';
+	if (!/[A-Za-z]/.test(trimmed)) return 'Password must include at least one letter.';
+	if (!/\d/.test(trimmed)) return 'Password must include at least one number.';
+	if (!/[^A-Za-z0-9]/.test(trimmed)) return 'Password must include at least one special character.';
+	return '';
+};
 
 function Settings() {
 	const { user, refreshUser } = useAuth();
@@ -20,6 +29,16 @@ function Settings() {
 	const [initialEmail, setInitialEmail] = useState('');
 	const [errors, setErrors] = useState({});
 	const [submitting, setSubmitting] = useState(false);
+	const [passwordFeedback, setPasswordFeedback] = useState({
+		currentPassword: '',
+		newPassword: '',
+		confirmPassword: ''
+	});
+	const [passwordVisibility, setPasswordVisibility] = useState({
+		currentPassword: false,
+		newPassword: false,
+		confirmPassword: false
+	});
 
 	useEffect(() => {
 		const currentEmail = (user?.username || user?.email || '').trim();
@@ -28,6 +47,16 @@ function Settings() {
 			...prev,
 			email: currentEmail
 		}));
+		setPasswordFeedback({
+			currentPassword: '',
+			newPassword: '',
+			confirmPassword: ''
+		});
+		setPasswordVisibility({
+			currentPassword: false,
+			newPassword: false,
+			confirmPassword: false
+		});
 	}, [user]);
 
 	const hasChanges = useMemo(() => {
@@ -38,9 +67,47 @@ function Settings() {
 		return emailChanged || passwordChanged;
 	}, [formValues.email, formValues.newPassword, formValues.confirmPassword, initialEmail]);
 
+	const updatePasswordFeedback = (field, nextValues) => {
+		if (!['currentPassword', 'newPassword', 'confirmPassword'].includes(field)) {
+			return;
+		}
+
+		setPasswordFeedback((prev) => {
+			const next = { ...prev };
+			if (field === 'confirmPassword') {
+				const formatMessage = passwordFormatMessage(nextValues.confirmPassword);
+				next.confirmPassword =
+					formatMessage ||
+					(nextValues.confirmPassword &&
+						nextValues.newPassword &&
+						nextValues.confirmPassword !== nextValues.newPassword
+							? 'Passwords do not match.'
+							: '');
+			} else {
+				next[field] = passwordFormatMessage(nextValues[field]);
+			}
+
+			if (field === 'newPassword') {
+				const confirmMessage = passwordFormatMessage(nextValues.confirmPassword);
+				next.confirmPassword =
+					confirmMessage ||
+					(nextValues.confirmPassword &&
+						nextValues.confirmPassword !== nextValues.newPassword
+							? 'Passwords do not match.'
+							: '');
+			}
+
+			return next;
+		});
+	};
+
 	const handleChange = (field) => (event) => {
 		const value = event.target.value;
-		setFormValues((prev) => ({ ...prev, [field]: value }));
+		setFormValues((prev) => {
+			const next = { ...prev, [field]: value };
+			updatePasswordFeedback(field, next);
+			return next;
+		});
 		if (errors[field]) {
 			setErrors((prev) => ({ ...prev, [field]: '' }));
 		}
@@ -49,14 +116,19 @@ function Settings() {
 		}
 	};
 
+	const togglePasswordVisibility = (field) => () => {
+		setPasswordVisibility((prev) => ({
+			...prev,
+			[field]: !prev[field]
+		}));
+	};
+
 	const validate = () => {
 		const newErrors = {};
 		const trimmedEmail = (formValues.email || '').trim();
 		const normalizedInitial = (initialEmail || '').trim().toLowerCase();
 		const wantsEmailChange = trimmedEmail.toLowerCase() !== normalizedInitial;
 		const wantsPasswordChange = Boolean(formValues.newPassword) || Boolean(formValues.confirmPassword);
-		const passwordValue = formValues.newPassword || '';
-		const passwordRequirements = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
 		if (!wantsEmailChange && !wantsPasswordChange) {
 			newErrors.general = 'No changes to save.';
@@ -68,23 +140,36 @@ function Settings() {
 		}
 
 		if (wantsPasswordChange) {
-			if (!passwordValue) {
+			if (!formValues.newPassword) {
 				newErrors.newPassword = 'Enter a new password.';
-			} else if (passwordValue.trim().length < 8) {
-				newErrors.newPassword = 'Password must be at least 8 characters long.';
-			} else if (!passwordRequirements.test(passwordValue)) {
-				newErrors.newPassword = 'Password must include letters, numbers, and a special character.';
+			} else {
+				const newPasswordFormat = passwordFormatMessage(formValues.newPassword);
+				if (newPasswordFormat) {
+					newErrors.newPassword = newPasswordFormat;
+				}
 			}
 
 			if (!formValues.confirmPassword) {
 				newErrors.confirmPassword = 'Confirm your new password.';
-			} else if (formValues.confirmPassword !== formValues.newPassword) {
-				newErrors.confirmPassword = 'Passwords do not match.';
+			} else {
+				const confirmPasswordFormat = passwordFormatMessage(formValues.confirmPassword);
+				if (confirmPasswordFormat) {
+					newErrors.confirmPassword = confirmPasswordFormat;
+				} else if (formValues.confirmPassword !== formValues.newPassword) {
+					newErrors.confirmPassword = 'Passwords do not match.';
+				}
 			}
 		}
 
-		if ((wantsEmailChange || wantsPasswordChange) && !formValues.currentPassword) {
-			newErrors.currentPassword = 'Enter your current password to continue.';
+		if (wantsEmailChange || wantsPasswordChange) {
+			if (!formValues.currentPassword) {
+				newErrors.currentPassword = 'Enter your current password to continue.';
+			} else {
+				const currentPasswordFormat = passwordFormatMessage(formValues.currentPassword);
+				if (currentPasswordFormat) {
+					newErrors.currentPassword = currentPasswordFormat;
+				}
+			}
 		}
 
 		return newErrors;
@@ -98,6 +183,16 @@ function Settings() {
 			confirmPassword: ''
 		});
 		setErrors({});
+		setPasswordFeedback({
+			currentPassword: '',
+			newPassword: '',
+			confirmPassword: ''
+		});
+		setPasswordVisibility({
+			currentPassword: false,
+			newPassword: false,
+			confirmPassword: false
+		});
 	};
 
 	const handleSubmit = async (event) => {
@@ -143,6 +238,16 @@ function Settings() {
 				currentPassword: '',
 				newPassword: '',
 				confirmPassword: ''
+			});
+			setPasswordFeedback({
+				currentPassword: '',
+				newPassword: '',
+				confirmPassword: ''
+			});
+			setPasswordVisibility({
+				currentPassword: false,
+				newPassword: false,
+				confirmPassword: false
 			});
 
 			if (typeof refreshUser === 'function') {
@@ -233,15 +338,27 @@ function Settings() {
 									</span>
 									<input
 										id="owner-current-password"
-										type="password"
+										type={passwordVisibility.currentPassword ? 'text' : 'password'}
 										value={formValues.currentPassword}
 										onChange={handleChange('currentPassword')}
-										className="w-full rounded-r-md border-0 py-2 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+										className="w-full flex-1 border-0 py-2 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
 										placeholder="Enter current password"
 										autoComplete="current-password"
 									/>
+									<button
+										type="button"
+										onClick={togglePasswordVisibility('currentPassword')}
+										className="px-3 text-slate-400 transition hover:text-slate-600 focus:outline-none"
+										aria-label={passwordVisibility.currentPassword ? 'Hide current password' : 'Show current password'}
+									>
+										{passwordVisibility.currentPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+									</button>
 								</div>
-								{errors.currentPassword && <p className="mt-1 text-xs text-red-500">{errors.currentPassword}</p>}
+								{(errors.currentPassword || passwordFeedback.currentPassword) && (
+									<p className="mt-1 text-xs text-red-500">
+										{errors.currentPassword || passwordFeedback.currentPassword}
+									</p>
+								)}
 							</div>
 
 							<div>
@@ -254,15 +371,27 @@ function Settings() {
 									</span>
 									<input
 										id="owner-new-password"
-										type="password"
+										type={passwordVisibility.newPassword ? 'text' : 'password'}
 										value={formValues.newPassword}
 										onChange={handleChange('newPassword')}
-										className="w-full rounded-r-md border-0 py-2 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+										className="w-full flex-1 border-0 py-2 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
 										placeholder="Leave blank to keep current password"
 										autoComplete="new-password"
 									/>
+									<button
+										type="button"
+										onClick={togglePasswordVisibility('newPassword')}
+										className="px-3 text-slate-400 transition hover:text-slate-600 focus:outline-none"
+										aria-label={passwordVisibility.newPassword ? 'Hide new password' : 'Show new password'}
+									>
+										{passwordVisibility.newPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+									</button>
 								</div>
-								{errors.newPassword && <p className="mt-1 text-xs text-red-500">{errors.newPassword}</p>}
+								{(errors.newPassword || passwordFeedback.newPassword) && (
+									<p className="mt-1 text-xs text-red-500">
+										{errors.newPassword || passwordFeedback.newPassword}
+									</p>
+								)}
 							</div>
 
 							<div>
@@ -275,22 +404,32 @@ function Settings() {
 									</span>
 									<input
 										id="owner-confirm-password"
-										type="password"
+										type={passwordVisibility.confirmPassword ? 'text' : 'password'}
 										value={formValues.confirmPassword}
 										onChange={handleChange('confirmPassword')}
-										className="w-full rounded-r-md border-0 py-2 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+										className="w-full flex-1 border-0 py-2 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
 										placeholder="Retype new password"
 										autoComplete="new-password"
 									/>
+									<button
+										type="button"
+										onClick={togglePasswordVisibility('confirmPassword')}
+										className="px-3 text-slate-400 transition hover:text-slate-600 focus:outline-none"
+										aria-label={passwordVisibility.confirmPassword ? 'Hide password confirmation' : 'Show password confirmation'}
+									>
+										{passwordVisibility.confirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+									</button>
 								</div>
-								{errors.confirmPassword && <p className="mt-1 text-xs text-red-500">{errors.confirmPassword}</p>}
+								{(errors.confirmPassword || passwordFeedback.confirmPassword) && (
+									<p className="mt-1 text-xs text-red-500">
+										{errors.confirmPassword || passwordFeedback.confirmPassword}
+									</p>
+								)}
 							</div>
 						</div>
 
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-							<div className="text-xs text-slate-500">
-								Passwords must be at least 8 characters long and should combine letters, numbers, and symbols for best security.
-							</div>
+							<div></div>
 							<div className="flex gap-3">
 								<button
 									type="button"
