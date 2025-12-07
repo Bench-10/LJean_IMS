@@ -118,8 +118,7 @@ function Category({
       {/* MAIN OVERLAY */}
       {isCategoryOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-[9998] backdrop-blur-sm"
-          style={{ pointerEvents: 'auto' }}
+          className="fixed inset-0 bg-black/50 z-[9998] backdrop-blur-sm pointer-events-auto"
           onClick={() => {
             // If edit popup is open, close that first instead of killing the whole modal
             if (openEdit) {

@@ -40,9 +40,8 @@ function AccountDisabledPopUp({ open, type, onAction, onClose, user }) {
     >
       {/* OVERLAY — click to close ONLY when there is NO user */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${!user ? 'cursor-pointer' : 'cursor-default'}`}
         onClick={!user ? onClose : undefined}
-        style={{ cursor: !user ? 'pointer' : 'default' }}
       />
 
       {/* DIALOG */}
