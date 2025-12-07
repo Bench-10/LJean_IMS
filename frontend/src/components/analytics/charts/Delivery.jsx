@@ -69,11 +69,11 @@ function Delivery({
     // yearly
     return raw;
   }, [deliveryInterval]);
-                    <span className="w-3 h-3 rounded-sm bg-emerald-400" />
+
   // If there are many bars, tilt labels for readability. Thresholds tuned so
   // initial window sizes (daily=20) still show labels by default.
   const manyTicks = normalizedData.length > (deliveryInterval === 'daily' ? 24 : 12);
-                    <span className="w-3 h-3 rounded-sm bg-red-400" />
+  const xAngle = manyTicks ? -35 : 0;
   const xAnchor = manyTicks ? 'end' : 'middle';
 
   // Show numeric labels above bars when the chart is not too dense
@@ -273,13 +273,14 @@ function Delivery({
                     radius={[4, 4, 0, 0]}
                     background={{ fill: '#F8FAFC' }}
                   >
-                      {showBarLabels && (
-                        <LabelList
-                          dataKey="delivered"
-                          position="top"
-                          formatter={(v) => (v == null ? '0' : String(v))}
-                        />
-                      )}
+                    {showBarLabels && (
+                      <LabelList
+                        dataKey="delivered"
+                        position="top"
+                        formatter={(v) => (v == null ? '0' : String(v))}
+                        style={{ fontSize: 12, fill: '#0f172a', fontWeight: 600 }}
+                      />
+                    )}
                   </Bar>
 
                   <Bar
@@ -289,13 +290,14 @@ function Delivery({
                     radius={[4, 4, 0, 0]}
                     background={{ fill: '#F8FAFC' }}
                   >
-                      {showBarLabels && (
-                        <LabelList
-                          dataKey="undelivered"
-                          position="top"
-                          formatter={(v) => (v == null ? '0' : String(v))}
-                        />
-                      )}
+                    {showBarLabels && (
+                      <LabelList
+                        dataKey="undelivered"
+                        position="top"
+                        formatter={(v) => (v == null ? '0' : String(v))}
+                        style={{ fontSize: 12, fill: '#0f172a', fontWeight: 600 }}
+                      />
+                    )}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

@@ -386,8 +386,9 @@ function ProductInventory({
                   key={rowIndex}
                   className={`hover:bg-gray-200/70 h-14 ${
                     (rowIndex + 1) % 2 === 0 ? 'bg-[#F6F6F6]' : ''
-                  } cursor-pointer`}
+                  }`}
                   onClick={() => openDetails(row)}
+                  style={{ cursor: 'pointer' }}
                 >
                   <td className="px-4 py-2 text-center">
                     {`${String(row.branch_id).padStart(2, '0')}${String(

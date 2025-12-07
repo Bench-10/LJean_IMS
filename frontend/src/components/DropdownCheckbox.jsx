@@ -72,7 +72,8 @@ export default function DropdownCheckbox({
         <div
           ref={boxRef}
           className={`absolute z-[9999] bg-white border border-gray-200 rounded-md shadow-lg w-full max-w-[calc(100%-0px)]
-            ${openUpward ? "mb-2 bottom-full" : "mt-2 top-full"} max-h-[280px]`}
+            ${openUpward ? "mb-2 bottom-full" : "mt-2 top-full"}`}
+          style={{ maxHeight: 280 }}
         >
           <div className="max-h-60 overflow-auto hide-scrollbar py-1">
             {options.map((opt) => (

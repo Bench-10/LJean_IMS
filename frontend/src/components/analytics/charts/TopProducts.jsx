@@ -60,11 +60,24 @@ const TopBarTooltip = ({ active, payload }) => {
   const p = payload[0]?.payload || {};
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg px-2.5 py-2 max-w-[260px] shadow-[0_8px_20px_rgba(0,0,0,0.08)] pointer-events-none leading-tight whitespace-normal break-words">
-      <div className="text-[12px] font-semibold text-slate-900 mb-1">
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        padding: '8px 10px',
+        maxWidth: 260,
+        boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
+        pointerEvents: 'none',
+        lineHeight: 1.25,
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>
         {p.product_name ?? ''}
       </div>
-      <div className="text-[12px] text-slate-600">
+      <div style={{ fontSize: 12, color: '#475569' }}>
         Sales Amount: <strong>{currencyFormat(p?.sales_amount || 0)}</strong>
       </div>
     </div>
@@ -397,8 +410,9 @@ function TopProducts({
           )}
 
           <div
-            className="flex-1 overflow-y-auto scrollbar-thin [scrollbar-color:transparent_transparent] [scrollbar-width:thin]"
+            className="overflow-y-auto scrollbar-thin [scrollbar-color:transparent_transparent] [scrollbar-width:thin]"
             data-chart-container="top-products"
+            style={{ height: visibleHeight, scrollbarColor: 'transparent transparent', scrollbarWidth: 'thin' }}
           >
             {(!topProductsDisplay || topProductsDisplay.length === 0) ? (
               <ChartNoData message="No top products for the selected filters." onRetry={onRetryTopProducts} />
@@ -440,6 +454,7 @@ function TopProducts({
                   {/* Compact, wrapping tooltip */}
                   <Tooltip
                     content={<TopBarTooltip />}
+                    wrapperStyle={{ outline: 'none', zIndex: 20 }}
                     cursor={{ fill: 'rgba(0,0,0,0.04)' }}
                   />
 
@@ -467,6 +482,7 @@ function TopProducts({
                       dataKey="sales_amount"
                       position="right"
                       formatter={(value) => currencyFormat(value)}
+                      style={{ fontSize: 10, fill: '#0f172a', fontWeight: 600 }}
                     />
                   </Bar>
                 </BarChart>
@@ -610,6 +626,7 @@ function TopProducts({
                         if (value >= 1000) return `₱${(value / 1000).toFixed(1)}K`;
                         return `₱${value.toLocaleString()}`;
                       }}
+                      style={{ fontSize: 9, fill: '#0f766e', fontWeight: 600 }}
                     />
                   </Line>
                 </LineChart>
@@ -679,7 +696,7 @@ function TopProducts({
                       }}
                     />
 
-                    <Legend />
+                    <Legend wrapperStyle={{ fontSize: '10px' }} />
 
                     {hasForecastData && lastActualPeriod && (
                       <ReferenceLine
@@ -726,6 +743,7 @@ function TopProducts({
                           if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
                           return value.toLocaleString();
                         }}
+                        style={{ fontSize: 9, fill: '#0891b2', fontWeight: 600 }}
                       />
                     </Area>
                     {hasForecastData && (
@@ -740,6 +758,7 @@ function TopProducts({
                             if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
                             return value.toLocaleString();
                           }}
+                          style={{ fontSize: 9, fill: '#f97316', fontWeight: 600 }}
                         />
                       </Line>
                     )}

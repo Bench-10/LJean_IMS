@@ -7,9 +7,9 @@ function FormLoading({ message = "Processing..." }) {
         
          {/*BOUNCING DOTS */}
         <div className="flex space-x-2 mt-2">
-          <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce animation-delay-0"></div>
-          <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce animation-delay-150"></div>
-          <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce animation-delay-300"></div>
+          <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+          <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
         </div>
         
         {/*MESSAGE */}
