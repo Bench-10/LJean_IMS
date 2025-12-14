@@ -512,7 +512,7 @@ function PendingInventoryRequests({
                             {requestedProduct.unit ?? ''}
                           </li>
                         )}
-                        {requestedProduct?.unit_price != null && (
+                        {requestedProduct?.unit_price != null && currentState?.unit_price != requestedProduct.unit_price && (
                           <li>
                             <span className="font-medium">Unit Price:</span> ₱{' '}
                             {Number(
@@ -520,7 +520,7 @@ function PendingInventoryRequests({
                             ).toLocaleString()}
                           </li>
                         )}
-                        {requestedProduct?.unit_cost != null && (
+                        {requestedProduct?.unit_cost != null && currentState?.unit_cost != requestedProduct.unit_cost && (
                           <li>
                             <span className="font-medium">Unit Cost:</span> ₱{' '}
                             {Number(
@@ -528,21 +528,21 @@ function PendingInventoryRequests({
                             ).toLocaleString()}
                           </li>
                         )}
-                        {(requestedProduct?.min_threshold != null ||
-                          requestedProduct?.max_threshold != null) && (
+                        {(requestedProduct?.min_threshold != null || requestedProduct?.max_threshold != null) && 
+                         (currentState?.min_threshold != requestedProduct.min_threshold || currentState?.max_threshold != requestedProduct.max_threshold) && (
                           <li>
                             <span className="font-medium">Threshold:</span>{' '}
                             {requestedProduct.min_threshold} -{' '}
                             {requestedProduct.max_threshold}
                           </li>
                         )}
-                        {requestedProduct?.product_validity && (
+                        {requestedProduct?.product_validity && currentState?.product_validity != requestedProduct.product_validity && (
                           <li>
                             <span className="font-medium">Validity:</span>{' '}
                             {requestedProduct.product_validity}
                           </li>
                         )}
-                        {requestedProduct?.description && (
+                        {requestedProduct?.description && currentState?.description != requestedProduct.description && (
                           <li>
                             <span className="font-medium">Description:</span>{' '}
                             {requestedProduct.description}
@@ -557,25 +557,34 @@ function PendingInventoryRequests({
                           Current values
                         </p>
                         <ul className="space-y-1">
-                          <li>
-                            <span className="font-medium">Quantity:</span>{' '}
-                            {Number(currentState.quantity).toLocaleString()}{' '}
-                            {currentState.unit}
-                          </li>
-                          <li>
-                            <span className="font-medium">Unit Price:</span> ₱{' '}
-                            {Number(currentState.unit_price).toLocaleString()}
-                          </li>
-                          <li>
-                            <span className="font-medium">Unit Cost:</span> ₱{' '}
-                            {Number(currentState.unit_cost).toLocaleString()}
-                          </li>
-                          <li>
-                            <span className="font-medium">Threshold:</span>{' '}
-                            {currentState.min_threshold} -{' '}
-                            {currentState.max_threshold}
-                          </li>
-                          {currentState.product_validity && (
+                          {requestedProduct?.quantity_added != null && (
+                            <li>
+                              <span className="font-medium">Quantity:</span>{' '}
+                              {Number(currentState.quantity).toLocaleString()}{' '}
+                              {currentState.unit}
+                            </li>
+                          )}
+                          {requestedProduct?.unit_price != null && currentState?.unit_price != requestedProduct.unit_price && (
+                            <li>
+                              <span className="font-medium">Unit Price:</span> ₱{' '}
+                              {Number(currentState.unit_price).toLocaleString()}
+                            </li>
+                          )}
+                          {requestedProduct?.unit_cost != null && currentState?.unit_cost != requestedProduct.unit_cost && (
+                            <li>
+                              <span className="font-medium">Unit Cost:</span> ₱{' '}
+                              {Number(currentState.unit_cost).toLocaleString()}
+                            </li>
+                          )}
+                          {(requestedProduct?.min_threshold != null || requestedProduct?.max_threshold != null) && 
+                           (currentState?.min_threshold != requestedProduct.min_threshold || currentState?.max_threshold != requestedProduct.max_threshold) && (
+                            <li>
+                              <span className="font-medium">Threshold:</span>{' '}
+                              {currentState.min_threshold} -{' '}
+                              {currentState.max_threshold}
+                            </li>
+                          )}
+                          {requestedProduct?.product_validity && currentState?.product_validity != requestedProduct.product_validity && requestedProduct?.quantity_added == null && (
                             <li>
                               <span className="font-medium">Validity:</span>{' '}
                               {currentState.product_validity}
