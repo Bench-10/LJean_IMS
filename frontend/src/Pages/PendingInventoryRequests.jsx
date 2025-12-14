@@ -12,6 +12,7 @@ import ChartLoading from '../components/common/ChartLoading.jsx';
 import RejectionReasonDialog from '../components/dialogs/RejectionReasonDialog.jsx';
 import InventoryRequestHistoryModal from '../components/InventoryRequestHistoryModal.jsx';
 import RequestChangeDialog from '../components/dialogs/RequestChangeDialog.jsx';
+import InventoryItemDetailsDialog from '../components/InventoryItemDetailsDialog.jsx';
 
 const normalizeId = (value) =>
   value === null || value === undefined ? null : String(value);
@@ -61,6 +62,10 @@ function PendingInventoryRequests({
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedHistoryPendingId, setSelectedHistoryPendingId] =
     useState(null);
+
+  const [inventoryDetailsDialogOpen, setInventoryDetailsDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedRequestedProduct, setSelectedRequestedProduct] = useState(null);
 
   const [highlightedPendingIds, setHighlightedPendingIds] = useState([]);
 
@@ -343,6 +348,18 @@ function PendingInventoryRequests({
     setHistoryModalOpen(true);
   }, []);
 
+  const openInventoryDetailsDialog = useCallback((item, requestedProduct) => {
+    setSelectedItem(item);
+    setSelectedRequestedProduct(requestedProduct);
+    setInventoryDetailsDialogOpen(true);
+  }, []);
+
+  const closeInventoryDetailsDialog = useCallback(() => {
+    setInventoryDetailsDialogOpen(false);
+    setSelectedItem(null);
+    setSelectedRequestedProduct(null);
+  }, []);
+
   const closeHistoryModal = useCallback(() => {
     setSelectedHistoryPendingId(null);
     setHistoryModalOpen(false);
@@ -433,11 +450,12 @@ function PendingInventoryRequests({
                 <div
                   key={key || request.pending_id || Math.random().toString(36)}
                   ref={(node) => setRequestRef(key, node)}
-                  className={`border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition ${
+                  className={`border bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition cursor-pointer ${
                     isHighlighted
                       ? 'border-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.45)] animate-pulse'
                       : ''
                   }`}
+                  onClick={() => openInventoryDetailsDialog(currentState, requestedProduct)}
                 >
                   {/* Header row with meta + request changes + timeline icon */}
                   <div className="flex items-start justify-between gap-3">
@@ -466,22 +484,20 @@ function PendingInventoryRequests({
                     <div className="flex items-center gap-2">
                       {canRequestChanges && (
                         <button
-                          type="button"
-                          onClick={() =>
-                            handleRequestChangesClick(request.pending_id)
-                          }
-                          disabled={
-                            isProcessing(request.pending_id) || changeDialogLoading
-                          }
-                          className="inline-flex items-center justify-center rounded-md bg-amber-600 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Request changes
-                        </button>
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleRequestChangesClick(request.pending_id); }}
+                            disabled={
+                              isProcessing(request.pending_id) || changeDialogLoading
+                            }
+                            className="inline-flex items-center justify-center rounded-md bg-amber-600 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Request changes
+                          </button>
                       )}
 
                       <button
                         type="button"
-                        onClick={() => openHistoryModal(request.pending_id)}
+                        onClick={(e) => { e.stopPropagation(); openHistoryModal(request.pending_id); }}
                         className="inline-flex items-center justify-center rounded-full border border-gray-300 p-2 text-gray-700 transition hover:bg-gray-100"
                         title="View request timeline"
                         aria-label="View request timeline"
@@ -599,7 +615,7 @@ function PendingInventoryRequests({
                   <div className="mt-4 flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => handleApproveClick(request.pending_id)}
+                      onClick={(e) => { e.stopPropagation(); handleApproveClick(request.pending_id); }}
                       disabled={isProcessing(request.pending_id)}
                       className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-white transition ${
                         isProcessing(request.pending_id)
@@ -619,7 +635,7 @@ function PendingInventoryRequests({
 
                     <button
                       type="button"
-                      onClick={() => handleRejectClick(request.pending_id)}
+                      onClick={(e) => { e.stopPropagation(); handleRejectClick(request.pending_id); }}
                       disabled={isProcessing(request.pending_id)}
                       className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-white transition ${
                         isProcessing(request.pending_id)
@@ -668,6 +684,14 @@ function PendingInventoryRequests({
         onClose={closeHistoryModal}
         pendingId={selectedHistoryPendingId}
         formatDateTime={formatDateTime}
+      />
+
+      <InventoryItemDetailsDialog
+        open={inventoryDetailsDialogOpen}
+        onClose={closeInventoryDetailsDialog}
+        user={user}
+        item={selectedItem}
+        requestedProduct={selectedRequestedProduct}
       />
     </div>
   );
