@@ -1488,6 +1488,7 @@ function App() {
 
       const isBranchManager = user.role && user.role.some(role => ['Branch Manager'].includes(role));
       const isOwner = user.role && user.role.some(role => ['Owner'].includes(role));
+      const isInventoryStaff = user.role && user.role.some(role => ['Inventory Staff'].includes(role));
       const isInSameBranch = payload.branch_id && payload.branch_id === user.branch_id;
 
       let affectedMonitor = false;
@@ -1560,6 +1561,10 @@ function App() {
         affectedMonitor = true;
       }
 
+      if (!affectedMonitor && isInventoryStaff && isInSameBranch) {
+        affectedMonitor = true;
+      }
+
       if (affectedMonitor) {
         console.log('📡 Inventory approval updated via WebSocket - triggering refresh', {
           pendingId: payload.pending_id,
@@ -1570,7 +1575,11 @@ function App() {
           isBranchManager
         });
         setRequestStatusRefreshKey((prev) => prev + 1);
-        window.dispatchEvent(new CustomEvent('inventory-approval-update'));
+        window.dispatchEvent(
+          new CustomEvent('inventory-approval-update', {
+            detail: { payload, source: 'socket' }
+          })
+        );
       }
     });
 
