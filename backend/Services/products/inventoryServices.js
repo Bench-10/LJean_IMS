@@ -1273,9 +1273,9 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
         
         await SQLquery(
             `UPDATE Inventory_Product 
-            SET product_name = $1, unit = $2, min_threshold = $3, category_id = $4, unit_cost = $5, base_unit = $6, conversion_factor = $7
-            WHERE product_id = $8 AND branch_id = $9 AND max_threshold = $10`,
-            [product_name, unit, min_threshold, category_id, unit_cost, unitConversion.base_unit, unitConversion.conversion_factor, itemId, branch_id, max_threshold]
+            SET product_name = $1, unit = $2, min_threshold = $3, category_id = $4, unit_cost = $5, base_unit = $6, conversion_factor = $7, max_threshold = $8
+            WHERE product_id = $9 AND branch_id = $10`,
+            [product_name, unit, min_threshold, category_id, unit_cost, unitConversion.base_unit, unitConversion.conversion_factor, max_threshold, itemId, branch_id]
         );
     }
 

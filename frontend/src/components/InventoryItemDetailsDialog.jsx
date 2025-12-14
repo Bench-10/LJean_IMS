@@ -3,7 +3,7 @@ import { currencyFormat } from '../utils/formatCurrency';
 import { IoMdClose } from "react-icons/io";
 import useModalLock from "../hooks/useModalLock";
 
-function InventoryItemDetailsDialog({ open, onClose, user, item }) {
+function InventoryItemDetailsDialog({ open, onClose, user, item, requestedProduct }) {
   // 🔒 Lock scroll + intercept browser back when dialog is open
   useModalLock(open, onClose);
 
@@ -26,6 +26,45 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
       : item.quantity >= item.max_threshold
       ? 'bg-[#1e5e1b] text-white'
       : 'bg-[#61E85C] text-green-700';
+
+  const renderValue = (field, currentValue, formatter = (v) => v) => {
+    // Special-case: when quantity_added is provided in the request, show current → +added
+    if (field === 'quantity' && requestedProduct && requestedProduct.quantity_added != null) {
+      const currentNum = Number(currentValue) || 0;
+      const addedNum = Number(requestedProduct.quantity_added) || 0;
+      const updatedNum = currentNum + addedNum;
+      return (
+        <>
+          {formatter(currentValue)} → <strong>{formatter(updatedNum)}</strong>
+        </>
+      );
+    }
+
+    if (!requestedProduct || requestedProduct[field] == null) {
+      return formatter(currentValue);
+    }
+
+    // Compare numeric fields numerically to avoid type mismatch issues
+    const isNumericField = ['unit_price', 'unit_cost', 'min_threshold', 'max_threshold', 'quantity'].includes(field);
+    const valuesAreSame = isNumericField 
+      ? Number(requestedProduct[field]) === Number(currentValue)
+      : requestedProduct[field] === currentValue;
+
+    if (valuesAreSame) {
+      return formatter(currentValue);
+    }
+
+    // For quantity additions, don't highlight `unit_price` changes
+    if (field === 'unit_price' && requestedProduct.quantity_added != null) {
+      return formatter(currentValue);
+    }
+
+    return (
+      <>
+        {formatter(currentValue)} → <strong>{formatter(requestedProduct[field])}</strong>
+      </>
+    );
+  };
 
   const handleOverlayClick = () => {
     if (onClose) onClose();
@@ -83,7 +122,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
               <div className="col-span-2 mb-6">
                 <label className="text-xs font-bold text-gray-600">DESCRIPTION</label>
                 <div className="p-3 bg-gray-50 border rounded-lg text-sm min-h-[64px] whitespace-pre-line">
-                  {item.description || (
+                  {renderValue('description', item.description) || (
                     <span className="text-gray-400 italic">No description provided.</span>
                   )}
                 </div>
@@ -111,7 +150,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
                 <div>
                   <label className="text-xs font-bold text-gray-600">UNIT PRICE</label>
                   <div className="p-2 bg-gray-50 border rounded-lg text-sm text-right">
-                    {currencyFormat(item.unit_price)}
+                    {renderValue('unit_price', item.unit_price, currencyFormat)}
                   </div>
                 </div>
 
@@ -119,7 +158,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
                   <div>
                     <label className="text-xs font-bold text-gray-600">UNIT COST</label>
                     <div className="p-2 bg-gray-50 border rounded-lg text-sm text-right">
-                      {currencyFormat(item.unit_cost)}
+                      {renderValue('unit_cost', item.unit_cost, currencyFormat)}
                     </div>
                   </div>
                 )}
@@ -128,13 +167,13 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
                   <div>
                     <label className="text-xs font-bold text-gray-600">MIN THRESHOLD</label>
                     <div className="p-2 bg-gray-50 border rounded-lg text-sm text-right">
-                      {Number(item.min_threshold).toLocaleString()}
+                      {renderValue('min_threshold', item.min_threshold, (v) => Number(v).toLocaleString())}
                     </div>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-600">MAX THRESHOLD</label>
                     <div className="p-2 bg-gray-50 border rounded-lg text-right text-sm whitespace-nowrap overflow-hidden text-ellipsis">
-                      {Number(item.max_threshold).toLocaleString()}
+                      {renderValue('max_threshold', item.max_threshold, (v) => Number(v).toLocaleString())}
                     </div>
                   </div>
                 </div>
@@ -142,7 +181,7 @@ function InventoryItemDetailsDialog({ open, onClose, user, item }) {
                 <div>
                   <label className="text-xs font-bold text-gray-600">QUANTITY</label>
                   <div className="p-2 bg-gray-50 border rounded-lg text-sm text-right">
-                    {Number(item.quantity).toLocaleString()}
+                    {renderValue('quantity', item.quantity, (v) => Number(v).toLocaleString())}
                   </div>
                 </div>
               </div>

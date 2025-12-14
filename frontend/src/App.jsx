@@ -1168,7 +1168,10 @@ function App() {
     const shouldPrefillDates = shouldPrefillQuantity;
     const productId = pendingObj.product_id || productData.product_id || null;
 
-    setModalMode(pendingObj.action_type === 'create' ? 'add' : 'edit');
+    // If changeType is explicitly about product info (not quantity), force 'edit' mode
+    // Otherwise, use action_type to determine mode
+    const isProductInfoChange = changeType && changeType !== 'quantity' && changeType !== 'other';
+    setModalMode(isProductInfoChange ? 'edit' : (pendingObj.action_type === 'create' ? 'add' : 'edit'));
     console.log('Opening edit modal for pending:', pendingId || pendingObj?.pending_id, 'changeType:', changeType);
     setItemData({
       product_id: productId,
@@ -1193,6 +1196,7 @@ function App() {
     const quantity = productData.quantity ?? productData.quantity_added ?? payload?.historyEntry?.quantity_added ?? payload?.currentState?.quantity ?? 0;
     setInitialEditChoice(
       changeType === 'quantity' ? (quantity > 0 ? 'addStocks' : 'edit') :
+      changeType === 'product_info' ? 'edit' :
       changeType === 'price' ? 'edit' :
       'edit'
     );
@@ -1484,6 +1488,7 @@ function App() {
 
       const isBranchManager = user.role && user.role.some(role => ['Branch Manager'].includes(role));
       const isOwner = user.role && user.role.some(role => ['Owner'].includes(role));
+      const isInventoryStaff = user.role && user.role.some(role => ['Inventory Staff'].includes(role));
       const isInSameBranch = payload.branch_id && payload.branch_id === user.branch_id;
 
       let affectedMonitor = false;
@@ -1556,6 +1561,10 @@ function App() {
         affectedMonitor = true;
       }
 
+      if (!affectedMonitor && isInventoryStaff && isInSameBranch) {
+        affectedMonitor = true;
+      }
+
       if (affectedMonitor) {
         console.log('📡 Inventory approval updated via WebSocket - triggering refresh', {
           pendingId: payload.pending_id,
@@ -1566,7 +1575,11 @@ function App() {
           isBranchManager
         });
         setRequestStatusRefreshKey((prev) => prev + 1);
-        window.dispatchEvent(new CustomEvent('inventory-approval-update'));
+        window.dispatchEvent(
+          new CustomEvent('inventory-approval-update', {
+            detail: { payload, source: 'socket' }
+          })
+        );
       }
     });
 

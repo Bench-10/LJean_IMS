@@ -109,6 +109,283 @@ const findBranchName = (branches, branchId) => {
   );
 };
 
+const deriveInventoryStatusDetail = (status, stage) => {
+  const normalizedStatus = typeof status === 'string'
+    ? status.toLowerCase()
+    : status || '';
+  const normalizedStage = stage || null;
+
+  if (normalizedStatus === 'approved') {
+    return {
+      code: 'approved',
+      label: 'Approved',
+      tone: 'emerald',
+      is_final: true,
+      stage: normalizedStage,
+    };
+  }
+
+  if (normalizedStatus === 'rejected') {
+    return {
+      code: 'rejected',
+      label: 'Rejected',
+      tone: 'rose',
+      is_final: true,
+      stage: normalizedStage,
+    };
+  }
+
+  if (normalizedStatus === 'deleted') {
+    return {
+      code: 'deleted',
+      label: 'Deleted',
+      tone: 'slate',
+      is_final: true,
+      stage: normalizedStage,
+    };
+  }
+
+  if (normalizedStatus === 'cancelled') {
+    return {
+      code: 'cancelled',
+      label: 'Cancelled',
+      tone: 'slate',
+      is_final: true,
+      stage: normalizedStage,
+    };
+  }
+
+  if (normalizedStatus === 'changes_requested') {
+    return {
+      code: 'changes_requested',
+      label: 'Changes requested',
+      tone: 'amber',
+      is_final: false,
+      stage: normalizedStage,
+    };
+  }
+
+  if (
+    normalizedStatus === 'pending_admin' ||
+    (normalizedStatus === 'pending' && normalizedStage === 'admin_review')
+  ) {
+    return {
+      code: 'pending_admin',
+      label: 'Awaiting owner approval',
+      tone: 'blue',
+      is_final: false,
+      stage: normalizedStage,
+    };
+  }
+
+  if (normalizedStatus === 'pending' || normalizedStatus === 'pending_manager') {
+    return {
+      code: 'pending_manager',
+      label: 'Awaiting branch manager approval',
+      tone: 'amber',
+      is_final: false,
+      stage: normalizedStage,
+    };
+  }
+
+  if (!normalizedStatus) {
+    return {
+      code: 'unknown',
+      label: 'Unknown status',
+      tone: 'slate',
+      is_final: false,
+      stage: normalizedStage,
+    };
+  }
+
+  const fallback = String(normalizedStatus).replace(/_/g, ' ');
+
+  return {
+    code: normalizedStatus,
+    label: fallback.charAt(0).toUpperCase() + fallback.slice(1),
+    tone: 'slate',
+    is_final: false,
+    stage: normalizedStage,
+  };
+};
+
+const normalizePendingId = (value) =>
+  value === null || value === undefined ? '' : String(value);
+
+const patchInventoryRequestFromSocket = (request, update) => {
+  if (!request || !update) return request;
+
+  const statusRaw = update.status ?? request.status ?? '';
+  const normalizedStatus = typeof statusRaw === 'string'
+    ? statusRaw.toLowerCase()
+    : statusRaw || '';
+  if (!normalizedStatus) return request;
+
+  const nextStage = update.next_stage ?? update.current_stage ?? request.current_stage ?? null;
+  const statusDetail = deriveInventoryStatusDetail(normalizedStatus, nextStage);
+  const nowIso = new Date().toISOString();
+
+  const priorTimeline = request.timeline || {};
+  const priorManager = priorTimeline.manager || null;
+  const priorAdmin = priorTimeline.admin || null;
+  const priorFinal = priorTimeline.final || {};
+
+  const finalActedAt = (() => {
+    if (['approved', 'rejected', 'cancelled'].includes(normalizedStatus)) {
+      return (
+        update.decision_at ??
+        update.resolved_at ??
+        update.request_resolved_at ??
+        update.admin_approved_at ??
+        update.manager_approved_at ??
+        priorFinal.acted_at ??
+        nowIso
+      );
+    }
+    return priorFinal.acted_at ?? null;
+  })();
+
+  const resolvedRejectionReason = ['rejected'].includes(normalizedStatus)
+    ? (
+        update.reason ??
+        update.rejection_reason ??
+        priorFinal.rejection_reason ??
+        request.rejection_reason ??
+        null
+      )
+    : priorFinal.rejection_reason ?? request.rejection_reason ?? null;
+
+  const resolvedCancellationReason = ['cancelled'].includes(normalizedStatus)
+    ? (
+        update.reason ??
+        update.cancellation_reason ??
+        priorFinal.cancellation_reason ??
+        request.cancelled_reason ??
+        null
+      )
+    : priorFinal.cancellation_reason ?? request.cancelled_reason ?? null;
+
+  const patched = {
+    ...request,
+    status: normalizedStatus,
+    current_stage: nextStage,
+    status_detail: statusDetail,
+    last_activity_at: nowIso,
+    decision_at:
+      ['approved', 'rejected', 'cancelled'].includes(normalizedStatus)
+        ? finalActedAt
+        : request.decision_at ?? null,
+    rejection_reason: resolvedRejectionReason,
+    cancelled_reason: resolvedCancellationReason,
+    change_requested: normalizedStatus === 'changes_requested',
+  };
+
+  if (normalizedStatus === 'changes_requested') {
+    patched.change_request_type = update.change_request_type ?? request.change_request_type ?? null;
+    patched.change_request_comment = update.change_request_comment ?? request.change_request_comment ?? null;
+    patched.change_requested_at = update.change_requested_at ?? request.change_requested_at ?? nowIso;
+    patched.change_requested_by = update.change_requested_by ?? request.change_requested_by ?? null;
+  } else {
+    patched.change_request_type = request.change_request_type ?? null;
+    patched.change_request_comment = request.change_request_comment ?? null;
+    patched.change_requested_at = request.change_requested_at ?? null;
+    patched.change_requested_by = request.change_requested_by ?? null;
+  }
+
+  if (update.product && patched.summary) {
+    patched.summary = {
+      ...patched.summary,
+      product_name: update.product.product_name ?? patched.summary.product_name,
+      unit: update.product.unit ?? patched.summary.unit,
+      unit_cost: update.product.unit_cost ?? patched.summary.unit_cost,
+      unit_price: update.product.unit_price ?? patched.summary.unit_price,
+      quantity_requested: update.product.quantity_added ?? update.product.quantity ?? patched.summary.quantity_requested,
+      current_quantity: update.product.quantity ?? patched.summary.current_quantity,
+    };
+  }
+
+  const managerTimeline = priorManager ? { ...priorManager } : null;
+  const adminTimeline = priorAdmin ? { ...priorAdmin } : null;
+
+  if (managerTimeline) {
+    if (normalizedStatus === 'pending_manager') {
+      // Still awaiting manager action.
+    } else {
+      managerTimeline.status = 'completed';
+      managerTimeline.acted_at =
+        update.manager_approved_at ??
+        managerTimeline.acted_at ??
+        nowIso;
+      managerTimeline.approver_id =
+        update.manager_approver_id ??
+        managerTimeline.approver_id ??
+        request.manager_approver_id ??
+        null;
+      managerTimeline.approver_name =
+        update.manager_approver_name ??
+        managerTimeline.approver_name ??
+        request.manager_approver_name ??
+        null;
+    }
+  }
+
+  if (adminTimeline) {
+    if (normalizedStatus === 'approved') {
+      adminTimeline.status = 'completed';
+      adminTimeline.acted_at =
+        update.admin_approved_at ??
+        adminTimeline.acted_at ??
+        nowIso;
+      adminTimeline.approver_id =
+        update.admin_approver_id ??
+        adminTimeline.approver_id ??
+        request.admin_approver_id ??
+        null;
+      adminTimeline.approver_name =
+        update.admin_approver_name ??
+        adminTimeline.approver_name ??
+        request.admin_approver_name ??
+        null;
+    } else if (normalizedStatus === 'pending_admin') {
+      adminTimeline.status = 'pending';
+      adminTimeline.acted_at = null;
+    } else if (normalizedStatus === 'changes_requested') {
+      adminTimeline.status = 'completed';
+      adminTimeline.acted_at =
+        update.admin_approved_at ??
+        adminTimeline.acted_at ??
+        nowIso;
+      adminTimeline.approver_id =
+        update.admin_approver_id ??
+        adminTimeline.approver_id ??
+        request.admin_approver_id ??
+        null;
+      adminTimeline.approver_name =
+        update.admin_approver_name ??
+        adminTimeline.approver_name ??
+        request.admin_approver_name ??
+        null;
+    }
+  }
+
+  const finalTimeline = {
+    ...priorFinal,
+    status: normalizedStatus,
+    acted_at: finalActedAt,
+    rejection_reason: resolvedRejectionReason,
+    cancellation_reason: resolvedCancellationReason,
+  };
+
+  patched.timeline = {
+    ...priorTimeline,
+    manager: managerTimeline,
+    admin: adminTimeline,
+    final: finalTimeline,
+  };
+
+  return patched;
+};
+
 // Helper to force "For approval" label where needed
 const resolveStatusPillLabel = (request, { isOwnerUser, isBranchManager }) => {
   const base = computeApprovalLabel(request, {
@@ -142,6 +419,41 @@ const InventoryRequestMonitorDialog = ({
   onOpenEditRequest,
 }) => {
   useModalLock(open, onClose);
+
+  const applyInventorySocketUpdate = useCallback((update) => {
+    if (!update || !update.pending_id) return false;
+    const targetId = normalizePendingId(update.pending_id);
+    let matched = false;
+    let changed = false;
+
+    setRequests((prev) => {
+      if (!Array.isArray(prev) || prev.length === 0) {
+        return prev;
+      }
+
+      const next = prev.map((request) => {
+        if (normalizePendingId(request?.pending_id) !== targetId) {
+          return request;
+        }
+
+        matched = true;
+        const patched = patchInventoryRequestFromSocket(request, update);
+        if (patched !== request) {
+          changed = true;
+          return patched;
+        }
+        return request;
+      });
+
+      if (!changed) {
+        return prev;
+      }
+
+      return next;
+    });
+
+    return matched;
+  }, []);
 
   const roleList = useMemo(() => {
     if (!user || !user.role) return [];
@@ -185,6 +497,7 @@ const InventoryRequestMonitorDialog = ({
   const [cancelError, setCancelError] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
   const lastRefreshTokenRef = useRef(refreshToken);
+  const socketRefreshReasonRef = useRef(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelDialogContext, setCancelDialogContext] = useState({
     pendingId: null,
@@ -230,13 +543,48 @@ const InventoryRequestMonitorDialog = ({
 
     if (lastRefreshTokenRef.current !== refreshToken) {
       lastRefreshTokenRef.current = refreshToken;
+      const refreshReason = socketRefreshReasonRef.current;
+      socketRefreshReasonRef.current = null;
+      if (refreshReason === 'socket') {
+        console.debug(
+          '[InventoryRequestMonitorDialog] socket update applied without refetch'
+        );
+        return;
+      }
       console.log(
-        '🔄 WebSocket event detected - refreshing inventory request status'
+        '🔄 Refreshing inventory request status feed'
       );
       triggerRefresh();
       if (typeof onRefresh === 'function') onRefresh();
     }
   }, [refreshToken, open, triggerRefresh, onRefresh]);
+
+  useEffect(() => {
+    const handleInventoryApprovalUpdate = (event) => {
+      const detail = event?.detail || null;
+      if (!detail || detail.source !== 'socket') {
+        return;
+      }
+
+      const payload = detail.payload || null;
+      if (!payload || !payload.pending_id) {
+        return;
+      }
+
+      // Flag socket-driven updates so we can skip redundant refetches when the
+      // payload matches an existing record.
+      socketRefreshReasonRef.current = 'socket';
+      const matched = applyInventorySocketUpdate(payload);
+      if (!matched) {
+        socketRefreshReasonRef.current = null;
+      }
+    };
+
+    window.addEventListener('inventory-approval-update', handleInventoryApprovalUpdate);
+    return () => {
+      window.removeEventListener('inventory-approval-update', handleInventoryApprovalUpdate);
+    };
+  }, [applyInventorySocketUpdate]);
 
   useEffect(() => {
     if (!open) return;
@@ -776,6 +1124,8 @@ const InventoryRequestMonitorDialog = ({
     statusFilter,
   ]);
 
+  const combinedLoading = loading || userRequestsLoading;
+
   const visibleRequests = useMemo(() => {
     if (filteredRequests.length === 0) return filteredRequests;
     const limit = Math.min(visibleCount, filteredRequests.length);
@@ -783,6 +1133,8 @@ const InventoryRequestMonitorDialog = ({
   }, [filteredRequests, visibleCount]);
 
   const hasMore = visibleCount < filteredRequests.length;
+  const hasFilteredRequests = filteredRequests.length > 0;
+  const showLoadingPlaceholder = combinedLoading && !hasFilteredRequests;
 
   const handleScroll = (e) => {
     if (!hasMore) return;
@@ -797,8 +1149,6 @@ const InventoryRequestMonitorDialog = ({
       );
     }
   };
-
-  const combinedLoading = loading || userRequestsLoading;
 
   const handleCancelInventory = useCallback(
     async (pendingId) => {
@@ -1048,7 +1398,7 @@ const InventoryRequestMonitorDialog = ({
           className="flex-1 overflow-y-auto px-4 sm:px-6 py-4"
           onScroll={handleScroll}
         >
-          {combinedLoading ? (
+          {showLoadingPlaceholder ? (
             <div className="py-12">
               <ChartLoading message="Loading request history..." />
             </div>
@@ -1315,9 +1665,11 @@ const InventoryRequestMonitorDialog = ({
 
                 const managerDescription =
                   manager.status === 'completed'
-                    ? `Approved by ${
-                        manager.approver_name || 'Branch Manager'
-                      } on ${formatDateTime(manager.acted_at)}`
+                    ? manager.approver_id && request.created_by && Number(manager.approver_id) === Number(request.created_by)
+                      ? `Auto-approved on ${formatDateTime(manager.acted_at)}`
+                      : `Approved by ${
+                          manager.approver_name || 'Branch Manager'
+                        } on ${formatDateTime(manager.acted_at)}`
                     : 'Awaiting branch manager decision';
 
                 const adminDescription = !request.requires_admin_review

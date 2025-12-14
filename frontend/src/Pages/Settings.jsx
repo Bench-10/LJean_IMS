@@ -83,6 +83,9 @@ function Settings() {
 						nextValues.confirmPassword !== nextValues.newPassword
 							? 'Passwords do not match.'
 							: '');
+			} else if (field === 'currentPassword') {
+				// No format validation for current password
+				next.currentPassword = '';
 			} else {
 				next[field] = passwordFormatMessage(nextValues[field]);
 			}
@@ -164,11 +167,6 @@ function Settings() {
 		if (wantsEmailChange || wantsPasswordChange) {
 			if (!formValues.currentPassword) {
 				newErrors.currentPassword = 'Enter your current password to continue.';
-			} else {
-				const currentPasswordFormat = passwordFormatMessage(formValues.currentPassword);
-				if (currentPasswordFormat) {
-					newErrors.currentPassword = currentPasswordFormat;
-				}
 			}
 		}
 

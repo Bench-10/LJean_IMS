@@ -291,7 +291,7 @@ function TopProducts({
   const historicalLimits = {
     daily: 15,
     weekly: 8,
-    monthly: 6,
+    monthly: 12,
     yearly: 6
   };
   const historicalLimit = historicalLimits[salesInterval] ?? null;
