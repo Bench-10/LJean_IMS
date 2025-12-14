@@ -41,7 +41,7 @@ const RequestChangeDialog = ({
       onClick={() => (loading ? null : onCancel && onCancel())}
     >
       <div
-        className="relative w-[min(680px,95%)] rounded-2xl bg-white p-6"
+        className="relative w-[min(680px,95%)] rounded-2xl bg-white p-6 animate-popup"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold text-gray-800">Request Changes</h3>
