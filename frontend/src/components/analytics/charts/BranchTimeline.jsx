@@ -414,7 +414,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
         exportId="branch-timeline"
       >
 
-        <div className="flex flex-col h-full overflow-hidden relative">
+        <div className="flex flex-col h-full relative overflow-visible">
           {loading && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/85 backdrop-blur-sm">
               <ChartLoading message="Loading branch timeline..." />
