@@ -1680,8 +1680,8 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
         const branchName = pending.branch_name || 'Branch';
         const requesterName = requestedBy.fullName || 'Inventory staff member';
         const managerDisplayName = approverName || 'Branch Manager';
-            const ownerForwardMessage = pending.action_type === 'create'
-            ? `System: ${managerDisplayName} approved ${productName} for ${branchName}. Awaiting owner confirmation.`
+        const ownerForwardMessage = pending.action_type === 'create'
+            ? `${managerDisplayName} approved ${productName} for ${branchName}. Awaiting owner confirmation.`
             : `${managerDisplayName} approved ${productName}. Awaiting owner confirmation.`;
 
         if (pending.action_type === 'create') {
@@ -1707,7 +1707,7 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
                 ownerForwardMessage,
                 'orange',
                 approverId,
-                managerDisplayName
+                'System'
             ]
         );
 

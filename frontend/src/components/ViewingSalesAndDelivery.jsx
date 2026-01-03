@@ -590,7 +590,13 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
-                      <ChartLoading asTableRow={true} colSpan={type === "sales" ? 5 : 3} message="Loading sales information..." />
+                      <ChartLoading
+                        variant="table-row"
+                        colSpan={type === "sales" ? 5 : 3}
+                        message="Loading sales information..."
+                        minHeight={120}
+                        type="table"
+                      />
                     ) : (!soldItems || soldItems.length === 0) ? (
                       <NoInfoFound col={type === "sales" ? 5 : 3} />
                     ) : (

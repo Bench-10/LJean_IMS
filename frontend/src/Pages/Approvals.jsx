@@ -630,6 +630,8 @@ function Approvals({
     try {
       await onRequestChanges(pendingId, changeType, comment);
       if (typeof refreshInventoryRequests === 'function') await refreshInventoryRequests();
+      setSelectedInventoryRequest(null);
+      setInventoryApprovalModalOpen(false);
     } catch (error) {
       console.error('Failed to request changes for the pending inventory request:', error);
     } finally {
@@ -785,12 +787,14 @@ function Approvals({
             </tr>
           </thead>
           <tbody className="bg-white">
-            {combinedLoading ? (
-              <tr>
-                <td colSpan={6} className="py-10">
-                  <ChartLoading message="Loading pending approvals..." />
-                </td>
-              </tr>
+            {combinedLoading && combinedRequests.length === 0 ? (
+              <ChartLoading
+                message="Loading pending approvals..."
+                variant="table-row"
+                colSpan={6}
+                type="table"
+                minHeight={128}
+              />
             ) : combinedRequests.length === 0 ? (
               <NoInfoFound
                 col={6}
@@ -1024,8 +1028,14 @@ function Approvals({
         className="md:hidden space-y-3 sm:space-y-4 overflow-y-auto max-h-[70vh] pb-6 hide-scrollbar"
         ref={mobileScrollContainerRef}
       >
-        {combinedLoading ? (
-          <ChartLoading message="Loading pending approvals..." />
+        {combinedLoading && combinedRequests.length === 0 ? (
+          <ChartLoading
+            message="Loading pending approvals..."
+            variant="container"
+            type="list"
+            minHeight={140}
+            className="border border-green-200 shadow-sm"
+          />
         ) : combinedRequests.length === 0 ? (
           <div className="bg-transparent flex flex-col items-center justify-center h-[180px] w-full rounded-lg border border-dashed border-gray-300 text-center text-sm text-gray-500 py-6">
             <MdInfoOutline

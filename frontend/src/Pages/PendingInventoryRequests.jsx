@@ -56,6 +56,7 @@ function PendingInventoryRequests({
     pendingId: null,
     changeType: 'quantity',
     comment: '',
+    hideChangeTypePicker: false,
   });
   const [changeDialogLoading, setChangeDialogLoading] = useState(false);
 
@@ -300,14 +301,36 @@ function PendingInventoryRequests({
     [handleRejectDialogCancel, pendingRejectId, rejectPendingRequest]
   );
 
-  const handleRequestChangesClick = useCallback((pendingId) => {
-    setChangeDialogContext({
-      pendingId,
-      changeType: 'quantity',
-      comment: '',
-    });
-    setChangeDialogOpen(true);
-  }, []);
+  const handleRequestChangesClick = useCallback(
+    (target) => {
+      const findById = (id) => {
+        if (!Number.isFinite(Number(id))) return null;
+        const matcher = (entry) => Number(entry?.pending_id) === Number(id);
+        return (Array.isArray(pendingRequests) ? pendingRequests.find(matcher) : null);
+      };
+
+      const request =
+        target && typeof target === 'object'
+          ? target
+          : findById(target);
+
+      const pendingId = request?.pending_id ?? (Number.isFinite(Number(target)) ? Number(target) : target);
+      if (!pendingId) return;
+
+      const actionType = String(request?.action_type || '').toLowerCase();
+      const isAddition = actionType && actionType !== 'update';
+      const nextChangeType = isAddition ? 'product_info' : 'quantity';
+
+      setChangeDialogContext({
+        pendingId,
+        changeType: request?.change_request_type || nextChangeType,
+        comment: '',
+        hideChangeTypePicker: isAddition,
+      });
+      setChangeDialogOpen(true);
+    },
+    [pendingRequests]
+  );
 
   const handleChangeDialogCancel = useCallback(() => {
     if (changeDialogLoading) return;
@@ -316,6 +339,7 @@ function PendingInventoryRequests({
       pendingId: null,
       changeType: 'quantity',
       comment: '',
+      hideChangeTypePicker: false,
     });
   }, [changeDialogLoading]);
 
@@ -485,7 +509,7 @@ function PendingInventoryRequests({
                       {canRequestChanges && (
                         <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); handleRequestChangesClick(request.pending_id); }}
+                            onClick={(e) => { e.stopPropagation(); handleRequestChangesClick(request); }}
                             disabled={
                               isProcessing(request.pending_id) || changeDialogLoading
                             }
