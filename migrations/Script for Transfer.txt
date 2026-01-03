@@ -1,0 +1,43 @@
+BEGIN;
+
+-- =========================
+-- SALES & DELIVERY
+-- =========================
+DELETE FROM sales_stock_usage;
+DELETE FROM sales_items;
+DELETE FROM sales_information;
+DELETE FROM delivery;
+
+-- =========================
+-- INVENTORY
+-- =========================
+DELETE FROM inventory_request_history;
+DELETE FROM inventory_pending_actions;
+DELETE FROM inventory_alerts;
+DELETE FROM add_stocks;
+DELETE FROM inventory_product;
+
+-- =========================
+-- PRODUCTS & CATEGORY
+-- =========================
+DELETE FROM products;
+DELETE FROM category;
+
+-- =========================
+-- USERS & AUTH
+-- =========================
+DELETE FROM push_subscriptions;
+DELETE FROM password_reset_tokens;
+DELETE FROM user_creation_requests;
+DELETE FROM users;
+
+-- =========================
+-- ADMIN RESET
+-- =========================
+UPDATE administrator
+SET
+    username   = 'owner@gmail.com',
+    first_name = 'Company',
+    last_name  = 'Owner';
+
+COMMIT;

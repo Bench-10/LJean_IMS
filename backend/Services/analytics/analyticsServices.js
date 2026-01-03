@@ -755,7 +755,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     // INVENTORY COUNT (FILTERED BY CATEGORY AND OPTIONAL BRANCH)
     const invCntConds = ['ip.category_id = $1'];
     const invCntParams = [category_id];
-    let invCountIdx = 2;
+    let invCountIdx = 2;                                                  
     if (branch_id) { invCntConds.push(`ip.branch_id = $${invCountIdx++}`); invCntParams.push(branch_id); }
     if (product_id) { invCntConds.push(`ip.product_id = $${invCountIdx++}`); invCntParams.push(product_id); }
     const invCntWhere = 'WHERE ' + invCntConds.join(' AND ');
