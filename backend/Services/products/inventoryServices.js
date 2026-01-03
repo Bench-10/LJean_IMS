@@ -1163,7 +1163,9 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
 
     let addedStockRow = null;
 
-    if (quantity_added !== null && Number(quantity_added) !== 0) {
+    const numericQuantityAdded = Number(quantity_added);
+    const isQuantityFinite = Number.isFinite(numericQuantityAdded);
+    if (isQuantityFinite && numericQuantityAdded > 0) {
         addedStockRow = await addStocksQuery();
         hasQuantityChange = true;
     }
@@ -1180,15 +1182,15 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
     // Build combined message
     const messages = [];
 
-    if (quantity_added !== 0 && priceChanged) {
+    if (hasQuantityChange && priceChanged) {
         messages.push(`${addqQuantityNotifMessage} and ${changePriceNotifMessage}`);
-    } else if (quantity_added !== 0 && !priceChanged) {
+    } else if (hasQuantityChange && !priceChanged) {
         messages.push(addqQuantityNotifMessage);
-    } else if (quantity_added === 0 && priceChanged) {
+    } else if (!hasQuantityChange && priceChanged) {
         messages.push(changePriceNotifMessage);
     }
 
-    if (productInfoChanged) {
+    if (productInfoChanged && hasQuantityChange) {
         messages.push(`Product information for ${product_name} has been updated.`);
         hasInfoChange = true;
     }
@@ -1675,22 +1677,45 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
             manager_approver_name: approverName || pending.manager_approver_name
         };
         const productName = productPayload.product_name || 'Inventory item';
+        const branchName = pending.branch_name || 'Branch';
         const requesterName = requestedBy.fullName || 'Inventory staff member';
-        const message = `System approved ${productName}. Awaiting owner confirmation.`;
+        const managerDisplayName = approverName || 'Branch Manager';
+            const ownerForwardMessage = pending.action_type === 'create'
+            ? `System: ${managerDisplayName} approved ${productName} for ${branchName}. Awaiting owner confirmation.`
+            : `${managerDisplayName} approved ${productName}. Awaiting owner confirmation.`;
+
+        if (pending.action_type === 'create') {
+            await logInventoryRequestHistory({
+                pendingId: pendingId,
+                actionType: 'manager_approved',
+                actionDescription: `${managerDisplayName} approved the new product request for ${productName} (${branchName})`,
+                userName: managerDisplayName,
+                userRole: 'Branch Manager',
+                oldPayload: pending.payload
+            });
+        }
 
         const alertResult = await SQLquery(
             `INSERT INTO Inventory_Alerts 
             (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
-            [pending.product_id || productPayload.product_id || null, pending.branch_id, 'Inventory Admin Approval Needed', message, 'orange', approverId, 'System']
+            [
+                pending.product_id || productPayload.product_id || null,
+                pending.branch_id,
+                'Inventory Admin Approval Needed',
+                ownerForwardMessage,
+                'orange',
+                approverId,
+                managerDisplayName
+            ]
         );
 
         if (alertResult.rows[0]) {
             broadcastOwnerNotification({
                 alert_id: alertResult.rows[0].alert_id,
                 alert_type: 'Inventory Admin Approval Needed',
-                message,
+                message: ownerForwardMessage,
                 banner_color: 'orange',
                 alert_date: alertResult.rows[0].alert_date,
                 isDateToday: true,
@@ -1704,7 +1729,9 @@ export const approvePendingInventoryRequest = async (pendingId, approverId, opti
             broadcastToUser(requestedBy.userID, {
                 alert_id: `inventory-forwarded-${pendingId}-${Date.now()}`,
                 alert_type: 'Inventory Request Forwarded',
-                message: `${productName} was approved by System and is awaiting owner approval.`,
+                message: pending.action_type === 'create'
+                    ? `Your request was forwarded by ${managerDisplayName}. ${productName} for ${branchName} now awaits owner review.`
+                    : `${productName} was approved by ${managerDisplayName} and is awaiting owner approval.`,
                 banner_color: 'blue',
                 created_at: new Date().toISOString()
             });
@@ -2537,18 +2564,108 @@ export const resubmitPendingInventoryRequest = async (pendingId, requesterId, pr
         // Broadcast that the pending request has transitioned back to 'pending'
         const mapped = mapPendingRequest(updated);
         if (mapped) {
-            broadcastInventoryApprovalUpdate(mapped.branch_id, {
+            const branchId = mapped.branch_id;
+            const alertProductId = mapped.product_id
+                || sanitized?.product_id
+                || sanitized?.existing_product_id
+                || pending.product_id
+                || null;
+            const requesterName = (typeof sanitized?.fullName === 'string' && sanitized.fullName.trim())
+                ? sanitized.fullName.trim()
+                : (pending.created_by_name || 'Inventory staff member');
+            const productName = sanitized?.product_name
+                || pending.payload?.productData?.product_name
+                || pending.payload?.currentState?.product_name
+                || 'an inventory item';
+            const categoryName = newPayload?.category_name
+                || pending.payload?.category_name
+                || null;
+            const categoryLabel = categoryName ? ` (${categoryName})` : '';
+            const verb = pending.action_type === 'update' ? 'update' : 'add';
+
+            broadcastInventoryApprovalUpdate(branchId, {
                 pending_id: mapped.pending_id,
                 status: 'pending',
                 action: mapped.action_type,
-                branch_id: mapped.branch_id
+                branch_id: branchId
             });
 
-            // If this requires owner review, also post the request to owners for awareness
             if (mapped.current_stage === 'admin_review') {
+                const managerDisplayName = mapped.manager_approver_name
+                    || pending.created_by_name
+                    || requesterName;
+                const adminNotificationMessage = `${managerDisplayName} resubmitted the request to ${verb} ${productName}${categoryLabel}. Awaiting owner approval.`;
+
+                const adminAlertResult = await SQLquery(
+                    `INSERT INTO Inventory_Alerts
+                     (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)
+                     RETURNING *`,
+                    [
+                        alertProductId,
+                        branchId,
+                        'Inventory Admin Approval Needed',
+                        adminNotificationMessage,
+                        'orange',
+                        mapped.manager_approver_id || pending.created_by || null,
+                        'System'
+                    ]
+                );
+
+                const adminAlertRow = adminAlertResult.rows[0];
+                if (adminAlertRow) {
+                    broadcastOwnerNotification({
+                        alert_id: adminAlertRow.alert_id,
+                        alert_type: 'Inventory Admin Approval Needed',
+                        message: adminNotificationMessage,
+                        banner_color: 'orange',
+                        alert_date: adminAlertRow.alert_date,
+                        isDateToday: true,
+                        alert_date_formatted: 'Just now'
+                    }, { category: 'inventory', targetRoles: ['Owner'] });
+                }
+
                 broadcastInventoryApprovalRequestToOwners({ request: mapped });
             } else {
-                broadcastInventoryApprovalRequest(mapped.branch_id, { request: mapped });
+                const managerNotificationMessage = `${requesterName} resubmitted the request to ${verb} ${productName}${categoryLabel}.`;
+
+                const managerAlertResult = await SQLquery(
+                    `INSERT INTO Inventory_Alerts
+                     (product_id, branch_id, alert_type, message, banner_color, user_id, user_full_name)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)
+                     RETURNING *`,
+                    [
+                        alertProductId,
+                        branchId,
+                        'Inventory Approval Needed',
+                        managerNotificationMessage,
+                        'orange',
+                        0,
+                        'System'
+                    ]
+                );
+
+                const managerAlertRow = managerAlertResult.rows[0];
+                if (managerAlertRow) {
+                    broadcastNotification(branchId, {
+                        alert_id: managerAlertRow.alert_id,
+                        alert_type: 'Inventory Approval Needed',
+                        message: managerNotificationMessage,
+                        banner_color: 'orange',
+                        user_id: managerAlertRow.user_id,
+                        user_full_name: 'System',
+                        alert_date: managerAlertRow.alert_date,
+                        alert_timestamp: managerAlertRow.alert_date,
+                        add_stock_id: null,
+                        history_timestamp: null,
+                        isDateToday: true,
+                        alert_date_formatted: 'Just now',
+                        target_roles: ['Branch Manager'],
+                        creator_id: sanitized?.userID || pending.created_by || null
+                    }, { category: 'inventory', targetRoles: ['Branch Manager'] });
+                }
+
+                broadcastInventoryApprovalRequest(branchId, { request: mapped });
             }
         }
 

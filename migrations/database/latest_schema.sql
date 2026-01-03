@@ -431,7 +431,7 @@ ALTER TABLE IF EXISTS public.inventory_pending_actions
     ADD CONSTRAINT fk_inventory_pending_actions_revision_requested_by FOREIGN KEY (revision_requested_by)
     REFERENCES public.users (user_id) MATCH SIMPLE
     ON UPDATE NO ACTION
-    ON DELETE NO ACTION;
+    ON DELETE SET NULL;
 
 
 ALTER TABLE IF EXISTS public.inventory_pending_actions

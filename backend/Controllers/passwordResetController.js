@@ -39,6 +39,7 @@ export const requestPasswordReset = async (req, res) => {
                 success: true,
                 message: result.message
             });
+            
         } else {
             const statusCode = result.code === 'USER_NOT_FOUND' ? 404 : 400;
             res.status(statusCode).json({

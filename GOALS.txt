@@ -1,5 +1,0 @@
-[
-	{"id":1,"title":"Tighten frontend owner-password validation","description":"Update Settings.jsx to enforce letter, digit, and special character rules before submit.","status":"completed"},
-	{"id":2,"title":"Mirror backend owner-password validation","description":"Update updateOwnerCredentials controller to enforce same complexity and messages.","status":"completed"},
-	{"id":3,"title":"Manual sanity check guidance","description":"List quick scenarios to test password change success/failure after change.","status":"completed"}
-]

@@ -63,6 +63,8 @@ function InventoryRequestHistoryModal({
         return "bg-blue-100 text-blue-800 border-blue-200";
       case "approved":
         return "bg-green-100 text-green-800 border-green-200";
+      case "manager_approved":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
       case "rejected":
         return "bg-red-100 text-red-800 border-red-200";
       case "request_changes":
@@ -84,6 +86,8 @@ function InventoryRequestHistoryModal({
         return "Inventory request was created";
       case "approved":
         return "Request was approved";
+      case "manager_approved":
+        return "Branch manager approved the request";
       case "rejected":
         return "Request was rejected";
       case "request_changes":
@@ -95,6 +99,13 @@ function InventoryRequestHistoryModal({
       default:
         return actionType || "Action performed";
     }
+  };
+
+  const formatActionLabel = (actionType) => {
+    if (!actionType) return "Action";
+
+    const normalized = actionType.replace(/_/g, " ");
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
   };
 
   const renderPayloadChanges = (oldPayload, newPayload) => {
@@ -212,9 +223,7 @@ function InventoryRequestHistoryModal({
                           entry.action_type
                         )}`}
                       >
-                        {entry.action_type
-                          ? entry.action_type.charAt(0).toUpperCase() + entry.action_type.slice(1).toLowerCase()
-                          : "Action"}
+                        {formatActionLabel(entry.action_type)}
                       </span>
                       <span className="text-sm text-gray-500">
                         by {entry.user_name || "Unknown"} ({entry.user_role || "Unknown Role"})
