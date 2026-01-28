@@ -496,8 +496,8 @@ function TopProducts({
                   <YAxis
                     dataKey="product_name"
                     type="category"
-                    tick={{ fontSize: isMobile ? 10 : 12 }}
-                    width={isMobile ? 72 : 90}
+                    tick={{ fontSize: isMobile ? 9 : 11 }}
+                    width={isMobile ? 68 : 84}
                     axisLine={false}
                     tickLine={false}
                     interval={0}
@@ -576,9 +576,9 @@ function TopProducts({
           )}
 
           {/* Controls row (Interval + bulb) — aligned & tidy */}
-          <div data-export-exclude className={`flex items-end gap-3 mt-1 ${isMobile ? 'justify-center flex-wrap' : 'justify-end'}`}>
+          <div data-export-exclude className={`flex items-end gap-3 mt-1 ${isMobile ? 'justify-between w-full' : 'justify-end'}`}>
             {/* Interval */}
-            <div className={isMobile ? 'w-full' : 'w-40'}>
+            <div className={isMobile ? 'flex-1' : 'w-40'}>
               <DropdownCustom
                 value={salesInterval}
                 onChange={(v) => setSalesInterval(v?.target ? v.target.value : v)}

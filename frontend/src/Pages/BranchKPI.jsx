@@ -29,7 +29,7 @@ export default function BranchKPI(){
   };
 
   return (
-  <div className='pt-20 lg:pt-3 px-4 lg:px-8 pb-6 h-screen overflow-hidden bg-[#eef2ee] flex flex-col min-h-0'>
+  <div className='pt-20 lg:pt-3 px-4 lg:px-8 pb-6 min-h-screen overflow-y-auto bg-[#eef2ee] flex flex-col'>
       <div className="flex items-center gap-4 flex-wrap mb-4"> 
 
         <NavLink to="/branches" className="flex gap-2 items-center relative py-2 px-4 border-2 bg-white font-medium rounded-md text-sm text-green-800 border-gray-200 transition-all cursor-pointer hover:bg-green-100">
@@ -41,7 +41,7 @@ export default function BranchKPI(){
 
       </div>
 
-      <div className='flex-1 min-h-0'>
+      <div className='flex-1'>
 
         <AnalyticsDashboard branchId={Number(branchId)} />
 
