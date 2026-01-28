@@ -347,7 +347,7 @@ const RestockSuggestionsDialog = ({
                     </div>
 
                     {/* Two columns on md+, stacked on mobile */}
-                    <div className="mt-4 flex flex-col md:flex-row md:items-stretch md:gap-4">
+                    <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-stretch md:gap-5">
                       {/* Historical snapshot */}
                       <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 md:flex-1 flex flex-col items-center justify-center text-center">
                         <h5 className="text-sm font-semibold text-gray-800">Historical snapshot</h5>
@@ -375,8 +375,8 @@ const RestockSuggestionsDialog = ({
                       </div>
 
                       {/* Recommendation */}
-                      <div className="rounded-lg bg-emerald-50 p-4 md:flex-1 md:border-l md:border-gray-200 md:pl-4 flex flex-col items-center justify-center">
-                        <div className="w-full text-center">
+                      <div className="rounded-lg bg-emerald-50 p-4 md:flex-1 md:border-l md:border-gray-200 md:pl-5 flex flex-col items-center justify-center">
+                        <div className="w-full text-center space-y-3">
                           <div className="text-sm font-semibold text-gray-700 mb-2">
                             Recommended restocking
                           </div>
@@ -393,11 +393,11 @@ const RestockSuggestionsDialog = ({
                           </div>
 
                           {p.forecastWindow === 0 ? (
-                            <p className="mt-2 text-xs text-gray-500">
+                            <p className="text-xs text-gray-500">
                               Forecast unavailable — additional sales data is required.
                             </p>
                           ) : (
-                            <div className="mt-2 text-xs text-gray-600" />
+                            <div className="text-xs text-gray-600" />
                           )}
 
                           {p.forecastContext?.message && (
@@ -417,10 +417,10 @@ const RestockSuggestionsDialog = ({
 
         {/* Footer — always visible */}
         <div
-          className="sticky bottom-0 z-20 border-t border-gray-200 bg-white px-4 sm:px-6 md:px-7 py-3 sm:py-4 shadow-[0_-6px_12px_-6px_rgba(0,0,0,0.08)]"
+          className="sticky bottom-0 z-20 border-t border-gray-200 bg-white px-5 sm:px-7 md:px-8 py-4 sm:py-5 shadow-[0_-6px_12px_-6px_rgba(0,0,0,0.08)]"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom))' }}
         >
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-sm sm:text-base text-gray-700">
                 Budget allocation recommendation
