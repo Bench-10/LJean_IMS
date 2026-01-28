@@ -694,8 +694,22 @@ export const broadcastUserApprovalRequest = (branchId, payload) => {
   io.to('owners').emit('user-approval-request', payload);
 };
 
-export const broadcastUserApprovalUpdate = (branchId, payload) => {
-  io.to(`branch-${branchId}`).emit('user-approval-updated', payload);
+export const broadcastUserApprovalUpdate = (branchId, payload, options = {}) => {
+  // Extract target roles, default to Branch Manager and Owner only
+  const targetRoles = options.targetRoles ?? ['Branch Manager', 'Owner'];
+  
+  // Use role-based dispatch for branch users
+  for (const [socketId, subscriber] of connectedUsers.entries()) {
+    if (shouldDispatchNotification(subscriber, {
+      category: 'user-management',
+      branchId,
+      targetRoles
+    })) {
+      io.to(socketId).emit('user-approval-updated', payload);
+    }
+  }
+  
+  // Also broadcast to all owners
   io.to('owners').emit('user-approval-updated', payload);
 };
 
