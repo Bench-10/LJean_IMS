@@ -2481,7 +2481,13 @@ function App() {
           response = await api.post(`/api/items/`, newItem);
         }
         if (response.status === 202 || response.data?.status === 'pending') {
-          addToNotificationQueue('Inventory request submitted for branch manager approval.', true);
+          const nextStage = response?.data?.next_stage || response?.data?.pending?.current_stage;
+          const awaitsOwner = nextStage === 'admin_review';
+          const submissionMessage = awaitsOwner
+            ? 'Inventory request submitted for owner approval.'
+            : 'Inventory request submitted for branch manager approval.';
+
+          addToNotificationQueue(submissionMessage, true);
           await fetchPendingInventoryRequests();
           setRequestStatusRefreshKey((prev) => prev + 1);
           // If this was a resubmission (add), the backend updated the pending entry in place; clear our tracking id
@@ -2522,7 +2528,13 @@ function App() {
           response = await api.put(`/api/items/${itemData.product_id}`, newItem);
         }
         if (response.status === 202 || response.data?.status === 'pending') {
-          addToNotificationQueue('Inventory update sent for branch manager approval.', true);
+          const nextStage = response?.data?.next_stage || response?.data?.pending?.current_stage;
+          const awaitsOwner = nextStage === 'admin_review';
+          const updateMessage = awaitsOwner
+            ? 'Inventory update sent for owner approval.'
+            : 'Inventory update sent for branch manager approval.';
+
+          addToNotificationQueue(updateMessage, true);
           await fetchPendingInventoryRequests();
           setRequestStatusRefreshKey((prev) => prev + 1);
           // If resubmitted, clear the resubmission source id since the backend updated the pending in place
@@ -3082,6 +3094,7 @@ function App() {
       <Toaster
         position="top-right"
         gutter={14}
+        containerStyle={{ zIndex: 2147483647 }}
         toastOptions={{
           duration: 5200,
           style: {
@@ -3094,7 +3107,7 @@ function App() {
             minWidth: '340px',
             border: '1px solid rgba(187, 247, 208, 0.9)',
             boxShadow: '0 20px 45px rgba(22, 101, 52, 0.16)',
-            zIndex: 9999
+            zIndex: 2000000000
           },
           success: {
             iconTheme: {
@@ -3105,7 +3118,7 @@ function App() {
               background: '#ffffff',
               color: '#14532d',
               border: '1px solid #86efac',
-              zIndex: 9999
+              zIndex: 2000000000
             }
           },
           error: {
@@ -3117,7 +3130,7 @@ function App() {
               background: '#ffffff',
               color: '#7f1d1d',
               border: '1px solid #fecaca',
-              zIndex: 9999
+              zIndex: 2000000000
             }
           }
         }}
