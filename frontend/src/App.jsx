@@ -2481,7 +2481,9 @@ function App() {
           response = await api.post(`/api/items/`, newItem);
         }
         if (response.status === 202 || response.data?.status === 'pending') {
-          const nextStage = response?.data?.next_stage || response?.data?.pending?.current_stage;
+          const nextStage = response?.data?.next_stage
+            || response?.data?.pending?.current_stage
+            || response?.data?.current_stage;
           const awaitsOwner = nextStage === 'admin_review';
           const submissionMessage = awaitsOwner
             ? 'Inventory request submitted for owner approval.'
@@ -2528,7 +2530,9 @@ function App() {
           response = await api.put(`/api/items/${itemData.product_id}`, newItem);
         }
         if (response.status === 202 || response.data?.status === 'pending') {
-          const nextStage = response?.data?.next_stage || response?.data?.pending?.current_stage;
+          const nextStage = response?.data?.next_stage
+            || response?.data?.pending?.current_stage
+            || response?.data?.current_stage;
           const awaitsOwner = nextStage === 'admin_review';
           const updateMessage = awaitsOwner
             ? 'Inventory update sent for owner approval.'
