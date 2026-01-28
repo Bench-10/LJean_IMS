@@ -228,8 +228,8 @@ export const getBranchTimeline = async (req, res) => {
 // BRANCH SALES SUMMARY (TOTAL AMOUNT DUE PER BRANCH)
 export const getBranchSalesSummary = async (req, res) => {
   try {
-    const { start_date, end_date, range = '3m', category_id } = req.query;
-    const rows = await analyticsServices.fetchBranchSalesSummary({ start_date, end_date, range, category_id });
+    const { start_date, end_date, range = '3m', category_id, product_id } = req.query;
+    const rows = await analyticsServices.fetchBranchSalesSummary({ start_date, end_date, range, category_id, product_id });
     res.json(rows);
   } catch (err) {
     console.error('Branch sales summary error', err);

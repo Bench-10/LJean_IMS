@@ -7,7 +7,8 @@ import { useAuth } from '../../../authentication/Authentication.jsx';
 import { currencyFormat } from '../../../utils/formatCurrency.js';
 import ChartNoData from '../../common/ChartNoData.jsx';
 import ChartLoading from '../../common/ChartLoading.jsx';
-import { analyticsApi } from '../../../utils/api.js';
+import api, { analyticsApi } from '../../../utils/api.js';
+import DropdownCustom from '../../DropdownCustom.jsx';
 
 const branchPerformanceCache = new Map();
 
@@ -17,7 +18,9 @@ function BranchPerformance({
   startDate,
   endDate,
   branchPerformanceRef,
-  revenueDistributionRef
+  revenueDistributionRef,
+  productIdFilter,
+  setProductIdFilter
 }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]);
@@ -27,6 +30,9 @@ function BranchPerformance({
     width: window.innerWidth,
     height: window.innerHeight
   });
+  const [productOptions, setProductOptions] = useState([{ value: '', label: 'All Products' }]);
+  const [productLoading, setProductLoading] = useState(false);
+  const [productError, setProductError] = useState(null);
 
   // Owner-only
   const isOwner = useMemo(() => {
@@ -57,6 +63,64 @@ function BranchPerformance({
     const centerY = height < 600 ? '40%' : '45%';
     return { outerRadius, legendFontSize, tooltipFontSize, centerY, isMobile: width < 768 };
   }, [screenDimensions]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    async function loadProducts() {
+      try {
+        setProductLoading(true);
+        setProductError(null);
+        const res = await api.get(`/api/items/unique`, { signal: controller.signal });
+        if (!isMounted) return;
+        const uniqueProducts = Array.isArray(res.data) ? res.data : [];
+        const mapped = uniqueProducts.map((item) => ({
+          value: String(item.product_id),
+          label: item.product_name ? `${item.product_name} (#${item.product_id})` : `Product #${item.product_id}`
+        }));
+        setProductOptions([{ value: '', label: 'All Products' }, ...mapped]);
+      } catch (err) {
+        if (err?.code === 'ERR_CANCELED') return;
+        if (!isMounted) return;
+        console.error('Branch performance products fetch error', err);
+        setProductError('Unable to load product list');
+        setProductOptions((prev) => (Array.isArray(prev) && prev.length ? prev : [{ value: '', label: 'All Products' }]));
+      } finally {
+        if (isMounted) setProductLoading(false);
+      }
+    }
+
+    loadProducts();
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, []);
+
+  const normalizedProductFilter = useMemo(() => {
+    if (productIdFilter === null || productIdFilter === undefined) return '';
+    const trimmed = String(productIdFilter).trim();
+    return trimmed || '';
+  }, [productIdFilter]);
+
+  const productFilterSetter = typeof setProductIdFilter === 'function' ? setProductIdFilter : null;
+
+  const handleProductChange = useCallback((event) => {
+    if (!productFilterSetter) return;
+    const nextValue = event?.target?.value ?? '';
+    productFilterSetter(nextValue);
+  }, [productFilterSetter]);
+
+  const handleClearProduct = useCallback(() => {
+    if (!productFilterSetter) return;
+    productFilterSetter('');
+  }, [productFilterSetter]);
+
+  const selectedProductLabel = useMemo(() => {
+    const match = productOptions.find((option) => option.value === normalizedProductFilter);
+    return match?.label ?? 'All Products';
+  }, [normalizedProductFilter, productOptions]);
 
   // Pie data
   const pieChartData = useMemo(
@@ -140,9 +204,10 @@ function BranchPerformance({
     () => JSON.stringify({
       start: startDate,
       end: endDate,
-      category: categoryFilter || 'all'
+      category: categoryFilter || 'all',
+      product: normalizedProductFilter || 'all'
     }),
-    [categoryFilter, endDate, startDate]
+    [categoryFilter, endDate, normalizedProductFilter, startDate]
   );
 
   // Fetch branch performance data
@@ -174,6 +239,9 @@ function BranchPerformance({
       if (categoryFilter) {
         params.category_id = categoryFilter;
       }
+      if (normalizedProductFilter) {
+        params.product_id = normalizedProductFilter;
+      }
 
       const response = await analyticsApi.get(`/api/analytics/branches-summary`, { 
         params, 
@@ -191,7 +259,7 @@ function BranchPerformance({
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [cacheKey, categoryFilter, endDate, isOwner, startDate, user]);
+  }, [cacheKey, categoryFilter, endDate, isOwner, normalizedProductFilter, startDate, user]);
 
   // Fetch data when dependencies change
   useEffect(() => {
@@ -242,6 +310,39 @@ function BranchPerformance({
           {error && !loading && (
             <ChartNoData message={error} hint="Please try refreshing the analytics page." onRetry={() => fetchBranchPerformance()} />
           )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3" data-export-exclude>
+            <span className="text-xs sm:text-sm font-semibold text-gray-500">
+              Comparing {selectedProductLabel}
+            </span>
+            <div className="flex items-center gap-2">
+              <div className="w-[210px] sm:w-56">
+                <DropdownCustom
+                  value={normalizedProductFilter}
+                  onChange={handleProductChange}
+                  options={productOptions}
+                  label="Product"
+                  variant="default"
+                  size="xs"
+                />
+              </div>
+              {normalizedProductFilter && (
+                <button
+                  type="button"
+                  onClick={handleClearProduct}
+                  className="text-[11px] font-semibold text-green-700 hover:text-green-900"
+                >
+                  Clear
+                </button>
+              )}
+              {productLoading && (
+                <span className="text-[10px] text-gray-400">Loading…</span>
+              )}
+              {!productLoading && productError && (
+                <span className="text-[10px] text-red-500">{productError}</span>
+              )}
+            </div>
+          </div>
 
           {showBarChart && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="branch-performance">

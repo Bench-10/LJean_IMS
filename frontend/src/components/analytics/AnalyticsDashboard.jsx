@@ -2115,6 +2115,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
                 endDate={resolvedRange.end_date}
                 branchPerformanceRef={branchPerformanceRef}
                 revenueDistributionRef={revenueDistributionRef}
+                productIdFilter={productIdFilter}
+                setProductIdFilter={setProductIdFilter}
               />
               <BranchTimeline
                 Card={Card}

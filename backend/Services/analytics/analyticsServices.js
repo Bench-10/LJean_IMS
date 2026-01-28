@@ -1021,9 +1021,10 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
 
 
 
-export async function fetchBranchSalesSummary({ start_date, end_date, range, category_id }){
+export async function fetchBranchSalesSummary({ start_date, end_date, range, category_id, product_id }) {
   // USE CUSTOM DATES IF PROVIDED; OTHERWISE FALL BACK TO RANGE
-  let start, end;
+  let start;
+  let end;
   if (start_date && end_date) {
     start = start_date;
     end = end_date;
@@ -1031,10 +1032,24 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
     ({ start, end } = buildDateRange(range));
   }
 
+  const normalizeNumeric = (value) => {
+    if (value === null || value === undefined) return null;
+    const trimmed = String(value).trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const normalizedCategoryId = normalizeNumeric(category_id);
+  const normalizedProductId = normalizeNumeric(product_id);
+  const hasCategoryFilter = normalizedCategoryId !== null;
+  const hasProductFilter = normalizedProductId !== null;
+
   const cacheKey = makeAnalyticsCacheKey('fetchBranchSalesSummary', {
     start,
     end,
-    category_id
+    category_id: hasCategoryFilter ? normalizedCategoryId : null,
+    product_id: hasProductFilter ? normalizedProductId : null
   });
   const cached = getAnalyticsCache(cacheKey);
   if (cached) {
@@ -1042,43 +1057,52 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
   }
 
   const params = [start, end];
-  
-  if (category_id) {
-    // Optimized query when filtering by category
-    params.push(category_id);
-    const { rows } = await SQLquery(`
-      SELECT b.branch_id,
-             b.branch_name,
-             COALESCE(SUM(CASE WHEN ip.category_id = $3 THEN si.amount ELSE 0 END), 0) AS total_amount_due
-      FROM branch b
-      LEFT JOIN Sales_Information s ON s.branch_id = b.branch_id 
-        AND s.date BETWEEN $1 AND $2
-        AND ${RESTORED_SALES_FILTER}
-      LEFT JOIN Sales_Items si ON si.sales_information_id = s.sales_information_id
-      LEFT JOIN Inventory_Product ip ON ip.product_id = si.product_id 
-        AND ip.branch_id = s.branch_id
-      GROUP BY b.branch_id, b.branch_name
-      ORDER BY total_amount_due DESC, b.branch_name ASC;`, params);
-    
-    const result = rows.map(row => ({
-      ...row,
-      total_amount_due: Number(row.total_amount_due || 0)
-    }));
-    setAnalyticsCache(cacheKey, result);
-    return result;
+  let nextParamIndex = 3;
+
+  let salesItemsJoin = '';
+  let sumExpression = 'COALESCE(SUM(s.total_amount_due), 0)';
+
+  if (hasProductFilter || hasCategoryFilter) {
+    const joinConditions = ['si.sales_information_id = s.sales_information_id'];
+
+    if (hasProductFilter) {
+      const productIdx = nextParamIndex;
+      params.push(normalizedProductId);
+      joinConditions.push(`si.product_id = $${productIdx}`);
+      nextParamIndex += 1;
+    }
+
+    if (hasCategoryFilter) {
+      const categoryIdx = nextParamIndex;
+      params.push(normalizedCategoryId);
+      joinConditions.push(`EXISTS (
+        SELECT 1 FROM Inventory_Product ip
+        WHERE ip.product_id = si.product_id
+          AND ip.branch_id = s.branch_id
+          AND ip.category_id = $${categoryIdx}
+      )`);
+      nextParamIndex += 1;
+    }
+
+    salesItemsJoin = `
+      LEFT JOIN Sales_Items si ON ${joinConditions.join(' AND ')}
+    `;
+    sumExpression = 'COALESCE(SUM(si.amount), 0)';
   }
-  
-  // Optimized query without category filter
-  const { rows } = await SQLquery(`
+
+  const query = `
     SELECT b.branch_id,
            b.branch_name,
-           COALESCE(SUM(s.total_amount_due), 0) AS total_amount_due
+           ${sumExpression} AS total_amount_due
     FROM branch b
     LEFT JOIN Sales_Information s ON s.branch_id = b.branch_id
       AND s.date BETWEEN $1 AND $2
       AND ${RESTORED_SALES_FILTER}
+    ${salesItemsJoin}
     GROUP BY b.branch_id, b.branch_name
-    ORDER BY total_amount_due DESC, b.branch_name ASC;`, params);
+    ORDER BY total_amount_due DESC, b.branch_name ASC;`;
+
+  const { rows } = await SQLquery(query, params);
 
   const result = rows.map(row => ({
     ...row,
