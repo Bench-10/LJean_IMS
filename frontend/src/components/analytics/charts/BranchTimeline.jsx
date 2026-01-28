@@ -63,6 +63,19 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
   const [totalPeriods, setTotalPeriods] = useState(TIMELINE_WINDOW_SIZES[timelineInterval] || TIMELINE_WINDOW_SIZES.monthly);
   const [rawTimelineLength, setRawTimelineLength] = useState(0);
   const [progressiveCount, setProgressiveCount] = useState(0);
+  const [screenDimensions, setScreenDimensions] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1024,
+    height: typeof window !== 'undefined' ? window.innerHeight : 768
+  }));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleResize = () => {
+      setScreenDimensions({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const updateSelectedBranch = useCallback((value, options = {}) => {
     const normalized = value ? String(value) : '';
@@ -542,17 +555,33 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
                     tickLine={false}
                   />
                   {(() => {
+                    const showYAxisTicks = screenDimensions.width >= 640;
+                    const sharedAxisProps = showYAxisTicks
+                      ? { tick: { fontSize: 10 }, axisLine: false, tickLine: false }
+                      : { hide: true };
                     const maxSales = displayTimelineData.reduce((m,p) => Math.max(m, Number(p.sales_amount)||0), 0);
                     const maxUnits = displayTimelineData.reduce((m,p) => Math.max(m, Number(p.units_sold)||0), 0);
                     const overallMax = Math.max(maxSales, maxUnits);
-                    
-                    if (overallMax <= 0) return <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 1]} />;
-                    
+
+                    if (overallMax <= 0) {
+                      return (
+                        <YAxis
+                          domain={[0, 1]}
+                          {...sharedAxisProps}
+                        />
+                      );
+                    }
+
                     const target = Math.ceil(overallMax * 1.15); 
                     const magnitude = Math.pow(10, Math.floor(Math.log10(target)));
                     const padded = Math.ceil(target / magnitude) * magnitude;
-                    
-                    return <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, padded]} />;
+
+                    return (
+                      <YAxis
+                        domain={[0, padded]}
+                        {...sharedAxisProps}
+                      />
+                    );
                   })()}
                   <Tooltip 
                     labelFormatter={(label) => {

@@ -648,7 +648,18 @@ const createPendingInventoryAction = async ({
 
 
 // GET ALL UNIQUE PRODUCTS ACROSS ALL BRANCHES (FOR PRODUCT SELECTION)
-export const getAllUniqueProducts = async () => {
+export const getAllUniqueProducts = async ({ categoryId } = {}) => {
+    const params = [];
+    let whereClause = '';
+
+    if (categoryId !== undefined && categoryId !== null && categoryId !== '') {
+        const parsed = Number(categoryId);
+        if (Number.isFinite(parsed)) {
+            params.push(parsed);
+            whereClause = 'WHERE ip.category_id = $1';
+        }
+    }
+
     const { rows } = await SQLquery(`
         SELECT DISTINCT 
             ip.product_id,
@@ -663,9 +674,10 @@ export const getAllUniqueProducts = async () => {
         LEFT JOIN category c USING(category_id)
         LEFT JOIN branch b ON ip.branch_id = b.branch_id
         LEFT JOIN products p ON ip.product_id = p.product_id
+        ${whereClause}
         GROUP BY ip.product_id, ip.product_name, c.category_name, ip.unit, c.category_id, p.description
         ORDER BY ip.product_name ASC
-    `);
+    `, params);
 
     return rows;
 };

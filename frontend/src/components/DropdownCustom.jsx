@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 
 const DropdownCustom = ({
   value,
@@ -9,11 +9,15 @@ const DropdownCustom = ({
   error = false,
   labelClassName,
   size = 'md', // 'xs' | 'sm' | 'md' | 'lg'
+  searchable = false,
+  searchPlaceholder = 'Search...',
+  noResultsMessage = 'No results found'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // --- size maps (button, option rows, icon, label, min width, icon gap) ---
   const btnSize = {
@@ -66,11 +70,14 @@ const DropdownCustom = ({
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
+        if (searchable) {
+          setSearchTerm('');
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [searchable]);
 
   const handleToggle = () => {
     if (!isOpen && buttonRef.current) {
@@ -80,10 +87,65 @@ const DropdownCustom = ({
       const dropdownHeight = Math.min(240, options.length * rowHeightNum);
       setOpenUpward(spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
     }
+    if (isOpen && searchable) {
+      setSearchTerm('');
+    }
     setIsOpen(!isOpen);
   };
 
   const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const renderedOptions = useMemo(() => {
+    if (!Array.isArray(options)) return [];
+    if (!searchable || normalizedSearch.length === 0) {
+      return options;
+    }
+    return options.filter((option) => {
+      const labelText = option?.label ? String(option.label).toLowerCase() : '';
+      return labelText.includes(normalizedSearch);
+    });
+  }, [options, searchable, normalizedSearch]);
+
+  useEffect(() => {
+    if (!isOpen && searchable && searchTerm) {
+      setSearchTerm('');
+    }
+  }, [isOpen, searchable, searchTerm]);
+
+  const renderOptionList = (list) => (
+    <div className="max-h-60 overflow-auto hide-scrollbar">
+      {list.length === 0 ? (
+        <div className="px-4 py-3 text-xs text-gray-500">
+          {noResultsMessage}
+        </div>
+      ) : (
+        list.map((option, index) => (
+          <div
+            key={option.value || index}
+            onClick={() => {
+              if (option.disabled) return;
+              onChange({ target: { value: option.value } });
+              setIsOpen(false);
+              if (searchable) {
+                setSearchTerm('');
+              }
+            }}
+            className={`
+              px-4 ${rowSize} cursor-pointer transition-colors border-b border-gray-100 last:border-b-0
+              ${option.disabled ? 'opacity-50 cursor-not-allowed text-gray-400' : ''}
+              ${value === option.value
+                ? 'bg-green-500 text-white font-semibold hover:bg-green-600'
+                : (option.disabled ? 'text-gray-400' : 'text-gray-700 hover:bg-gray-100')
+              }
+            `}
+          >
+            {option.label}
+          </div>
+        ))
+      )}
+    </div>
+  );
 
   const getButtonClassName = () => {
     if (variant === 'simple' || variant === 'default') {
@@ -146,28 +208,19 @@ const DropdownCustom = ({
               `}
               style={openUpward ? { marginBottom: '8px' } : { marginTop: '8px' }}
             >
-              <div className="max-h-60 overflow-auto hide-scrollbar">
-                {options.map((option, index) => (
-                  <div
-                    key={option.value || index}
-                    onClick={() => {
-                      if (option.disabled) return; // prevent selecting disabled options
-                      onChange({ target: { value: option.value } });
-                      setIsOpen(false);
-                    }}
-                    className={`
-                      px-4 ${rowSize} cursor-pointer transition-colors border-b border-gray-100 last:border-b-0
-                      ${option.disabled ? 'opacity-50 cursor-not-allowed text-gray-400' : ''}
-                      ${value === option.value
-                        ? 'bg-green-500 text-white font-semibold hover:bg-green-600'
-                        : (option.disabled ? 'text-gray-400' : 'text-gray-700 hover:bg-gray-100')
-                      }
-                    `}
-                  >
-                    {option.label}
-                  </div>
-                ))}
-              </div>
+              {searchable && (
+                <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder={searchPlaceholder}
+                    className="w-full text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    autoFocus
+                  />
+                </div>
+              )}
+              {renderOptionList(renderedOptions)}
             </div>
           )}
         </div>
@@ -215,27 +268,19 @@ const DropdownCustom = ({
               `}
               style={openUpward ? { marginBottom: '8px' } : { marginTop: '8px' }}
             >
-              <div className="max-h-60 overflow-auto hide-scrollbar">
-                {options.map((option, index) => (
-                  <div
-                    key={option.value || index}
-                    onClick={() => {
-                      if (option.disabled) return; // prevent selecting disabled options
-                      onChange({ target: { value: option.value } });
-                      setIsOpen(false);
-                    }}
-                    className={`
-                      px-4 ${rowSize} cursor-pointer transition-colors border-b border-gray-100 last:border-b-0
-                      ${value === option.value
-                        ? 'bg-green-500 text-white font-semibold hover:bg-green-600'
-                        : (option.disabled ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900')
-                      }
-                    `}
-                  >
-                    {option.label}
-                  </div>
-                ))}
-              </div>
+              {searchable && (
+                <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder={searchPlaceholder}
+                    className="w-full text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    autoFocus
+                  />
+                </div>
+              )}
+              {renderOptionList(renderedOptions)}
             </div>
           )}
         </div>

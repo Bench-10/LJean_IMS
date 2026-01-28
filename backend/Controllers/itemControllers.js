@@ -93,7 +93,18 @@ export const searchItem = async (req, res) =>{
 
 export const getAllUniqueProducts = async (req, res) => {
     try {
-        const uniqueProducts = await inventoryServices.getAllUniqueProducts();
+        const rawCategoryId = req.query.category_id;
+        let categoryId = null;
+
+        if (rawCategoryId !== undefined && rawCategoryId !== null && String(rawCategoryId).trim() !== '') {
+            const parsed = Number(rawCategoryId);
+            if (!Number.isFinite(parsed)) {
+                return res.status(400).json({ message: 'category_id must be numeric' });
+            }
+            categoryId = parsed;
+        }
+
+        const uniqueProducts = await inventoryServices.getAllUniqueProducts({ categoryId });
         res.status(200).json(uniqueProducts);
     } catch (error) {
         console.error('Error fetching unique products: ', error);

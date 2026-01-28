@@ -19,6 +19,7 @@ const FORECAST_SERIES_LIMIT = 360;
 const PROGRESSIVE_SEGMENTS = 6;
 const PROGRESSIVE_INTERVAL_MS = 90;
 const MIN_PROGRESSIVE_CHUNK = 6;
+const MOBILE_SERIES_CAP = 8;
 
 const buildSampledIndices = (length, limit, includeIndices = []) => {
   if (!Number.isFinite(length) || length <= 0) return [];
@@ -94,6 +95,10 @@ function TopProducts({
 }) {
   const [showRestockDialog, setShowRestockDialog] = useState(false);
   const [visibleCount, setVisibleCount] = useState(INITIAL_TOP_PRODUCTS_PAGE);
+  const [screenDimensions, setScreenDimensions] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1024,
+    height: typeof window !== 'undefined' ? window.innerHeight : 768
+  }));
 
   const intervalOptions = useMemo(() => {
     if (Array.isArray(salesIntervalOptions) && salesIntervalOptions.length) {
@@ -106,6 +111,29 @@ function TopProducts({
       { value: 'yearly', label: 'Yearly' }
     ];
   }, [salesIntervalOptions]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleResize = () => {
+      setScreenDimensions({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = screenDimensions.width < 640;
+  const currencyAxisProps = useMemo(() => (
+    isMobile
+      ? { hide: true }
+      : { tick: { fontSize: 10 }, axisLine: false, tickLine: false, tickFormatter: pesoAxis }
+  ), [isMobile]);
+  const numericAxisProps = useMemo(() => (
+    isMobile
+      ? { hide: true }
+      : { tick: { fontSize: 10 }, axisLine: false, tickLine: false }
+  ), [isMobile]);
+  const salesChartHeight = isMobile ? 320 : null;
+  const demandChartHeight = isMobile ? 320 : null;
 
   // NEW (debug heights)
   useEffect(() => {
@@ -294,7 +322,12 @@ function TopProducts({
     monthly: 12,
     yearly: 6
   };
-  const historicalLimit = historicalLimits[salesInterval] ?? null;
+  const baseHistoricalLimit = historicalLimits[salesInterval] ?? null;
+  const historicalLimit = useMemo(() => {
+    if (!isMobile) return baseHistoricalLimit;
+    if (!baseHistoricalLimit) return MOBILE_SERIES_CAP;
+    return Math.min(baseHistoricalLimit, MOBILE_SERIES_CAP);
+  }, [baseHistoricalLimit, isMobile]);
 
   const displayActualSeries = useMemo(() => {
     if (!historicalLimit || actualSeries.length <= historicalLimit) return actualSeries;
@@ -302,15 +335,35 @@ function TopProducts({
   }, [actualSeries, historicalLimit]);
 
   const displayCombinedSeries = useMemo(() => {
-    if (!historicalLimit || actualSeries.length <= historicalLimit) return combinedSeries;
+    const limitForecastEntries = (series) => {
+      if (!isMobile) return series;
+      let forecastCount = 0;
+      return series.filter((item) => {
+        if (item && item.is_forecast === true) {
+          forecastCount += 1;
+          return forecastCount <= MOBILE_SERIES_CAP;
+        }
+        return true;
+      });
+    };
+
+    if (!historicalLimit || actualSeries.length <= historicalLimit) {
+      return limitForecastEntries(combinedSeries);
+    }
     const allowedPeriods = new Set(displayActualSeries.map(item => item.period));
-    return combinedSeries.filter(item => item.is_forecast === true || allowedPeriods.has(item.period));
-  }, [combinedSeries, displayActualSeries, actualSeries.length, historicalLimit]);
+    const filteredSeries = combinedSeries.filter(item => item.is_forecast === true || allowedPeriods.has(item.period));
+    return limitForecastEntries(filteredSeries);
+  }, [combinedSeries, displayActualSeries, actualSeries.length, historicalLimit, isMobile]);
 
   const displayForecastSeries = useMemo(() => {
-    if (!historicalLimit || actualSeries.length <= historicalLimit) return forecastSeries;
-    return displayCombinedSeries.filter(item => item && item.is_forecast === true);
-  }, [displayCombinedSeries, forecastSeries, historicalLimit, actualSeries.length]);
+    if (!historicalLimit || actualSeries.length <= historicalLimit) {
+      if (!isMobile) return forecastSeries;
+      return forecastSeries.slice(0, MOBILE_SERIES_CAP);
+    }
+    const limited = displayCombinedSeries.filter(item => item && item.is_forecast === true);
+    if (!isMobile) return limited;
+    return limited.slice(0, MOBILE_SERIES_CAP);
+  }, [displayCombinedSeries, forecastSeries, historicalLimit, actualSeries.length, isMobile]);
 
   const [progressiveCount, setProgressiveCount] = useState(() => {
     if (!displayActualSeries.length) return 0;
@@ -390,7 +443,7 @@ function TopProducts({
       {/* TOP PRODUCTS */}
       <Card
         title={selectedProductName ? `${categoryName} - ${selectedProductName}` : categoryName}
-        className="relative col-span-12 lg:col-span-4 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]"
+        className="relative col-span-12 lg:col-span-4"
         exportRef={topProductsRef}
         exportId="top-products"
         exportSpans={{ lg: 4 }}
@@ -443,8 +496,8 @@ function TopProducts({
                   <YAxis
                     dataKey="product_name"
                     type="category"
-                    tick={{ fontSize: 12 }}
-                    width={90}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                    width={isMobile ? 72 : 90}
                     axisLine={false}
                     tickLine={false}
                     interval={0}
@@ -482,7 +535,7 @@ function TopProducts({
                       dataKey="sales_amount"
                       position="right"
                       formatter={(value) => currencyFormat(value)}
-                      style={{ fontSize: 10, fill: '#0f172a', fontWeight: 600 }}
+                      style={{ fontSize: isMobile ? 9 : 10, fill: '#0f172a', fontWeight: 600 }}
                     />
                   </Bar>
                 </BarChart>
@@ -509,12 +562,12 @@ function TopProducts({
       {/* SALES PERFORMANCE + FORECAST */}
       <Card
         title={selectedProductName ? `Sales Performance - ${selectedProductName}` : 'Sales Performance'}
-        className="col-span-12 lg:col-span-8 h-[360px] md:h-[420px] lg:h-[480px] xl:h-[560px]"
+        className="col-span-12 lg:col-span-8"
         exportRef={salesChartRef}
         exportId="sales-performance"
         exportSpans={{ lg: 8 }}
       >
-        <div className="flex flex-col h-full gap-6 max-h-full overflow-hidden relative">
+        <div className="flex flex-col gap-6 relative">
           {loadingSalesPerformance && <ChartLoading message="Loading sales performance..." />}
           {progressiveProgress < 100 && !loadingSalesPerformance && (
             <div className="absolute top-2 right-3 z-10 px-2 py-1 text-[10px] rounded-md bg-white/90 border border-gray-200 shadow-sm" data-export-exclude>
@@ -523,9 +576,9 @@ function TopProducts({
           )}
 
           {/* Controls row (Interval + bulb) — aligned & tidy */}
-          <div data-export-exclude className="flex justify-end items-end gap-3 mt-1">
+          <div data-export-exclude className={`flex items-end gap-3 mt-1 ${isMobile ? 'justify-center flex-wrap' : 'justify-end'}`}>
             {/* Interval */}
-            <div className="w-40">
+            <div className={isMobile ? 'w-full' : 'w-40'}>
               <DropdownCustom
                 value={salesInterval}
                 onChange={(v) => setSalesInterval(v?.target ? v.target.value : v)}
@@ -554,7 +607,11 @@ function TopProducts({
           </div>
 
           {/* Sales line chart */}
-          <div className="flex-1 min-h-0 overflow-hidden" data-chart-container="sales-performance">
+          <div
+            className={`${isMobile ? 'h-[320px]' : 'flex-1 min-h-[280px]'} overflow-hidden`}
+            data-chart-container="sales-performance"
+            style={salesChartHeight ? { height: salesChartHeight } : undefined}
+          >
             {(!hasActualData) ? (
               <ChartNoData
                 message={selectedProductName ? `No sales performance data for ${selectedProductName}.` : 'No sales performance data for the selected filters.'}
@@ -562,7 +619,7 @@ function TopProducts({
                 onRetry={onRetrySalesPerformance}
               />
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={salesChartHeight || '100%'}>
                 <LineChart data={lineChartData} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
                   <defs>
                     <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
@@ -584,10 +641,7 @@ function TopProducts({
                         <YAxis
                           type="number"
                           domain={[0, 1]}
-                          tick={{ fontSize: 10 }}
-                          axisLine={false}
-                          tickLine={false}
-                          tickFormatter={pesoAxis} // ← show ₱ on zero-scale too
+                          {...currencyAxisProps}
                         />
                       );
                     }
@@ -600,10 +654,7 @@ function TopProducts({
                       <YAxis
                         type="number"
                         domain={[0, padded]}
-                        tick={{ fontSize: 10 }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={pesoAxis} // ← ₱ compact ticks
+                        {...currencyAxisProps}
                       />
                     );
                   })()}
@@ -635,7 +686,7 @@ function TopProducts({
           </div>
 
           {/* Demand Forecasting */}
-          <div className="flex flex-col flex-1 min-h-0">
+          <div className={`flex flex-col ${isMobile ? '' : 'flex-1 min-h-0'}`}>
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-[11px] tracking-wide font-semibold text-gray-500 uppercase">
                 {selectedProductName ? `Demand Forecasting - ${selectedProductName} (Units Sold)` : 'Demand Forecasting (Units Sold)'}
@@ -651,8 +702,11 @@ function TopProducts({
                 />
               </div>
             ) : (
-              <div className="h-52 flex-1 min-h-0 overflow-hidden">
-                <ResponsiveContainer width="100%" height="100%">
+              <div
+                className={`${isMobile ? 'h-[320px]' : 'flex-1 min-h-[240px]'} overflow-hidden`}
+                style={demandChartHeight ? { height: demandChartHeight } : undefined}
+              >
+                <ResponsiveContainer width="100%" height={demandChartHeight || '100%'}>
                   <ComposedChart data={chartForecastData} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
                     <defs>
                       <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
@@ -669,13 +723,25 @@ function TopProducts({
                       const maxForecast = displayForecastSeries.reduce((m, p) => Math.max(m, Number(p.units_sold) || 0), 0);
                       const max = Math.max(maxActual, maxForecast);
 
-                      if (max <= 0) return <YAxis tick={{ fontSize: 10 }} domain={[0, 1]} />;
+                      if (max <= 0) {
+                        return (
+                          <YAxis
+                            domain={[0, 1]}
+                            {...numericAxisProps}
+                          />
+                        );
+                      }
 
                       const target = Math.ceil(max * 1.15);
                       const magnitude = Math.pow(10, Math.floor(Math.log10(target)));
                       const padded = Math.ceil(target / magnitude) * magnitude;
 
-                      return <YAxis tick={{ fontSize: 10 }} domain={[0, padded]} />;
+                      return (
+                        <YAxis
+                          domain={[0, padded]}
+                          {...numericAxisProps}
+                        />
+                      );
                     })()}
 
                     <Tooltip

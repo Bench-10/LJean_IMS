@@ -56,13 +56,53 @@ function BranchPerformance({
   // Responsive sizes for pie/legend/tooltip
   const responsiveSizes = useMemo(() => {
     const { width, height } = screenDimensions;
-    const baseRadius = Math.min(width * 0.05, height * 0.08);
-    const outerRadius = Math.max(40, Math.min(baseRadius, 120));
+    const isMobile = width < 640;
+    const baseRadius = Math.min(width * (isMobile ? 0.16 : 0.05), height * (isMobile ? 0.22 : 0.08));
+    const outerRadius = Math.max(isMobile ? 70 : 40, Math.min(baseRadius, isMobile ? 150 : 120));
     const legendFontSize = width < 768 ? 10 : width < 1024 ? 11 : 12;
     const tooltipFontSize = width < 768 ? 12 : 14;
     const centerY = height < 600 ? '40%' : '45%';
     return { outerRadius, legendFontSize, tooltipFontSize, centerY, isMobile: width < 768 };
   }, [screenDimensions]);
+
+  const chartMargins = useMemo(() => {
+    const isNarrow = screenDimensions.width < 640;
+    return {
+      top: 10,
+      right: 5,
+      left: 5,
+      bottom: isNarrow ? 28 : 20
+    };
+  }, [screenDimensions.width]);
+
+  const xAxisHeight = useMemo(
+    () => (screenDimensions.width < 640 ? 36 : 28),
+    [screenDimensions.width]
+  );
+
+  const showYAxisTicks = screenDimensions.width >= 640;
+  const barLabelFontSize = useMemo(
+    () => (screenDimensions.width < 640 ? 5 : 6),
+    [screenDimensions.width]
+  );
+
+  const formatBarLabel = useCallback((value) => {
+    const formatted = currencyFormat(value);
+    if (screenDimensions.width < 640) {
+      return formatted.replace('₱ ', '₱');
+    }
+    return formatted;
+  }, [screenDimensions.width]);
+
+  const productFilterSetter = typeof setProductIdFilter === 'function' ? setProductIdFilter : null;
+
+  const normalizedProductFilter = useMemo(() => {
+    if (productIdFilter === null || productIdFilter === undefined) return '';
+    const trimmed = String(productIdFilter).trim();
+    if (trimmed === '') return '';
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? String(parsed) : '';
+  }, [productIdFilter]);
 
   useEffect(() => {
     let isMounted = true;
@@ -72,14 +112,30 @@ function BranchPerformance({
       try {
         setProductLoading(true);
         setProductError(null);
-        const res = await api.get(`/api/items/unique`, { signal: controller.signal });
+        const params = {};
+        if (categoryFilter) {
+          params.category_id = categoryFilter;
+        }
+        const requestConfig = { signal: controller.signal };
+        if (Object.keys(params).length) {
+          requestConfig.params = params;
+        }
+        const res = await api.get(`/api/items/unique`, requestConfig);
         if (!isMounted) return;
         const uniqueProducts = Array.isArray(res.data) ? res.data : [];
         const mapped = uniqueProducts.map((item) => ({
           value: String(item.product_id),
           label: item.product_name ? `${item.product_name} (#${item.product_id})` : `Product #${item.product_id}`
         }));
-        setProductOptions([{ value: '', label: 'All Products' }, ...mapped]);
+        const nextOptions = [{ value: '', label: 'All Products' }, ...mapped];
+        setProductOptions(nextOptions);
+        if (
+          productFilterSetter &&
+          normalizedProductFilter &&
+          !nextOptions.some((option) => option.value === normalizedProductFilter)
+        ) {
+          productFilterSetter('');
+        }
       } catch (err) {
         if (err?.code === 'ERR_CANCELED') return;
         if (!isMounted) return;
@@ -96,15 +152,7 @@ function BranchPerformance({
       isMounted = false;
       controller.abort();
     };
-  }, []);
-
-  const normalizedProductFilter = useMemo(() => {
-    if (productIdFilter === null || productIdFilter === undefined) return '';
-    const trimmed = String(productIdFilter).trim();
-    return trimmed || '';
-  }, [productIdFilter]);
-
-  const productFilterSetter = typeof setProductIdFilter === 'function' ? setProductIdFilter : null;
+  }, [categoryFilter, normalizedProductFilter, productFilterSetter]);
 
   const handleProductChange = useCallback((event) => {
     if (!productFilterSetter) return;
@@ -116,11 +164,6 @@ function BranchPerformance({
     if (!productFilterSetter) return;
     productFilterSetter('');
   }, [productFilterSetter]);
-
-  const selectedProductLabel = useMemo(() => {
-    const match = productOptions.find((option) => option.value === normalizedProductFilter);
-    return match?.label ?? 'All Products';
-  }, [normalizedProductFilter, productOptions]);
 
   // Pie data
   const pieChartData = useMemo(
@@ -296,7 +339,7 @@ function BranchPerformance({
       {/* BRANCH PERFORMANCE COMPARISON */}
       <Card
         title={"BRANCH SALES PERFORMANCE COMPARISON"}
-        className="col-span-12 lg:col-span-8 h-[220px] md:h-[260px] lg:h-[280px]"
+        className="col-span-12 lg:col-span-8 h-[320px] sm:h-[260px] lg:h-[280px]"
         exportRef={branchPerformanceRef}
         exportId="branch-performance"
         exportSpans={{ lg: 8 }}
@@ -311,21 +354,29 @@ function BranchPerformance({
             <ChartNoData message={error} hint="Please try refreshing the analytics page." onRetry={() => fetchBranchPerformance()} />
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3" data-export-exclude>
-            <span className="text-xs sm:text-sm font-semibold text-gray-500">
-              Comparing {selectedProductLabel}
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2" data-export-exclude>
             <div className="flex items-center gap-2">
-              <div className="w-[210px] sm:w-56">
+              <span className="text-xs sm:text-sm font-semibold text-gray-600 uppercase tracking-wide">Product</span>
+              <div className="w-[220px] sm:w-64">
                 <DropdownCustom
                   value={normalizedProductFilter}
                   onChange={handleProductChange}
                   options={productOptions}
-                  label="Product"
                   variant="default"
                   size="xs"
+                  searchable
+                  searchPlaceholder="Search products"
+                  noResultsMessage="No matching products"
                 />
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {productLoading && (
+                <span className="text-[10px] text-gray-400">Loading…</span>
+              )}
+              {!productLoading && productError && (
+                <span className="text-[10px] text-red-500">{productError}</span>
+              )}
               {normalizedProductFilter && (
                 <button
                   type="button"
@@ -335,12 +386,6 @@ function BranchPerformance({
                   Clear
                 </button>
               )}
-              {productLoading && (
-                <span className="text-[10px] text-gray-400">Loading…</span>
-              )}
-              {!productLoading && productError && (
-                <span className="text-[10px] text-red-500">{productError}</span>
-              )}
             </div>
           </div>
 
@@ -349,7 +394,7 @@ function BranchPerformance({
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={processedBarData}
-                  margin={{ top: 10, right: 5, left: 5, bottom: 40 }} // extra room for 2nd line
+                  margin={chartMargins}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
 
@@ -358,21 +403,35 @@ function BranchPerformance({
                     tick={<TwoLineTick />}   // two-line tick
                     axisLine={false}
                     tickLine={false}
-                    interval={0}       // auto-skip when crowded CHANGE THIS INSTEAD OF "preserveStartEnd"   
-                    tickMargin={8}
-                    height={screenDimensions.width < 640 ? 44 : 36}
+                    interval={0}
+                    tickMargin={4}
+                    height={xAxisHeight}
                     angle={0}
                   />
 
                   {(() => {
                     const maxAmount = processedBarData.reduce((m, p) => Math.max(m, Number(p.total_amount_due) || 0), 0);
                     if (maxAmount <= 0) {
-                      return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 1]} />;
+                      return (
+                        <YAxis
+                          domain={[0, 1]}
+                          {...(showYAxisTicks
+                            ? { tick: { fontSize: 12 }, axisLine: false, tickLine: false }
+                            : { hide: true })}
+                        />
+                      );
                     }
                     const target = Math.ceil(maxAmount * 1.15);
                     const magnitude = Math.pow(10, Math.floor(Math.log10(target)));
                     const padded = Math.ceil(target / magnitude) * magnitude;
-                    return <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, padded]} />;
+                    return (
+                      <YAxis
+                        domain={[0, padded]}
+                        {...(showYAxisTicks
+                          ? { tick: { fontSize: 12 }, axisLine: false, tickLine: false }
+                          : { hide: true })}
+                      />
+                    );
                   })()}
 
                   <Tooltip
@@ -393,8 +452,8 @@ function BranchPerformance({
                     <LabelList
                       dataKey="total_amount_due"
                       position="top"
-                      formatter={(value) => currencyFormat(value)}
-                      style={{ fontSize: 10, fill: '#0f172a', fontWeight: 600 }}
+                      formatter={formatBarLabel}
+                      style={{ fontSize: barLabelFontSize, fill: '#0f172a', fontWeight: 600 }}
                     />
                   </Bar>
                 </BarChart>
@@ -414,7 +473,7 @@ function BranchPerformance({
       {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
       <Card
         title={"REVENUE DISTRIBUTION (%)"}
-        className="col-span-12 lg:col-span-4 h-[220px] md:h-[260px] lg:h-[280px]"
+        className="col-span-12 lg:col-span-4 h-[320px] sm:h-[260px] lg:h-[280px]"
         exportRef={revenueDistributionRef}
         exportId="revenue-distribution"
         exportSpans={{ lg: 4 }}
