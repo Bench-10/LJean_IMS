@@ -181,7 +181,14 @@ function TopProducts({
   }, [selectedProductIndex, topProducts]);
 
   const totalTopProducts = Array.isArray(topProducts) ? topProducts.length : 0;
-  const baseDisplay = virtualizedTopProducts.length ? virtualizedTopProducts : topProducts || [];
+  const baseDisplay = useMemo(() => {
+    if (!Array.isArray(topProducts) || !topProducts.length) return [];
+    if (totalTopProducts <= TOP_PRODUCTS_LIMIT || visibleCount > TOP_PRODUCTS_LIMIT) {
+      return topProducts;
+    }
+    if (virtualizedTopProducts.length) return virtualizedTopProducts;
+    return topProducts.slice(0, TOP_PRODUCTS_LIMIT);
+  }, [topProducts, totalTopProducts, visibleCount, virtualizedTopProducts]);
   const topProductsDisplay = baseDisplay.slice(0, Math.min(visibleCount, baseDisplay.length));
 
   const VISIBLE_ROWS = 7;
