@@ -26,7 +26,9 @@ function Delivery({
   globalStartDate = null,
   globalEndDate = null,
   deliveryPage = 0,
-  deliveryTotalPages = null
+  deliveryTotalPages = null,
+  deliveryWindowSize = 5,
+  isMobileView = false
 }) {
   // globalStartDate / globalEndDate are provided by the parent analytics dashboard
   // and define the global date range the dashboard is operating in. These are
@@ -35,7 +37,18 @@ function Delivery({
   const globalEnd = useMemo(() => (globalEndDate ? dayjs(globalEndDate, 'YYYY-MM-DD') : null), [globalEndDate]);
   // Expect incoming deliveryData to be an array of { date, delivered, undelivered }
   const normalizedData = useMemo(() => (Array.isArray(deliveryData) ? deliveryData : []), [deliveryData]);
-  const hasData = normalizedData.length > 0;
+  const chunkSize = Math.max(1, Number(deliveryWindowSize) || 1);
+  const chartData = useMemo(() => {
+    if (!isMobileView) return normalizedData;
+    if (!normalizedData.length) return normalizedData;
+    const total = normalizedData.length;
+    const maxPage = Math.max(0, Math.ceil(total / chunkSize) - 1);
+    const safePage = Math.min(Math.max(0, Number(deliveryPage) || 0), maxPage);
+    const end = Math.min(total, total - (safePage * chunkSize)) || total;
+    const start = Math.max(0, end - chunkSize);
+    return normalizedData.slice(start, end);
+  }, [chunkSize, deliveryPage, isMobileView, normalizedData]);
+  const hasData = chartData.length > 0;
 
   const deliveredColor = '#4ade80';
   const undeliveredColor = '#f87171';
@@ -72,7 +85,7 @@ function Delivery({
 
   // If there are many bars, tilt labels for readability. Thresholds tuned so
   // initial window sizes (daily=20) still show labels by default.
-  const manyTicks = normalizedData.length > (deliveryInterval === 'daily' ? 24 : 12);
+  const manyTicks = chartData.length > (deliveryInterval === 'daily' ? 24 : 12);
   const xAngle = manyTicks ? -35 : 0;
   const xAnchor = manyTicks ? 'end' : 'middle';
 
@@ -81,6 +94,16 @@ function Delivery({
 
   const loadOlderDisabled = loadingDelivery || !canLoadOlder;
   const resetDisabled = loadingDelivery || !hasExtendedRange;
+
+  const displayRangeLabel = useMemo(() => {
+    if (!isMobileView || !chartData.length) return rangeLabel;
+    const first = chartData[0]?.date ? String(chartData[0].date) : '';
+    const last = chartData[chartData.length - 1]?.date ? String(chartData[chartData.length - 1].date) : '';
+    if (!first) return rangeLabel;
+    const formattedStart = formatTick(first);
+    const formattedEnd = last ? formatTick(last) : formattedStart;
+    return formattedStart === formattedEnd ? formattedStart : `${formattedStart} - ${formattedEnd}`;
+  }, [chartData, formatTick, isMobileView, rangeLabel]);
 
   // Decide which interval options should be presented and whether they should be disabled
   // based on the global date range (parent dashboard). Rules:
@@ -141,10 +164,10 @@ function Delivery({
           {/* Controls */}
           <div
             data-export-exclude
-            className="flex flex-wrap items-end justify-between gap-3 mb-3"
+            className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-3"
           >
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-36">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 w-full md:w-auto">
+              <div className="w-full max-w-[180px] sm:w-36">
                 <DropdownCustom
                   value={deliveryInterval}
                   onChange={(e) => setDeliveryInterval(e.target.value)}
@@ -156,22 +179,22 @@ function Delivery({
               </div>
 
               {/* Legend: delivered vs undelivered for clarity */}
-              <div className="flex items-center gap-3 m-1">
-                <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-sm" style={{ background: deliveredColor }} />
                   <span className="text-gray-600">Delivered</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-sm" style={{ background: undeliveredColor }} />
                   <span className="text-gray-600">Undelivered</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-2 text-right">
-              {rangeLabel && (
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 text-left sm:text-right w-full md:w-auto">
+              {displayRangeLabel && (
                 <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
-                  {rangeLabel}
+                  {displayRangeLabel}
                 </span>
               )}
               {windowLabel && (
@@ -190,7 +213,7 @@ function Delivery({
                 </button>
               )}
               {Number.isFinite(deliveryTotalPages) && (
-                <span className="text-xs text-gray-500 font-medium whitespace-nowrap mx-3">
+                <span className="text-xs text-gray-500 font-medium whitespace-nowrap sm:mx-3">
                   Page {Math.max(1, (Number(deliveryPage || 0) + 1))} of {deliveryTotalPages}
                 </span>
               )}
@@ -215,8 +238,10 @@ function Delivery({
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={normalizedData}
-                  margin={{ top: 10, right: 10, left: 10, bottom: manyTicks ? 30 : 16 }}
+                  data={chartData}
+                  margin={{ top: 10, right: 10, left: 0, bottom: manyTicks ? 30 : 16 }}
+                  barCategoryGap={chartData.length <= 5 ? 12 : 8}
+                  barGap={6}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
 
@@ -232,7 +257,7 @@ function Delivery({
                   />
 
                   {(() => {
-                    const max = normalizedData.reduce(
+                    const max = chartData.reduce(
                       (m, p) => Math.max(m, Number(p.delivered) || 0, Number(p.undelivered) || 0),
                       0
                     );
@@ -241,10 +266,11 @@ function Delivery({
                       return (
                         <YAxis
                           domain={[0, 1]}
-                          tick={{ fontSize: 12 }}
+                          tick={{ fontSize: 12, fill: 'transparent' }}
                           allowDecimals={false}
                           axisLine={false}
                           tickLine={false}
+                          width={0}
                         />
                       );
                     }
@@ -252,10 +278,11 @@ function Delivery({
                     return (
                       <YAxis
                         domain={[0, padded]}
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: 12, fill: 'transparent' }}
                         allowDecimals={false}
                         axisLine={false}
                         tickLine={false}
+                        width={0}
                       />
                     );
                   })()}

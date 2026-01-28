@@ -35,6 +35,7 @@ import DatePickerCustom from '../DatePickerCustom.jsx';
 
 const FETCH_DEBOUNCE_MS = 150;
 const DELIVERY_WINDOW_SIZES = { daily: 14, monthly: 12, yearly: 5 };
+const DELIVERY_WINDOW_SIZES_MOBILE = { daily: 5, monthly: 5, yearly: 5 };
 const DELIVERY_META_DEFAULT = {
   min_bucket: null,
   max_bucket: null,
@@ -497,6 +498,25 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const [loadingTopProducts, setLoadingTopProducts] = useState(false);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [loadingKPIs, setLoadingKPIs] = useState(false);
+
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1024
+  }));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleResize = () => {
+      setViewport({ width: window.innerWidth });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = viewport.width < 640;
+
+  const currentDeliveryWindowSizes = useMemo(() => (
+    isMobile ? DELIVERY_WINDOW_SIZES_MOBILE : DELIVERY_WINDOW_SIZES
+  ), [isMobile]);
 
   const [salesInterval, setSalesInterval] = useState(persistedState?.salesInterval ?? 'monthly');
   const [restockInterval, setRestockInterval] = useState(persistedState?.restockInterval ?? 'monthly');
@@ -1380,7 +1400,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   }, [branchId, categoryFilter, resolvedRange, user]);
 
   const computeDeliveryRange = useCallback((cursor = 0) => {
-    const windowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
+    const windowSize = currentDeliveryWindowSizes[deliveryInterval] ?? currentDeliveryWindowSizes.daily;
     if (!windowSize) return null;
 
     // Determine global clamp window from resolvedRange so delivery data never escapes the global range
@@ -1457,7 +1477,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       end_date: end.format('YYYY-MM-DD'),
       windowSize
     };
-  }, [deliveryInterval, resolvedRange.start_date, resolvedRange.end_date]);
+  }, [deliveryInterval, resolvedRange.start_date, resolvedRange.end_date, currentDeliveryWindowSizes]);
 
   const loadDeliveryChunk = useCallback(async ({ cursor = 0, mode = 'replace', signal, silent = false, forceRefresh = false } = {}) => {
     if (!user) return;
@@ -1587,7 +1607,10 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     }
   }, [branchId, categoryFilter, computeDeliveryRange, deliveryInterval, registerDataBounds, user]);
 
-  const deliveryWindowSize = DELIVERY_WINDOW_SIZES[deliveryInterval] ?? DELIVERY_WINDOW_SIZES.daily;
+  const deliveryWindowSize = useMemo(() => {
+    const fallback = currentDeliveryWindowSizes.daily ?? DELIVERY_WINDOW_SIZES.daily;
+    return currentDeliveryWindowSizes[deliveryInterval] ?? fallback;
+  }, [currentDeliveryWindowSizes, deliveryInterval]);
 
   const deliveryTotalPages = useMemo(() => {
     const globalStart = resolvedRange?.start_date ? dayjs(resolvedRange.start_date, 'YYYY-MM-DD').startOf('day') : null;
@@ -2087,6 +2110,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
               globalEndDate={resolvedRange.end_date}
               deliveryPage={deliveryOldestCursor}
               deliveryTotalPages={deliveryTotalPages}
+              deliveryWindowSize={deliveryWindowSize}
+              isMobileView={isMobile}
             />
           )}
 
