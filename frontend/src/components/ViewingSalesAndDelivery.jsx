@@ -149,6 +149,11 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
     const hasDiscount = headerInformation.discount !== undefined && Number(headerInformation.discount) > 0;
     const hasDeliveryFee = headerInformation.deliveryFee !== undefined && Number(headerInformation.deliveryFee) > 0;
 
+    // Calculate VAT percentage from the actual values
+    const vatPercentage = headerInformation.amountNet && headerInformation.vat 
+      ? ((Number(headerInformation.vat) / Number(headerInformation.amountNet)) * 100).toFixed(0)
+      : '12';
+
     const totalsMarkup = isSales ? `
       <table class="summary-table">
         <tbody>
@@ -157,7 +162,7 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
             <td class="value">${escapeHtml(currencyFormat(headerInformation.amountNet ?? 0))}</td>
           </tr>
           <tr>
-            <td class="label">VAT (10%):</td>
+            <td class="label">VAT (${vatPercentage}%):</td>
             <td class="value">${escapeHtml(currencyFormat(headerInformation.vat ?? 0))}</td>
           </tr>
           ${hasDiscount ? `
@@ -667,7 +672,7 @@ function ViewingSalesAndDelivery({ openModal, closeModal, user, type, headerInfo
                         <span className="font-semibold">{currencyFormat(headerInformation.amountNet)}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b border-gray-200 text-sm sm:text-base">
-                        <span className="font-medium text-gray-600">VAT (10%):</span>
+                        <span className="font-medium text-gray-600">VAT ({headerInformation.amountNet && headerInformation.vat ? ((Number(headerInformation.vat) / Number(headerInformation.amountNet)) * 100).toFixed(0) : '12'}%):</span>
                         <span className="font-semibold">{currencyFormat(headerInformation.vat)}</span>
                       </div>
                       {(headerInformation.discount !== undefined && headerInformation.discount > 0) && (

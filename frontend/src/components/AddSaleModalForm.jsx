@@ -64,6 +64,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   //CALCULATING AMOUNT AND VAT
   const [additionalDiscount, setAdditionalDiscount] = useState(0);
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [vatPercentage, setVatPercentage] = useState(12);
   const [vat, setVat] = useState(0);
   const [amountNetVat, setAmount] = useState(0);
   const [totalAmountDue, setTotalAmountDue] = useState(0);
@@ -96,6 +97,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
     setAddress('');
     setDate('');
     setVat(0);
+    setVatPercentage(12);
     setSearchTerms({});
     setShowDropdowns({});
     setEmptyQuantiy(false);
@@ -174,7 +176,7 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
 
   //CALCULATES THE VAT AND TOTAL AMOUNT
   const vatAmount = (amount) => {
-    const vatCalculated = amount * 0.12;
+    const vatCalculated = amount * (vatPercentage / 100);
     setVat(vatCalculated);
 
     calculateTotalAmount(amount, vatCalculated, additionalDiscount, deliveryFee);
@@ -214,6 +216,15 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
   const handleDeliveryFeeChange = (feeAmount) => {
     setDeliveryFee(feeAmount);
     calculateTotalAmount(amountNetVat, vat, additionalDiscount, feeAmount);
+  };
+
+  //HANDLE VAT PERCENTAGE CHANGE
+  const handleVatPercentageChange = (percentage) => {
+    const validPercentage = Math.max(0, Math.min(100, percentage));
+    setVatPercentage(validPercentage);
+    const recalculatedVat = amountNetVat * (validPercentage / 100);
+    setVat(recalculatedVat);
+    calculateTotalAmount(amountNetVat, recalculatedVat, additionalDiscount, deliveryFee);
   };
 
   //REMOVES THE SPECIFIC ROW
@@ -971,8 +982,18 @@ function AddSaleModalForm({ openSaleModal, setOpenSaleModal, productsData, setSa
                 <div className='bg-white border border-gray-200 rounded-lg p-4 mb-4 shadow-sm'>
                   <div className='flex flex-wrap justify-between items-center gap-4 mb-3'>
                     <div className='flex flex-wrap gap-x-8 gap-y-2'>
-                      <div className='text-sm'>
+                      <div className='text-sm flex items-center gap-2'>
                         <span className='text-xs font-bold text-gray-600'>VAT:</span>
+                        <input
+                          type='number'
+                          min='0'
+                          max='100'
+                          step='0.01'
+                          value={vatPercentage}
+                          onChange={(e) => handleVatPercentageChange(Number(e.target.value) || 0)}
+                          className='w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500'
+                        />
+                        <span className='text-xs text-gray-600'>%</span>
                         <span className='ml-2 font-semibold text-gray-800'>{currencyFormat(toTwoDecimals(vat))}</span>
                       </div>
                       <div className='text-sm'>
