@@ -133,7 +133,7 @@ function TopProducts({
       : { tick: { fontSize: 10 }, axisLine: false, tickLine: false }
   ), [isMobile]);
   const salesChartHeight = isMobile ? 320 : 380;
-  const demandChartHeight = isMobile ? 320 : 340;
+  const demandChartHeight = isMobile ? 320 : 280;
 
   // SET FILTER BY PRODUCT ID
   const handleClick = (data) => {
@@ -177,7 +177,7 @@ function TopProducts({
   }, [topProducts, totalTopProducts, visibleCount, virtualizedTopProducts]);
   const topProductsDisplay = baseDisplay.slice(0, Math.min(visibleCount, baseDisplay.length));
 
-  const VISIBLE_ROWS = 7;
+  const VISIBLE_ROWS = isMobile ? 7 : 10;
   const BAR_SIZE = 30;
   const ROW_GAP = 44;
   const MARGIN_TOP = 10;
@@ -527,7 +527,7 @@ function TopProducts({
                     <LabelList
                       dataKey="sales_amount"
                       position="right"
-                      formatter={(value) => currencyFormat(value)}
+                      formatter={(value) => currencyFormat(value).replace('₱ ', '₱')}
                       style={{ fontSize: isMobile ? 9 : 10, fill: '#0f172a', fontWeight: 600 }}
                     />
                   </Bar>
@@ -696,7 +696,7 @@ function TopProducts({
               </div>
             ) : (
               <div
-                className={`${isMobile ? 'h-[320px]' : 'h-[340px]'} overflow-hidden`}
+                className={`${isMobile ? 'h-[320px]' : 'h-[280px]'} overflow-hidden`}
                 style={demandChartHeight ? { height: demandChartHeight } : undefined}
               >
                 <ResponsiveContainer width="100%" height={demandChartHeight}>
