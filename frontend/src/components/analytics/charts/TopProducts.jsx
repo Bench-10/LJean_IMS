@@ -132,22 +132,8 @@ function TopProducts({
       ? { hide: true }
       : { tick: { fontSize: 10 }, axisLine: false, tickLine: false }
   ), [isMobile]);
-  const salesChartHeight = isMobile ? 320 : null;
-  const demandChartHeight = isMobile ? 320 : null;
-
-  // NEW (debug heights)
-  useEffect(() => {
-    const containers = document.querySelectorAll('[data-chart-container]');
-    containers.forEach((container, index) => {
-      const rect = container.getBoundingClientRect();
-      // eslint-disable-next-line no-console
-      console.log(`Container ${index}:`, {
-        width: rect.width,
-        height: rect.height,
-        visible: rect.width > 0 && rect.height > 0
-      });
-    });
-  }, []);
+  const salesChartHeight = isMobile ? 320 : 380;
+  const demandChartHeight = isMobile ? 320 : 340;
 
   // SET FILTER BY PRODUCT ID
   const handleClick = (data) => {
@@ -615,7 +601,7 @@ function TopProducts({
 
           {/* Sales line chart */}
           <div
-            className={`${isMobile ? 'h-[320px]' : 'flex-1 min-h-[280px]'} overflow-hidden`}
+            className={`${isMobile ? 'h-[320px]' : 'h-[380px]'} overflow-hidden`}
             data-chart-container="sales-performance"
             style={salesChartHeight ? { height: salesChartHeight } : undefined}
           >
@@ -626,7 +612,7 @@ function TopProducts({
                 onRetry={onRetrySalesPerformance}
               />
             ) : (
-              <ResponsiveContainer width="100%" height={salesChartHeight || '100%'}>
+              <ResponsiveContainer width="100%" height={salesChartHeight}>
                 <LineChart data={lineChartData} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
                   <defs>
                     <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
@@ -710,10 +696,10 @@ function TopProducts({
               </div>
             ) : (
               <div
-                className={`${isMobile ? 'h-[320px]' : 'flex-1 min-h-[240px]'} overflow-hidden`}
+                className={`${isMobile ? 'h-[320px]' : 'h-[340px]'} overflow-hidden`}
                 style={demandChartHeight ? { height: demandChartHeight } : undefined}
               >
-                <ResponsiveContainer width="100%" height={demandChartHeight || '100%'}>
+                <ResponsiveContainer width="100%" height={demandChartHeight}>
                   <ComposedChart data={chartForecastData} margin={{ top: 0, right: 15, left: 0, bottom: 5 }}>
                     <defs>
                       <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
