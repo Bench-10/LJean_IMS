@@ -404,7 +404,7 @@ const CategorySelect = ({ categoryFilter, setCategoryFilter, onCategoryNameChang
 
 
 /* ---------- Responsive KPI tile ---------- */
-function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, dateRangeDisplay }) {
+function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, dateRangeDisplay, clarification }) {
   return (
     <div className="h-full bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 relative overflow-hidden" data-kpi-card>
       {loading && <ChartLoading message={title} type="kpi" />}
@@ -421,6 +421,11 @@ function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, d
             <h3 className="text-[14px] sm:text-[18px] font-semibold text-gray-700 whitespace-nowrap">
               {title}
             </h3>
+            {clarification && (
+              <span className="text-[10px] sm:text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                {clarification}
+              </span>
+            )}
             {dateRangeDisplay && (
               <span className="text-[10px] sm:text-[11px] text-gray-500 leading-none">
                 {dateRangeDisplay}
@@ -1047,9 +1052,11 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     };
     if (branchId) params.branch_id = branchId;
     if (categoryFilter) params.category_id = categoryFilter;
+    if (productIdFilter) params.product_id = productIdFilter;
     const cacheParams = {
       branch: branchId ?? 'all',
       category: categoryFilter || 'all',
+      product: productIdFilter || 'all',
       interval: salesInterval,
       start: resolvedRange.start_date,
       end: resolvedRange.end_date
@@ -1120,7 +1127,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     } finally {
       if (!silent) setLoadingSalesPerformance(false);
     }
-  }, [branchId, categoryFilter, registerSalesBounds, resolvedRange.end_date, resolvedRange.start_date, salesInterval, user, optimizationsEnabled]);
+  }, [branchId, categoryFilter, productIdFilter, registerSalesBounds, resolvedRange.end_date, resolvedRange.start_date, salesInterval, user, optimizationsEnabled]);
 
   const fetchTopProductsData = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
@@ -1330,10 +1337,12 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     };
     if (branchId) params.branch_id = branchId;
     if (categoryFilter) params.category_id = categoryFilter;
+    if (productIdFilter) params.product_id = productIdFilter;
 
     const cacheParams = {
       branch: branchId ?? 'all',
       category: categoryFilter || 'all',
+      product: productIdFilter || 'all',
       start: resolvedRange.start_date,
       end: resolvedRange.end_date,
       preset: resolvedRange.presetKey
@@ -1397,7 +1406,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     } finally {
       if (!silent) setLoadingKPIs(false);
     }
-  }, [branchId, categoryFilter, resolvedRange, user]);
+  }, [branchId, categoryFilter, productIdFilter, resolvedRange.end_date, resolvedRange.presetKey, resolvedRange.start_date, user]);
 
   const computeDeliveryRange = useCallback((cursor = 0) => {
     const windowSize = currentDeliveryWindowSizes[deliveryInterval] ?? currentDeliveryWindowSizes.daily;
@@ -2026,6 +2035,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
             value={currencyFormat(kpis.total_sales)}
             sub={compareValues(kpis.total_sales, kpis.prev_total_sales)}
             dateRangeDisplay={dateRangeDisplay}
+            clarification={categoryFilter || productIdFilter ? "Net Sales" : "Gross Sales"}
           />
           <KPI
             loading={loadingKPIs}
