@@ -417,7 +417,7 @@ function KPI({ loading, icon: Icon, iconClass, accentClass, title, value, sub, d
 
         <div className="min-w-0">
           {/* Title + Date: allow wrapping; no truncate on the date */}
-          <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
             <h3 className="text-[14px] sm:text-[18px] font-semibold text-gray-700 whitespace-nowrap">
               {title}
             </h3>
