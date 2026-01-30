@@ -460,7 +460,8 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
           )}
           
           {/* CONTROLS */}
-          <div data-export-exclude className="flex flex-col gap-3 mb-4">
+          {!error && (
+            <div data-export-exclude className="flex flex-col gap-3 mb-4">
             {/* Dropdowns Row */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 sm:gap-3 justify-end">
               {/* BRANCH SELECTOR */}
@@ -535,7 +536,8 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
 
           {/* CHART AREA */}

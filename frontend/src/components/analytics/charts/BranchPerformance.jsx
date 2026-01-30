@@ -370,41 +370,43 @@ function BranchPerformance({
             <ChartNoData message={error} hint="Please try refreshing the analytics page." onRetry={() => fetchBranchPerformance()} />
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-2" data-export-exclude>
-            <div className="flex items-center gap-2">
-              <span className="text-xs sm:text-sm font-semibold text-gray-600 uppercase tracking-wide">Product</span>
-              <div className="w-[220px] sm:w-64">
-                <DropdownCustom
-                  value={normalizedProductFilter}
-                  onChange={handleProductChange}
-                  options={productOptions}
-                  variant="default"
-                  size="xs"
-                  searchable
-                  searchPlaceholder="Search products"
-                  noResultsMessage="No matching products"
-                  autoFocusSearch={!responsiveSizes.isMobile}
-                />
+          {!error && !loading && (
+            <div className="flex flex-col gap-1 mb-2" data-export-exclude>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-semibold text-gray-600 uppercase tracking-wide">Product</span>
+                <div className="w-[220px] sm:w-64">
+                  <DropdownCustom
+                    value={normalizedProductFilter}
+                    onChange={handleProductChange}
+                    options={productOptions}
+                    variant="default"
+                    size="xs"
+                    searchable
+                    searchPlaceholder="Search products"
+                    noResultsMessage="No matching products"
+                    autoFocusSearch={!responsiveSizes.isMobile}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  {productLoading && (
+                    <span className="text-[10px] text-gray-400">Loading…</span>
+                  )}
+                  {!productLoading && productError && (
+                    <span className="text-[10px] text-red-500">{productError}</span>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {productLoading && (
-                <span className="text-[10px] text-gray-400">Loading…</span>
-              )}
-              {!productLoading && productError && (
-                <span className="text-[10px] text-red-500">{productError}</span>
-              )}
               {normalizedProductFilter && (
                 <button
                   type="button"
                   onClick={handleClearProduct}
-                  className="text-[11px] font-semibold text-green-700 hover:text-green-900"
+                  className="self-start text-[11px] font-semibold text-green-700 hover:text-green-900"
                 >
                   Clear
                 </button>
               )}
             </div>
-          </div>
+          )}
 
           {showBarChart && (
             <div className="flex-1 min-h-0 max-h-full overflow-hidden" data-chart-container="branch-performance">
