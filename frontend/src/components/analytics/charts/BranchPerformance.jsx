@@ -109,6 +109,13 @@ function BranchPerformance({
     return Number.isFinite(parsed) ? String(parsed) : '';
   }, [productIdFilter]);
 
+  const selectedProductLabel = useMemo(() => {
+    if (!normalizedProductFilter) return '';
+    const match = productOptions.find((option) => option.value === normalizedProductFilter);
+    if (match?.label) return match.label;
+    return `Product #${normalizedProductFilter}`;
+  }, [normalizedProductFilter, productOptions]);
+
   useEffect(() => {
     let isMounted = true;
     const controller = new AbortController();
@@ -480,7 +487,16 @@ function BranchPerformance({
 
       {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
       <Card
-        title={`REVENUE DISTRIBUTION (${resolvedSalesTypeLabel}) %`}
+        title={(
+          <span className="flex flex-wrap items-center gap-2">
+            <span>{`REVENUE DISTRIBUTION (${resolvedSalesTypeLabel}) %`}</span>
+            {selectedProductLabel && (
+              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                {selectedProductLabel}
+              </span>
+            )}
+          </span>
+        )}
         className="col-span-12 lg:col-span-4 h-[320px] sm:h-[260px] lg:h-[280px]"
         exportRef={revenueDistributionRef}
         exportId="revenue-distribution"
