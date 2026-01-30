@@ -87,11 +87,11 @@ const TopBarTooltip = ({ active, payload }) => {
 
 function TopProducts({
   topProducts, salesPerformance, formatPeriod, restockTrends, Card, categoryName,
-  salesInterval, setSalesInterval, restockInterval, setRestockInterval,
+  salesTypeLabel, useNetAmount, salesInterval, setSalesInterval, restockInterval, setRestockInterval,
   setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts,
   loadingRestockSuggestions, restockSuggestions, dateRangeDisplay, topProductsRef, salesChartRef,
   globalStartDate, globalEndDate, salesIntervalOptions,
-  onRetryTopProducts, onRetrySalesPerformance, rangeMode, preset
+  onRetryTopProducts, onRetrySalesPerformance
 }) {
   const [showRestockDialog, setShowRestockDialog] = useState(false);
   const [visibleCount, setVisibleCount] = useState(INITIAL_TOP_PRODUCTS_PAGE);
@@ -100,19 +100,7 @@ function TopProducts({
     height: typeof window !== 'undefined' ? window.innerHeight : 768
   }));
 
-  // Determine if we're showing Gross Sales or Net Sales
-  // Gross Sales: All complete transactions (filtered by date only)
-  // Net Sales: Filtered by category or specific product
-  const isFiltered = useMemo(() => {
-    // Check if category filter is applied (not "All Products")
-    const hasCategoryFilter = categoryName && categoryName !== 'All Products';
-    // Check if product filter is applied
-    const hasProductFilter = !!productIdFilter;
-    
-    return hasCategoryFilter || hasProductFilter;
-  }, [categoryName, productIdFilter]);
-
-  const salesTypeLabel = isFiltered ? 'Net Sales' : 'Gross Sales';
+  const resolvedSalesTypeLabel = salesTypeLabel || (useNetAmount ? 'Net Sales' : 'Gross Sales');
 
   const intervalOptions = useMemo(() => {
     if (Array.isArray(salesIntervalOptions) && salesIntervalOptions.length) {
@@ -568,7 +556,7 @@ function TopProducts({
 
       {/* SALES PERFORMANCE + FORECAST */}
       <Card
-        title={selectedProductName ? `Sales Performance (${salesTypeLabel}) - ${selectedProductName}` : `Sales Performance (${salesTypeLabel})`}
+        title={selectedProductName ? `Sales Performance (${resolvedSalesTypeLabel}) - ${selectedProductName}` : `Sales Performance (${resolvedSalesTypeLabel})`}
         className="col-span-12 lg:col-span-8"
         exportRef={salesChartRef}
         exportId="sales-performance"
@@ -669,11 +657,11 @@ function TopProducts({
 
                   <Tooltip
                     labelFormatter={formatPeriod}
-                    formatter={(value) => [currencyFormat(value), salesTypeLabel]}
+                    formatter={(value) => [currencyFormat(value), resolvedSalesTypeLabel]}
                   />
 
                   <Area type="monotone" dataKey="sales_amount" stroke="none" fillOpacity={1} fill="url(#colorSales)" />
-                  <Line type="monotone" dataKey="sales_amount" name={salesTypeLabel} stroke="#0f766e" strokeWidth={2} dot={{ r: 3, fill: '#0f766e', strokeWidth: 0 }}>
+                  <Line type="monotone" dataKey="sales_amount" name={resolvedSalesTypeLabel} stroke="#0f766e" strokeWidth={2} dot={{ r: 3, fill: '#0f766e', strokeWidth: 0 }}>
                     <LabelList
                       dataKey="sales_amount"
                       position="top"

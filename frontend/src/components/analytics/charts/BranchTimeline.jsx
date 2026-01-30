@@ -42,21 +42,14 @@ const getProgressiveChunkSize = (length) => {
   return Math.max(MIN_PROGRESSIVE_CHUNK, base);
 };
 
-function BranchTimeline({ Card, categoryFilter, branchTimelineRef, categoryName, productIdFilter }) {
+function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabel, useNetAmount }) {
   const { user } = useAuth();
   const [branchTimelineData, setBranchTimelineData] = useState([]);
   const [displayTimelineData, setDisplayTimelineData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Determine if we're showing Gross Sales or Net Sales
-  const isFiltered = useMemo(() => {
-    const hasCategoryFilter = categoryName && categoryName !== 'All Products';
-    const hasProductFilter = !!productIdFilter;
-    return hasCategoryFilter || hasProductFilter;
-  }, [categoryName, productIdFilter]);
-
-  const salesTypeLabel = isFiltered ? 'Net Sales' : 'Gross Sales';
+  const resolvedSalesTypeLabel = salesTypeLabel || (useNetAmount ? 'Net Sales' : 'Gross Sales');
   const [selectedBranch, setSelectedBranch] = useState(() => {
     if (typeof window === 'undefined') return '1';
     return window.sessionStorage.getItem(TIMELINE_SELECTION_KEY) || '1';
@@ -110,9 +103,10 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, categoryName,
     () => JSON.stringify({
       branch: selectedBranch || '1',
       interval: timelineInterval,
-      category: categoryFilter || 'all'
+      category: categoryFilter || 'all',
+      useNetAmount: !!useNetAmount
     }),
-    [categoryFilter, selectedBranch, timelineInterval]
+    [categoryFilter, selectedBranch, timelineInterval, useNetAmount]
   );
 
   // Fetch branches independently and always auto-select first branch
@@ -268,7 +262,8 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, categoryName,
         branch_id: selectedBranch,
         interval: timelineInterval,
         start_date: range.start_date,
-        end_date: range.end_date
+        end_date: range.end_date,
+        use_net_amount: !!useNetAmount
       };
 
       if (categoryFilter) {
@@ -317,7 +312,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, categoryName,
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [cacheKey, categoryFilter, computeTimelineRange, initializeTimelineData, isOwner, selectedBranch, timelineInterval, totalPeriods]);
+  }, [cacheKey, categoryFilter, computeTimelineRange, initializeTimelineData, isOwner, selectedBranch, timelineInterval, totalPeriods, useNetAmount]);
 
   // Load initial data
   useEffect(() => {
@@ -430,7 +425,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, categoryName,
     <>
       {/* BRANCH TIMELINE CHART */}
       <Card
-        title={`BRANCH SALES TIMELINE (${salesTypeLabel}) - ${selectedBranchName.toUpperCase()}`}
+        title={`BRANCH SALES TIMELINE (${resolvedSalesTypeLabel}) - ${selectedBranchName.toUpperCase()}`}
         className="col-span-full mt-5 lg:mt-0 mb-8 h-[calc(100vh-260px)] min-h-[420px]"
         exportRef={branchTimelineRef}
         exportId="branch-timeline"

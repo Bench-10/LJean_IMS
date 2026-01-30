@@ -32,7 +32,8 @@ export const getSalesPerformance = async (req, res) => {
       interval = 'monthly',
       range = '1y',
       start_date,
-      end_date
+      end_date,
+      use_net_amount
     } = req.query;
     const rows = await analyticsServices.fetchSalesPerformance({
       branch_id,
@@ -41,7 +42,8 @@ export const getSalesPerformance = async (req, res) => {
       interval,
       range,
       start_date,
-      end_date
+      end_date,
+      use_net_amount: use_net_amount === 'true' || use_net_amount === true
     });
     res.json(rows);
   } catch (err) {
@@ -137,8 +139,16 @@ export const getCategoryDistribution = async (req, res) => {
 
 export const getKPIs = async (req, res) => {
   try {
-  const { branch_id, category_id, product_id, range = '1m', start_date, end_date } = req.query;
-  const rows = await analyticsServices.fetchKPIs({ branch_id, category_id, product_id, range, start_date, end_date });
+  const { branch_id, category_id, product_id, range = '1m', start_date, end_date, use_net_amount } = req.query;
+  const rows = await analyticsServices.fetchKPIs({ 
+    branch_id, 
+    category_id, 
+    product_id, 
+    range, 
+    start_date, 
+    end_date,
+    use_net_amount: use_net_amount === 'true' || use_net_amount === true
+  });
     res.json(rows);
 
   } catch (err) {
@@ -196,14 +206,14 @@ export const numberOfDeliveriesByDate = async (req, res) => {
 // BRANCH TIMELINE - DEDICATED ENDPOINT FOR BRANCH-SPECIFIC TIMELINE DATA
 export const getBranchTimeline = async (req, res) => {
   try {
-    const { branch_id, category_id, interval = 'monthly', start_date, end_date, range = '3m' } = req.query;
+    const { branch_id, category_id, interval = 'monthly', start_date, end_date, range = '3m', use_net_amount } = req.query;
     
     // Validate required branch_id
     if (!branch_id) {
       return res.status(400).json({ message: 'branch_id is required' });
     }
     
-    console.log('Branch timeline request params:', { branch_id, category_id, interval, start_date, end_date, range });
+    console.log('Branch timeline request params:', { branch_id, category_id, interval, start_date, end_date, range, use_net_amount });
     
     const rows = await analyticsServices.fetchBranchTimeline({ 
       branch_id, 
@@ -211,7 +221,8 @@ export const getBranchTimeline = async (req, res) => {
       interval, 
       start_date, 
       end_date, 
-      range
+      range,
+      use_net_amount: use_net_amount === 'true' || use_net_amount === true
     });
     
     console.log('Branch timeline response data:', rows);
@@ -228,8 +239,15 @@ export const getBranchTimeline = async (req, res) => {
 // BRANCH SALES SUMMARY (TOTAL AMOUNT DUE PER BRANCH)
 export const getBranchSalesSummary = async (req, res) => {
   try {
-    const { start_date, end_date, range = '3m', category_id, product_id } = req.query;
-    const rows = await analyticsServices.fetchBranchSalesSummary({ start_date, end_date, range, category_id, product_id });
+    const { start_date, end_date, range = '3m', category_id, product_id, use_net_amount } = req.query;
+    const rows = await analyticsServices.fetchBranchSalesSummary({ 
+      start_date, 
+      end_date, 
+      range, 
+      category_id, 
+      product_id,
+      use_net_amount: use_net_amount === 'true' || use_net_amount === true
+    });
     res.json(rows);
   } catch (err) {
     console.error('Branch sales summary error', err);

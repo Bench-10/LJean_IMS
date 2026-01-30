@@ -21,23 +21,15 @@ function BranchPerformance({
   revenueDistributionRef,
   productIdFilter,
   setProductIdFilter,
-  categoryName
+  salesTypeLabel,
+  useNetAmount
 }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Determine if we're showing Gross Sales or Net Sales
-  // Gross Sales: All complete transactions (filtered by date only)
-  // Net Sales: Filtered by category or specific product
-  const isFiltered = useMemo(() => {
-    const hasCategoryFilter = categoryName && categoryName !== 'All Products';
-    const hasProductFilter = !!productIdFilter;
-    return hasCategoryFilter || hasProductFilter;
-  }, [categoryName, productIdFilter]);
-
-  const salesTypeLabel = isFiltered ? 'Net Sales' : 'Gross Sales';
+  const resolvedSalesTypeLabel = salesTypeLabel || (useNetAmount ? 'Net Sales' : 'Gross Sales');
   const [screenDimensions, setScreenDimensions] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -260,9 +252,10 @@ function BranchPerformance({
       start: startDate,
       end: endDate,
       category: categoryFilter || 'all',
-      product: normalizedProductFilter || 'all'
+      product: normalizedProductFilter || 'all',
+      useNetAmount: !!useNetAmount
     }),
-    [categoryFilter, endDate, normalizedProductFilter, startDate]
+    [categoryFilter, endDate, normalizedProductFilter, startDate, useNetAmount]
   );
 
   // Fetch branch performance data
@@ -289,7 +282,8 @@ function BranchPerformance({
     try {
       const params = { 
         start_date: startDate, 
-        end_date: endDate 
+        end_date: endDate,
+        use_net_amount: !!useNetAmount
       };
       if (categoryFilter) {
         params.category_id = categoryFilter;
@@ -314,7 +308,7 @@ function BranchPerformance({
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [cacheKey, categoryFilter, endDate, isOwner, normalizedProductFilter, startDate, user]);
+  }, [cacheKey, categoryFilter, endDate, isOwner, normalizedProductFilter, startDate, useNetAmount, user]);
 
   // Fetch data when dependencies change
   useEffect(() => {
@@ -350,7 +344,7 @@ function BranchPerformance({
     <>
       {/* BRANCH PERFORMANCE COMPARISON */}
       <Card
-        title={`BRANCH SALES PERFORMANCE COMPARISON (${salesTypeLabel})`}
+        title={`BRANCH SALES PERFORMANCE COMPARISON (${resolvedSalesTypeLabel})`}
         className="col-span-12 lg:col-span-8 h-[320px] sm:h-[260px] lg:h-[280px]"
         exportRef={branchPerformanceRef}
         exportId="branch-performance"
@@ -484,7 +478,7 @@ function BranchPerformance({
 
       {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
       <Card
-        title={`REVENUE DISTRIBUTION (${salesTypeLabel}) %`}
+        title={`REVENUE DISTRIBUTION (${resolvedSalesTypeLabel}) %`}
         className="col-span-12 lg:col-span-4 h-[320px] sm:h-[260px] lg:h-[280px]"
         exportRef={revenueDistributionRef}
         exportId="revenue-distribution"

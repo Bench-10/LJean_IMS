@@ -283,7 +283,7 @@ export async function fetchInventoryLevels({ branch_id, range }) {
 
 
 
-export async function fetchSalesPerformance({ branch_id, category_id, product_id, interval, range, start_date, end_date }) {
+export async function fetchSalesPerformance({ branch_id, category_id, product_id, interval, range, start_date, end_date, use_net_amount }) {
   let start;
   let end;
 
@@ -294,22 +294,24 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     ({ start, end } = buildDateRange(range));
   }
   const dateTrunc = interval === 'weekly' ? 'week' : interval === 'daily' ? 'day' : interval === 'yearly' ? 'year' : 'month';
+  const hasCategoryFilter = Boolean(category_id);
+  const hasProductFilter = Boolean(product_id);
+  const shouldUseSalesItems = hasCategoryFilter || hasProductFilter;
+  const useNetAmount = Boolean(use_net_amount) && !shouldUseSalesItems;
+
   const cacheKey = makeAnalyticsCacheKey('fetchSalesPerformance', {
     branch_id,
     category_id,
     product_id,
     interval,
     start,
-    end
+    end,
+    use_net_amount: useNetAmount
   });
   const cached = getAnalyticsCache(cacheKey);
   if (cached) {
     return cached;
   }
-
-  const hasCategoryFilter = Boolean(category_id);
-  const hasProductFilter = Boolean(product_id);
-  const shouldUseSalesItems = hasCategoryFilter || hasProductFilter;
 
   let rows;
 
@@ -335,12 +337,13 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     let idx = 3;
     if (branch_id) { baseConditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
     const whereClause = 'WHERE ' + baseConditions.join(' AND ');
+    const salesField = useNetAmount ? 's.amount_net_vat' : 's.total_amount_due';
 
     ({ rows } = await SQLquery(`
       WITH base_sales AS (
         SELECT s.sales_information_id,
                date_trunc('${dateTrunc}', s.date)::date AS period,
-               s.total_amount_due
+               ${salesField} AS sales_amount
         FROM Sales_Information s
         ${whereClause}
       ),
@@ -352,7 +355,7 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
         GROUP BY si.sales_information_id
       )
       SELECT b.period,
-             SUM(b.total_amount_due) AS sales_amount,
+             SUM(b.sales_amount) AS sales_amount,
              SUM(COALESCE(u.units_sold, 0)) AS units_sold
       FROM base_sales b
       LEFT JOIN units u USING (sales_information_id)
@@ -642,7 +645,7 @@ export async function fetchCategoryDistribution({ branch_id }) {
 
 
 
-export async function fetchKPIs({ branch_id, category_id, product_id, range, start_date, end_date }) {
+export async function fetchKPIs({ branch_id, category_id, product_id, range, start_date, end_date, use_net_amount }) {
 
   let start, end;
   if (start_date && end_date) {
@@ -658,7 +661,8 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     product_id,
     range,
     start,
-    end
+    end,
+    use_net_amount: Boolean(use_net_amount) && !(category_id || product_id)
   });
   const cached = getAnalyticsCache(cacheKey);
   if (cached) {
@@ -688,6 +692,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
   const hasCategoryFilter = Boolean(category_id);
   const hasProductFilter = Boolean(product_id);
   const shouldUseSalesItems = hasCategoryFilter || hasProductFilter;
+  const useNetAmount = Boolean(use_net_amount) && !shouldUseSalesItems;
 
   if (hasCategoryFilter) {
     // CURRENT SALES
@@ -820,8 +825,9 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     let salesIdx = 3;
     if (branch_id) { salesConditions.push(`s.branch_id = $${salesIdx++}`); salesParams.push(branch_id); }
     const salesWhere = 'WHERE ' + salesConditions.join(' AND ');
+    const salesField = useNetAmount ? 's.amount_net_vat' : 's.total_amount_due';
     ({ rows: salesRows } = await SQLquery(`
-      SELECT COALESCE(SUM(s.total_amount_due),0) AS total_sales
+      SELECT COALESCE(SUM(${salesField}),0) AS total_sales
       FROM Sales_Information s
       ${salesWhere};`,
       salesParams));
@@ -833,7 +839,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     if (branch_id) { prevSalesConditions.push(`s.branch_id = $${prevSalesIdx++}`); prevSalesParams.push(branch_id); }
     const prevSalesWhere = 'WHERE ' + prevSalesConditions.join(' AND ');
     ({ rows: prevSalesRows } = await SQLquery(`
-      SELECT COALESCE(SUM(s.total_amount_due),0) AS total_sales
+      SELECT COALESCE(SUM(${salesField}),0) AS total_sales
       FROM Sales_Information s
       ${prevSalesWhere};`, 
       prevSalesParams));
@@ -910,7 +916,7 @@ export async function fetchBranches(){
 
 
 
-export async function fetchBranchTimeline({ branch_id, category_id, interval, start_date, end_date, range }) {
+export async function fetchBranchTimeline({ branch_id, category_id, interval, start_date, end_date, range, use_net_amount }) {
   // Use custom dates if provided, otherwise use range
   let start, end;
   if (start_date && end_date) {
@@ -925,7 +931,8 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
     category_id,
     interval,
     start,
-    end
+    end,
+    use_net_amount: Boolean(use_net_amount) && !category_id
   });
   const cached = getAnalyticsCache(cacheKey);
   if (cached) {
@@ -937,6 +944,7 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
   
   // Build conditions and parameters - optimized for performance
   const hasCategoryFilter = Boolean(category_id);
+  const useNetAmount = Boolean(use_net_amount) && !hasCategoryFilter;
   const conditions = ['s.date BETWEEN $1 AND $2', 's.branch_id = $3', RESTORED_SALES_FILTER];
   const params = [start, end, branch_id];
   let idx = 4;
@@ -978,11 +986,12 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
     ({ rows } = await SQLquery(query, params));
   } else {
     const baseWhere = 'WHERE ' + ['s.date BETWEEN $1 AND $2', 's.branch_id = $3', RESTORED_SALES_FILTER].join(' AND ');
+    const salesField = useNetAmount ? 's.amount_net_vat' : 's.total_amount_due';
     const query = `
       WITH base_sales AS (
         SELECT s.sales_information_id,
                date_trunc('${dateTrunc}', s.date)::date AS period,
-               s.total_amount_due
+               ${salesField} AS sales_amount
         FROM Sales_Information s
         ${baseWhere}
       ),
@@ -995,7 +1004,7 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
       )
       SELECT b.period,
              ${interval === 'daily' || interval === 'weekly' ? "TO_CHAR(b.period, 'Mon DD')" : "TO_CHAR(b.period, 'Mon YYYY')"} AS formatted_period,
-             SUM(b.total_amount_due) AS sales_amount,
+             SUM(b.sales_amount) AS sales_amount,
              SUM(COALESCE(u.units_sold, 0)) AS units_sold,
              COUNT(DISTINCT b.sales_information_id) AS transaction_count
       FROM base_sales b
@@ -1021,7 +1030,7 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
 
 
 
-export async function fetchBranchSalesSummary({ start_date, end_date, range, category_id, product_id }) {
+export async function fetchBranchSalesSummary({ start_date, end_date, range, category_id, product_id, use_net_amount }) {
   // USE CUSTOM DATES IF PROVIDED; OTHERWISE FALL BACK TO RANGE
   let start;
   let end;
@@ -1045,11 +1054,14 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
   const hasCategoryFilter = normalizedCategoryId !== null;
   const hasProductFilter = normalizedProductId !== null;
 
+  const useNetAmount = Boolean(use_net_amount) && !hasCategoryFilter && !hasProductFilter;
+
   const cacheKey = makeAnalyticsCacheKey('fetchBranchSalesSummary', {
     start,
     end,
     category_id: hasCategoryFilter ? normalizedCategoryId : null,
-    product_id: hasProductFilter ? normalizedProductId : null
+    product_id: hasProductFilter ? normalizedProductId : null,
+    use_net_amount: useNetAmount
   });
   const cached = getAnalyticsCache(cacheKey);
   if (cached) {
@@ -1060,7 +1072,9 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
   let nextParamIndex = 3;
 
   let salesItemsJoin = '';
-  let sumExpression = 'COALESCE(SUM(s.total_amount_due), 0)';
+  let sumExpression = useNetAmount
+    ? 'COALESCE(SUM(s.amount_net_vat), 0)'
+    : 'COALESCE(SUM(s.total_amount_due), 0)';
 
   if (hasProductFilter || hasCategoryFilter) {
     const joinConditions = ['si.sales_information_id = s.sales_information_id'];
