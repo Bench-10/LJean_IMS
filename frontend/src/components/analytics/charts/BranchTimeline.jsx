@@ -69,6 +69,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
     width: typeof window !== 'undefined' ? window.innerWidth : 1024,
     height: typeof window !== 'undefined' ? window.innerHeight : 768
   }));
+  const isMobileView = screenDimensions.width < 640;
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -565,7 +566,9 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
                       ? { tick: { fontSize: 10 }, axisLine: false, tickLine: false }
                       : { hide: true };
                     const maxSales = displayTimelineData.reduce((m,p) => Math.max(m, Number(p.sales_amount)||0), 0);
-                    const maxUnits = displayTimelineData.reduce((m,p) => Math.max(m, Number(p.units_sold)||0), 0);
+                    const maxUnits = isMobileView
+                      ? 0
+                      : displayTimelineData.reduce((m,p) => Math.max(m, Number(p.units_sold)||0), 0);
                     const overallMax = Math.max(maxSales, maxUnits);
 
                     if (overallMax <= 0) {
@@ -588,41 +591,51 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
                       />
                     );
                   })()}
-                  <Tooltip 
-                    labelFormatter={(label) => {
-                      // Simple date formatting based on interval
-                      if (timelineInterval === 'daily') {
-                        return `Date: ${label}`;
-                      } else if (timelineInterval === 'weekly') {
-                        return `Week of: ${label}`;
-                      } else {
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || !payload.length) return null;
+                      const dataPoint = payload[0]?.payload || {};
+                      const salesValue = Number(dataPoint.sales_amount ?? 0);
+                      const unitsValue = Number(dataPoint.units_sold ?? 0);
+                      const labelText = (() => {
+                        if (timelineInterval === 'daily') return `Date: ${label}`;
+                        if (timelineInterval === 'weekly') return `Week of: ${label}`;
                         return `Month: ${label}`;
-                      }
-                    }}
-                    formatter={(value, name) => {
-                      if (name === 'Sales Amount') {
-                        return [currencyFormat(value), 'Sales Amount (Net Vat)'];
-                      } else if (name === 'Units Sold') {
-                        return [`${value} units`, 'Units Sold'];
-                      }
-                      return [value, name];
+                      })();
+
+                      return (
+                        <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-[11px] shadow-md">
+                          <div className="font-semibold text-gray-700 mb-1">{labelText}</div>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-gray-500">Sales Amount</span>
+                            <span className="font-semibold text-gray-900">{currencyFormat(salesValue)}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 mt-1">
+                            <span className="text-gray-500">Units Sold</span>
+                            <span className="font-semibold text-gray-900">{unitsValue} units</span>
+                          </div>
+                        </div>
+                      );
                     }}
                   />
-                  <Legend 
-                    verticalAlign="top" 
-                    height={24} 
-                    wrapperStyle={{ fontSize: 10 }}
-                    payload={[
-                      { value: 'Sales Amount', type: 'rect', color: '#0f766e' },
-                      { value: 'Units Sold', type: 'rect', color: '#0891b2' }
-                    ]}
-                  />
+                  {!isMobileView && (
+                    <Legend 
+                      verticalAlign="top" 
+                      height={24} 
+                      wrapperStyle={{ fontSize: 10 }}
+                      payload={[
+                        { value: 'Sales Amount', type: 'rect', color: '#0f766e' },
+                        { value: 'Units Sold', type: 'rect', color: '#0891b2' }
+                      ]}
+                    />
+                  )}
                   
                   <Bar 
                     dataKey="sales_amount" 
                     name="Sales Amount"
                     fill="#0f766e" 
                     radius={[4,4,0,0]}
+                    barSize={isMobileView ? 28 : undefined}
                   >
                     <LabelList
                       dataKey="sales_amount"
@@ -631,19 +644,21 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
                       style={{ fontSize: 9, fill: '#0f172a', fontWeight: 600 }}
                     />
                   </Bar>
-                  <Bar 
-                    dataKey="units_sold" 
-                    name="Units Sold"
-                    fill="#0891b2" 
-                    radius={[4,4,0,0]}
-                  >
-                    <LabelList
-                      dataKey="units_sold"
-                      position="top"
-                      formatter={(value) => `${value}`}
-                      style={{ fontSize: 9, fill: '#0f172a', fontWeight: 600 }}
-                    />
-                  </Bar>
+                  {!isMobileView && (
+                    <Bar 
+                      dataKey="units_sold" 
+                      name="Units Sold"
+                      fill="#0891b2" 
+                      radius={[4,4,0,0]}
+                    >
+                      <LabelList
+                        dataKey="units_sold"
+                        position="top"
+                        formatter={(value) => `${value}`}
+                        style={{ fontSize: 9, fill: '#0f172a', fontWeight: 600 }}
+                      />
+                    </Bar>
+                  )}
                 </BarChart>
               </ResponsiveContainer>
             </div>
