@@ -359,7 +359,7 @@ function BranchPerformance({
         exportId="branch-performance"
         exportSpans={{ lg: 8 }}
       >
-        <div className="flex flex-col h-full max-h-full overflow-hidden relative">
+        <div className="flex flex-col h-full max-h-full overflow-visible relative">
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm">
               <ChartLoading message="Loading branch performance..." />
@@ -382,6 +382,7 @@ function BranchPerformance({
                   searchable
                   searchPlaceholder="Search products"
                   noResultsMessage="No matching products"
+                  autoFocusSearch={!responsiveSizes.isMobile}
                 />
               </div>
             </div>

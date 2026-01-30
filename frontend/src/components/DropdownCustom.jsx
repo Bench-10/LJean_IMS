@@ -11,7 +11,8 @@ const DropdownCustom = ({
   size = 'md', // 'xs' | 'sm' | 'md' | 'lg'
   searchable = false,
   searchPlaceholder = 'Search...',
-  noResultsMessage = 'No results found'
+  noResultsMessage = 'No results found',
+  autoFocusSearch = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
@@ -216,7 +217,7 @@ const DropdownCustom = ({
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder={searchPlaceholder}
                     className="w-full text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    autoFocus
+                    autoFocus={autoFocusSearch}
                   />
                 </div>
               )}
