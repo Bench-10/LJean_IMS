@@ -88,7 +88,7 @@ function BranchPerformance({
   const showYAxisTicks = screenDimensions.width >= 640;
   const isMobileBarView = screenDimensions.width < 640;
   const barLabelFontSize = useMemo(
-    () => (screenDimensions.width < 640 ? 5 : 6),
+    () => (screenDimensions.width < 640 ? 6 : 10),
     [screenDimensions.width]
   );
 
