@@ -160,6 +160,8 @@ const RESTORED_SALES_FILTER = `(s.is_for_delivery = false OR EXISTS (
     AND (COALESCE(d.is_delivered,false) = true OR COALESCE(d.is_pending,false) = true)
   ))`;
 
+const NET_SALES_EXPRESSION = 'COALESCE(s.amount_net_vat, s.total_amount_due - COALESCE(s.vat, 0), s.total_amount_due)';
+
 const ANALYTICS_CACHE_TTL_MS = 2 * 60 * 1000;
 const ANALYTICS_CACHE_MAX_ENTRIES = 128;
 const analyticsCache = new Map();
@@ -337,7 +339,7 @@ export async function fetchSalesPerformance({ branch_id, category_id, product_id
     let idx = 3;
     if (branch_id) { baseConditions.push(`s.branch_id = $${idx++}`); params.push(branch_id); }
     const whereClause = 'WHERE ' + baseConditions.join(' AND ');
-    const salesField = useNetAmount ? 's.amount_net_vat' : 's.total_amount_due';
+    const salesField = useNetAmount ? NET_SALES_EXPRESSION : 's.total_amount_due';
 
     ({ rows } = await SQLquery(`
       WITH base_sales AS (
@@ -825,7 +827,7 @@ export async function fetchKPIs({ branch_id, category_id, product_id, range, sta
     let salesIdx = 3;
     if (branch_id) { salesConditions.push(`s.branch_id = $${salesIdx++}`); salesParams.push(branch_id); }
     const salesWhere = 'WHERE ' + salesConditions.join(' AND ');
-    const salesField = useNetAmount ? 's.amount_net_vat' : 's.total_amount_due';
+    const salesField = useNetAmount ? NET_SALES_EXPRESSION : 's.total_amount_due';
     ({ rows: salesRows } = await SQLquery(`
       SELECT COALESCE(SUM(${salesField}),0) AS total_sales
       FROM Sales_Information s
@@ -986,7 +988,7 @@ export async function fetchBranchTimeline({ branch_id, category_id, interval, st
     ({ rows } = await SQLquery(query, params));
   } else {
     const baseWhere = 'WHERE ' + ['s.date BETWEEN $1 AND $2', 's.branch_id = $3', RESTORED_SALES_FILTER].join(' AND ');
-    const salesField = useNetAmount ? 's.amount_net_vat' : 's.total_amount_due';
+    const salesField = useNetAmount ? NET_SALES_EXPRESSION : 's.total_amount_due';
     const query = `
       WITH base_sales AS (
         SELECT s.sales_information_id,
@@ -1073,7 +1075,7 @@ export async function fetchBranchSalesSummary({ start_date, end_date, range, cat
 
   let salesItemsJoin = '';
   let sumExpression = useNetAmount
-    ? 'COALESCE(SUM(s.amount_net_vat), 0)'
+    ? `COALESCE(SUM(${NET_SALES_EXPRESSION}), 0)`
     : 'COALESCE(SUM(s.total_amount_due), 0)';
 
   if (hasProductFilter || hasCategoryFilter) {

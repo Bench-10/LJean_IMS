@@ -562,6 +562,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const [categoryFilter, setCategoryFilter] = useState(persistedState?.categoryFilter ?? '');
   const [productIdFilter, setProductIdFilter] = useState(persistedState?.productIdFilter ?? '');
   const [useNetAmount, setUseNetAmount] = useState(false);
+  const [salesModeVersion, setSalesModeVersion] = useState(0);
   const [kpis, setKpis] = useState({
     total_sales: 0, total_investment: 0, total_profit: 0,
     prev_total_sales: 0, prev_total_investment: 0, prev_total_profit: 0,
@@ -589,6 +590,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const handleSalesTypeToggle = useCallback(() => {
     if (!canToggleSalesType) return;
     setUseNetAmount((prev) => !prev);
+    setSalesModeVersion((prev) => prev + 1);
   }, [canToggleSalesType]);
 
   const dateRangeDisplay = useMemo(() => {
@@ -1103,7 +1105,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       interval: salesInterval,
       start: resolvedRange.start_date,
       end: resolvedRange.end_date,
-      use_net_amount: effectiveUseNetAmount
+      use_net_amount: effectiveUseNetAmount,
+      sales_mode_version: salesModeVersion
     };
     const cached = getCachedValue('salesPerformance', cacheParams);
     if (cached) {
@@ -1171,7 +1174,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     } finally {
       if (!silent) setLoadingSalesPerformance(false);
     }
-  }, [branchId, categoryFilter, effectiveUseNetAmount, productIdFilter, registerSalesBounds, resolvedRange.end_date, resolvedRange.start_date, salesInterval, user, optimizationsEnabled]);
+  }, [branchId, categoryFilter, effectiveUseNetAmount, productIdFilter, registerSalesBounds, resolvedRange.end_date, resolvedRange.start_date, salesInterval, user, optimizationsEnabled, salesModeVersion]);
 
   const fetchTopProductsData = useCallback(async (signal, { silent = false } = {}) => {
     if (!user) return;
@@ -1391,7 +1394,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       start: resolvedRange.start_date,
       end: resolvedRange.end_date,
       preset: resolvedRange.presetKey,
-      use_net_amount: effectiveUseNetAmount
+      use_net_amount: effectiveUseNetAmount,
+      sales_mode_version: salesModeVersion
     };
 
     const cached = getCachedValue('kpis', cacheParams);
@@ -1452,7 +1456,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     } finally {
       if (!silent) setLoadingKPIs(false);
     }
-  }, [branchId, categoryFilter, effectiveUseNetAmount, productIdFilter, resolvedRange.end_date, resolvedRange.presetKey, resolvedRange.start_date, user]);
+  }, [branchId, categoryFilter, effectiveUseNetAmount, productIdFilter, resolvedRange.end_date, resolvedRange.presetKey, resolvedRange.start_date, user, salesModeVersion]);
 
   const computeDeliveryRange = useCallback((cursor = 0) => {
     const windowSize = currentDeliveryWindowSizes[deliveryInterval] ?? currentDeliveryWindowSizes.daily;
@@ -2193,6 +2197,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
                 setProductIdFilter={setProductIdFilter}
                 salesTypeLabel={salesTypeLabel}
                 useNetAmount={effectiveUseNetAmount}
+                salesModeVersion={salesModeVersion}
               />
               <BranchTimeline
                 Card={Card}
@@ -2200,6 +2205,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
                 branchTimelineRef={branchTimelineRef}
                 salesTypeLabel={salesTypeLabel}
                 useNetAmount={effectiveUseNetAmount}
+                salesModeVersion={salesModeVersion}
               />
             </>
           )}

@@ -42,7 +42,7 @@ const getProgressiveChunkSize = (length) => {
   return Math.max(MIN_PROGRESSIVE_CHUNK, base);
 };
 
-function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabel, useNetAmount }) {
+function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabel, useNetAmount, salesModeVersion }) {
   const { user } = useAuth();
   const [branchTimelineData, setBranchTimelineData] = useState([]);
   const [displayTimelineData, setDisplayTimelineData] = useState([]);
@@ -104,9 +104,10 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
       branch: selectedBranch || '1',
       interval: timelineInterval,
       category: categoryFilter || 'all',
-      useNetAmount: !!useNetAmount
+      useNetAmount: !!useNetAmount,
+      salesModeVersion: salesModeVersion ?? 0
     }),
-    [categoryFilter, selectedBranch, timelineInterval, useNetAmount]
+    [categoryFilter, selectedBranch, timelineInterval, useNetAmount, salesModeVersion]
   );
 
   // Fetch branches independently and always auto-select first branch

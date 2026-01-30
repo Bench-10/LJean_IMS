@@ -22,7 +22,8 @@ function BranchPerformance({
   productIdFilter,
   setProductIdFilter,
   salesTypeLabel,
-  useNetAmount
+  useNetAmount,
+  salesModeVersion
 }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]);
@@ -253,9 +254,10 @@ function BranchPerformance({
       end: endDate,
       category: categoryFilter || 'all',
       product: normalizedProductFilter || 'all',
-      useNetAmount: !!useNetAmount
+      useNetAmount: !!useNetAmount,
+      salesModeVersion: salesModeVersion ?? 0
     }),
-    [categoryFilter, endDate, normalizedProductFilter, startDate, useNetAmount]
+    [categoryFilter, endDate, normalizedProductFilter, startDate, useNetAmount, salesModeVersion]
   );
 
   // Fetch branch performance data
