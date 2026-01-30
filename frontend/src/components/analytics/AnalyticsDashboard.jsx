@@ -2097,6 +2097,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
               salesIntervalOptions={salesIntervalOptions}
               onRetryTopProducts={() => fetchTopProductsData()}
               onRetrySalesPerformance={() => fetchSalesPerformance()}
+              rangeMode={rangeMode}
+              preset={preset}
             />
           )}
 
@@ -2136,11 +2138,14 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
                 revenueDistributionRef={revenueDistributionRef}
                 productIdFilter={productIdFilter}
                 setProductIdFilter={setProductIdFilter}
+                categoryName={categoryName}
               />
               <BranchTimeline
                 Card={Card}
                 categoryFilter={categoryFilter}
                 branchTimelineRef={branchTimelineRef}
+                categoryName={categoryName}
+                productIdFilter={productIdFilter}
               />
             </>
           )}

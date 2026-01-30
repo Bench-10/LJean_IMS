@@ -20,12 +20,24 @@ function BranchPerformance({
   branchPerformanceRef,
   revenueDistributionRef,
   productIdFilter,
-  setProductIdFilter
+  setProductIdFilter,
+  categoryName
 }) {
   const { user } = useAuth();
   const [branchTotals, setBranchTotals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Determine if we're showing Gross Sales or Net Sales
+  // Gross Sales: All complete transactions (filtered by date only)
+  // Net Sales: Filtered by category or specific product
+  const isFiltered = useMemo(() => {
+    const hasCategoryFilter = categoryName && categoryName !== 'All Products';
+    const hasProductFilter = !!productIdFilter;
+    return hasCategoryFilter || hasProductFilter;
+  }, [categoryName, productIdFilter]);
+
+  const salesTypeLabel = isFiltered ? 'Net Sales' : 'Gross Sales';
   const [screenDimensions, setScreenDimensions] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -338,7 +350,7 @@ function BranchPerformance({
     <>
       {/* BRANCH PERFORMANCE COMPARISON */}
       <Card
-        title={"BRANCH SALES PERFORMANCE COMPARISON"}
+        title={`BRANCH SALES PERFORMANCE COMPARISON (${salesTypeLabel})`}
         className="col-span-12 lg:col-span-8 h-[320px] sm:h-[260px] lg:h-[280px]"
         exportRef={branchPerformanceRef}
         exportId="branch-performance"
@@ -472,7 +484,7 @@ function BranchPerformance({
 
       {/* PIE CHART: REVENUE DISTRIBUTION BY BRANCH (PERCENTAGE) */}
       <Card
-        title={"REVENUE DISTRIBUTION (%)"}
+        title={`REVENUE DISTRIBUTION (${salesTypeLabel}) %`}
         className="col-span-12 lg:col-span-4 h-[320px] sm:h-[260px] lg:h-[280px]"
         exportRef={revenueDistributionRef}
         exportId="revenue-distribution"

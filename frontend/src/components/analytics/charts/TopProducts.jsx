@@ -91,7 +91,7 @@ function TopProducts({
   setProductIdFilter, productIdFilter, loadingSalesPerformance, loadingTopProducts,
   loadingRestockSuggestions, restockSuggestions, dateRangeDisplay, topProductsRef, salesChartRef,
   globalStartDate, globalEndDate, salesIntervalOptions,
-  onRetryTopProducts, onRetrySalesPerformance
+  onRetryTopProducts, onRetrySalesPerformance, rangeMode, preset
 }) {
   const [showRestockDialog, setShowRestockDialog] = useState(false);
   const [visibleCount, setVisibleCount] = useState(INITIAL_TOP_PRODUCTS_PAGE);
@@ -99,6 +99,20 @@ function TopProducts({
     width: typeof window !== 'undefined' ? window.innerWidth : 1024,
     height: typeof window !== 'undefined' ? window.innerHeight : 768
   }));
+
+  // Determine if we're showing Gross Sales or Net Sales
+  // Gross Sales: All complete transactions (filtered by date only)
+  // Net Sales: Filtered by category or specific product
+  const isFiltered = useMemo(() => {
+    // Check if category filter is applied (not "All Products")
+    const hasCategoryFilter = categoryName && categoryName !== 'All Products';
+    // Check if product filter is applied
+    const hasProductFilter = !!productIdFilter;
+    
+    return hasCategoryFilter || hasProductFilter;
+  }, [categoryName, productIdFilter]);
+
+  const salesTypeLabel = isFiltered ? 'Net Sales' : 'Gross Sales';
 
   const intervalOptions = useMemo(() => {
     if (Array.isArray(salesIntervalOptions) && salesIntervalOptions.length) {
@@ -554,7 +568,7 @@ function TopProducts({
 
       {/* SALES PERFORMANCE + FORECAST */}
       <Card
-        title={selectedProductName ? `Sales Performance - ${selectedProductName}` : 'Sales Performance'}
+        title={selectedProductName ? `Sales Performance (${salesTypeLabel}) - ${selectedProductName}` : `Sales Performance (${salesTypeLabel})`}
         className="col-span-12 lg:col-span-8"
         exportRef={salesChartRef}
         exportId="sales-performance"
@@ -655,11 +669,11 @@ function TopProducts({
 
                   <Tooltip
                     labelFormatter={formatPeriod}
-                    formatter={(value) => [currencyFormat(value), 'Sales']}
+                    formatter={(value) => [currencyFormat(value), salesTypeLabel]}
                   />
 
                   <Area type="monotone" dataKey="sales_amount" stroke="none" fillOpacity={1} fill="url(#colorSales)" />
-                  <Line type="monotone" dataKey="sales_amount" name="Sales" stroke="#0f766e" strokeWidth={2} dot={{ r: 3, fill: '#0f766e', strokeWidth: 0 }}>
+                  <Line type="monotone" dataKey="sales_amount" name={salesTypeLabel} stroke="#0f766e" strokeWidth={2} dot={{ r: 3, fill: '#0f766e', strokeWidth: 0 }}>
                     <LabelList
                       dataKey="sales_amount"
                       position="top"

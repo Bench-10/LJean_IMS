@@ -42,12 +42,21 @@ const getProgressiveChunkSize = (length) => {
   return Math.max(MIN_PROGRESSIVE_CHUNK, base);
 };
 
-function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
+function BranchTimeline({ Card, categoryFilter, branchTimelineRef, categoryName, productIdFilter }) {
   const { user } = useAuth();
   const [branchTimelineData, setBranchTimelineData] = useState([]);
   const [displayTimelineData, setDisplayTimelineData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Determine if we're showing Gross Sales or Net Sales
+  const isFiltered = useMemo(() => {
+    const hasCategoryFilter = categoryName && categoryName !== 'All Products';
+    const hasProductFilter = !!productIdFilter;
+    return hasCategoryFilter || hasProductFilter;
+  }, [categoryName, productIdFilter]);
+
+  const salesTypeLabel = isFiltered ? 'Net Sales' : 'Gross Sales';
   const [selectedBranch, setSelectedBranch] = useState(() => {
     if (typeof window === 'undefined') return '1';
     return window.sessionStorage.getItem(TIMELINE_SELECTION_KEY) || '1';
@@ -421,7 +430,7 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef }) {
     <>
       {/* BRANCH TIMELINE CHART */}
       <Card
-        title={`BRANCH SALES TIMELINE - ${selectedBranchName.toUpperCase()}`}
+        title={`BRANCH SALES TIMELINE (${salesTypeLabel}) - ${selectedBranchName.toUpperCase()}`}
         className="col-span-full mt-5 lg:mt-0 mb-8 h-[calc(100vh-260px)] min-h-[420px]"
         exportRef={branchTimelineRef}
         exportId="branch-timeline"
