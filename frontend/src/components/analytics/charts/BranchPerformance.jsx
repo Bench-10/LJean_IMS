@@ -86,6 +86,7 @@ function BranchPerformance({
   );
 
   const showYAxisTicks = screenDimensions.width >= 640;
+  const isMobileBarView = screenDimensions.width < 640;
   const barLabelFontSize = useMemo(
     () => (screenDimensions.width < 640 ? 5 : 6),
     [screenDimensions.width]
@@ -464,6 +465,7 @@ function BranchPerformance({
                     fill="#3b82f6"
                     radius={[4, 4, 0, 0]}
                     minPointSize={2}      // ensure tiny values still show
+                    barSize={isMobileBarView ? 28 : undefined}
                   >
                     <LabelList
                       dataKey="total_amount_due"

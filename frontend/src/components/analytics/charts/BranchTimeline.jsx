@@ -70,6 +70,13 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
     height: typeof window !== 'undefined' ? window.innerHeight : 768
   }));
   const isMobileView = screenDimensions.width < 640;
+  const formatTimelineLabel = useCallback((value) => {
+    const formatted = currencyFormat(value);
+    if (isMobileView) {
+      return formatted.replace('₱ ', '₱');
+    }
+    return formatted;
+  }, [isMobileView]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -640,8 +647,8 @@ function BranchTimeline({ Card, categoryFilter, branchTimelineRef, salesTypeLabe
                     <LabelList
                       dataKey="sales_amount"
                       position="top"
-                      formatter={(value) => currencyFormat(value)}
-                      style={{ fontSize: 9, fill: '#0f172a', fontWeight: 600 }}
+                      formatter={formatTimelineLabel}
+                      style={{ fontSize: isMobileView ? 7 : 9, fill: '#0f172a', fontWeight: 600 }}
                     />
                   </Bar>
                   {!isMobileView && (
