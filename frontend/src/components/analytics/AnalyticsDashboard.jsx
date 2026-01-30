@@ -561,6 +561,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
   const [endDate, setEndDate] = useState(persistedState?.endDate ?? todayISO);
   const [categoryFilter, setCategoryFilter] = useState(persistedState?.categoryFilter ?? '');
   const [productIdFilter, setProductIdFilter] = useState(persistedState?.productIdFilter ?? '');
+  const [branchProductIdFilter, setBranchProductIdFilter] = useState(persistedState?.branchProductIdFilter ?? '');
   const [useNetAmount, setUseNetAmount] = useState(false);
   const [salesModeVersion, setSalesModeVersion] = useState(0);
   const [kpis, setKpis] = useState({
@@ -642,6 +643,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
         setEndDate(todayISO);
         setCategoryFilter('');
         setProductIdFilter('');
+        setBranchProductIdFilter('');
         setSalesInterval('monthly');
         setRestockInterval('monthly');
         setDeliveryInterval('monthly');
@@ -660,6 +662,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       if (persistedState.endDate) setEndDate(persistedState.endDate);
       if (Object.prototype.hasOwnProperty.call(persistedState, 'categoryFilter')) setCategoryFilter(persistedState.categoryFilter ?? '');
       if (Object.prototype.hasOwnProperty.call(persistedState, 'productIdFilter')) setProductIdFilter(persistedState.productIdFilter ?? '');
+      if (Object.prototype.hasOwnProperty.call(persistedState, 'branchProductIdFilter')) setBranchProductIdFilter(persistedState.branchProductIdFilter ?? '');
       if (persistedState.salesInterval) setSalesInterval(persistedState.salesInterval);
       if (persistedState.restockInterval) setRestockInterval(persistedState.restockInterval);
       if (persistedState.deliveryInterval) setDeliveryInterval(persistedState.deliveryInterval);
@@ -684,6 +687,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       endDate,
       categoryFilter,
       productIdFilter,
+      branchProductIdFilter,
       salesInterval,
       restockInterval,
       deliveryInterval,
@@ -695,7 +699,7 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     } catch (error) {
       console.error('Failed to persist analytics preferences:', error);
     }
-  }, [categoryFilter, currentCharts, deliveryInterval, deliveryStatus, endDate, preset, rangeMode, restockInterval, salesInterval, startDate, storageKey, productIdFilter]);
+  }, [branchProductIdFilter, categoryFilter, currentCharts, deliveryInterval, deliveryStatus, endDate, preset, rangeMode, restockInterval, salesInterval, startDate, storageKey, productIdFilter]);
 
   const normalizeCandidateDate = useCallback((candidate) => {
     if (candidate === null || candidate === undefined) return null;
@@ -2193,8 +2197,8 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
                 endDate={resolvedRange.end_date}
                 branchPerformanceRef={branchPerformanceRef}
                 revenueDistributionRef={revenueDistributionRef}
-                productIdFilter={productIdFilter}
-                setProductIdFilter={setProductIdFilter}
+                productIdFilter={branchProductIdFilter}
+                setProductIdFilter={setBranchProductIdFilter}
                 salesTypeLabel={salesTypeLabel}
                 useNetAmount={effectiveUseNetAmount}
                 salesModeVersion={salesModeVersion}
