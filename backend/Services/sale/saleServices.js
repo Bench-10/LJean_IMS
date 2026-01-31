@@ -331,7 +331,7 @@ export const addSale = async (headerAndProducts = {}) => {
                         unit,
                         unit_price,
                         unit_cost,
-                        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
+                        COALESCE(SUM(CASE WHEN ast.product_validity IS NOT NULL AND ast.product_validity <> '9999-12-31' AND ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
                         min_threshold,
                         max_threshold
                      FROM inventory_product

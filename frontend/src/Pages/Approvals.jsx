@@ -1605,6 +1605,8 @@ function PendingInventoryApprovalModal({
   // Date-only formatter (MM/DD/YYYY style)
   const formatDateOnly = (value) => {
     if (!value) return "—";
+    const raw = String(value);
+    if (raw.startsWith('9999-12-31')) return "No Expiration";
     try {
       return new Date(value).toLocaleDateString("en-US", {
         year: "numeric",

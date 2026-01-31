@@ -18,7 +18,9 @@ export const notifyProductShelfLife = async() =>{
             FROM Add_Stocks a
             LEFT JOIN Inventory_product ip ON a.product_id = ip.product_id AND a.branch_id = ip.branch_id
             LEFT JOIN Category c USING(category_id)
-            WHERE a.product_validity >= CURRENT_DATE - 2
+                        WHERE a.product_validity IS NOT NULL
+                            AND a.product_validity <> '9999-12-31'
+                            AND a.product_validity >= CURRENT_DATE - 2
             GROUP BY a.product_id, ip.branch_id, a.product_validity, ip.product_name, c.category_name
             ORDER BY a.product_validity DESC
     `);

@@ -576,10 +576,12 @@ function PendingInventoryRequests({
                             {requestedProduct.max_threshold}
                           </li>
                         )}
-                        {requestedProduct?.product_validity && currentState?.product_validity != requestedProduct.product_validity && (
+                        {(requestedProduct?.product_validity || requestedProduct?.product_validity === null) && currentState?.product_validity != requestedProduct.product_validity && (
                           <li>
                             <span className="font-medium">Validity:</span>{' '}
-                            {requestedProduct.product_validity}
+                            {requestedProduct.product_validity && String(requestedProduct.product_validity).startsWith('9999-12-31')
+                              ? 'No Expiration'
+                              : (requestedProduct.product_validity || 'No Expiration')}
                           </li>
                         )}
                         {requestedProduct?.description && currentState?.description != requestedProduct.description && (
@@ -624,10 +626,12 @@ function PendingInventoryRequests({
                               {currentState.max_threshold}
                             </li>
                           )}
-                          {requestedProduct?.product_validity && currentState?.product_validity != requestedProduct.product_validity && requestedProduct?.quantity_added == null && (
+                          {(requestedProduct?.product_validity || requestedProduct?.product_validity === null) && currentState?.product_validity != requestedProduct.product_validity && requestedProduct?.quantity_added == null && (
                             <li>
                               <span className="font-medium">Validity:</span>{' '}
-                              {currentState.product_validity}
+                              {currentState.product_validity && String(currentState.product_validity).startsWith('9999-12-31')
+                                ? 'No Expiration'
+                                : (currentState.product_validity || 'No Expiration')}
                             </li>
                           )}
                         </ul>

@@ -4,6 +4,9 @@ import { checkAndHandleLowStock } from "../Services_Utils/lowStockNotification.j
 import { convertToBaseUnit, getUnitConversion } from "../Services_Utils/unitConversion.js";
 import { invalidateAnalyticsCache } from "../analytics/analyticsServices.js";
 
+const DEFAULT_PRODUCT_VALIDITY = '9999-12-31';
+const normalizeValidityForStorage = (value) => value || DEFAULT_PRODUCT_VALIDITY;
+
 //HELPER FUNCTION TO GET CATEGORY NAME
 const getCategoryName = async (categoryId) => {
     const { rows } = await SQLquery('SELECT category_name FROM Category WHERE category_id = $1', [categoryId]);
@@ -697,7 +700,7 @@ const getUpdatedInventoryList =  async (productId, branchId) => {
             ip.unit_price, 
             ip.unit_cost, 
             '[]'::jsonb AS selling_units,
-            COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
+            COALESCE(SUM(CASE WHEN ast.product_validity IS NOT NULL AND ast.product_validity <> '9999-12-31' AND ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
             ip.min_threshold,
             ip.max_threshold,
             p.description
@@ -740,7 +743,7 @@ export const getProductItems = async(branchId) => {
                 ip.unit_price, 
                 ip.unit_cost, 
                 '[]'::jsonb AS selling_units,
-                COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
+                COALESCE(SUM(CASE WHEN ast.product_validity IS NOT NULL AND ast.product_validity <> '9999-12-31' AND ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
                 ip.min_threshold,
                 ip.max_threshold,
                 p.description
@@ -779,7 +782,7 @@ export const getProductItems = async(branchId) => {
             ip.unit_price, 
             ip.unit_cost, 
             '[]'::jsonb AS selling_units,
-            COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
+            COALESCE(SUM(CASE WHEN ast.product_validity IS NOT NULL AND ast.product_validity <> '9999-12-31' AND ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity,
             ip.min_threshold,
             ip.max_threshold,
             p.description
@@ -827,7 +830,8 @@ export const addProductItem = async (productData, options = {}) => {
 
     const { product_name, category_id, branch_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added: raw_date_added, product_validity: raw_product_validity, userID, fullName, existing_product_id, description } = cleanedData;
     const date_added = raw_date_added ?? new Date().toISOString();
-    const product_validity = raw_product_validity ?? '9999-12-31';
+    const product_validity = raw_product_validity ?? null;
+    const productValidityForStorage = normalizeValidityForStorage(product_validity);
 
     const isNewProductSubmission = !existing_product_id;
     const ignorePendingId = bypassApproval ? pendingActionId : null;
@@ -951,7 +955,7 @@ export const addProductItem = async (productData, options = {}) => {
         (product_id, h_unit_price, h_unit_cost, quantity_added_display, quantity_added_base, date_added, product_validity, quantity_left_display, quantity_left_base, branch_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *`,
-        [product_id, unit_price, unit_cost, Number(quantity_added), quantity_added_base, date_added, product_validity, Number(quantity_added), quantity_added_base, branch_id]
+        [product_id, unit_price, unit_cost, Number(quantity_added), quantity_added_base, date_added, productValidityForStorage, Number(quantity_added), quantity_added_base, branch_id]
     );
 
     const addedStockRow = addStockInsert.rows?.[0] ?? null;
@@ -1022,7 +1026,7 @@ export const addProductItem = async (productData, options = {}) => {
     const categoryName = await getCategoryName(category_id);
     const addedDateObj = new Date(date_added);
 
-    if (product_validity && product_validity !== '9999-12-31') {
+    if (product_validity) {
         const validityDateObj = new Date(product_validity);
         const currentDate = new Date();
         
@@ -1116,6 +1120,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
     });
 
     const { product_name, branch_id, category_id, unit, unit_price, unit_cost, quantity_added, min_threshold, max_threshold, date_added, product_validity, userID, fullName } = cleanedData;
+    const productValidityForStorage = normalizeValidityForStorage(product_validity);
 
     const addStocksQuery = async () => {
         // Calculate base units for storage - ensure quantity_added is a number
@@ -1126,7 +1131,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
             (product_id, h_unit_price, h_unit_cost, quantity_added_display, quantity_added_base, date_added, product_validity, quantity_left_display, quantity_left_base, branch_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *`,
-            [itemId, unit_price, unit_cost, Number(quantity_added), quantity_added_base, date_added, product_validity, Number(quantity_added), quantity_added_base, branch_id]
+            [itemId, unit_price, unit_cost, Number(quantity_added), quantity_added_base, date_added, productValidityForStorage, Number(quantity_added), quantity_added_base, branch_id]
         );
 
         return result.rows?.[0] ?? null;
@@ -1315,7 +1320,7 @@ export const updateProductItem = async (productData, itemId, options = {}) => {
         const categoryName = await getCategoryName(category_id);
         const addedDateObj = new Date(date_added);
 
-        if (product_validity && product_validity !== '9999-12-31') {
+        if (product_validity) {
             const validityDateObj = new Date(product_validity);
             const currentDate = new Date();
             const daysUntilExpiry = Math.ceil((validityDateObj - currentDate) / (1000 * 60 * 60 * 24));

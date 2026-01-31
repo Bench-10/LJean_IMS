@@ -19,7 +19,7 @@ export const checkAndHandleLowStock = async (productId, branchId, options = {}) 
         ip.max_threshold,
         ip.low_stock_notified,
         ip.branch_id,
-        COALESCE(SUM(CASE WHEN ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity
+        COALESCE(SUM(CASE WHEN ast.product_validity IS NOT NULL AND ast.product_validity <> '9999-12-31' AND ast.product_validity < NOW() THEN 0 ELSE ast.quantity_left_display END), 0) AS quantity
       FROM Inventory_Product ip
       LEFT JOIN Add_Stocks ast ON ast.product_id = ip.product_id AND ast.branch_id = ip.branch_id
       WHERE ip.product_id = $1 AND ip.branch_id = $2

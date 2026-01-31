@@ -15,6 +15,12 @@ function ModalForm({ isModalOpen, OnSubmit, mode, onClose, itemData, listCategor
   // Feature flag: hide selling-units UI and price fields from users without deleting code.
   // Set to true to prevent users from accessing selling unit configuration and price input.
   const HIDE_SELLING_UNITS = true;
+  const normalizeValidityInput = (value) => {
+    if (!value) return '';
+    const raw = String(value).trim();
+    if (!raw || raw.startsWith('9999-12-31')) return '';
+    return raw;
+  };
 
   // FORM STATE
   const [product_name, setItemName] = useState('');
@@ -214,7 +220,7 @@ const handleModalClose = useCallback(() => {
         setMinThreshold(itemData.min_threshold || '');
         setMaxThreshold(itemData.max_threshold || '');
         setPrice(itemData.unit_price || '');
-        setExpirationDate(itemData.product_validity || '');
+        setExpirationDate(normalizeValidityInput(itemData.product_validity));
         setDescription(itemData.description || '');
         setSellingUnits(initializeSellingUnits(itemData.selling_units, itemData.unit, itemData.unit_price));
         setSellingUnitErrors({ general: '', entries: {} });
@@ -241,7 +247,7 @@ const handleModalClose = useCallback(() => {
         // Preload date fields only for addStocks scenario
         if (shouldPrefillQuantity) {
           setDatePurchased(itemData.date_added ?? '');
-          setExpirationDate(itemData.product_validity ?? '');
+          setExpirationDate(normalizeValidityInput(itemData.product_validity));
         } else {
           setDatePurchased('');
           setExpirationDate('');
@@ -411,7 +417,6 @@ const handleModalClose = useCallback(() => {
       if (!String(quantity_added).trim()) isEmptyField.quantity_added = true;
       if (!String(unit_cost).trim()) isEmptyField.unit_cost = true;
       if (!String(date_added).trim()) isEmptyField.date_added = true;
-      if (!String(product_validity).trim()) isEmptyField.product_validity = true;
     } else {
       if (!String(product_name).trim()) isEmptyField.product_name = true;
       if (!String(category_id).trim()) isEmptyField.category_id = true;
@@ -447,7 +452,7 @@ const handleModalClose = useCallback(() => {
       if (String(unit_price).trim() && Number(unit_price) <= 0) invalidNumberValue.unit_price = true;
     }
 
-    const isExpiryEarly = date_added > product_validity;
+    const isExpiryEarly = Boolean(product_validity && date_added && date_added > product_validity);
     setIsExpiredEarly(isExpiryEarly);
 
     if (unit && quantity_added && !isNaN(Number(quantity_added))) {
@@ -1191,15 +1196,13 @@ const handleModalClose = useCallback(() => {
         id="product_validity"
         value={product_validity}
         onChange={(e) => setExpirationDate(e.target.value)}
-        label="Enter Product Validity"
-        error={emptyField.product_validity || isExpiredEarly}
+        label="Product Validity (optional)"
+        error={isExpiredEarly}
         placeholder="mm/dd/yyyy"
         errorMessage={
-          emptyField.product_validity
-            ? "Please enter a date!"
-            : isExpiredEarly
-              ? "Expiry date must be after purchase date!"
-              : null
+          isExpiredEarly
+            ? "Expiry date must be after purchase date!"
+            : null
         }
       />
     </div>
