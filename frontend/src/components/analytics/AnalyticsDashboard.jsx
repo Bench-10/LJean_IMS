@@ -594,6 +594,12 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
     setSalesModeVersion((prev) => prev + 1);
   }, [canToggleSalesType]);
 
+  const handleSalesModeSelect = useCallback((nextUseNet) => {
+    if (!canToggleSalesType) return;
+    setUseNetAmount(!!nextUseNet);
+    setSalesModeVersion((prev) => prev + 1);
+  }, [canToggleSalesType]);
+
   const dateRangeDisplay = useMemo(() => {
     if (rangeMode !== 'preset') return null;
     const today = dayjs().startOf('day');
@@ -2075,6 +2081,47 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
       >
 
         {/* KPI CARDS */}
+        <div className="flex flex-nowrap sm:flex-wrap items-center gap-2 mb-3" data-export-exclude>
+          <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Sales Mode :</div>
+          <div
+            title={!canToggleSalesType
+              ? 'Gross/Net switch is disabled while category or product filters are active.'
+              : undefined
+            }
+            className={`flex flex-1 min-w-0 sm:flex-initial sm:min-w-max border-2 rounded-lg bg-gray-50 shadow-sm overflow-hidden transition-all duration-200 ${
+              !canToggleSalesType ? 'border-gray-200' : 'border-green-200'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => handleSalesModeSelect(false)}
+              disabled={!canToggleSalesType}
+              className={`inline-flex items-center justify-center gap-2 py-1.5 px-5 font-semibold text-[11px] flex-1 sm:flex-initial transition ${
+                !canToggleSalesType
+                  ? 'text-gray-500 cursor-not-allowed'
+                  : (!effectiveUseNetAmount
+                      ? 'bg-green-800 text-white scale-105 shadow-md'
+                      : 'text-green-800 hover:bg-green-100')
+              }`}
+            >
+              Gross Sales
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSalesModeSelect(true)}
+              disabled={!canToggleSalesType}
+              className={`inline-flex items-center justify-center gap-2 py-1.5 px-5 font-semibold text-[11px] flex-1 sm:flex-initial transition ${
+                !canToggleSalesType
+                  ? 'text-gray-500 cursor-not-allowed'
+                  : (effectiveUseNetAmount
+                      ? 'bg-green-800 text-white scale-105 shadow-md'
+                      : 'text-green-800 hover:bg-green-100')
+              }`}
+            >
+              Net Sales
+            </button>
+          </div>
+        </div>
         <div
           ref={kpiRef}
           data-export-section="kpi-summary"
@@ -2089,14 +2136,6 @@ export default function AnalyticsDashboard({ branchId, canSelectBranch = false }
             value={currencyFormat(kpis.total_sales)}
             sub={compareValues(kpis.total_sales, kpis.prev_total_sales)}
             dateRangeDisplay={dateRangeDisplay}
-            clarification={salesTypeLabel}
-            clarificationOnClick={handleSalesTypeToggle}
-            clarificationDisabled={!canToggleSalesType}
-            clarificationTitle={
-              !canToggleSalesType
-                ? 'Gross/Net toggle is disabled while category or product filters are active.'
-                : (effectiveUseNetAmount ? 'Switch to Gross Sales' : 'Switch to Net Sales')
-            }
           />
           <KPI
             loading={loadingKPIs}
