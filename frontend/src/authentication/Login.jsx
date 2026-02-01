@@ -83,11 +83,14 @@ function Login() {
       await loginAuthentication(username, password);
     } catch (error) {
       const msg = String(error?.message || "");
+      const normalizedMsg = msg.trim().toLowerCase();
       if (msg === "Invalid username") {
         setAuthErrors({ username: "Please enter a valid username." });
         setIsShaking({ username: true });
         setTimeout(() => setIsShaking({}), 500);
-      } else if (msg === "Account Disabled") {
+      } else if (normalizedMsg.includes("too many") || normalizedMsg.includes("attempts") || normalizedMsg.includes("locked")) {
+        setShowTooManyAttempts(true);
+      } else if (normalizedMsg.includes("account disabled") || normalizedMsg === "account disabled") {
         setDisabledDialog(true);
       } else if (msg === "Invalid password") {
         setAuthErrors({ password: "Password is incorrect." });

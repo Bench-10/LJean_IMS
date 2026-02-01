@@ -47,11 +47,14 @@ function Authentication ({ children }) {
         setUser(userData);
         return userData.role ? userData.role : false;
       } catch (error) {
-        // Handle specific authentication errors
-        if (error.response && error.response.status === 401) {
-          const errorMessage = error.response.data.error;
+        const response = error?.response;
+        const errorMessage = response?.data?.error || response?.data?.message;
+
+        // Surface backend-provided messages (401, 403, 429, etc.)
+        if (errorMessage) {
           throw new Error(errorMessage);
         }
+
         // Handle other errors
         throw new Error('Something went wrong. Please try again.');
       }
