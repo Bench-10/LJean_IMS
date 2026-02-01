@@ -22,7 +22,7 @@ function TooMuchAttempts({ open, onClose }) {
 
           <h2 id="too-many-attempts-title" className="text-lg font-semibold text-red-500">Too Many Attempts</h2>
           <p className="text-sm text-gray-600">
-            You have exceeded the maximum number of login attempts. The account associated with this username has been temporarily disabled.
+            You have exceeded the maximum number of login attempts. The account associated with this email has been temporarily disabled.
           </p>
 
           <button
